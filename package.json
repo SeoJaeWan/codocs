@@ -1,0 +1,23 @@
+{
+  "name": "codosc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
+    "lint": "eslint .",
+    "format:check": "prettier . --check",
+    "test": "vitest",
+    "check:development": "vitest run tools/developmentChecks"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.3",
+    "eslint": "10.10.0",
+    "eslint-plugin-jsdoc": "64.3.10",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.0"
+  }
+}
