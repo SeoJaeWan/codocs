@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { bundleIde } from '../build/build.mjs';
 
@@ -36,9 +37,40 @@ beforeAll(
   /** 이전 출력 없는 빌드와 소스 없는 별도 소비자를 준비한다. */ () => {
     // build 명령 자체가 모든 dist를 지우며, 이전 산출물로 성공하지 않는다.
     run(['tools/build/build.mjs', 'build'], root);
-    rmSync(fixture, { recursive: true, force: true });
+    const resolvedFixture = path.resolve(fixture);
+    if (
+      !resolvedFixture.startsWith(
+        path.resolve(root, '.workbench/fixtures') + path.sep,
+      )
+    )
+      throw new Error('Fixture path escapes workspace');
+    rmSync(resolvedFixture, { recursive: true, force: true });
     mkdirSync(consumer, { recursive: true });
-    writeFileSync(path.join(consumer, 'package.json'), '{"type":"module"}\n');
+    const coreManifest: unknown = JSON.parse(
+      readFileSync(path.join(root, 'packages/core/package.json'), 'utf8'),
+    );
+    if (
+      typeof coreManifest !== 'object' ||
+      coreManifest === null ||
+      !('dependencies' in coreManifest)
+    )
+      throw new Error('Core dependencies missing');
+    writeFileSync(
+      path.join(consumer, 'package.json'),
+      JSON.stringify({
+        type: 'module',
+        dependencies: coreManifest.dependencies,
+      }),
+    );
+    const coreRequire = createRequire(
+      path.join(root, 'packages/core/package.json'),
+    );
+    const yamlDirectory = path.dirname(
+      coreRequire.resolve('yaml/package.json'),
+    );
+    cpSync(yamlDirectory, path.join(consumer, 'node_modules/yaml'), {
+      recursive: true,
+    });
     for (let index = 0; index < folders.length; index++) {
       const folder = folders[index];
       const name = names[index];
@@ -69,6 +101,11 @@ for (const name of ${JSON.stringify(names)}) {
 for (const name of ['language-server', 'vscode']) {
   if (typeof require('@codosc/' + name) !== 'object') throw new Error('Invalid CJS');
 }
+const { parseYaml, getValueRange } = await import('@codosc/core');
+const parsed = parseYaml('name: "한글 😀"\\n');
+const range = getValueRange(parsed, ['name']);
+if (!parsed.success || parsed.data.name !== '한글 😀' || !range || parsed.source.slice(range.start, range.end) !== '"한글 😀"') throw new Error('Parser API failed');
+if (!import.meta.resolve('yaml').startsWith(new URL('./node_modules/yaml/', import.meta.url).href)) throw new Error('Yaml dependency must be local');
 console.log('JS packages loaded');`;
     writeFileSync(path.join(consumer, 'consume.mjs'), script);
     expect(run(['consume.mjs'])).toContain('JS packages loaded');
@@ -80,12 +117,14 @@ console.log('JS packages loaded');`;
   });
 
   it('별도 TS 소비자가 dist d.ts를 해석하고 금지 subpath를 거부한다', /** 타입 namespace를 출력 없이 검사하고 해석 경로를 확인한다. */ () => {
-    const code = names
-      .map(
-        (name, index) =>
-          `import type * as Package${index} from '@codosc/${name}';\nexport type Module${index} = typeof Package${index};`,
-      )
-      .join('\n');
+    const code =
+      names
+        .map(
+          (name, index) =>
+            `import type * as Package${index} from '@codosc/${name}';\nexport type Module${index} = typeof Package${index};`,
+        )
+        .join('\n') +
+      "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition } from '@codosc/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic } from '@codosc/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\n";
     const config = {
       compilerOptions: {
         strict: true,
@@ -300,7 +339,7 @@ console.log('JS packages loaded');`;
     const source = path.join(consumer, 'adapter.ts');
     writeFileSync(
       source,
-      "import '@codosc/core';\nimport '@codosc/workspace';\nexport const loaded = true;\n",
+      "import { parseYaml } from '@codosc/core';\nimport '@codosc/workspace';\nexport const loaded = parseYaml('name: bundled').success;\n",
     );
     await bundleIde([source], path.join(consumer, 'adapter.cjs'));
     expect(
