@@ -1,0 +1,25 @@
+{
+  "name": "@codosc/language-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.cjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "node ../../tools/build/build.mjs build"
+  },
+  "dependencies": {
+    "@codosc/core": "workspace:*",
+    "@codosc/workspace": "workspace:*"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}
