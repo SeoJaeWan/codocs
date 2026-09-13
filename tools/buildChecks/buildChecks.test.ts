@@ -25,6 +25,62 @@ function run(args: string[], cwd = consumer): string {
   return execFileSync(process.execPath, args, { cwd, encoding: 'utf8' });
 }
 
+/** 원본 또는 배포된 예제를 소스 없는 소비자의 공개 파서로 검사한다. */
+function checkExamples(directory: string): void {
+  const cases = [
+    {
+      relative: 'examples/.codocs/terms.yaml',
+      expected: {
+        type: 'term',
+        id: 'sample-order',
+        name: '가상 주문',
+        definition:
+          '가상 고객의 구매 요청이며 [[sample-fulfillment]] 절차를 따른다.',
+        domain: 'sample-sales',
+        examples: ['가상 주문 SAMPLE-001을 생성한다.'],
+      },
+    },
+    {
+      relative: 'examples/.codocs/knowledge.yaml',
+      expected: {
+        type: 'knowledge',
+        id: 'sample-fulfillment',
+        title: '가상 주문 처리',
+        body: '가상 프로젝트에서 [[sample-order]]를 확인한 뒤 가상 배송 상태를 기록한다.',
+        domains: ['sample-sales'],
+      },
+    },
+  ].map((item) => ({
+    ...item,
+    source: readFileSync(path.join(root, item.relative), 'utf8'),
+  }));
+  const script = `import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parseYaml, getKeyRange, getValueRange, getPropertyRange } from '@codosc/core';
+for (const item of ${JSON.stringify(cases)}) {
+  const filePath = path.join(process.argv[2], item.relative);
+  const source = readFileSync(filePath, 'utf8');
+  assert.equal(source, item.source);
+  const parsed = parseYaml(source, filePath);
+  assert.equal(parsed.success, true, JSON.stringify(parsed.diagnostics));
+  assert.equal(parsed.source, source);
+  assert.deepEqual(parsed.diagnostics, []);
+  assert.deepEqual(parsed.data, item.expected);
+  const key = getKeyRange(parsed, ['id']);
+  const value = getValueRange(parsed, ['id']);
+  const property = getPropertyRange(parsed, ['id']);
+  assert.ok(key && value && property);
+  assert.equal(source.slice(key.start, key.end), 'id');
+  assert.equal(source.slice(value.start, value.end), item.expected.id);
+  const newline = source.includes('\\r\\n') ? '\\r\\n' : '\\n';
+  assert.equal(source.slice(property.start, property.end), 'id: ' + item.expected.id + newline);
+}
+console.log('2 examples parsed');`;
+  writeFileSync(path.join(consumer, 'examples.mjs'), script);
+  expect(run(['examples.mjs', directory])).toContain('2 examples parsed');
+}
+
 /** 디렉터리 안의 실제 출력 파일을 상대 경로로 반환한다. */
 function outputFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -91,6 +147,10 @@ beforeAll(
 );
 
 describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 없이 소비한다. */ () => {
+  it('기존 예제 두 파일은 단일 매핑으로 해석되고 ID·참조·본문을 유지한다', /** 공개 API로 실제 YAML과 원문 위치를 고정 기대값에 대조한다. */ () => {
+    checkExamples(root);
+  });
+
   it('Node subprocess가 ESM import 및 CJS require 진입점을 실제 로드한다', /** package 이름과 exports를 통해 모든 실제 출력을 로드한다. */ () => {
     const script = `import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -199,6 +259,9 @@ console.log('JS packages loaded');`;
           ),
         ).toBe(readFileSync(path.join(root, relative), 'utf8'));
       }
+      checkExamples(
+        path.join(consumer, 'node_modules/@codosc', folder, 'dist'),
+      );
     }
     expect(
       readFileSync(
@@ -295,6 +358,16 @@ console.log('JS packages loaded');`;
         expect(files).toContain('package/dist/' + relative);
       }
       expect(files).not.toContain('package/src/');
+      const extracted = path.join(fixture, 'packed', folder);
+      mkdirSync(extracted, { recursive: true });
+      execFileSync('tar', ['-xzf', archive, '-C', extracted]);
+      expect(
+        readFileSync(
+          path.join(extracted, 'package/dist/docs/guide/README.md'),
+          'utf8',
+        ),
+      ).toBe(readFileSync(path.join(root, 'docs/guide/README.md'), 'utf8'));
+      checkExamples(path.join(extracted, 'package/dist'));
       if (folder === 'vscode')
         expect(files).toContain('package/dist/server/index.cjs');
     }

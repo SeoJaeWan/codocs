@@ -34,4 +34,6 @@ if (parsed.success) {
 
 모든 offset은 0 기반 UTF-16이고 시작 포함·끝 제외다. `source.slice(start, end)`로 실제 원문을 조회한다. 원문의 CRLF·공백·주석·따옴표를 정규화하지 않는다. 이모지는 UTF-16 코드 단위로 센다. `offsetToPosition`은 LF 다음을 새 줄로 세어 0 기반 `line/character`를 반환하며 EOF를 허용한다. 범위 밖·비정수 offset에는 좌표가 없다. CRLF 내부 offset은 원문 코드 단위 위치다. EOF 문법 오류는 확인된 0 길이 삽입 위치를 제공한다.
 
-`pnpm test --run packages/core/src/parser`로 기능 테스트를 실행한다. 정상·금지 6종·잘린 YAML·비매핑, 실제 문자열 값과 끝 개행, LF·CRLF·한글·이모지·EOF 좌표, 중첩·flow의 세 가지 원문 slice를 고정 기대값으로 검증한다. `pnpm check:development`는 source 전체를 복사한 frozen 재설치 및 불일치 거부, 공개 진입점과 개발 규칙을 검증한다. `pnpm check:build`는 source 없는 JS·`types: []` 선언 소비자, 소비자 내부에 명시적으로 준비한 yaml 의존성, 실제 core API 실행과 CJS bundle 및 배포 asset을 검증한다. build는 test/spec를 제외한다. 검증 환경은 Windows x64 / Node 24.21.0 / pnpm 10.34.5다.
+`examples/.codocs/terms.yaml`과 `knowledge.yaml`은 파일마다 하나의 매핑이며 가상 프로젝트의 ID·참조·본문을 유지한다. 예제 읽기는 tools의 Node subprocess에서 수행하고 core는 문자열만 받는다. 현재 스키마 검증, 참조 해석, 파일 IO·writer, Hover/LSP, VS Code activation과 MCP 도구/stdio는 구현하지 않았다. 작성 계약은 루트의 `docs/guide/README.md`에 있다.
+
+`pnpm test --run packages/core/src/parser`로 기능 테스트를 실행한다. 정상·금지 6종·잘린 YAML·비매핑, 실제 문자열 값과 끝 개행, LF·CRLF·한글·이모지·EOF 좌표, 중첩·flow의 세 가지 원문 slice를 고정 기대값으로 검증한다. `pnpm check:development`는 source 전체를 복사한 frozen 재설치 및 불일치 거부, 공개 진입점과 개발 규칙을 검증한다. `pnpm check:build`는 source 없는 JS·`types: []` 선언 소비자, 소비자 내부에 명시적으로 준비한 yaml 의존성, 실제 core API 실행과 CJS bundle을 검증한다. 원본 예제와 MCP/vscode dist·pack에서 추출한 예제의 파싱 성공, 전체 데이터의 고정 기대값, ID 위치와 원문 일치 및 guide 원문 일치도 검사한다. build는 test/spec를 제외한다. 검증 환경은 Windows x64 / Node 24.21.0 / pnpm 10.34.5다.
