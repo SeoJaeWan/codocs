@@ -5,14 +5,18 @@
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
+    "typecheck": "node tools/build/build.mjs typecheck",
     "lint": "eslint .",
     "format:check": "prettier . --check",
     "test": "vitest",
-    "check:development": "vitest run tools/developmentChecks"
+    "check:development": "vitest run tools/developmentChecks",
+    "build": "node tools/build/build.mjs build",
+    "bundle": "node tools/build/build.mjs bundle",
+    "check:build": "vitest run tools/buildChecks"
   },
   "devDependencies": {
     "@types/node": "22.19.3",
+    "esbuild": "0.28.2",
     "eslint": "10.10.0",
     "eslint-plugin-jsdoc": "64.3.10",
     "prettier": "3.9.6",

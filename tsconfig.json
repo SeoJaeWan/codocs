@@ -1,6 +1,10 @@
 {
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": { "noEmit": true, "types": ["node"], "allowJs": true },
+  "extends": "./tsconfig.runtime.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "allowJs": true
+  },
   "include": ["tools/**/*.ts", "vitest.config.ts"],
   "exclude": ["node_modules", "dist", ".workbench"]
 }
