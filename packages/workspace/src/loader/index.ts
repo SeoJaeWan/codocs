@@ -4,8 +4,6 @@ import path from 'node:path';
 import {
   parseYaml,
   validateDocument,
-  workspaceDiagnosticCodes,
-  workspaceDiagnosticMessages,
   type Knowledge,
   type SchemaDiagnostic,
   type Term,
@@ -13,6 +11,8 @@ import {
 } from '@codosc/core';
 import {
   createWorkspaceDiagnostic,
+  workspaceDiagnosticCodes,
+  workspaceDiagnosticMessages,
   type WorkspaceDiagnostic,
 } from '../diagnostics/index.js';
 import {

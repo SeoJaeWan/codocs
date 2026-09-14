@@ -235,7 +235,12 @@ describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 �
         `import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, symlink, realpath, rm} from 'node:fs/promises';
 import path from 'node:path';
-import {loadWorkspace, resolveWorkspacePath} from '@codosc/workspace';
+import {loadWorkspace, resolveWorkspacePath, workspaceDiagnosticCodes, workspaceDiagnosticMessages} from '@codosc/workspace';
+import * as core from '@codosc/core';
+assert.equal(workspaceDiagnosticCodes.readFailed, 'workspace_read_failed');
+assert.equal(workspaceDiagnosticMessages.readFailed, '작업 경로를 읽을 수 없습니다.');
+assert.equal('workspaceDiagnosticCodes' in core, false);
+assert.equal('workspaceDiagnosticMessages' in core, false);
 assert.ok(import.meta.resolve('@codosc/workspace').startsWith(new URL('./node_modules/', import.meta.url).href));
 const temporary = await mkdtemp(path.join(process.cwd(), '실제 프로젝트 '));
 try {
@@ -371,8 +376,20 @@ try {
       );
       writeFileSync(
         path.join(packedConsumer, 'workspace.ts'),
-        `import {loadWorkspace, resolveWorkspacePath} from '@codosc/workspace';
-import type {WorkspaceScanResult, WorkspaceDocumentResult, WorkspaceScanDiagnostic, WorkspaceScanFailure, WorkspaceDocumentSource, WorkspaceSkippedCycle} from '@codosc/workspace';
+        `import {loadWorkspace, resolveWorkspacePath, workspaceDiagnosticCodes, workspaceDiagnosticMessages} from '@codosc/workspace';
+import type {WorkspaceScanResult, WorkspaceDocumentResult, WorkspaceScanDiagnostic, WorkspaceScanFailure, WorkspaceDocumentSource, WorkspaceSkippedCycle, WorkspaceDiagnostic, WorkspaceDiagnosticCode} from '@codosc/workspace';
+import type {Diagnostic, DiagnosticCode} from '@codosc/core';
+const workspaceCode: WorkspaceDiagnosticCode = workspaceDiagnosticCodes.readFailed;
+const workspaceIssue: WorkspaceDiagnostic = {code: workspaceCode, severity: 'error', message: workspaceDiagnosticMessages.readFailed};
+const commonIssue: Diagnostic<WorkspaceDiagnosticCode> = workspaceIssue;
+void commonIssue;
+// @ts-expect-error workspace codes exclude YAML parser codes
+const invalidWorkspaceCode: WorkspaceDiagnosticCode = 'invalid_yaml';
+// @ts-expect-error core codes exclude workspace IO codes
+const invalidCoreCode: DiagnosticCode = 'workspace_read_failed';
+// @ts-expect-error workspace diagnostic code type is owned by workspace
+import type {WorkspaceDiagnosticCode as RemovedCoreCode} from '@codosc/core';
+void invalidWorkspaceCode; void invalidCoreCode;
 const scan: WorkspaceScanResult = await loadWorkspace({project: 'project'});
 const documents: readonly WorkspaceDocumentResult[] = scan.documents;
 const failures: readonly WorkspaceScanFailure[] = scan.failures;

@@ -11,11 +11,8 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  parseYaml,
-  validateDocument,
-  workspaceDiagnosticCodes,
-} from '@codosc/core';
+import { parseYaml, validateDocument } from '@codosc/core';
+import { workspaceDiagnosticCodes } from '../diagnostics/index.js';
 import { loadWorkspace, resolveWorkspacePath } from '../index.js';
 
 let fixture: string;

@@ -27,7 +27,7 @@ if (selected.success) {
 
 성공의 `access.read/write: true`는 현 시점 연결 범위 정책이며 OS 파일 읽기/쓰기 성공을 보장하지 않는다. 조회는 루트·대상을 확인하지만 파일 원문 읽기·폴더 열거·실제 저장은 수행하지 않는다. 루트는 각 경로 확인 시 다시 검증하며 실제 writer는 쓰기 시 링크 대상을 다시 확인해야 한다. 링크 유지 저장·대상 교체 충돌·watcher·색인·공유 대상 잠금은 후속 작업이다.
 
-실패 `status`는 `denied`(입력 또는 범위 거부), `missing`(유효한 루트의 `.codocs` 자체 부재), `unavailable`(깨진 링크·잘못된 대상·대상 확인 실패)이다. 존재하는 깨진 `.codocs` 링크를 부재로 반환하지 않는다. 확인하지 못한 원문·실경로·ID·좌표는 만들지 않는다. 진단은 core의 `workspaceDiagnosticCodes/workspaceDiagnosticMessages`와 선택적인 실제 `ioCode`를 사용한다. 로더는 `.codocs` 부재를 정상 빈 프로젝트로, 실제 루트/IO 오류를 실패로 분리한다.
+실패 `status`는 `denied`(입력 또는 범위 거부), `missing`(유효한 루트의 `.codocs` 자체 부재), `unavailable`(깨진 링크·잘못된 대상·대상 확인 실패)이다. 존재하는 깨진 `.codocs` 링크를 부재로 반환하지 않는다. 확인하지 못한 원문·실경로·ID·좌표는 만들지 않는다. 진단은 workspace의 `workspaceDiagnosticCodes/workspaceDiagnosticMessages`와 선택적인 실제 `ioCode`를 사용한다. 로더는 `.codocs` 부재를 정상 빈 프로젝트로, 실제 루트/IO 오류를 실패로 분리한다.
 
 기능과 test는 `src/기능/`에 함께 두며 build에서 test/spec를 제외한다. `pnpm exec vitest run packages/workspace/src/projectRoot packages/workspace/src/paths`는 테스트마다 고유한 실제 임시 파일·폴더·링크를 만들고 자기 fixture만 정리한다. 루트 선택·잘못된 루트·체인·별칭·범위 탈출·깨진 링크·실제 권한 실패·정책과 OS 권한 구분을 확인한다. `pnpm typecheck`는 공개 선언을 순차로 준비한다. 이번 경로·로더 검증 환경은 macOS arm64 / Node 24.21.0 / pnpm 10.34.5다. Windows 정션·다른 OS/Node 버전은 미검증이며 기존 Windows x64 진입점/빌드 검증과 구분한다.
 
@@ -53,7 +53,7 @@ for (const document of scan.documents) {
 
 공개 `WorkspaceScanResult`는 `documents`, `failures`, `skippedCycles`, 합산 `diagnostics`와 위 스캔 상태를 제공한다. 문서는 `WorkspaceDocumentResult`의 `status`로 좁힌 뒤에만 `data`를 읽는다. `WorkspaceDocumentSource`는 확인한 세 경로를, `WorkspaceScanFailure`는 미확인 범위를, `WorkspaceSkippedCycle`은 의도적으로 건너뛴 연결을 표현한다. `WorkspaceDocumentDiagnostic`은 core YAML·스키마 진단이며 `WorkspaceScanDiagnostic`은 여기에 `WorkspaceDiagnostic`을 더한 합집합이다. IO 진단의 `code`로 좁히면 선택적 `ioCode`를 읽을 수 있다.
 
-`failures`의 `WorkspaceScanFailure`는 확인하지 못한 파일·폴더 범위와 실제 IO 진단을 보관한다. 확인한 `path/logicalPath/realPath`만 제공하므로 대상 확인 실패에는 실제 경로가 없을 수 있다. 읽지 못한 원문·ID·좌표를 만들지 않는다. 부분 완료에서 누락된 경로는 삭제 증거가 아니며 후속 색인은 `failures` 범위를 보존해야 한다. 진단 코드는 core의 이름 있는 상수로 관리한다.
+`failures`의 `WorkspaceScanFailure`는 확인하지 못한 파일·폴더 범위와 실제 IO 진단을 보관한다. 확인한 `path/logicalPath/realPath`만 제공하므로 대상 확인 실패에는 실제 경로가 없을 수 있다. 읽지 못한 원문·ID·좌표를 만들지 않는다. 부분 완료에서 누락된 경로는 삭제 증거가 아니며 후속 색인은 `failures` 범위를 보존해야 한다. workspace 진단 코드·고정 문구와 `WorkspaceDiagnosticCode`는 workspace diagnostics에서 관리하고 `@codosc/workspace` 공개 진입점으로 제공한다. 공통 형식 `Diagnostic<WorkspaceDiagnosticCode>`는 core에서 받아 사용한다.
 
 `pnpm exec vitest run packages/workspace`는 고유한 실제 임시 프로젝트에서 loader·경로·루트 검사를 수행한다. macOS arm64 / Node 24.21.0 / pnpm 10.34.5에서 실제 파일·폴더 링크, 순환·공유 폴더 재방문, 혼합 내용 오류·경고, 실제 파일 읽기·폴더 열거·루트·`.codocs` 권한 실패를 확인했다.
 

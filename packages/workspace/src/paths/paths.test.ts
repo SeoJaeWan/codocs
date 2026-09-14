@@ -18,7 +18,7 @@ import {
 import {
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
-} from '@codosc/core';
+} from '../diagnostics/index.js';
 
 let fixture: string;
 let project: string;

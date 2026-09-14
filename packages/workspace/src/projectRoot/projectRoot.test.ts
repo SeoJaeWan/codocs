@@ -14,7 +14,7 @@ import { resolveProjectRoot } from '../index.js';
 import {
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
-} from '@codosc/core';
+} from '../diagnostics/index.js';
 
 let fixture: string;
 beforeEach(

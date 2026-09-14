@@ -1,11 +1,9 @@
 import { lstat, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  createWorkspaceDiagnostic,
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
-} from '@codosc/core';
-import {
-  createWorkspaceDiagnostic,
   getIoErrorCode,
   type WorkspaceDiagnostic,
 } from '../diagnostics/index.js';

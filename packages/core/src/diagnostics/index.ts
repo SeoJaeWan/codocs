@@ -69,60 +69,8 @@ export const schemaDiagnosticMessages = {
 /** 코드 정의에서 도출한 스키마 진단 코드 타입이다. */
 export type SchemaDiagnosticCode =
   (typeof schemaDiagnosticCodes)[keyof typeof schemaDiagnosticCodes];
-/** workspace의 경로·IO·탐색 진단 코드와 발생 조건이다. core는 실제 IO를 수행하지 않는다. */
-export const workspaceDiagnosticCodes = {
-  /** 루트 선택 입력이 잘못됐거나 선택 대상이 디렉터리가 아니면 반환한다. */
-  invalidProjectRoot: 'invalid_project_root',
-  /** 선택 루트의 대상 확인 또는 읽기·탐색 권한 확인에 실패하면 반환한다. */
-  projectRootUnavailable: 'project_root_unavailable',
-  /** 경로 입력이 비문자열·빈 문자열·NUL 포함 문자열이면 반환한다. */
-  invalidWorkspacePath: 'invalid_workspace_path',
-  /** 논리 .codocs 밖의 입력 또는 연결 루트를 벗어나는 이동이면 반환한다. */
-  pathOutsideWorkspace: 'path_outside_workspace',
-  /** 경로가 없거나 링크가 깨졌거나 실제 대상 확인에 실패하면 반환한다. */
-  pathUnavailable: 'path_unavailable',
-  /** 디렉터리가 필요한 위치에 파일이나 특수 대상이 있으면 반환한다. */
-  notDirectory: 'not_directory',
-  /** 발견한 경로에서 실제 파일 읽기 또는 폴더 열거에 실패하면 반환한다. */
-  readFailed: 'workspace_read_failed',
-  /** 현재 탐색 가지의 실제 조상 폴더로 돌아오는 연결을 건너뛸 때 반환한다. */
-  circularDirectoryLink: 'circular_directory_link',
-} as const;
-
-/** workspace 진단의 고정 문구다. 실제 시스템 오류 코드는 IO 경계가 별도로 보존한다. */
-export const workspaceDiagnosticMessages = {
-  /** 객체가 아닌 루트 선택 옵션을 받았을 때 사용한다. */
-  invalidRootOptions: '프로젝트 루트 선택 옵션은 객체이어야 합니다.',
-  /** 시작 cwd가 유효한 절대 경로 문자열이 아닐 때 사용한다. */
-  invalidCwd: '시작 cwd는 비어 있지 않은 절대 경로이어야 합니다.',
-  /** 명시한 project가 유효한 경로 문자열이 아닐 때 사용한다. */
-  invalidProject: 'project는 비어 있지 않은 경로 문자열이어야 합니다.',
-  /** 선택한 루트가 디렉터리가 아닐 때 사용한다. */
-  rootNotDirectory: '선택한 프로젝트 루트는 디렉터리가 아닙니다.',
-  /** 선택 루트의 확인 또는 읽기·탐색 권한 확인에 실패했을 때 사용한다. */
-  rootUnavailable: '선택한 프로젝트 루트에 접근할 수 없습니다.',
-  /** 경로 입력을 검증하지 못했을 때 사용한다. */
-  invalidPath: '작업 경로는 비어 있지 않은 경로 문자열이어야 합니다.',
-  /** 논리 작업 범위 밖의 입력이나 연결 범위를 벗어나는 이동에 사용한다. */
-  pathOutsideWorkspace:
-    '.codocs와 명시적으로 연결한 경로의 범위를 벗어났습니다.',
-  /** 실제 경로와 대상을 확인하지 못했을 때 사용한다. */
-  pathUnavailable: '작업 경로의 실제 대상을 확인할 수 없습니다.',
-  /** 디렉터리를 기대한 위치에서 다른 대상을 확인했을 때 사용한다. */
-  notDirectory: '탐색할 작업 경로는 디렉터리이어야 합니다.',
-  /** 파일 읽기나 폴더 열거의 실제 IO 실패에 사용한다. */
-  readFailed: '작업 경로를 읽을 수 없습니다.',
-  /** 현재 가지의 조상 폴더로 돌아오는 연결을 확인했을 때 사용한다. */
-  circularDirectoryLink:
-    '현재 탐색 가지의 조상 폴더로 돌아오는 연결을 건너뜁니다.',
-} as const;
-
-/** 코드 정의에서 도출한 workspace 진단 코드다. */
-export type WorkspaceDiagnosticCode =
-  (typeof workspaceDiagnosticCodes)[keyof typeof workspaceDiagnosticCodes];
-/** 파서·스키마·workspace가 공유하는 진단 코드다. */
-export type DiagnosticCode =
-  YamlDiagnosticCode | SchemaDiagnosticCode | WorkspaceDiagnosticCode;
+/** core의 파서와 스키마 검증이 반환하는 진단 코드다. */
+export type DiagnosticCode = YamlDiagnosticCode | SchemaDiagnosticCode;
 /** 오류와 경고를 구분하는 공통 심각도다. */
 export type DiagnosticSeverity = 'error' | 'warning';
 /** 시작 포함·끝 제외인 0 기반 UTF-16 원문 범위다. */
@@ -142,9 +90,9 @@ export interface SourceRange {
 }
 /** 매핑 키와 배열 인덱스로 구성한 경로다. */
 export type FieldPath = readonly (string | number)[];
-/** 파서와 스키마 검증의 공통 진단이며 확인할 수 없는 메타데이터는 생략한다. */
-export interface Diagnostic {
-  code: DiagnosticCode;
+/** 각 계층이 코드 타입을 지정하는 공통 진단이다. 기본 코드는 core 진단이며 미확인 메타데이터는 생략한다. */
+export interface Diagnostic<Code extends string = DiagnosticCode> {
+  code: Code;
   severity: DiagnosticSeverity;
   message: string;
   path?: string;

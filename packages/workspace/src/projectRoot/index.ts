@@ -2,11 +2,9 @@ import { constants } from 'node:fs';
 import { access, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  createWorkspaceDiagnostic,
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
-} from '@codosc/core';
-import {
-  createWorkspaceDiagnostic,
   type WorkspaceDiagnostic,
 } from '../diagnostics/index.js';
 
