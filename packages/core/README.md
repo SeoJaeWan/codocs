@@ -1,6 +1,6 @@
 # core
 
-IO 없는 .codocs YAML 파싱·원문 위치와 Zod 문서 스키마 검증을 제공한다. Node 내장 모듈과 IDE/LSP/MCP SDK에 직접 의존하지 않는다. 필수 속성·자료형·ID·JSON 값은 검증하며 참조 의미는 후속 계층의 책임이다. 파싱·스키마 성공이나 범위 조회는 저장·삭제 허용을 의미하지 않는다.
+IO 없는 .codocs YAML 파싱·원문 위치와 Zod 문서 스키마 검증을 제공한다. Node 내장 모듈과 IDE/LSP/MCP SDK에 직접 의존하지 않는다. 실제 프로젝트 선택·파일 IO·연결 경계·스캔 상태는 `@codosc/workspace`가 담당하며 core는 순수 함수·타입·상수를 제공한다. 필수 속성·자료형·ID·JSON 값은 검증하며 참조 의미는 후속 계층의 책임이다. 파싱·스키마 성공이나 범위 조회는 저장·삭제 허용을 의미하지 않는다.
 
 공개 진입점은 `@codosc/core`다. `src/index.ts`는 parser·diagnostics·validator를 재내보낸다. 직접 의존성은 정확히 고정한 `yaml@2.9.1`과 `zod@4.6.5`이며 lockfile에 기록한다. ESM JS와 선언 파일은 tsc로 `dist`에 생성한다. 추출 타입 선언은 Zod에 의존하고 `validateDocument`는 ZodError를 반환하지 않는다. strict, ES2022, NodeNext, 상대 `.js` import와 `types: []`를 유지한다.
 
@@ -77,3 +77,5 @@ if (parsed.success) {
 선언 소비의 `types: []`는 Node 전역 타입 자동 추가를 차단한다. Zod 4.6.5의 외부 선언은 `URL` 전역 타입을 참조하므로 이번 `skipLibCheck: false` 독립 소비자는 `lib: [ES2022, DOM]`으로 검증한다. `lib: [ES2022]`만 사용하는 저장소와 frozen fixture의 core emit은 공통 `skipLibCheck: true`를 사용한다. DOM 없이 외부 선언까지 검사하는 소비자의 성공은 보장하지 않는다. Zod 추출 선택 필드 타입에는 undefined가 포함되지만 validator는 명시적인 undefined 입력을 허용하지 않는다.
 
 `workspaceDiagnosticCodes`, `workspaceDiagnosticMessages`, `WorkspaceDiagnosticCode`는 workspace의 루트·경로·IO·순환 진단을 위한 공개 정의다. `invalidProjectRoot`, `projectRootUnavailable`, `invalidWorkspacePath`, `pathOutsideWorkspace`, `pathUnavailable`, `notDirectory`, `readFailed`, `circularDirectoryLink`는 각각 입력/디렉터리 검증, 루트 접근, 경로 입력, 연결 범위 탈출, 실제 대상 확인, 폴더 요구, 읽기/열거 실패, 현재 가지의 조상 연결 조건을 표현한다. core는 이 정의를 제공하며 실제 파일 확인·읽기·경로 해석은 workspace에서 수행한다. workspace는 확인하지 못한 원문·실경로·ID·좌표를 만들지 않고 실제 시스템 오류 코드만 별도로 보존한다.
+
+`pnpm exec vitest run tools/buildChecks -t workspace`는 core/workspace의 실제 tarball을 소스 없는 별도 소비자에 offline frozen 설치하고 `@codosc/workspace` 공개 로더를 실행한다. workspace가 core 공개 진입점의 parser→validator에 읽은 원문과 확인한 경로·위치를 전달하는지, 내용 오류가 스캔 누락과 구분되는지, 경고만 있는 성공과 사용자 값이 유지되는지 검사한다. 소비자의 공개 d.ts는 상태로 좁힌 검증 데이터와 IO 진단을 제공하며 Node/TS workspace 내부 subpath를 거부한다. 기존 core parser·schema JS/d.ts 검사는 `pnpm check:build`에서 그대로 실행한다. 이 workspace 배포 소비 검증 환경은 macOS arm64 / Node 24.21.0 / pnpm 10.34.5이며 다른 OS·Windows 정션은 미검증이다. 실제 저장·링크 교체 시 재검증·외부 watcher·색인·공유 대상 잠금은 후속 계층의 작업이다.
