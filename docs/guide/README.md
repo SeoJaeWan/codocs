@@ -15,7 +15,7 @@ examples:
   - '가상 주문 SAMPLE-001을 생성한다.'
 ```
 
-단일 `---`, 주석, 따옴표, 블록 문자열, 중첩 배열·매핑과 flow 구조를 허용한다. 앵커·별칭·병합 키·사용자 태그·복수 문서·중복 키는 `unsupported_yaml_feature`, 일반 문법 오류와 빈 파일·주석만 있는 파일·최상위 배열/스칼라는 `invalid_yaml`로 실패한다. 실패 결과에는 원문·진단만 있고 `data/fields`가 없다.
+단일 `---`, 주석, 따옴표, 블록 문자열, 중첩 배열·매핑과 flow 구조를 허용한다. 앵커·별칭·병합 키·사용자 태그·복수 문서·중복 키는 `unsupported_yaml_feature`, 일반 문법 오류와 빈 파일·주석만 있는 파일·최상위 배열/스칼라는 `invalid_yaml`로 실패한다. 실패 결과에는 원문·진단만 있고 `data/fields/rootRange`가 없다. 진단은 공통 `code/severity/message`를 사용하며 파서의 심각도는 `error`다. 호출자가 전달한 파일 경로는 `path`로 제공하고 확인되지 않은 `path/fieldPath/range`는 생략한다. 확인된 진단에는 원문 `offsetRange`도 제공한다.
 
 ```ts
 import { parseYaml, getValueRange } from '@codosc/core';
@@ -28,6 +28,8 @@ if (parsed.success) {
   console.log(parsed.diagnostics);
 }
 ```
+
+성공 결과의 `rootRange`는 AST에서 확인한 최상위 매핑의 값 범위다. 문서 표시와 앞뒤 독립 주석은 제외하며, 블록 매핑의 같은 줄 주석·끝 개행은 포함할 수 있다. flow 매핑 뒤 주석은 제외한다. AST 위치를 확인할 수 없으면 범위를 생략하고 원문 전체로 대체하지 않는다. 이 범위는 후속 검증에서 최상위 누락 속성의 부모 위치로 사용할 수 있다.
 
 공개 `getKeyRange/getValueRange/getPropertyRange`는 문자열 키·숫자 배열 인덱스의 경로로 키·값·속성 전체 범위를 조회하며 확인할 수 없는 위치는 `undefined`다. 모든 원문 범위는 0 기반 UTF-16, 시작 포함·끝 제외다. `offsetToPosition`과 진단의 외부 좌표는 0 기반 `line/character`다. 원문의 공백·주석·따옴표·줄바꿈을 정규화하지 않는다. 파싱 성공은 스키마 검증 성공이나 저장 허용이 아니며 위치 조회는 필수 속성 삭제를 허용하지 않는다.
 

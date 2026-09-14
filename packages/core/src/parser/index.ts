@@ -7,32 +7,19 @@ import {
   Parser,
 } from 'yaml';
 import { yamlDiagnosticCodes } from '../diagnostics/index.js';
-import type { YamlDiagnosticCode } from '../diagnostics/index.js';
+import type {
+  Diagnostic,
+  FieldPath,
+  OffsetRange,
+  SourcePosition,
+  YamlDiagnosticCode,
+} from '../diagnostics/index.js';
 
-/** 시작 포함·끝 제외인 0 기반 UTF-16 원문 범위다. */
-export interface OffsetRange {
-  start: number;
-  end: number;
-}
-/** 0 기반 UTF-16 줄 좌표다. */
-export interface SourcePosition {
-  line: number;
-  character: number;
-}
-/** 외부 진단에 사용하는 시작 포함·끝 제외 좌표다. */
-export interface SourceRange {
-  start: SourcePosition;
-  end: SourcePosition;
-}
-/** 매핑 키와 배열 인덱스로 구성한 경로다. */
-export type FieldPath = readonly (string | number)[];
 /** 문법 또는 지원하지 않는 YAML 구문의 오류다. */
-export interface YamlDiagnostic {
+export interface YamlDiagnostic extends Diagnostic {
   code: YamlDiagnosticCode;
-  message: string;
-  filePath: string | undefined;
-  offsetRange: OffsetRange | undefined;
-  range: SourceRange | undefined;
+  severity: 'error';
+  offsetRange?: OffsetRange;
 }
 /** 특정 속성의 세 가지 원문 범위를 구분한다. */
 export interface FieldRanges {
@@ -48,6 +35,8 @@ export type YamlParseResult =
       source: string;
       data: Record<string, unknown>;
       fields: readonly FieldRanges[];
+      /** 최상위 매핑 AST의 확인된 값 범위이며 문서 표시와 앞뒤 독립 주석은 제외한다. */
+      rootRange?: OffsetRange;
       diagnostics: readonly YamlDiagnostic[];
     }
   | {
@@ -88,7 +77,7 @@ function diagnostic(
   source: string | undefined,
   code: YamlDiagnostic['code'],
   message: string,
-  filePath: string | undefined,
+  path: string | undefined,
   offsets?: readonly number[],
 ): YamlDiagnostic {
   const start = offsets?.[0];
@@ -109,10 +98,15 @@ function diagnostic(
     start <= end;
   return {
     code,
+    severity: 'error',
     message,
-    filePath,
-    offsetRange: valid ? { start, end } : undefined,
-    range: valid ? { start: startPosition, end: endPosition } : undefined,
+    ...(path !== undefined ? { path } : {}),
+    ...(valid
+      ? {
+          offsetRange: { start, end },
+          range: { start: startPosition, end: endPosition },
+        }
+      : {}),
   };
 }
 
@@ -235,7 +229,7 @@ function collectFields(
 function rejectMergeKeys(
   value: unknown,
   source: string,
-  filePath: string | undefined,
+  path: string | undefined,
   diagnostics: YamlDiagnostic[],
 ): void {
   if (isMap(value)) {
@@ -250,17 +244,17 @@ function rejectMergeKeys(
             source,
             yamlDiagnosticCodes.unsupportedYamlFeature,
             '병합 키는 지원하지 않습니다.',
-            filePath,
+            path,
             pair.key.range ?? undefined,
           ),
         );
       }
-      rejectMergeKeys(pair.key, source, filePath, diagnostics);
-      rejectMergeKeys(pair.value, source, filePath, diagnostics);
+      rejectMergeKeys(pair.key, source, path, diagnostics);
+      rejectMergeKeys(pair.value, source, path, diagnostics);
     }
   } else if (isSeq(value)) {
     for (const item of value.items)
-      rejectMergeKeys(item, source, filePath, diagnostics);
+      rejectMergeKeys(item, source, path, diagnostics);
   }
 }
 
@@ -285,10 +279,10 @@ function keyAtOffset(value: unknown, offset: number): OffsetRange | undefined {
 
 /** IO 없이 단일 YAML 매핑을 해석한다. 오류가 있으면 정상 데이터와 범위를 제공하지 않는다.
  * @param input 호출자가 읽은 외부 원문이다. 문자열만 허용한다.
- * @param filePath 진단에 전달할 경로이며 파일을 읽지 않는다.
+ * @param path 진단에 전달할 경로이며 파일을 읽지 않는다.
  * @returns 원문과 오류 또는 해석 데이터 및 확인된 원문 위치다.
  */
-export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
+export function parseYaml(input: unknown, path?: string): YamlParseResult {
   if (typeof input !== 'string')
     return {
       success: false,
@@ -298,7 +292,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
           undefined,
           yamlDiagnosticCodes.invalidYaml,
           'YAML 원문은 문자열이어야 합니다.',
-          filePath,
+          path,
         ),
       ],
     };
@@ -330,7 +324,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
           source,
           yamlDiagnosticCodes.unsupportedYamlFeature,
           message,
-          filePath,
+          path,
           [
             Number(token.offset),
             Number(token.offset) + String(token.source).length,
@@ -349,7 +343,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
         source,
         yamlDiagnosticCodes.unsupportedYamlFeature,
         '복수 YAML 문서는 지원하지 않습니다.',
-        filePath,
+        path,
         start
           ? [Number(start.offset), Number(start.offset) + 3]
           : (documents[1]?.range ?? undefined),
@@ -357,7 +351,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
     );
   }
   for (const document of documents) {
-    rejectMergeKeys(document.contents, source, filePath, diagnostics);
+    rejectMergeKeys(document.contents, source, path, diagnostics);
     for (const issue of [...document.errors, ...document.warnings]) {
       const unsupported =
         issue.code === 'DUPLICATE_KEY' || issue.code === 'TAG_RESOLVE_FAILED';
@@ -383,7 +377,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
             ? yamlDiagnosticCodes.unsupportedYamlFeature
             : yamlDiagnosticCodes.invalidYaml,
           message,
-          filePath,
+          path,
           offsets,
         ),
       );
@@ -400,7 +394,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
           source,
           yamlDiagnosticCodes.invalidYaml,
           '최상위 YAML 값은 매핑이어야 합니다.',
-          filePath,
+          path,
           document?.contents && isNode(document.contents)
             ? (document.contents.range ?? undefined)
             : undefined,
@@ -417,13 +411,21 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
           source,
           yamlDiagnosticCodes.invalidYaml,
           '최상위 YAML 값은 매핑이어야 합니다.',
-          filePath,
+          path,
         ),
       ],
     };
   const fields: FieldRanges[] = [];
   collectFields(document.contents, [], fields, source);
-  return { success: true, source, data, fields, diagnostics };
+  const rootRange = nodeRange(document.contents);
+  return {
+    success: true,
+    source,
+    data,
+    fields,
+    diagnostics,
+    ...(rootRange ? { rootRange } : {}),
+  };
 }
 
 /** 성공 결과의 fieldPath에 대응하는 확인된 범위를 조회한다. */
