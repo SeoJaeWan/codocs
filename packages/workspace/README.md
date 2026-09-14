@@ -1,6 +1,6 @@
 # workspace
 
-프로젝트 루트 선택, 연결 YAML 탐색·읽기, 논리 경로·실제 대상·읽기/쓰기 범위 판정을 담당하는 IO 경계다. 순수 검증과 진단 코드·고정 문구는 `@codosc/core` 공개 진입점만 소비한다. `src/projectRoot`는 루트 선택·확인, `src/paths`는 연결 경로 해석·범위 판정, `src/diagnostics`는 확인된 경로와 실제 시스템 오류 코드 전달, `src/loader`는 가지별 순환 중단·원문 읽기·core 파싱/검증 연결과 스캔 상태 분리를 담당한다.
+프로젝트 루트 선택, 연결 YAML 탐색·읽기, 논리 경로·실제 대상·읽기/쓰기 범위 판정을 담당하는 IO 경계다. 순수 검증과 진단 코드·고정 문구는 `@codosc/core` 공개 진입점만 소비한다. `src/projectRoot`는 루트 선택·확인, `src/paths`는 연결 경로 해석·범위 판정, `src/diagnostics`는 확인된 경로와 실제 시스템 오류 코드 전달, `src/loader`는 가지별 순환 중단·원문 읽기·core 파싱/검증 연결과 스캔 상태 분리, `src/indexing`은 스캔을 core 색인 관측으로 변환하는 연결을 담당한다.
 
 공개 진입점은 `@codosc/workspace`이며 다른 패키지의 내부 경로·subpath import를 금지한다. package exports는 루트 `.`만 제공한다. Node와 TypeScript에서 `@codosc/workspace/src/index.js`, `@codosc/workspace/dist/index.js`, `@codosc/workspace/dist/loader/index.js` 접근을 거부한다. tsc는 core 다음에 ESM `dist/index.js`와 `dist/index.d.ts`를 생성한다. ES2022·NodeNext·type module·상대 `.js` import를 유지하고 Node IO를 사용하는 workspace에만 `types: [node]`를 활성화한다. 공개 반환 타입은 Node Stats 같은 FS 내부 타입을 노출하지 않는다.
 
@@ -47,13 +47,31 @@ for (const document of scan.documents) {
 }
 ```
 
-`documents`의 `WorkspaceDocumentResult`는 실제로 읽은 `raw` UTF-8 원문, `source.path` 프로젝트 상대 경로, `source.logicalPath` 논리 절대 경로, 확인한 `source.realPath`, 연결 `scope/access`, 실제 core 진단을 보존한다. CRLF·한글·공백과 사용자 YAML 표기를 재포맷하지 않는다. `status: valid`에서만 검증 성공한 `data: Term | Knowledge`를 제공한다. `parseError`와 `validationError`에는 원문·경로·진단을 제공하며 검증 성공 데이터는 없다. core 파싱의 `fields/rootRange`와 원문·경로를 스키마 검증에 전달하여 실제 오류·경고 좌표를 유지한다. 경고만 있는 문서는 `valid`이며 사용자 속성도 보존한다.
+`documents`의 `WorkspaceDocumentResult`는 실제로 읽은 `raw` UTF-8 원문, `source.path` 프로젝트 상대 경로, `source.logicalPath` 논리 절대 경로, 확인한 `source.realPath`, 연결 `scope/access`, 실제 core 진단을 보존한다. CRLF·한글·공백과 사용자 YAML 표기를 재포맷하지 않는다. `status: valid`에서만 검증 성공한 `data: Term | Knowledge`를 제공한다. `valid/validationError`에는 별도 `parsed: Extract<YamlParseResult, { success: true }>`도 제공한다. `parsed.data`는 검증되지 않은 `Record<string, unknown>`이며 `source/fields/strings/rootRange` 원문 매핑을 재사용한다. 이를 검증 성공 데이터로 취급하지 않는다. `validationError/parseError`에 `data`는 없고, `parseError`에는 `parsed`도 없다. 파싱 실패의 진단은 YAML 진단으로 좁혀진다. 파싱 실패 원문에서 종류·이름·참조를 추측하지 않는다. core 파싱의 `fields/rootRange`와 원문·경로를 스키마 검증에 전달하여 실제 오류·경고 좌표를 유지한다. 경고만 있는 문서는 `valid`이며 사용자 속성도 보존한다.
 
 스캔 `status`는 문서 유효성과 별개다. `complete`는 확인 대상의 탐색 완료이며 `.codocs` 부재·빈 프로젝트·읽은 내용 오류만 있는 경우도 포함한다. 확인한 순환 연결은 의도적으로 건너뛰므로 자체적으로 부분 완료를 만들지 않는다. 하위 폴더 열거·파일 읽기 실패와 깨진 하위 링크는 `partial`이며 정상 문서는 계속 읽는다. 루트가 유효하지 않거나 읽을 수 없거나 `.codocs` 자체를 확인·탐색할 수 없으면 `failed`다. `complete/partial`은 확인한 `root`를 제공하고 `failed`의 루트는 선택에 성공한 경우에만 있다.
 
 공개 `WorkspaceScanResult`는 `documents`, `failures`, `skippedCycles`, 합산 `diagnostics`와 위 스캔 상태를 제공한다. 문서는 `WorkspaceDocumentResult`의 `status`로 좁힌 뒤에만 `data`를 읽는다. `WorkspaceDocumentSource`는 확인한 세 경로를, `WorkspaceScanFailure`는 미확인 범위를, `WorkspaceSkippedCycle`은 의도적으로 건너뛴 연결을 표현한다. `WorkspaceDocumentDiagnostic`은 core YAML·스키마 진단이며 `WorkspaceScanDiagnostic`은 여기에 `WorkspaceDiagnostic`을 더한 합집합이다. IO 진단의 `code`로 좁히면 선택적 `ioCode`를 읽을 수 있다.
 
 `failures`의 `WorkspaceScanFailure`는 확인하지 못한 파일·폴더 범위와 실제 IO 진단을 보관한다. 확인한 `path/logicalPath/realPath`만 제공하므로 대상 확인 실패에는 실제 경로가 없을 수 있다. 읽지 못한 원문·ID·좌표를 만들지 않는다. 부분 완료에서 누락된 경로는 삭제 증거가 아니며 후속 색인은 `failures` 범위를 보존해야 한다. workspace 진단 코드·고정 문구와 `WorkspaceDiagnosticCode`는 workspace diagnostics에서 관리하고 `@codosc/workspace` 공개 진입점으로 제공한다. 공통 형식 `Diagnostic<WorkspaceDiagnosticCode>`는 core에서 받아 사용한다.
+
+`toCatalogScan(scan: WorkspaceScanResult): CatalogScan`은 추가 IO 없이 발견 경로별 관측과 스캔 상태·실패 범위를 변환한다. 성공 파싱 모델은 객체와 문자열 원문 매핑 그대로 재사용하고, 파싱 실패에는 원문과 YAML 진단만 전달한다. 확인한 상대 `path`가 있는 `file/directory` 실패만 core의 `file/folder`로 대응한다. 경로가 없거나 종류가 미확인이면 `unknown`이며 절대 논리 경로를 상대 실패 범위로 추측하지 않는다. IO 진단 코드·문구·`ioCode`를 바꾸지 않고, 의도적인 순환 건너뜀은 실패로 만들지 않는다.
+
+`buildWorkspaceCatalog(scan: WorkspaceScanResult, previous?: Catalog): Catalog`은 변환한 관측을 core `buildCatalog`에 연결한다. 이전 색인은 반드시 같은 프로젝트의 것이어야 한다. ID나 실경로가 같아도 발견 경로별 문서를 합치지 않는다. ID 누락·충돌·스키마 오류에서도 확인 가능한 이름과 정상 문자열 본문은 유지하며, 직접/역참조·등장 위치·진단은 core에서 계산한다. 목록은 확정 연결만 포함하므로 모호함·자기 참조·미확인 자료에 역참조를 만들지 않는다. `complete`의 확인된 부재만 삭제 근거이며 `partial`은 새 관측을 갱신하고 모든 누락 이전 경로를 보수적으로 미확인 상태로 보존한다. `failed`는 새 관측을 채택하지 않고 이전 자료와 실패 상태를 유지한다. 미탐색 신규 후보 가능성 때문에 불확실한 검색을 성공이나 부재로 확정하지 않는다. 입력·원문은 변경하지 않는다.
+
+```ts
+import { buildWorkspaceCatalog, loadWorkspace } from '@codosc/workspace';
+import { resolveReference } from '@codosc/core';
+
+const first = buildWorkspaceCatalog(await loadWorkspace({ project: '../app' }));
+const updated = buildWorkspaceCatalog(
+  await loadWorkspace({ project: '../app' }),
+  first,
+);
+console.log(updated.status, resolveReference(updated, { name: '용어' }));
+```
+
+`pnpm exec vitest run packages/workspace/src/indexing`은 Windows x64 / Node 24.21.0 / pnpm 10.34.5의 고유한 실제 임시 프로젝트에서 파싱 모델 보존·정상 원소 추출·스키마 오류 대상 연결·hardlink 발견 경로·파일 수정/이동/삭제와 충돌 해소를 확인한다. 같은 실경로 입력의 별칭 보존, partial/failed 실패 범위 전달과 복구는 결정적인 순수 스캔 입력으로 따로 확인한다. 이 순수 시험은 OS 권한 실패나 파일 symlink 시험을 대체하지 않는다. 로더의 기존 접근 정책은 변경하지 않으며 Windows 기존 실패 집합도 별도 비교한다. 계산 연결만 제공하고 watcher·UI·LSP/MCP 연결·rename 실행·다중 파일 저장/복구는 제공하지 않는다.
 
 `pnpm exec vitest run packages/workspace`는 고유한 실제 임시 프로젝트에서 loader·경로·루트 검사를 수행한다. macOS arm64 / Node 24.21.0 / pnpm 10.34.5에서 실제 파일·폴더 링크, 순환·공유 폴더 재방문, 혼합 내용 오류·경고, 실제 파일 읽기·폴더 열거·루트·`.codocs` 권한 실패를 확인했다.
 
