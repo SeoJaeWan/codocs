@@ -17,6 +17,9 @@ import type {
   SourcePosition,
   YamlDiagnosticCode,
 } from '../diagnostics/index.js';
+import { collectStringMappings } from './stringMapping.js';
+import type { StringSourceMapping } from './stringMapping.js';
+export type { StringSourceMapping } from './stringMapping.js';
 
 /** 문법 또는 지원하지 않는 YAML 구문의 오류다. */
 export interface YamlDiagnostic extends Diagnostic {
@@ -38,6 +41,8 @@ export type YamlParseResult =
       source: string;
       data: Record<string, unknown>;
       fields: readonly FieldRanges[];
+      /** 문자열 해석값의 코드 단위별 실제 원문 구간이다. */
+      strings: readonly StringSourceMapping[];
       /** 최상위 매핑 AST의 확인된 값 범위이며 문서 표시와 앞뒤 독립 주석은 제외한다. */
       rootRange?: OffsetRange;
       diagnostics: readonly YamlDiagnostic[];
@@ -420,12 +425,15 @@ export function parseYaml(input: unknown, path?: string): YamlParseResult {
     };
   const fields: FieldRanges[] = [];
   collectFields(document.contents, [], fields, source);
+  const strings: StringSourceMapping[] = [];
+  collectStringMappings(document.contents, [], strings);
   const rootRange = nodeRange(document.contents);
   return {
     success: true,
     source,
     data,
     fields,
+    strings,
     diagnostics,
     ...(rootRange ? { rootRange } : {}),
   };
@@ -459,6 +467,52 @@ export function getValueRange(
   fieldPath: FieldPath,
 ): OffsetRange | undefined {
   return findRange(result, fieldPath, 'value');
+}
+/** 확인된 문자열 매핑을 복사해서 조회한다. 실패·비문자열에는 매핑이 없다. */
+export function getStringMapping(
+  result: YamlParseResult,
+  fieldPath: FieldPath,
+): StringSourceMapping | undefined {
+  if (!result.success) return undefined;
+  const mapping = result.strings.find(
+    (candidate) =>
+      candidate.fieldPath.length === fieldPath.length &&
+      candidate.fieldPath.every((part, index) => part === fieldPath[index]),
+  );
+  return mapping
+    ? {
+        fieldPath: [...mapping.fieldPath],
+        value: mapping.value,
+        sourceRanges: mapping.sourceRanges.map((range) => ({ ...range })),
+      }
+    : undefined;
+}
+/** 해석 문자열의 비어 있지 않은 UTF-16 범위를 실제 YAML 원문 범위로 계산한다. */
+export function getStringRange(
+  result: YamlParseResult,
+  fieldPath: FieldPath,
+  decodedRange: OffsetRange,
+): OffsetRange | undefined {
+  if (!result.success) return undefined;
+  const mapping = result.strings.find(
+    (candidate) =>
+      candidate.fieldPath.length === fieldPath.length &&
+      candidate.fieldPath.every((part, index) => part === fieldPath[index]),
+  );
+  if (
+    !mapping ||
+    !Number.isInteger(decodedRange.start) ||
+    !Number.isInteger(decodedRange.end) ||
+    decodedRange.start < 0 ||
+    decodedRange.start >= decodedRange.end ||
+    decodedRange.end > mapping.value.length
+  )
+    return undefined;
+  const start = mapping.sourceRanges[decodedRange.start]?.start;
+  const end = mapping.sourceRanges[decodedRange.end - 1]?.end;
+  return start !== undefined && end !== undefined && start <= end
+    ? { start, end }
+    : undefined;
 }
 /** 키부터 같은 줄·값 내부 주석과 줄바꿈을 포함한 속성 전체 범위를 조회한다. 삭제 허용 판정은 수행하지 않는다. */
 export function getPropertyRange(

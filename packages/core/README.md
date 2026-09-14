@@ -2,7 +2,7 @@
 
 IO 없는 .codocs YAML 파싱·원문 위치와 Zod 문서 스키마 검증을 제공한다. Node 내장 모듈과 IDE/LSP/MCP SDK에 직접 의존하지 않는다. 실제 프로젝트 선택·파일 IO·연결 경계·스캔 상태는 `@codosc/workspace`가 담당하며 core는 순수 함수·타입·상수를 제공한다. 필수 속성·자료형·ID·JSON 값은 검증하며 참조 의미는 후속 계층의 책임이다. 파싱·스키마 성공이나 범위 조회는 저장·삭제 허용을 의미하지 않는다.
 
-공개 진입점은 `@codosc/core`다. `src/index.ts`는 parser·diagnostics·validator를 재내보낸다. 직접 의존성은 정확히 고정한 `yaml@2.9.1`과 `zod@4.6.5`이며 lockfile에 기록한다. ESM JS와 선언 파일은 tsc로 `dist`에 생성한다. 추출 타입 선언은 Zod에 의존하고 `validateDocument`는 ZodError를 반환하지 않는다. strict, ES2022, NodeNext, 상대 `.js` import와 `types: []`를 유지한다.
+공개 진입점은 `@codosc/core`다. `src/index.ts`는 parser·diagnostics·validator·references를 재내보낸다. 직접 의존성은 정확히 고정한 `yaml@2.9.1`과 `zod@4.6.5`이며 lockfile에 기록한다. ESM JS와 선언 파일은 tsc로 `dist`에 생성한다. 추출 타입 선언은 Zod에 의존하고 `validateDocument`는 ZodError를 반환하지 않는다. strict, ES2022, NodeNext, 상대 `.js` import와 `types: []`를 유지한다.
 
 ```ts
 import {
@@ -26,7 +26,7 @@ if (parsed.success) {
 
 `parseYaml(input: unknown, path?: string)`는 문자열을 검사하고 Document/CST 토큰으로 원문 위치와 금지 구문을 확인한 후 데이터를 변환한다. 단일 문서와 최상위 매핑만 성공한다. 단일 `---`, 주석, 따옴표, 블록 문자열, 중첩 배열·객체와 flow 구조는 허용한다. 앵커, 별칭, 병합 키, 사용자 태그, 복수 문서와 중복 키는 `unsupported_yaml_feature`이며 일반 문법 오류와 비매핑은 `invalid_yaml`이다. 뒤의 중복 키 전체를 지목한다. 실패는 원문·진단만 제공하고 복구 AST에서 정상 데이터를 선택하지 않는다. 비문자열 입력에는 원문과 위치가 없다. `path`는 진단 메타데이터일 뿐 파일을 읽지 않는다. 파서 진단은 항상 `severity: 'error'`다.
 
-공통 진단은 `Diagnostic`의 `code/severity/message`와 선택적인 `path/fieldPath/range`를 사용한다. 확인되지 않은 메타데이터는 생략한다. YAML 오류 코드는 `src/diagnostics/index.ts`의 `yamlDiagnosticCodes`에서 관리하며 각 코드의 발생 조건을 주석으로 설명한다. `YamlDiagnosticCode`와 `YamlDiagnostic.code`의 타입도 이 정의에서 도출한다. 공개 진입점에서 두 정의를 가져올 수 있다. `schemaDiagnosticCodes`는 `missingRequiredField` (`missing_required_field`), `invalidFieldType` (`invalid_field_type`), `invalidFieldValue` (`invalid_field_value`), `unknownField` (`unknown_field`)를 제공한다. `DiagnosticCode`는 core의 YAML·스키마 코드 합집합이다. 공통 형식 `Diagnostic<Code extends string = DiagnosticCode>`는 각 계층이 자기 코드 타입을 지정할 수 있으며 `DiagnosticSeverity`는 `error/warning`이다. 문서 검증은 오류를 `errors`, 사용자 속성 경고를 `warnings`로 분리한다.
+공통 진단은 `Diagnostic`의 `code/severity/message`와 선택적인 `path/fieldPath/range`를 사용한다. 확인되지 않은 메타데이터는 생략한다. YAML 오류 코드는 `src/diagnostics/index.ts`의 `yamlDiagnosticCodes`에서 관리하며 각 코드의 발생 조건을 주석으로 설명한다. `YamlDiagnosticCode`와 `YamlDiagnostic.code`의 타입도 이 정의에서 도출한다. 공개 진입점에서 두 정의를 가져올 수 있다. `schemaDiagnosticCodes`는 `missingRequiredField` (`missing_required_field`), `invalidFieldType` (`invalid_field_type`), `invalidFieldValue` (`invalid_field_value`), `unknownField` (`unknown_field`)를 제공한다. `DiagnosticCode`는 core의 YAML·스키마·참조 문법 코드 합집합이다. 공통 형식 `Diagnostic<Code extends string = DiagnosticCode>`는 각 계층이 자기 코드 타입을 지정할 수 있으며 `DiagnosticSeverity`는 `error/warning`이다. 문서 검증은 오류를 `errors`, 사용자 속성 경고를 `warnings`로 분리한다.
 
 고정 진단 문구는 같은 모듈의 `yamlDiagnosticMessages`와 `schemaDiagnosticMessages`에서 관리하며 공개 진입점에서 가져올 수 있다. 구현과 테스트는 해당 상수를 함께 참조한다. YAML 문법 오류는 `yamlDiagnosticMessages.syntaxErrorPrefix` 뒤에 라이브러리 상세 메시지를 이어 붙이며, Zod가 생성하는 상세 메시지도 그대로 유지한다.
 
@@ -35,7 +35,7 @@ if (parsed.success) {
 | `yamlDiagnosticCodes.invalidYaml`            | `invalid_yaml`             | 비문자열 입력, YAML 문법 오류, 빈 문서 또는 최상위 값이 매핑이 아닌 경우                       |
 | `yamlDiagnosticCodes.unsupportedYamlFeature` | `unsupported_yaml_feature` | 앵커·별칭·병합 키·사용자 태그·복수 문서·중복 키가 있는 경우. 중첩 매핑과 flow 표기 자체는 허용 |
 
-`YamlParseResult`는 `success`로 분기한다. 성공에는 `source`, `data`, `fields`, `diagnostics`와 AST에서 확인한 최상위 매핑의 `rootRange`가 있고 실패에는 `data/fields/rootRange`가 없다. `rootRange`는 AST의 매핑 값 범위(`OffsetRange`)이며 문서 표시와 앞뒤 독립 주석을 제외한다. 블록 매핑의 같은 줄 주석·끝 개행은 포함할 수 있고 flow 매핑 뒤 주석은 제외한다. AST 범위가 없으면 임의로 원문 전체를 사용하지 않고 생략한다. `YamlDiagnostic`은 공통 `Diagnostic`을 확장하며 YAML 코드, `severity: 'error'`, 원인별 한국어 메시지, 선택적인 `path`, `offsetRange`와 외부 `range`를 제공한다. 위치를 확인할 수 없으면 두 범위 필드를 생략한다.
+`YamlParseResult`는 `success`로 분기한다. 성공에는 `source`, `data`, `fields`, `strings`, `diagnostics`와 AST에서 확인한 최상위 매핑의 `rootRange`가 있고 실패에는 `data/fields/strings/rootRange`가 없다. `rootRange`는 AST의 매핑 값 범위(`OffsetRange`)이며 문서 표시와 앞뒤 독립 주석을 제외한다. 블록 매핑의 같은 줄 주석·끝 개행은 포함할 수 있고 flow 매핑 뒤 주석은 제외한다. AST 범위가 없으면 임의로 원문 전체를 사용하지 않고 생략한다. `YamlDiagnostic`은 공통 `Diagnostic`을 확장하며 YAML 코드, `severity: 'error'`, 원인별 한국어 메시지, 선택적인 `path`, `offsetRange`와 외부 `range`를 제공한다. 위치를 확인할 수 없으면 두 범위 필드를 생략한다.
 
 `FieldPath`는 문자열 매핑 키와 숫자 배열 인덱스의 배열이다. 점이 포함된 문자열도 실제 키로 취급한다. `getKeyRange`, `getValueRange`, `getPropertyRange`는 확인된 `OffsetRange` 또는 `undefined`를 반환한다. 값 범위는 따옴표와 블록 헤더를 포함하고 뒤의 주석을 제외한다. 속성 전체는 키부터 같은 줄·값 내부 주석과 블록 개행까지 포함하며 앞의 독립 주석은 제외한다. 빈 값에는 확인된 0 길이 값 범위가 있다. 배열 항목에는 값 범위만 있고 매핑 키와 속성 전체 범위가 없다. 복합 매핑 키처럼 `FieldPath`로 표현할 수 없는 위치에는 범위를 임의 생성하지 않는다.
 
@@ -77,5 +77,33 @@ if (parsed.success) {
 선언 소비의 `types: []`는 Node 전역 타입 자동 추가를 차단한다. Zod 4.6.5의 외부 선언은 `URL` 전역 타입을 참조하므로 이번 `skipLibCheck: false` 독립 소비자는 `lib: [ES2022, DOM]`으로 검증한다. `lib: [ES2022]`만 사용하는 저장소와 frozen fixture의 core emit은 공통 `skipLibCheck: true`를 사용한다. DOM 없이 외부 선언까지 검사하는 소비자의 성공은 보장하지 않는다. Zod 추출 선택 필드 타입에는 undefined가 포함되지만 validator는 명시적인 undefined 입력을 허용하지 않는다.
 
 workspace 전용 경로·IO·순환 진단 코드와 고정 문구는 `@codosc/workspace`가 소유하고 공개한다. core는 workspace 코드에 의존하지 않으며 공통 진단 형식만 제공한다. 실제 파일 확인·읽기·경로 해석은 workspace에서 수행한다.
+
+## 해석 문자열의 원문 매핑과 본문 참조 추출
+
+`parseYaml` 성공 결과의 `strings: readonly StringSourceMapping[]`는 문자열 값마다 `fieldPath/value/sourceRanges`를 제공한다. `sourceRanges`의 인덱스는 해석 문자열의 UTF-16 코드 단위 offset이며 각 항목은 그 문자를 만든 실제 YAML 원문 구간이다. Unicode escape 하나가 이모지를 만들면 두 코드 단위 모두 같은 escape 구간을 가리킨다. 줄 접기가 만든 공백·개행은 기여한 실제 개행 구간을 가리키고, YAML이 EOF에 생성한 마지막 개행은 EOF의 0 길이 구간을 가리킨다. AST/CST 객체나 YAML 내부 타입을 공개하지 않는다.
+
+`getStringMapping(parsed, fieldPath)`는 매핑의 복사본 또는 `undefined`를 반환한다. `getStringRange(parsed, fieldPath, { start, end })`는 비어 있지 않은 해석 문자열 범위를 실제 원문 범위로 계산한다. 범위 밖·비정수·역방향·빈 범위와 실패·비문자열 값에는 `undefined`다. 기존 `fields/getKeyRange/getValueRange/getPropertyRange`의 의미는 변경하지 않는다. 매핑은 공개 AST/CST의 스칼라 토큰과 해석값 일치 검증으로 얻으며 원문 검색이나 해석 offset의 단순 가산을 사용하지 않는다. 따옴표·Unicode escape·여러 줄 plain/quoted·literal/folded 블록·들여쓰기·chomping과 LF/CRLF를 처리한다.
+
+```ts
+import { parseYaml, extractReferences } from '@codosc/core';
+
+const parsed = parseYaml('type: knowledge\nbody: "[[판매:주문]] [[주문]]"\n');
+const extracted = extractReferences(parsed, 'knowledge.yaml');
+for (const occurrence of extracted.occurrences) {
+  if (occurrence.syntax === 'valid') {
+    console.log(occurrence.name, occurrence.domain); // 주문, 판매 / 주문, undefined
+  }
+  console.log(occurrence.fieldPath, occurrence.offsetRange, occurrence.range);
+}
+console.log(extracted.diagnostics);
+```
+
+`extractReferences(parsed: YamlParseResult, path?: string): ReferenceExtraction`는 파싱 성공의 `type`을 먼저 확인한다. term의 문자열 `definition`과 배열 `examples`의 문자열 원소, knowledge의 문자열 `body`에서만 추출한다. 본문 외 필드·잘못된 종류·자료형·배열 원소는 변환이나 종류 추측 없이 제외한다. 정상 원소는 유지하며 스키마 실패나 ID 누락으로 정상 본문을 버리지 않는다. 파싱 실패는 빈 등장·진단을 반환한다. 입력·원문·렌더링을 변경하거나 파일을 읽고 저장하지 않는다.
+
+문법은 YAML 해석 문자열에서 판정한다. `[[` 바로 앞 연속 백슬래시 개수가 홀수면 리터럴이고 짝수면 참조다. 첫 비이스케이프 콜론은 도메인 구분자이며 구성 내부 콜론은 `\:`로 작성한다. `[[이름]]`과 `[[도메인:이름]]`의 이름·도메인은 trim·대소문자 보정·ID 패턴 제한 없이 유지한다. escape 콜론만 해석 이름에서 콜론으로 바꾸며 실제 `text`와 원문은 그대로다. 빈 이름·도메인, 대괄호가 남은 구성, 추가 비이스케이프 콜론과 미완성은 오류다. 닫히기 전에 새 비리터럴 `[[`가 나타나면 앞 구간을 오류로 기록하고 새 시작에서 복구한다.
+
+`ReferenceOccurrence`는 `syntax: 'valid' | 'invalid'`로 분기한다. 각 등장에는 `text/fieldPath/decodedRange/offsetRange/range`가 있고 정상 문법에만 `name`과 선택 `domain`이 있다. 반복과 무효 등장도 모두 보존한다. `decodedRange`는 해석 문자열, `offsetRange/range`는 실제 YAML 원문 기준이며 모두 0 기반 UTF-16 시작 포함·끝 제외다. `ReferenceDiagnostic`은 실제 오류 등장 범위와 `severity: 'error'`, 선택 `path`를 제공한다. `referenceDiagnosticCodes.invalidReference` (`invalid_reference`)와 `referenceDiagnosticMessages.invalidReference`가 코드·고정 문구를 소유하며 `DiagnosticCode`에도 참조 문법 코드를 포함한다. 이름 후보 검색·ID 충돌·확정 연결·역참조는 이 추출 API가 해석하지 않는다.
+
+인접 `parser/stringMapping.test.ts`와 `references/references.test.ts`는 실제 해석값·원문 slice·고정 offset/좌표, 백슬래시 홀짝·콜론·중첩 복구·반복 위치, mixed examples·파싱 실패와 입력 불변을 검증한다. 이번 task의 환경은 Windows x64 / Node 24.21.0 / pnpm 10.34.5이며 과거 macOS 검증과 별개다. IO·실제 IDE/MCP·rename writer를 검증한 것으로 간주하지 않는다.
 
 `pnpm exec vitest run tools/buildChecks -t workspace`는 core/workspace의 실제 tarball을 소스 없는 별도 소비자에 offline frozen 설치하고 `@codosc/workspace` 공개 로더를 실행한다. workspace가 core 공개 진입점의 parser→validator에 읽은 원문과 확인한 경로·위치를 전달하는지, 내용 오류가 스캔 누락과 구분되는지, 경고만 있는 성공과 사용자 값이 유지되는지 검사한다. 소비자의 공개 d.ts는 상태로 좁힌 검증 데이터와 IO 진단을 제공하며 Node/TS workspace 내부 subpath를 거부한다. 기존 core parser·schema JS/d.ts 검사는 `pnpm check:build`에서 그대로 실행한다. 이 workspace 배포 소비 검증 환경은 macOS arm64 / Node 24.21.0 / pnpm 10.34.5이며 다른 OS·Windows 정션은 미검증이다. 실제 저장·링크 교체 시 재검증·외부 watcher·색인·공유 대상 잠금은 후속 계층의 작업이다.
