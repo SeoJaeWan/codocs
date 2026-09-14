@@ -35,7 +35,7 @@ if (parsed.success) {
 
 참조는 `definition`, `examples`, `body` 본문에서 `[[id]]`로 표시한다. 예제의 `sample-order`와 `sample-fulfillment` 및 서로의 참조·본문은 파싱 후에도 유지된다. 현재 파서는 이 참조를 일반 문자열로 전달한다. 현재 스키마는 문서 구조를 검사한다. 후속 계층은 참조 의미, 중복 ID 및 없는 참조를 확인해야 하며 실패 원문에서 ID·참조를 임의 검색하지 않는다.
 
-개발 Prettier 검사는 저장소의 가상 예시에만 적용한다. 사용자 .codocs 저장 시 문서 전체를 재포맷하는 동작은 제공하지 않는다. 가이드와 예시는 MCP 및 VS Code의 dist asset에 복사한다. `pnpm check:build`는 dist와 pack에서 추출한 원문 일치 및 소스 없는 소비자의 공개 파서 실행을 확인하지만 도구 API와 VSIX 배포 기능은 아직 없다.
+개발 Prettier 검사는 저장소의 가상 예시에만 적용한다. 사용자 .codocs 저장 시 문서 전체를 재포맷하는 동작은 제공하지 않는다. 가이드와 예시는 MCP 및 VS Code의 dist asset에 복사한다. `pnpm check:build`는 dist와 pack에서 추출한 원문 일치 및 소스 없는 소비자의 공개 parser→validator 실행을 확인하지만 도구 API와 VSIX 배포 기능은 아직 없다.
 
 문서 스키마의 term 선택 필드는 `examples: string[]`와 `deprecatedAliases: { name: string; message?: string }[]`이며 빈 선택 배열을 허용한다. knowledge의 `domains`는 문자열 하나 이상이어야 한다. knowledge 선택 `kind`는 `policy/procedure/decision/discussion`, `status`는 `proposed/confirmed/deprecated`다. status를 생략하면 그대로 생략하고 기본값이나 경고를 추가하지 않는다. 모든 문서 문자열은 빈 값·공백뿐인 값이 될 수 없으며 원래 대소문자와 공백을 유지한다. 알려진 속성의 null과 틀린 배열 원소는 오류다.
 
@@ -44,3 +44,7 @@ if (parsed.success) {
 성공에는 `success: true`, `data: Term | Knowledge`, `errors: []`, `warnings`가 있고 실패에는 `success: false`, `errors`, `warnings`만 있다. 입력과 원문·범위를 변경하지 않는다. `missing_required_field/invalid_field_type/invalid_field_value`는 error, `unknown_field`는 warning이며 경고만 있으면 성공이다. 검사 성공은 저장 허용 판정이 아니다.
 
 사용자 속성은 재귀 JSON 문자열·유한 숫자·boolean·null·배열·문자열 키 객체를 보존하고 미등록 키를 경고한다. 사용자 JSON 객체 내부는 업무 필드로 해석하지 않는다. `aliases`는 사용자 속성이며 이름 매칭 의미가 없다. `.nan/.inf`, undefined, 순환 등 비JSON 값을 제거하거나 변환하지 않고 실패한다. Zod 4.6.5를 정확히 고정하며 추출 타입 `Term/Knowledge/JsonValue`도 제공한다. 검증 결과는 ZodError를 반환하지 않는다.
+
+가상 예제 원본, MCP/VS Code dist와 실제 pack에서 추출한 예제는 파일을 읽어 parser→validator 성공과 전체 데이터·ID 위치·원문 일치를 검사한다. 배포 guide도 원본과 동일해야 한다. 독립 ESM 소비자의 파일/객체 후보·입력 보존·진단 코드와 위치, `types: []`의 dist d.ts success 분기·Term/Knowledge 필드 타입, CJS bundle과 frozen 설치 fixture의 validator 실행을 검증한다. 이번 전체 기능·개발·빌드·typecheck·lint·변경 파일 서식 검증 환경은 macOS arm64 / Node 24.21.0 / pnpm 10.34.5 / yaml 2.9.1 / Zod 4.6.5다. 루트 format:check에는 변경하지 않은 `.github/workplans/COD-4.md`의 기존 서식 실패 한 건이 남는다. 실제 VS Code/Node 20 호스트·MCP 클라이언트·npm 단독 설치/게시·VSIX 시험은 포함하지 않는다.
+
+선언 소비의 `types: []`는 Node 전역 타입 자동 추가를 차단한다. Zod 4.6.5의 외부 선언은 `URL` 전역 타입을 참조하므로 이번 `skipLibCheck: false` 독립 소비자는 `lib: [ES2022, DOM]`으로 검증한다. `lib: [ES2022]`만 사용하는 저장소와 frozen fixture의 core emit은 공통 `skipLibCheck: true`를 사용한다. DOM 없이 외부 선언까지 검사하는 소비자의 성공은 보장하지 않는다. Zod 추출 선택 필드 타입에는 undefined가 포함되지만 validator는 명시적인 undefined 입력을 허용하지 않는다.

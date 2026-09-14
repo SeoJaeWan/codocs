@@ -25,7 +25,7 @@ function run(args: string[], cwd = consumer): string {
   return execFileSync(process.execPath, args, { cwd, encoding: 'utf8' });
 }
 
-/** 원본 또는 배포된 예제를 소스 없는 소비자의 공개 파서로 검사한다. */
+/** 원본 또는 배포된 예제를 소스 없는 소비자의 공개 파서와 검증기로 검사한다. */
 function checkExamples(directory: string): void {
   const cases = [
     {
@@ -57,7 +57,7 @@ function checkExamples(directory: string): void {
   const script = `import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { parseYaml, getKeyRange, getValueRange, getPropertyRange } from '@codosc/core';
+import { parseYaml, validateDocument, getKeyRange, getValueRange, getPropertyRange } from '@codosc/core';
 for (const item of ${JSON.stringify(cases)}) {
   const filePath = path.join(process.argv[2], item.relative);
   const source = readFileSync(filePath, 'utf8');
@@ -67,6 +67,13 @@ for (const item of ${JSON.stringify(cases)}) {
   assert.equal(parsed.source, source);
   assert.deepEqual(parsed.diagnostics, []);
   assert.deepEqual(parsed.data, item.expected);
+  const before = structuredClone(parsed);
+  const validated = validateDocument({data: parsed.data, source: parsed.source, fields: parsed.fields, path: filePath, ...(parsed.rootRange ? {rootRange: parsed.rootRange} : {})});
+  assert.equal(validated.success, true, JSON.stringify(validated.errors));
+  assert.deepEqual(validated.data, item.expected);
+  assert.deepEqual(validated.errors, []);
+  assert.deepEqual(validated.warnings, []);
+  assert.deepEqual(parsed, before);
   const key = getKeyRange(parsed, ['id']);
   const value = getValueRange(parsed, ['id']);
   const property = getPropertyRange(parsed, ['id']);
@@ -76,9 +83,11 @@ for (const item of ${JSON.stringify(cases)}) {
   const newline = source.includes('\\r\\n') ? '\\r\\n' : '\\n';
   assert.equal(source.slice(property.start, property.end), 'id: ' + item.expected.id + newline);
 }
-console.log('2 examples parsed');`;
+console.log('2 examples parsed and validated');`;
   writeFileSync(path.join(consumer, 'examples.mjs'), script);
-  expect(run(['examples.mjs', directory])).toContain('2 examples parsed');
+  expect(run(['examples.mjs', directory])).toContain(
+    '2 examples parsed and validated',
+  );
 }
 
 /** 디렉터리 안의 실제 출력 파일을 상대 경로로 반환한다. */
@@ -201,6 +210,74 @@ console.log('Diagnostic code contract verified');`;
     );
   });
 
+  it('빌드된 검증기를 파일과 객체 후보에 사용하면 외부 진단 계약과 입력을 보존한다', /** 실제 파일을 읽고 제품 코드·심각도·경로·UTF-16 위치와 불변성을 검사한다. */ () => {
+    const source =
+      '# 앞\n---\n{type: term, id: Bad-ID, definition: 정의, domain: 영역, examples: ["😀", false], aliases: [old]} # 뒤\n';
+    const filePath = path.join(consumer, 'invalid terms.yaml');
+    writeFileSync(filePath, source);
+    const script = `import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {parseYaml, validateDocument} from '@codosc/core';
+const filePath = process.argv[2];
+const source = readFileSync(filePath, 'utf8');
+const parsed = parseYaml(source, filePath);
+assert.equal(parsed.success, true);
+const input = {data: parsed.data, source: parsed.source, fields: parsed.fields, rootRange: parsed.rootRange, path: filePath};
+const before = structuredClone(input);
+const result = validateDocument(input);
+assert.equal(result.success, false);
+assert.equal(Object.hasOwn(result, 'data'), false);
+assert.deepEqual(input, before);
+const expected = [
+  ['missing_required_field', ['name'], source.slice(source.indexOf('{'), source.indexOf('}') + 1)],
+  ['invalid_field_type', ['examples', 1], 'false'],
+  ['invalid_field_value', ['id'], 'Bad-ID'],
+];
+assert.equal(result.errors.length, expected.length);
+for (const [code, fieldPath, slice] of expected) {
+  const issue = result.errors.find(item => JSON.stringify(item.fieldPath) === JSON.stringify(fieldPath));
+  assert.ok(issue);
+  assert.equal(issue.code, code);
+  assert.equal(issue.severity, 'error');
+  assert.equal(issue.path, filePath);
+  const start = source.indexOf(slice);
+  const offsetPosition = offset => {const lines = source.slice(0, offset).split('\\n'); return {line: lines.length - 1, character: lines.at(-1).length};};
+  assert.deepEqual(issue.range, {start: offsetPosition(start), end: offsetPosition(start + slice.length)});
+}
+assert.equal(result.warnings.length, 1);
+const warning = result.warnings[0];
+assert.equal(warning.code, 'unknown_field');
+assert.equal(warning.severity, 'warning');
+assert.equal(warning.path, filePath);
+assert.deepEqual(warning.fieldPath, ['aliases']);
+const aliasStart = source.split('\\n')[2].indexOf('aliases');
+assert.deepEqual(warning.range, {start: {line: 2, character: aliasStart}, end: {line: 2, character: aliasStart + 'aliases'.length}});
+const candidate = {type: 'knowledge', id: 'sample', title: ' 标题 😀 ', body: ' Body [[sample-order]] ', domains: [' Sales '], aliases: [' Old '], custom: {nested: [null, true, 1.5, {'a.b': ' Value '}]}};
+const candidateBefore = structuredClone(candidate);
+const accepted = validateDocument({data: candidate});
+assert.equal(accepted.success, true);
+assert.deepEqual(accepted.data, candidateBefore);
+assert.deepEqual(candidate, candidateBefore);
+assert.deepEqual(accepted.errors, []);
+assert.deepEqual(accepted.warnings.map(issue => [issue.code, issue.severity, issue.fieldPath]), [['unknown_field', 'warning', ['aliases']], ['unknown_field', 'warning', ['custom']]]);
+assert.equal(Object.hasOwn(accepted.data, 'status'), false);
+for (const issue of accepted.warnings) {assert.equal(Object.hasOwn(issue, 'path'), false); assert.equal(Object.hasOwn(issue, 'range'), false);}
+const rejectedCandidate = {...candidate, domains: []};
+const rejectedBefore = structuredClone(rejectedCandidate);
+const rejected = validateDocument({data: rejectedCandidate});
+assert.equal(rejected.success, false);
+assert.equal(rejected.errors[0].code, 'invalid_field_value');
+assert.deepEqual(rejected.errors[0].fieldPath, ['domains']);
+assert.equal(Object.hasOwn(rejected.errors[0], 'range'), false);
+assert.equal(Object.hasOwn(rejected, 'data'), false);
+assert.deepEqual(rejectedCandidate, rejectedBefore);
+console.log('Validator external contract verified');`;
+    writeFileSync(path.join(consumer, 'validatorContract.mjs'), script);
+    expect(run(['validatorContract.mjs', filePath])).toContain(
+      'Validator external contract verified',
+    );
+  });
+
   it('별도 TS 소비자가 dist d.ts를 해석하고 금지 subpath를 거부한다', /** 타입 namespace를 출력 없이 검사하고 해석 경로를 확인한다. */ () => {
     const code =
       names
@@ -210,20 +287,69 @@ console.log('Diagnostic code contract verified');`;
         )
         .join('\n') +
       "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition, yamlDiagnosticCodes, validateDocument } from '@codosc/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic, YamlDiagnosticCode, Term, Knowledge } from '@codosc/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\nexport const diagnosticCode: YamlDiagnosticCode = yamlDiagnosticCodes.invalidYaml;\nexport const returnedCodes: readonly YamlDiagnosticCode[] = diagnostics.map(issue => issue.code);\nconst validated = validateDocument({data: parsed.success ? parsed.data : {}});\nif (validated.success) {\n  const data: Term | Knowledge = validated.data;\n  if (data.type === 'term') { const name: string = data.name; void name; }\n  else { const domains: string[] = data.domains; void domains; }\n}\n";
+    const validatorTypes = `
+import type { DocumentValidationResult, ValidateDocumentInput, JsonValue, SchemaDiagnostic, SchemaDiagnosticCode } from '@codosc/core';
+const input: ValidateDocumentInput = {data: {}};
+const result: DocumentValidationResult = validateDocument(input);
+export const issues: readonly SchemaDiagnostic[] = [...result.errors, ...result.warnings];
+export const code: SchemaDiagnosticCode = 'invalid_field_value';
+export const json: JsonValue = {nested: [null, false, 1, 'value']};
+if (result.success) {
+  const document: Term | Knowledge = result.data;
+  const id: string = document.id;
+  void id;
+  if (document.type === 'term') {
+    const fields: string[] = [document.name, document.definition, document.domain];
+    const examples: string[] | undefined = document.examples;
+    const aliases: {name: string; message?: string | undefined}[] | undefined = document.deprecatedAliases;
+    void fields; void examples; void aliases;
+    // @ts-expect-error term.name must remain a string
+    const wrong: number = document.name;
+    void wrong;
+  } else {
+    const fields: string[] = [document.title, document.body, ...document.domains];
+    const kind: 'policy' | 'procedure' | 'decision' | 'discussion' | undefined = document.kind;
+    const status: 'proposed' | 'confirmed' | 'deprecated' | undefined = document.status;
+    void fields; void kind; void status;
+    // @ts-expect-error knowledge.domains must remain a string array
+    const wrong: number[] = document.domains;
+    void wrong;
+  }
+} else {
+  // @ts-expect-error failure must not expose validated data
+  const absent = result.data;
+  void absent;
+}
+// @ts-expect-error unknown success must be narrowed before reading data
+const unnarrowed = result.data;
+void unnarrowed;
+// @ts-expect-error document schema is internal
+import {documentSchema} from '@codosc/core';
+void documentSchema;
+// @ts-expect-error term structure is internal
+import {termStructure} from '@codosc/core';
+void termStructure;
+// @ts-expect-error knowledge structure is internal
+import {knowledgeStructure} from '@codosc/core';
+void knowledgeStructure;
+`;
     const config = {
       compilerOptions: {
         strict: true,
+        exactOptionalPropertyTypes: true,
         noEmit: true,
         module: 'NodeNext',
         moduleResolution: 'NodeNext',
         target: 'ES2022',
+        // Zod 선언의 URL 전역 참조도 실제 기본 라이브러리로 검사한다.
+        lib: ['ES2022', 'DOM'],
         types: [],
         skipLibCheck: false,
       },
       files: ['consume.ts'],
     };
     writeFileSync(path.join(consumer, 'tsconfig.json'), JSON.stringify(config));
-    writeFileSync(path.join(consumer, 'consume.ts'), code);
+    writeFileSync(path.join(consumer, 'consume.ts'), code + validatorTypes);
     const trace = run([tsc, '-p', 'tsconfig.json', '--traceResolution']);
     for (const name of names) {
       expect(trace.replaceAll('\\', '/')).toContain(
@@ -231,6 +357,28 @@ console.log('Diagnostic code contract verified');`;
       );
     }
     expect(trace).not.toContain('/src/index.ts');
+    // 공개 입력 타입만 사용해도 root 선언의 Zod URL 의존성은 남는다.
+    writeFileSync(
+      path.join(consumer, 'consume.ts'),
+      "import type {ValidateDocumentInput} from '@codosc/core';\nexport const input: ValidateDocumentInput = {data: {}};\n",
+    );
+    writeFileSync(
+      path.join(consumer, 'tsconfig.json'),
+      JSON.stringify({
+        ...config,
+        compilerOptions: { ...config.compilerOptions, lib: ['ES2022'] },
+      }),
+    );
+    const esOnlyFailure = spawnSync(
+      process.execPath,
+      [tsc, '-p', 'tsconfig.json'],
+      { cwd: consumer, encoding: 'utf8' },
+    );
+    expect(esOnlyFailure.status).not.toBe(0);
+    expect(esOnlyFailure.stdout + esOnlyFailure.stderr).toContain(
+      "TS2304: Cannot find name 'URL'",
+    );
+    writeFileSync(path.join(consumer, 'tsconfig.json'), JSON.stringify(config));
     writeFileSync(
       path.join(consumer, 'consume.ts'),
       "import type * as Hidden from '@codosc/core/src/index.js';\nexport type Value = typeof Hidden;\n",
@@ -437,7 +585,17 @@ console.log('Diagnostic code contract verified');`;
     const source = path.join(consumer, 'adapter.ts');
     writeFileSync(
       source,
-      "import { parseYaml } from '@codosc/core';\nimport '@codosc/workspace';\nexport const loaded = parseYaml('name: bundled').success;\n",
+      `import { parseYaml, validateDocument } from '@codosc/core';
+import '@codosc/workspace';
+const source = 'type: term\\nid: bundled\\nname: 名前 😀\\ndefinition: 定義\\ndomain: Sales\\n';
+const parsed = parseYaml(source);
+if (!parsed.success) throw new Error('Bundled parser failed');
+const result = validateDocument({data: parsed.data, source: parsed.source, fields: parsed.fields, ...(parsed.rootRange ? {rootRange: parsed.rootRange} : {})});
+if (!result.success || result.data.type !== 'term' || result.data.name !== '名前 😀' || result.errors.length || result.warnings.length) throw new Error('Bundled validator failed');
+const invalid = validateDocument({data: {...result.data, id: 'Bad-ID'}});
+if (invalid.success || invalid.errors[0]?.code !== 'invalid_field_value') throw new Error('Bundled validator error failed');
+export const loaded = true;
+`,
     );
     await bundleIde([source], path.join(consumer, 'adapter.cjs'));
     expect(

@@ -211,6 +211,27 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
     },
   );
 
+  it('기존 문서와 수정 후보를 병합해 검사하면 같은 필수 계약을 적용하고 원본을 유지한다', /** 호출자가 만든 전체 후보에 기본값이나 저장 허용을 추가하지 않는다. */ () => {
+    const original = { ...knowledge, custom: { nested: [null, ' Value '] } };
+    const originalBefore = snapshot(original);
+    const candidate = { ...original, title: ' New Title ' };
+    const accepted = validateUnchanged({ data: candidate });
+    expect(accepted.success).toBe(true);
+    if (accepted.success) {
+      expect(accepted.data.title).toBe(' New Title ');
+      expect(accepted.data).not.toHaveProperty('status');
+      expect(accepted.data).not.toHaveProperty('saveAllowed');
+    }
+    const { body: omitted, ...incomplete } = candidate;
+    expect(omitted).toBeDefined();
+    const rejected = validateUnchanged({ data: incomplete });
+    expect(rejected.success).toBe(false);
+    expect(at(rejected.errors, ['body']).code).toBe(
+      schemaDiagnosticCodes.missingRequiredField,
+    );
+    expect(original).toEqual(originalBefore);
+  });
+
   it('필수 필드를 생략하면 missing 오류와 안전한 사용자 경고를 함께 반환한다', /** 오류가 있어도 aliases 경고를 별도로 수집한다. */ () => {
     const { name: omitted, ...rest } = term;
     expect(omitted).toBeDefined();

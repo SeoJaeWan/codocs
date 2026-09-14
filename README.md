@@ -1,6 +1,6 @@
 # codosc
 
-`.codocs` 지식 문서를 위한 모노레포다. `@codosc/core`는 IO 없는 단일 YAML 매핑 파서와 원문 위치 API를 제공한다. 나머지 네 패키지는 빈 모듈이며 스키마 검증, 참조 해석, 파일 IO, Hover/LSP, VS Code activation, MCP 도구/stdio 기능은 구현하지 않았다. 검사는 파서·원문 위치와 개발·설치·빌드 계약을 검증하며 실제 IDE/MCP 연결, VSIX, npm 게시는 검증하지 않는다.
+`.codocs` 지식 문서를 위한 모노레포다. `@codosc/core`는 IO 없는 단일 YAML 매핑 파서·원문 위치 API와 Zod 문서 검증을 제공한다. 나머지 네 패키지는 빈 모듈이며 참조 해석, 파일 IO, Hover/LSP, VS Code activation, MCP 도구/stdio 기능은 구현하지 않았다. 검사는 파서·원문 위치·term/knowledge 스키마와 개발·설치·빌드 소비자 계약을 검증하며 실제 IDE/MCP 연결, VSIX, npm 게시는 검증하지 않는다.
 
 ```ts
 import { parseYaml, getValueRange, offsetToPosition } from '@codosc/core';
@@ -17,9 +17,11 @@ if (parsed.success) {
 }
 ```
 
-`parseYaml(input: unknown, filePath?: string)`는 문자열을 해석하며 파일을 읽지 않는다. 성공 결과의 `source/data/fields/diagnostics`와 실패 결과의 원문·진단을 구분한다. 단일 `---`, 주석, 블록 문자열, 중첩 배열·매핑과 flow 구조는 허용하고 최상위 배열·스칼라 및 빈 문서는 거부한다. 앵커·별칭·병합 키·사용자 태그·복수 문서·중복 키는 `unsupported_yaml_feature`, 일반 문법 오류와 비매핑은 `invalid_yaml`이다. 실패에는 `data/fields`가 없다.
+`parseYaml(input: unknown, filePath?: string)`는 문자열을 해석하며 파일을 읽지 않는다. 성공 결과는 `source/data/fields/diagnostics`와 확인된 선택 `rootRange`를 제공하고 실패 결과는 원문·진단만 제공한다. 단일 `---`, 주석, 블록 문자열, 중첩 배열·매핑과 flow 구조는 허용하고 최상위 배열·스칼라 및 빈 문서는 거부한다. 앵커·별칭·병합 키·사용자 태그·복수 문서·중복 키는 `unsupported_yaml_feature`, 일반 문법 오류와 비매핑은 `invalid_yaml`이다. 실패에는 `data/fields/rootRange`가 없다.
 
 `getKeyRange/getValueRange/getPropertyRange`는 문자열 키·숫자 배열 인덱스의 경로로 키·값·속성 전체의 확인된 범위 또는 `undefined`를 반환한다. 원문은 정규화하지 않고 내부 범위는 0 기반 UTF-16, 시작 포함·끝 제외다. 외부 좌표는 0 기반 `line/character`다. 파싱 성공과 위치 조회는 스키마 유효성이나 저장·삭제 허용을 뜻하지 않는다. 상세 계약은 [core README](packages/core/README.md), 단일 문서 작성 예시는 [작성 가이드](docs/guide/README.md)에 있다.
+
+`validateDocument({ data, path?, source?, fields?, rootRange? })`는 조회·생성·수정의 전체 후보를 검사한다. 수정 후보의 병합과 파일 읽기는 호출자 책임이다. 성공은 `success: true`, `data: Term | Knowledge`, `errors: []`, 별도 `warnings`이며 실패에는 `data`가 없다. 입력 데이터·원문·위치를 보존하고 coercion, trim, 기본값 추가나 사용자 속성 삭제를 하지 않는다. term의 필수 속성은 `type/id/name/definition/domain`, knowledge는 `type/id/title/body/domains`이며 문자열·ID·열거값·배열 원소와 재귀 JSON 값을 검사한다. status 생략은 그대로 유지하고 aliases는 사용자 속성이며 매칭 의미가 없다. `missing_required_field/invalid_field_type/invalid_field_value`는 error, `unknown_field`는 warning이다. 경고만 있으면 성공하며 위치를 확인할 수 없으면 range를 생략한다. 검사 성공은 저장 허용 판정이 아니다. 공개 추출 타입과 validator는 정확히 고정한 `yaml@2.9.1`, `zod@4.6.5`를 실제 소비자에서도 필요로 한다. 직접 스키마 객체는 내부 구현이다.
 
 개발 런타임은 **Node 24.21.0**, 패키지 관리자는 **pnpm 10.34.5**다. `.node-version`, `packageManager`, 직접 의존성의 정확한 버전과 `pnpm-lock.yaml`을 함께 커밋한다. TypeScript 5.9.3은 typescript-eslint 8.70.0의 지원 범위(`<6.1`)에 맞춘다. ESLint 10.10.0, eslint-plugin-jsdoc 64.3.10, Prettier 3.9.6, Vitest 5.0.0, esbuild 0.28.2, 개발 도구용 `@types/node` 22.19.3을 사용한다.
 
@@ -42,6 +44,8 @@ node --version
 node .workbench/runtime/package/bin/pnpm.cjs --version
 node .workbench/runtime/package/bin/pnpm.cjs install --frozen-lockfile --store-dir .workbench/pnpm-store
 ```
+
+macOS의 이번 검증도 Node 공식 배포 바이너리와 registry integrity로 확인한 pnpm 10.34.5 배포를 작업 안에 준비했다. `packageManager`에 따른 child 선택만으로 CLI 배포 버전을 판정하지 않고 pnpm 자체 package.json의 10.34.5도 확인한다. cache/data/state/config의 XDG 경로 및 임시 디렉터리를 `.workbench` 안에 지정해 store 밖의 기본 호스트 cache 쓰기도 격리한다. 테스트 하위 프로세스에는 같은 환경과 실제 로컬 `pnpm.cjs`를 가리키는 `CODOSC_PNPM_CLI`를 전달한다.
 
 Node/pnpm이 이미 작업에 격리되어 있으면 다음 루트 명령을 실행한다. 위 방식에서는 `pnpm` 대신 `node .workbench/runtime/package/bin/pnpm.cjs`를 사용한다.
 
@@ -70,11 +74,11 @@ git diff --check
 
 모든 내부 패키지는 `private: true`, `workspace:*`, 제한된 `exports`를 사용한다. 패키지 이름으로 공개 진입점을 import하고 상대 내부 경로, subpath, 별칭을 통한 내부 접근은 금지한다. 경계 규칙은 TypeScript 설정에 따라 해석한 실제 경로도 검사한다. core는 순수 라이브러리를 사용할 수 있지만 Node 내장/IO, VS Code, LSP/MCP SDK와 독립이다. 내부 공개 API와 npm 게시를 구분하며, 개발용 Node 24 요구를 공유/IDE 코드의 engines 제약으로 일괄 적용하지 않는다.
 
-strict 공통 설정과 ES2022/NodeNext 런타임 설정을 분리한다. TypeScript source는 명시적인 ESM package type과 로컬 .js import를 사용한다. 모든 패키지는 `types: []`로 root 도구용 Node 타입을 상속하지 않는다. 이 설정은 호스트 전역 타입을 자동 추가하지 않는다. 현재 core는 순수 YAML 라이브러리 API를 사용하며 호스트 의존성은 lint로 금지한다. 향후 workspace/어댑터에 런타임 타입을 추가할 때 해당 런타임 지원 하한과 API 사용을 별도로 검증해야 한다. esbuild target만으로 Node API 호환성을 보장할 수 없다.
+strict 공통 설정과 ES2022/NodeNext 런타임 설정을 분리한다. TypeScript source는 명시적인 ESM package type과 로컬 .js import를 사용한다. 모든 패키지는 `types: []`로 root 도구용 Node 타입을 상속하지 않는다. 이 설정은 호스트 전역 타입을 자동 추가하지 않는다. 현재 core는 순수 YAML·Zod 라이브러리 API를 사용하며 호스트 의존성은 lint로 금지한다. 향후 workspace/어댑터에 런타임 타입을 추가할 때 해당 런타임 지원 하한과 API 사용을 별도로 검증해야 한다. esbuild target만으로 Node API 호환성을 보장할 수 없다.
 
 함수/변수는 camelCase, 클래스/타입은 PascalCase다. 공개 함수 반환 타입을 명시하고 선언 함수, 메서드와 변수에 할당한 함수에는 한국어 JSDoc을 작성한다. 4줄 이내의 인라인 호출 콜백은 JSDoc 검사에서 제외한다. Promise는 await 또는 오류를 처리하는 연결로 소비하며 단순 `void`는 허용하지 않는다. 외부 프로젝트 입력은 `unknown`으로 받아 구조와 의미를 검증한 뒤 내부 타입으로 사용한다. lint는 의미 검증의 대체가 아니다.
 
-기능을 추가할 때 `src/기능/index.ts`와 `src/기능/기능.test.ts`를 같은 폴더에 둔다. 패키지 README에는 실제 입력/출력 흐름, 경계와 공개 API, 오류/상태, 시험 범위를 갱신한다. 단순 re-export에는 형식적 테스트를 요구하지 않는다. 현재 테스트는 파싱·금지 구문·원문 범위·좌표, 실제 ESLint 성공/실패 및 rule ID, 패키지 발견과 의존 방향, parser source 전체를 복사한 별도 fixture에서 frozen 설치 성공과 불일치 manifest 거부, 빌드 선언 타입 진입점 해석과 금지 subpath의 TypeScript 거부를 검증한다. 실행 중인 Windows 명령 shim이 설치 과정에서 변경되지 않도록 설치 fixture는 활성 작업의 node_modules와 격리한다.
+기능을 추가할 때 `src/기능/index.ts`와 `src/기능/기능.test.ts`를 같은 폴더에 둔다. 패키지 README에는 실제 입력/출력 흐름, 경계와 공개 API, 오류/상태, 시험 범위를 갱신한다. 단순 re-export에는 형식적 테스트를 요구하지 않는다. 현재 테스트는 파싱·금지 구문·원문 범위·좌표·스키마·입력 불변, 실제 ESLint 성공/실패 및 rule ID, 패키지 발견과 의존 방향, core source 전체를 복사한 별도 fixture에서 frozen 설치 성공과 불일치 manifest 거부, 빌드 선언 타입 진입점 해석과 금지 subpath의 TypeScript 거부를 검증한다. 실행 중인 Windows 명령 shim이 설치 과정에서 변경되지 않도록 설치 fixture는 활성 작업의 node_modules와 격리한다.
 
 루트 `build`는 이전 package dist를 지우고 core/workspace/MCP를 tsc로 JS+d.ts emit한 뒤 언어 서버와 확장을 esbuild CJS로 번들한다. 두 IDE 패키지의 d.ts는 tsc로 별도 생성한다. `exports.types`는 모두 실제 `dist/index.d.ts`이고 core/workspace/MCP의 import는 `dist/index.js`, 언어 서버/확장의 import 및 require는 `dist/index.cjs`다. build에서 test/spec는 제외하고 source alias나 TS loader를 사용하지 않는다.
 
@@ -82,8 +86,10 @@ strict 공통 설정과 ES2022/NodeNext 런타임 설정을 분리한다. TypeSc
 
 IDE target node20.19는 VS Code 1.100.0의 [고정 Node 설정](https://github.com/microsoft/vscode/blob/1.100.0/.nvmrc) 20.19.0에 근거한 문법 하한 후보다. 공유 TypeScript ES2022는 그보다 낮은 문법 수준을 사용한다. esbuild target은 Node API를 polyfill하지 않는다. core source에는 호스트 API가 없고 VS Code 1.100.0/Node 20의 실제 시험은 수행하지 않았다. vscode 모듈은 호스트 제공 external이며 서버 bundle/map은 확장의 `dist/server/`에 복사한다.
 
-`docs/guide`는 파서 계약과 미구현 기능을 표시한 작성 가이드이며 `examples/.codocs`는 파일마다 하나의 최상위 매핑인 가상 업무 사실 YAML이다. 두 파일의 ID·참조·본문은 실제 공개 파서로 검증한다. build는 MCP와 vscode의 dist에 두 폴더를 복사하고 package files에 dist/README를 포함한다. MCP guide 도구는 구현하지 않는다. 개발 서식 검사는 저장소 가상 예시에 적용하며 사용자 .codocs 저장 시 전체 재포맷 기능은 없다.
+`docs/guide`는 파서·스키마 계약과 미구현 기능을 표시한 작성 가이드이며 `examples/.codocs`는 파일마다 하나의 최상위 매핑인 가상 업무 사실 YAML이다. 두 파일의 ID·참조·본문은 실제 공개 parser→validator로 검증한다. build는 MCP와 vscode의 dist에 두 폴더를 복사하고 package files에 dist/README를 포함한다. MCP guide 도구는 구현하지 않는다. 개발 서식 검사는 저장소 가상 예시에 적용하며 사용자 .codocs 저장 시 전체 재포맷 기능은 없다.
 
-`check:build`는 이전 dist 없이 실제 빌드를 실행하고 한글/공백 경로의 별도 소비자에 manifest와 dist 및 명시적인 yaml 의존성을 준비한다. 실제 Node subprocess의 package 이름 ESM import/CJS require와 파서 API 실행, `types: []` TypeScript d.ts 해석 trace, TS/Node 내부 subpath 거부, tsc 타입 오류와 같은 source의 독립 bundle 성공, 실제 test 출력 제외, core를 포함한 CJS bundle 소비, vscode external을 검증한다. MCP/vscode의 dist와 실제 pack에서 추출한 guide/example 원문 일치 및 예제 파싱도 확인한다. 기존 개발 규칙의 Promise/JSDoc/공개 타입/경계 성공·실패 검출도 유지한다. private workspace 의존성의 로컬 소비 성공은 npm 단독 설치 성공을 뜻하지 않는다.
+`check:build`는 이전 dist 없이 실제 빌드를 실행하고 한글/공백 경로의 별도 소비자에 manifest와 dist 및 명시적으로 복사한 yaml·Zod 의존성을 준비한다. 실제 Node subprocess의 package 이름 ESM import/CJS require와 파서·validator API 실행, `types: []` TypeScript d.ts 해석 trace, TS/Node 내부 subpath 거부, tsc 타입 오류와 같은 source의 독립 bundle 성공, 실제 test 출력 제외, core를 포함한 CJS bundle 소비, vscode external을 검증한다. MCP/vscode의 dist와 실제 pack에서 추출한 guide/example 원문 일치 및 예제 parser→validator 성공도 확인한다. 파일 검증·객체 후보 검증, 오류/경고 분리, 입력 보존, 외부 코드 리터럴·path/severity·UTF-16 위치와 d.ts의 success 분기·Term/Knowledge 필드 타입·실패의 data 부재를 검증한다. frozen 개발 fixture도 빌드된 validator의 JS 및 선언을 실행·소비한다. 기존 개발 규칙의 Promise/JSDoc/공개 타입/경계 성공·실패 검출도 유지한다. private workspace 의존성의 로컬 소비 성공은 npm 단독 설치 성공을 뜻하지 않는다.
 
-검증 환경은 Windows x64, 작업 전용 Node 24.21.0 / pnpm 10.34.5다. 다른 운영체제, VS Code 호스트와 실제 MCP 클라이언트는 아직 검증하지 않았다.
+이번 전체 검증 환경은 macOS arm64, 작업 전용 Node 24.21.0 / pnpm 10.34.5 / yaml 2.9.1 / Zod 4.6.5다. frozen 설치, 전체 기능·개발·빌드 검사, typecheck, lint와 변경 파일 Prettier를 확인한다. 루트 format:check에는 변경하지 않은 `.github/workplans/COD-4.md`의 기존 서식 실패 한 건이 남는다. 기존 Windows x64 빌드 검증과 별개로 다른 OS/아키텍처, VS Code 1.100.0/Node 20 호스트, 실제 MCP 클라이언트, npm 단독 설치·게시와 VSIX는 이번 검증 범위 밖이다.
+
+선언 소비의 `types: []`는 Node 전역 타입 자동 추가를 차단한다. Zod 4.6.5의 외부 선언은 `URL` 전역 타입을 참조하므로 이번 `skipLibCheck: false` 독립 소비자는 `lib: [ES2022, DOM]`으로 검증한다. `lib: [ES2022]`만 사용하는 저장소와 frozen fixture의 core emit은 공통 `skipLibCheck: true`를 사용한다. DOM 없이 외부 선언까지 검사하는 소비자의 성공은 보장하지 않는다. Zod 추출 선택 필드 타입에는 undefined가 포함되지만 validator는 명시적인 undefined 입력을 허용하지 않는다.
