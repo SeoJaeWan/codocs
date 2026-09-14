@@ -2,6 +2,6 @@
 type: knowledge
 id: sample-fulfillment
 title: 가상 주문 처리
-body: 가상 프로젝트에서 [[sample-order]]를 확인한 뒤 가상 배송 상태를 기록한다.
+body: 가상 프로젝트에서 [[가상 주문]]를 확인한 뒤 가상 배송 상태를 기록한다.
 domains:
   - sample-sales

@@ -25,7 +25,7 @@ if (selected.success) {
 
 파일 링크는 해당 파일만 편입하고 폴더 링크는 그 하위를 편입한다. 연결 대상의 실제 외부 경로 직접 입력은 거부한다. `..`는 일반 하위 폴더 또는 연결 폴더 내부에서 부모로 돌아올 때만 허용하며 `.codocs` 또는 현재 연결 루트 밖으로 넘어가면 거부한다. 전체 입력을 먼저 정규화하여 `link/..`를 지우지 않는다. `.codocs/공통/하위/../terms.yaml`은 연결 루트 안에서 허용하지만 `.codocs/공통/../형제.yaml`은 거부한다. 파일 뒤의 폴더 탐색도 허용하지 않는다.
 
-성공의 `access.read/write: true`는 현 시점 연결 범위 정책이며 OS 파일 읽기/쓰기 성공을 보장하지 않는다. 조회는 루트·대상을 확인하지만 파일 원문 읽기·폴더 열거·실제 저장은 수행하지 않는다. 루트는 각 경로 확인 시 다시 검증하며 실제 writer는 쓰기 시 링크 대상을 다시 확인해야 한다. 링크 유지 저장·대상 교체 충돌·watcher·색인·공유 대상 잠금은 후속 작업이다.
+성공의 `access.read/write: true`는 현 시점 연결 범위 정책이며 OS 파일 읽기/쓰기 성공을 보장하지 않는다. 경로 조회는 루트·대상을 확인하지만 파일 원문 읽기·폴더 열거·실제 저장은 수행하지 않는다. 로더의 실제 읽기와 core 색인 연결은 별도 API다. 루트는 각 경로 확인 시 다시 검증하며 실제 writer는 쓰기 시 링크 대상을 다시 확인해야 한다. 링크 유지 저장·대상 교체 충돌·watcher·공유 대상 잠금은 후속 작업이다.
 
 실패 `status`는 `denied`(입력 또는 범위 거부), `missing`(유효한 루트의 `.codocs` 자체 부재), `unavailable`(깨진 링크·잘못된 대상·대상 확인 실패)이다. 존재하는 깨진 `.codocs` 링크를 부재로 반환하지 않는다. 확인하지 못한 원문·실경로·ID·좌표는 만들지 않는다. 진단은 workspace의 `workspaceDiagnosticCodes/workspaceDiagnosticMessages`와 선택적인 실제 `ioCode`를 사용한다. 로더는 `.codocs` 부재를 정상 빈 프로젝트로, 실제 루트/IO 오류를 실패로 분리한다.
 
@@ -53,7 +53,7 @@ for (const document of scan.documents) {
 
 공개 `WorkspaceScanResult`는 `documents`, `failures`, `skippedCycles`, 합산 `diagnostics`와 위 스캔 상태를 제공한다. 문서는 `WorkspaceDocumentResult`의 `status`로 좁힌 뒤에만 `data`를 읽는다. `WorkspaceDocumentSource`는 확인한 세 경로를, `WorkspaceScanFailure`는 미확인 범위를, `WorkspaceSkippedCycle`은 의도적으로 건너뛴 연결을 표현한다. `WorkspaceDocumentDiagnostic`은 core YAML·스키마 진단이며 `WorkspaceScanDiagnostic`은 여기에 `WorkspaceDiagnostic`을 더한 합집합이다. IO 진단의 `code`로 좁히면 선택적 `ioCode`를 읽을 수 있다.
 
-`failures`의 `WorkspaceScanFailure`는 확인하지 못한 파일·폴더 범위와 실제 IO 진단을 보관한다. 확인한 `path/logicalPath/realPath`만 제공하므로 대상 확인 실패에는 실제 경로가 없을 수 있다. 읽지 못한 원문·ID·좌표를 만들지 않는다. 부분 완료에서 누락된 경로는 삭제 증거가 아니며 후속 색인은 `failures` 범위를 보존해야 한다. workspace 진단 코드·고정 문구와 `WorkspaceDiagnosticCode`는 workspace diagnostics에서 관리하고 `@codosc/workspace` 공개 진입점으로 제공한다. 공통 형식 `Diagnostic<WorkspaceDiagnosticCode>`는 core에서 받아 사용한다.
+`failures`의 `WorkspaceScanFailure`는 확인하지 못한 파일·폴더 범위와 실제 IO 진단을 보관한다. 확인한 `path/logicalPath/realPath`만 제공하므로 대상 확인 실패에는 실제 경로가 없을 수 있다. 읽지 못한 원문·ID·좌표를 만들지 않는다. 부분 완료에서 누락된 경로는 삭제 증거가 아니며 색인 연결은 `failures` 범위를 보존한다. workspace 진단 코드·고정 문구와 `WorkspaceDiagnosticCode`는 workspace diagnostics에서 관리하고 `@codosc/workspace` 공개 진입점으로 제공한다. 공통 형식 `Diagnostic<WorkspaceDiagnosticCode>`는 core에서 받아 사용한다.
 
 `toCatalogScan(scan: WorkspaceScanResult): CatalogScan`은 추가 IO 없이 발견 경로별 관측과 스캔 상태·실패 범위를 변환한다. 성공 파싱 모델은 객체와 문자열 원문 매핑 그대로 재사용하고, 파싱 실패에는 원문과 YAML 진단만 전달한다. 확인한 상대 `path`가 있는 `file/directory` 실패만 core의 `file/folder`로 대응한다. 경로가 없거나 종류가 미확인이면 `unknown`이며 절대 논리 경로를 상대 실패 범위로 추측하지 않는다. IO 진단 코드·문구·`ioCode`를 바꾸지 않고, 의도적인 순환 건너뜀은 실패로 만들지 않는다.
 
@@ -78,3 +78,11 @@ console.log(updated.status, resolveReference(updated, { name: '용어' }));
 `pnpm exec vitest run tools/buildChecks -t workspace`는 이전 dist를 지우고 순차 빌드한 core/workspace tarball을 별도 소비자에 offline frozen 설치한다. 최초 lockfile 준비는 fixture 전용 cache에서 고정 의존성의 registry metadata를 조회하므로 registry 접근이 필요하다. private core 패키지 의존성은 같은 실제 core tarball에 고정하며 npm 게시 성공을 검사하는 것은 아니다. 소비자는 `src` 없이 `@codosc/workspace`만 import하며 고유한 실제 임시 프로젝트의 UTF-8·CRLF 원문, 한글·공백 경로, 외부 파일·폴더 링크와 두 논리 가지의 같은 문서, 순환 경고, 파싱/스키마 오류와 경고 성공을 확인한다. 깨진 링크는 `partial`, 내용 오류만 있으면 `complete`, `.codocs` 부재는 정상 0개, 잘못된 루트는 `failed`임을 확인한다. 실패 범위에는 확인하지 못한 원문·실경로를 넣지 않는 계약도 검사한다.
 
 같은 소스 없는 소비자는 `types: []`, strict/exactOptionalPropertyTypes, NodeNext, ES2022, `skipLibCheck: false`, `lib: [ES2022, DOM]`으로 공개 d.ts를 해석한다. DOM은 core에서 추출한 Zod 선언의 `URL` 참조에 필요하다. 상태별 루트·문서 데이터와 Term/Knowledge 필드·IO 코드 타입을 좁히며 오류 문서의 data 접근과 Node/TS 내부 subpath 접근을 거부한다. 이 배포 소비 검증도 macOS arm64 / Node 24.21.0 / pnpm 10.34.5에서 수행했다. 전체 교차 검증은 `pnpm exec vitest run`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`로 별도 실행하며, 이 공개 소비 검사의 성공만으로 다른 OS·실제 저장·watcher·색인·잠금의 완료를 주장하지 않는다.
+
+## COD-8 이름 참조 배포 소비
+
+`pnpm exec vitest run tools/buildChecks -t '이름 참조'`는 Windows x64 / Node 24.21.0 / pnpm 10.34.5에서 기존 symlink fixture와 별도로 실행한다. 새 실제 tarball 소비자는 소스를 포함하지 않고 링크 없이 추출하며 고정 yaml/Zod 의존성을 명시적으로 복사한다. 공개 core/workspace 루트의 JS와 strict NodeNext d.ts로 추출·색인·갱신·rename 계획·진단 코드 합집합·내부 subpath 거부를 확인한다. 실제 보통 파일의 한글/공백 경로·UTF-8/CRLF 원문·파싱/스키마 오류 모델·parsed 객체 재사용·수정/이동/삭제 재색인과 planRename의 저장 없음도 검사한다. partial/failed·동일 realPath의 다른 발견 경로는 결정적인 core 입력으로 별도 검증한다. 이 시험은 OS symlink·권한 실패나 npm 설치/게시 검증이 아니다. 기존 workspace tarball의 파일 symlink EPERM 한 건은 삭제·skip·완화하지 않으며 승인된 정확 회귀 집합 비교와 분리한다.
+
+참조는 `[[이름]]`의 전체 검색과 `[[도메인:이름]]`의 지정 도메인 정확 비교다. 작성 문서의 도메인 우선·trim·대소문자 보정·ID 패턴 제한은 없으며 ID는 전역 식별 값이지 참조 키가 아니다. type을 확인한 정상 문자열 본문만 추출한다. escape 작성·충돌·자기 참조·미확인 상태는 [작성 가이드](../../docs/guide/README.md)에 있다. 소스 guide와 실제 name/title 참조 예제를 MCP/vscode 배포 asset에 복사하고 원문 일치를 검사한다.
+
+후속 rename 실행은 선택적 기존 참조 변경·후보/도메인 선택, 쓰기 불가 전체 사전 중단, 원문 변경 시 최신 미리보기 재시작, 중간 저장 실패 복구 시도 및 실제 파일 상태 안내를 보존해야 한다. 다중 파일 원자성을 보장하지 않고 이번 계산/로더 연결에서 writer 완료로 표시하지 않는다. 기존 validateDocument·MCP ID get/list·단일 codocs_write 계약은 유지한다. 최종 전체 회귀 acceptance는 INT-001이 별도로 봉인한다.

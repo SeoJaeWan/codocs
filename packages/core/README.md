@@ -149,4 +149,10 @@ complete 재관측만 이전 미관측 문서를 제거한다. partial은 확인
 
 `status: ready | unresolved | blocked`는 저장 허용이 아니다. `impacts`는 무선택 모호 후보가 이름 변경 후 다른 단일 후보가 되는 경우도 이전/이후 후보와 실제 등장 위치로 보고한다. 미선택·잘못된 선택·도메인 미선택·참조 변경 비활성화 등을 자동 결정하지 않는다. `invalidSelections`는 존재하지 않는 등장·리터럴·중복 선택을 보고하며 이런 선택은 차단한다. `catalogDiagnosticCodes/catalogDiagnosticMessages`는 색인 코드·고정 한국어 문구를 소유하고 `DiagnosticCode`에도 코드 합집합을 추가한다. `CatalogDiagnostic`은 확인한 offsetRange와 충돌의 relatedPaths·domain도 제공한다.
 
-인접 `catalog/catalog.test.ts`는 경로/이름/ID 충돌, 정상 부분 정보, 전체 정확 검색, 반복·순환·자기 참조, 갱신·부분/실패/회복과 rename 선택·충돌·실제 위치·입력 불변을 검증한다. TASK-001의 parser/references 테스트도 그대로 수행한다. 1,000개 합성 문서의 구축/갱신·등장/연결 수 측정은 task-local `.workbench` 보고서에 남기며 제품의 2초/500ms·실제 IDE/MCP 목표를 달성했다는 근거가 아니다. 이번 계산 API 검증 환경은 Windows x64 / Node 24.21.0 / pnpm 10.34.5다. 실제 로더 연결·배포 소비는 후속 단계이며 UI·실제 rename·다중 파일 writer/복구·watcher·LSP/MCP 연결은 구현하지 않는다.
+인접 `catalog/catalog.test.ts`는 경로/이름/ID 충돌, 정상 부분 정보, 전체 정확 검색, 반복·순환·자기 참조, 갱신·부분/실패/회복과 rename 선택·충돌·실제 위치·입력 불변을 검증한다. TASK-001의 parser/references 테스트도 그대로 수행한다. 1,000개 합성 문서의 구축/갱신·등장/연결 수 측정은 task-local `.workbench` 보고서에 남기며 제품의 2초/500ms·실제 IDE/MCP 목표를 달성했다는 근거가 아니다. 이번 계산 API 검증 환경은 Windows x64 / Node 24.21.0 / pnpm 10.34.5다. 실제 로더 연결은 workspace의 toCatalogScan/buildWorkspaceCatalog가 제공한다. UI·실제 rename·다중 파일 writer/복구·watcher·LSP/MCP 연결은 구현하지 않는다.
+
+## 공개 배포 소비와 후속 저장
+
+`pnpm exec vitest run tools/buildChecks -t '이름 참조'`는 Windows x64 / Node 24.21.0 / pnpm 10.34.5에서 src 없는 JS·strict d.ts·실제 tarball 소비자를 실행한다. core/workspace 공개 루트만 사용해 문법 추출·ID/realPath 별칭 보존·후보 오류·정확 검색·반복 직접/역참조·자기 참조·partial/failed·rename ready/unresolved/blocked와 입력/실제 파일 원문 불변을 확인한다. 진단 상수의 공개 문자열 리터럴과 DiagnosticCode 합집합 좁히기를 따로 확인하며 Node/TS 내부 subpath도 거부한다. tarball은 링크 없이 추출하고 고정 의존성을 명시적으로 복사한다. 기존 링크 fixture의 symlink EPERM 실패를 이 시험의 성공으로 대체하지 않는다. npm 설치/게시·OS 권한 실패나 실제 writer 검증도 아니다.
+
+작성 escape 예시와 본문 범위는 [작성 가이드](../../docs/guide/README.md), 현재 합의는 [COD-8](../../.github/workplans/COD-8.md)에 있다. 후속 writer는 선택적 기존 참조 변경·후보/도메인 선택, 쓰기 불가 전체 사전 중단, 원문 변경 시 최신 미리보기 재시작, 중간 저장 실패 복구 시도와 실제 파일 상태 안내를 제공해야 한다. 다중 파일 원자성을 보장하지 않으며 이번 계산 API에서 그 writer를 완료했다고 표시하지 않는다. 기존 validateDocument·MCP ID get/list·단일 codocs_write 계약은 유지한다.

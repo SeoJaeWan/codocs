@@ -1,6 +1,6 @@
 # codosc
 
-`.codocs` 지식 문서를 위한 모노레포다. `@codosc/core`는 IO 없는 단일 YAML 매핑 파서·원문 위치 API와 Zod 문서 검증을 제공한다. 나머지 네 패키지는 빈 모듈이며 참조 해석, 파일 IO, Hover/LSP, VS Code activation, MCP 도구/stdio 기능은 구현하지 않았다. 검사는 파서·원문 위치·term/knowledge 스키마와 개발·설치·빌드 소비자 계약을 검증하며 실제 IDE/MCP 연결, VSIX, npm 게시는 검증하지 않는다.
+`.codocs` 지식 문서를 위한 모노레포다. `@codosc/core`는 IO 없는 YAML 매핑 파서·원문 위치·Zod 문서 검증, 이름 참조 추출·경로별 색인·직접/역참조·이름 변경 수정안 계산을 제공한다. `@codosc/workspace`는 프로젝트 선택·연결 경계·실제 파일 탐색과 색인 연결을 담당한다. Hover/LSP, VS Code activation, MCP 도구/stdio 연결, 실제 rename·다중 파일 writer/복구·watcher는 COD-8 범위에 포함하지 않는다. 기존 ID 기반 MCP get/list와 단일 codocs_write 계약을 바꾸는 작업도 아니다. 공개 계산·로더 및 소스 없는 배포 소비 검사와 실제 IDE/MCP·npm 게시·VSIX 검증을 구분한다.
 
 ```ts
 import { parseYaml, getValueRange, offsetToPosition } from '@codosc/core';
@@ -86,7 +86,36 @@ strict 공통 설정과 ES2022/NodeNext 런타임 설정을 분리한다. TypeSc
 
 IDE target node20.19는 VS Code 1.100.0의 [고정 Node 설정](https://github.com/microsoft/vscode/blob/1.100.0/.nvmrc) 20.19.0에 근거한 문법 하한 후보다. 공유 TypeScript ES2022는 그보다 낮은 문법 수준을 사용한다. esbuild target은 Node API를 polyfill하지 않는다. core source에는 호스트 API가 없고 VS Code 1.100.0/Node 20의 실제 시험은 수행하지 않았다. vscode 모듈은 호스트 제공 external이며 서버 bundle/map은 확장의 `dist/server/`에 복사한다.
 
-`docs/guide`는 파서·스키마 계약과 미구현 기능을 표시한 작성 가이드이며 `examples/.codocs`는 파일마다 하나의 최상위 매핑인 가상 업무 사실 YAML이다. 두 파일의 ID·참조·본문은 실제 공개 parser→validator로 검증한다. build는 MCP와 vscode의 dist에 두 폴더를 복사하고 package files에 dist/README를 포함한다. MCP guide 도구는 구현하지 않는다. 개발 서식 검사는 저장소 가상 예시에 적용하며 사용자 .codocs 저장 시 전체 재포맷 기능은 없다.
+`docs/guide`는 파서·스키마·이름 참조 계약과 계산/저장 경계를 표시한 작성 가이드이며 `examples/.codocs`는 파일마다 하나의 최상위 매핑인 가상 업무 사실 YAML이다. ID는 전역 식별 값이지 참조 키가 아니다. 두 예제는 `[[가상 주문]]`/`[[가상 주문 처리]]`라는 실제 name/title로 서로를 참조하며 공개 parser→validator→catalog에서 확인한다. build는 MCP와 vscode의 dist에 두 폴더를 복사하고 package files에 dist/README를 포함한다. MCP guide 도구는 구현하지 않는다. 개발 서식 검사는 저장소 가상 예시에 적용하며 사용자 .codocs 저장 시 전체 재포맷 기능은 없다.
+
+## 이름 참조와 계산 API
+
+`[[이름]]`은 전체 이름 공간, `[[도메인:이름]]`은 지정 도메인에서 term.name/knowledge.title을 정확 비교한다. 작성 문서의 도메인 우선·trim·대소문자 보정·ID 패턴 제한이 없다. escape 및 정상 본문 범위는 [작성 가이드](docs/guide/README.md)에 있다. 문서는 프로젝트 상대 발견 경로로 보관하며 같은 ID/realPath라도 별칭 경로를 합치지 않는다. ID 충돌은 모든 경로에 진단하고 스키마 오류 대상도 확인 가능한 이름·오류와 함께 후보로 유지한다.
+
+```ts
+import { loadWorkspace, buildWorkspaceCatalog } from '@codosc/workspace';
+import { resolveReference, planRename } from '@codosc/core';
+
+const catalog = buildWorkspaceCatalog(
+  await loadWorkspace({ project: '../app' }),
+);
+const reference = resolveReference(catalog, {
+  name: '가상 주문',
+  domain: 'sample-sales',
+});
+console.log(reference.status, reference.candidates);
+const preview = planRename(catalog, {
+  targetPath: '.codocs/terms.yaml',
+  newName: '가상 판매 주문',
+});
+console.log(preview.status, preview.changes, preview.impacts);
+```
+
+직접/역참조 목록은 확정 직접 연결만 경로별 중복 제거·정렬하며 부재·모호함·자기 참조·미확인 자료는 등장 기록과 진단만 남긴다. complete의 확인된 부재만 삭제 근거다. partial은 확인한 문서를 갱신하고 모든 미관측 이전 기록을 보수적으로 unconfirmed로 보존한다. failed는 이전 자료와 실패 상태를 유지한다. 미탐색 신규 후보 가능성이 있으므로 불완전 색인의 검색은 후보 0/1개도 정상 또는 부재로 확정하지 않는다.
+
+`planRename`은 경로·필드·실제 위치·기존/새 해석값·후보·충돌·미해결 영향만 계산한다. 파일을 저장하지 않으며 ready도 저장 허용이 아니다. 선택적 참조 동시 변경과 모호 후보/다중 도메인 선택을 받는다. 기존 도메인은 유지하고 새 무도메인 표기가 모호하면 도메인을 명시한다. 선택하지 않은 영향은 미해결, 새 이름 충돌은 차단한다. [COD-8 작업 합의](.github/workplans/COD-8.md)는 후속 writer의 사전 중단·최신 미리보기·복구 안내를 보존하며 다중 파일 원자성을 약속하지 않는다.
+
+`pnpm exec vitest run tools/buildChecks -t '이름 참조'`는 Windows x64 / Node 24.21.0 / pnpm 10.34.5에서 소스 없는 JS·strict NodeNext d.ts·실제 tarball 소비자를 독립 실행한다. tarball은 링크 없이 추출하고 고정 yaml/Zod 의존성을 명시적으로 복사하며 npm 설치/게시 성공을 주장하지 않는다. 공개 core/workspace 루트의 추출·색인·갱신·rename 계획, 진단 코드 리터럴·타입 합집합, 내부 subpath 거부를 검사한다. 기존 workspace tarball의 파일 symlink EPERM 실패는 삭제·skip하지 않고 별도 회귀 집합으로 비교한다. 새 소비 시험의 성공이 그 실패의 성공을 뜻하지 않는다.
 
 `check:build`는 이전 dist 없이 실제 빌드를 실행하고 한글/공백 경로의 별도 소비자에 manifest와 dist 및 명시적으로 복사한 yaml·Zod 의존성을 준비한다. 실제 Node subprocess의 package 이름 ESM import/CJS require와 파서·validator API 실행, `types: []` TypeScript d.ts 해석 trace, TS/Node 내부 subpath 거부, tsc 타입 오류와 같은 source의 독립 bundle 성공, 실제 test 출력 제외, core를 포함한 CJS bundle 소비, vscode external을 검증한다. MCP/vscode의 dist와 실제 pack에서 추출한 guide/example 원문 일치 및 예제 parser→validator 성공도 확인한다. 파일 검증·객체 후보 검증, 오류/경고 분리, 입력 보존, 외부 코드 리터럴·path/severity·UTF-16 위치와 d.ts의 success 분기·Term/Knowledge 필드 타입·실패의 data 부재를 검증한다. frozen 개발 fixture도 빌드된 validator의 JS 및 선언을 실행·소비한다. 기존 개발 규칙의 Promise/JSDoc/공개 타입/경계 성공·실패 검출도 유지한다. private workspace 의존성의 로컬 소비 성공은 npm 단독 설치 성공을 뜻하지 않는다.
 

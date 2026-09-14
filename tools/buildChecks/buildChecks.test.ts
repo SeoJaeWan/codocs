@@ -13,6 +13,11 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { bundleIde } from '../build/build.mjs';
+import {
+  nameReferenceConfig,
+  nameReferenceJs,
+  nameReferenceTs,
+} from './nameReferences/index.js';
 
 const root = process.cwd();
 const fixture = path.join(root, '.workbench/fixtures/빌드 소비자 with spaces');
@@ -36,7 +41,7 @@ function checkExamples(directory: string): void {
         id: 'sample-order',
         name: '가상 주문',
         definition:
-          '가상 고객의 구매 요청이며 [[sample-fulfillment]] 절차를 따른다.',
+          '가상 고객의 구매 요청이며 [[가상 주문 처리]] 절차를 따른다.',
         domain: 'sample-sales',
         examples: ['가상 주문 SAMPLE-001을 생성한다.'],
       },
@@ -47,7 +52,7 @@ function checkExamples(directory: string): void {
         type: 'knowledge',
         id: 'sample-fulfillment',
         title: '가상 주문 처리',
-        body: '가상 프로젝트에서 [[sample-order]]를 확인한 뒤 가상 배송 상태를 기록한다.',
+        body: '가상 프로젝트에서 [[가상 주문]]를 확인한 뒤 가상 배송 상태를 기록한다.',
         domains: ['sample-sales'],
       },
     },
@@ -58,7 +63,8 @@ function checkExamples(directory: string): void {
   const script = `import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { parseYaml, validateDocument, getKeyRange, getValueRange, getPropertyRange } from '@codosc/core';
+import { parseYaml, validateDocument, getKeyRange, getValueRange, getPropertyRange, buildCatalog } from '@codosc/core';
+const observations = [];
 for (const item of ${JSON.stringify(cases)}) {
   const filePath = path.join(process.argv[2], item.relative);
   const source = readFileSync(filePath, 'utf8');
@@ -66,6 +72,7 @@ for (const item of ${JSON.stringify(cases)}) {
   const parsed = parseYaml(source, filePath);
   assert.equal(parsed.success, true, JSON.stringify(parsed.diagnostics));
   assert.equal(parsed.source, source);
+  observations.push({path: item.relative, parsed});
   assert.deepEqual(parsed.diagnostics, []);
   assert.deepEqual(parsed.data, item.expected);
   const before = structuredClone(parsed);
@@ -83,6 +90,13 @@ for (const item of ${JSON.stringify(cases)}) {
   assert.equal(source.slice(value.start, value.end), item.expected.id);
   const newline = source.includes('\\r\\n') ? '\\r\\n' : '\\n';
   assert.equal(source.slice(property.start, property.end), 'id: ' + item.expected.id + newline);
+}
+const catalog = buildCatalog({status: 'complete', observations});
+for (const document of catalog.documents.values()) {
+  assert.equal(document.occurrences.length, 1);
+  assert.equal(document.occurrences[0].resolution.status, 'resolved');
+  assert.equal(document.references.length, 1);
+  assert.equal(document.referencedBy.length, 1);
 }
 console.log('2 examples parsed and validated');`;
   writeFileSync(path.join(consumer, 'examples.mjs'), script);
@@ -159,6 +173,81 @@ beforeAll(
 );
 
 describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 없이 소비한다. */ () => {
+  it('이름 참조 공개 JS 소비자가 추출·색인·갱신·rename 계획과 실제 파일 상태를 확인한다', /** 링크 없는 소스 없는 소비자에서 공개 루트 계산 계약을 실행한다. */ () => {
+    writeFileSync(path.join(consumer, 'nameReferences.mjs'), nameReferenceJs);
+    expect(run(['nameReferences.mjs'])).toContain(
+      'Name reference JS contract verified',
+    );
+  });
+
+  it('이름 참조 공개 d.ts 소비자가 strict 상태 분기와 진단 코드 합집합을 좁힌다', /** 내부 subpath와 검증되지 않은 데이터 접근도 선언으로 거부한다. */ () => {
+    writeFileSync(path.join(consumer, 'nameReferences.ts'), nameReferenceTs);
+    writeFileSync(
+      path.join(consumer, 'nameReferences.json'),
+      JSON.stringify(nameReferenceConfig),
+    );
+    expect(run([tsc, '-p', 'nameReferences.json'])).toBe('');
+  });
+
+  it('이름 참조 tarball 소비자가 symlink 없이 공개 JS·d.ts와 내부 subpath 거부를 실행한다', /** 기존 링크 fixture 실패와 독립적으로 실제 pack 배포를 추출해 소비한다. */ () => {
+    const directory = mkdtempSync(path.join(fixture, 'name packed '));
+    const packed = path.join(directory, 'consumer');
+    const pnpm = process.env.CODOSC_PNPM_CLI;
+    if (!pnpm?.endsWith('pnpm.cjs') || !existsSync(pnpm))
+      throw new Error('Set CODOSC_PNPM_CLI to the task-local pnpm.cjs');
+    mkdirSync(packed);
+    writeFileSync(
+      path.join(packed, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+    );
+    for (const folder of ['core', 'workspace']) {
+      const archive = path.join(directory, folder + '.tgz');
+      run(
+        [
+          pnpm,
+          '--dir',
+          path.join(root, 'packages', folder),
+          'pack',
+          '--out',
+          archive,
+        ],
+        root,
+      );
+      const files = execFileSync('tar', ['-tzf', archive], {
+        encoding: 'utf8',
+      });
+      expect(files).toContain('package/dist/index.js');
+      expect(files).toContain('package/dist/index.d.ts');
+      expect(files).not.toContain('package/src/');
+      const destination = path.join(packed, 'node_modules/@codosc', folder);
+      mkdirSync(destination, { recursive: true });
+      execFileSync('tar', [
+        '-xzf',
+        archive,
+        '-C',
+        destination,
+        '--strip-components=1',
+      ]);
+      expect(existsSync(path.join(destination, 'src'))).toBe(false);
+    }
+    for (const dependency of ['yaml', 'zod'])
+      cpSync(
+        path.join(consumer, 'node_modules', dependency),
+        path.join(packed, 'node_modules', dependency),
+        { recursive: true },
+      );
+    writeFileSync(path.join(packed, 'nameReferences.mjs'), nameReferenceJs);
+    writeFileSync(path.join(packed, 'nameReferences.ts'), nameReferenceTs);
+    writeFileSync(
+      path.join(packed, 'nameReferences.json'),
+      JSON.stringify(nameReferenceConfig),
+    );
+    expect(run(['nameReferences.mjs'], packed)).toContain(
+      'Name reference JS contract verified',
+    );
+    expect(run([tsc, '-p', 'nameReferences.json'], packed)).toBe('');
+  });
+
   it('workspace tarball만 설치한 JS·TS 소비자가 실제 문서를 로딩하고 내부 subpath를 거부한다', /** 소스 없는 배포 소비자의 실제 IO와 구분된 반환 타입 및 exports 경계를 검증한다. */ () => {
     const directory = mkdtempSync(path.join(fixture, 'workspace packed '));
     const packedConsumer = path.join(directory, 'consumer');

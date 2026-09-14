@@ -2,7 +2,7 @@
 type: term
 id: sample-order
 name: 가상 주문
-definition: 가상 고객의 구매 요청이며 [[sample-fulfillment]] 절차를 따른다.
+definition: 가상 고객의 구매 요청이며 [[가상 주문 처리]] 절차를 따른다.
 domain: sample-sales
 examples:
   - '가상 주문 SAMPLE-001을 생성한다.'
