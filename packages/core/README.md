@@ -1,8 +1,8 @@
 # core
 
-IO 없는 .codocs YAML 파싱·원문 위치와 Zod 문서 스키마 검증을 제공한다. Node 내장 모듈과 IDE/LSP/MCP SDK에 직접 의존하지 않는다. 실제 프로젝트 선택·파일 IO·연결 경계·스캔 상태는 `@codosc/workspace`가 담당하며 core는 순수 함수·타입·상수를 제공한다. 필수 속성·자료형·ID·JSON 값은 검증하며 참조 의미는 후속 계층의 책임이다. 파싱·스키마 성공이나 범위 조회는 저장·삭제 허용을 의미하지 않는다.
+IO 없는 .codocs YAML 파싱·원문 위치, Zod 문서 스키마 검증, 경로별 참조 색인과 이름 변경 수정안 계산을 제공한다. Node 내장 모듈과 IDE/LSP/MCP SDK에 직접 의존하지 않는다. 실제 프로젝트 선택·파일 IO·연결 경계·스캔 상태는 `@codosc/workspace`가 담당하며 core는 순수 함수·타입·상수를 제공한다. 필수 속성·자료형·ID·JSON 값을 검증한다. 파싱·스키마 성공이나 범위 조회는 저장·삭제 허용을 의미하지 않는다.
 
-공개 진입점은 `@codosc/core`다. `src/index.ts`는 parser·diagnostics·validator·references를 재내보낸다. 직접 의존성은 정확히 고정한 `yaml@2.9.1`과 `zod@4.6.5`이며 lockfile에 기록한다. ESM JS와 선언 파일은 tsc로 `dist`에 생성한다. 추출 타입 선언은 Zod에 의존하고 `validateDocument`는 ZodError를 반환하지 않는다. strict, ES2022, NodeNext, 상대 `.js` import와 `types: []`를 유지한다.
+공개 진입점은 `@codosc/core`다. `src/index.ts`는 parser·diagnostics·validator·references·catalog를 재내보낸다. 직접 의존성은 정확히 고정한 `yaml@2.9.1`과 `zod@4.6.5`이며 lockfile에 기록한다. ESM JS와 선언 파일은 tsc로 `dist`에 생성한다. 추출 타입 선언은 Zod에 의존하고 `validateDocument`는 ZodError를 반환하지 않는다. strict, ES2022, NodeNext, 상대 `.js` import와 `types: []`를 유지한다.
 
 ```ts
 import {
@@ -26,7 +26,7 @@ if (parsed.success) {
 
 `parseYaml(input: unknown, path?: string)`는 문자열을 검사하고 Document/CST 토큰으로 원문 위치와 금지 구문을 확인한 후 데이터를 변환한다. 단일 문서와 최상위 매핑만 성공한다. 단일 `---`, 주석, 따옴표, 블록 문자열, 중첩 배열·객체와 flow 구조는 허용한다. 앵커, 별칭, 병합 키, 사용자 태그, 복수 문서와 중복 키는 `unsupported_yaml_feature`이며 일반 문법 오류와 비매핑은 `invalid_yaml`이다. 뒤의 중복 키 전체를 지목한다. 실패는 원문·진단만 제공하고 복구 AST에서 정상 데이터를 선택하지 않는다. 비문자열 입력에는 원문과 위치가 없다. `path`는 진단 메타데이터일 뿐 파일을 읽지 않는다. 파서 진단은 항상 `severity: 'error'`다.
 
-공통 진단은 `Diagnostic`의 `code/severity/message`와 선택적인 `path/fieldPath/range`를 사용한다. 확인되지 않은 메타데이터는 생략한다. YAML 오류 코드는 `src/diagnostics/index.ts`의 `yamlDiagnosticCodes`에서 관리하며 각 코드의 발생 조건을 주석으로 설명한다. `YamlDiagnosticCode`와 `YamlDiagnostic.code`의 타입도 이 정의에서 도출한다. 공개 진입점에서 두 정의를 가져올 수 있다. `schemaDiagnosticCodes`는 `missingRequiredField` (`missing_required_field`), `invalidFieldType` (`invalid_field_type`), `invalidFieldValue` (`invalid_field_value`), `unknownField` (`unknown_field`)를 제공한다. `DiagnosticCode`는 core의 YAML·스키마·참조 문법 코드 합집합이다. 공통 형식 `Diagnostic<Code extends string = DiagnosticCode>`는 각 계층이 자기 코드 타입을 지정할 수 있으며 `DiagnosticSeverity`는 `error/warning`이다. 문서 검증은 오류를 `errors`, 사용자 속성 경고를 `warnings`로 분리한다.
+공통 진단은 `Diagnostic`의 `code/severity/message`와 선택적인 `path/fieldPath/range`를 사용한다. 확인되지 않은 메타데이터는 생략한다. YAML 오류 코드는 `src/diagnostics/index.ts`의 `yamlDiagnosticCodes`에서 관리하며 각 코드의 발생 조건을 주석으로 설명한다. `YamlDiagnosticCode`와 `YamlDiagnostic.code`의 타입도 이 정의에서 도출한다. 공개 진입점에서 두 정의를 가져올 수 있다. `schemaDiagnosticCodes`는 `missingRequiredField` (`missing_required_field`), `invalidFieldType` (`invalid_field_type`), `invalidFieldValue` (`invalid_field_value`), `unknownField` (`unknown_field`)를 제공한다. `DiagnosticCode`는 core의 YAML·스키마·참조 문법·색인 코드 합집합이다. 공통 형식 `Diagnostic<Code extends string = DiagnosticCode>`는 각 계층이 자기 코드 타입을 지정할 수 있으며 `DiagnosticSeverity`는 `error/warning`이다. 문서 검증은 오류를 `errors`, 사용자 속성 경고를 `warnings`로 분리한다.
 
 고정 진단 문구는 같은 모듈의 `yamlDiagnosticMessages`와 `schemaDiagnosticMessages`에서 관리하며 공개 진입점에서 가져올 수 있다. 구현과 테스트는 해당 상수를 함께 참조한다. YAML 문법 오류는 `yamlDiagnosticMessages.syntaxErrorPrefix` 뒤에 라이브러리 상세 메시지를 이어 붙이며, Zod가 생성하는 상세 메시지도 그대로 유지한다.
 
@@ -43,7 +43,7 @@ if (parsed.success) {
 
 모든 offset은 0 기반 UTF-16이고 시작 포함·끝 제외다. `source.slice(start, end)`로 실제 원문을 조회한다. 원문의 CRLF·공백·주석·따옴표를 정규화하지 않는다. 이모지는 UTF-16 코드 단위로 센다. `offsetToPosition`은 LF 다음을 새 줄로 세어 0 기반 `line/character`를 반환하며 EOF를 허용한다. 범위 밖·비정수 offset에는 좌표가 없다. CRLF 내부 offset은 원문 코드 단위 위치다. EOF 문법 오류는 확인된 0 길이 삽입 위치를 제공한다.
 
-`examples/.codocs/terms.yaml`과 `knowledge.yaml`은 파일마다 하나의 매핑이며 가상 프로젝트의 ID·참조·본문을 유지한다. 예제 읽기는 tools의 Node subprocess에서 수행하고 core는 문자열만 받는다. 현재 참조 해석, 파일 IO·writer, Hover/LSP, VS Code activation과 MCP 도구/stdio는 구현하지 않았다. 작성 계약은 루트의 `docs/guide/README.md`에 있다.
+`examples/.codocs/terms.yaml`과 `knowledge.yaml`은 파일마다 하나의 매핑이며 가상 프로젝트의 ID·참조·본문을 유지한다. 예제 읽기는 tools의 Node subprocess에서 수행하고 core는 문자열만 받는다. core의 참조 해석은 순수 계산이며 실제 rename writer, Hover/LSP와 외부 MCP 연결은 이번 구현 범위가 아니다. 작성 계약은 루트의 `docs/guide/README.md`에 있다.
 
 `pnpm test --run packages/core/src`로 기능 테스트를 실행한다. 테스트 이름과 설명문은 “[조건/행동]하면 [관찰 가능한 결과]한다” 형태로 작성한다. 기준 규칙은 Local Work Memory의 「Codocs 개발 환경과 코드·테스트 컨벤션」 (`codocs-development-conventions`)이 소유한다. 오류 테스트의 코드 비교·기대값은 `yamlDiagnosticCodes`와 `schemaDiagnosticCodes`를 사용한다. 외부에 반환하는 코드 문자열의 호환성은 별도 빌드 계약 테스트에서 명시적인 문자열 기대값으로 확인한다. 정상·금지 6종·잘린 YAML·비매핑, 실제 문자열 값과 끝 개행, LF·CRLF·한글·이모지·EOF 좌표, 중첩·flow의 세 가지 원문 slice를 고정 기대값으로 검증한다. `pnpm check:development`는 source 전체를 복사한 frozen 재설치 및 불일치 거부, 공개 진입점과 개발 규칙을 검증한다. `pnpm check:build`는 source 없는 JS·`types: []` 선언 소비자, 소비자 내부에 명시적으로 복사한 yaml·Zod 의존성, 실제 core API 실행과 CJS bundle을 검증한다. 원본 예제와 MCP/vscode dist·pack에서 추출한 예제의 parser→validator 성공, 전체 데이터의 고정 기대값, ID 위치와 원문 일치 및 guide 원문 일치도 검사한다. build는 test/spec를 제외한다. 이번 전체 기능·개발·빌드·typecheck·lint·변경 파일 서식 검증은 macOS arm64 / Node 24.21.0 / pnpm 10.34.5 / yaml 2.9.1 / Zod 4.6.5에서 수행한다. 루트 format:check는 변경하지 않은 `.github/workplans/COD-4.md`의 기존 서식 실패 한 건만 남는다. 기존 Windows x64 빌드 검증과 구분하며 VS Code/Node 20 호스트, 실제 MCP 클라이언트·npm 단독 설치·게시·VSIX는 시험하지 않았다.
 
@@ -107,3 +107,46 @@ console.log(extracted.diagnostics);
 인접 `parser/stringMapping.test.ts`와 `references/references.test.ts`는 실제 해석값·원문 slice·고정 offset/좌표, 백슬래시 홀짝·콜론·중첩 복구·반복 위치, mixed examples·파싱 실패와 입력 불변을 검증한다. 이번 task의 환경은 Windows x64 / Node 24.21.0 / pnpm 10.34.5이며 과거 macOS 검증과 별개다. IO·실제 IDE/MCP·rename writer를 검증한 것으로 간주하지 않는다.
 
 `pnpm exec vitest run tools/buildChecks -t workspace`는 core/workspace의 실제 tarball을 소스 없는 별도 소비자에 offline frozen 설치하고 `@codosc/workspace` 공개 로더를 실행한다. workspace가 core 공개 진입점의 parser→validator에 읽은 원문과 확인한 경로·위치를 전달하는지, 내용 오류가 스캔 누락과 구분되는지, 경고만 있는 성공과 사용자 값이 유지되는지 검사한다. 소비자의 공개 d.ts는 상태로 좁힌 검증 데이터와 IO 진단을 제공하며 Node/TS workspace 내부 subpath를 거부한다. 기존 core parser·schema JS/d.ts 검사는 `pnpm check:build`에서 그대로 실행한다. 이 workspace 배포 소비 검증 환경은 macOS arm64 / Node 24.21.0 / pnpm 10.34.5이며 다른 OS·Windows 정션은 미검증이다. 실제 저장·링크 교체 시 재검증·외부 watcher·색인·공유 대상 잠금은 후속 계층의 작업이다.
+
+## 경로별 색인·갱신·이름 변경 계산
+
+`buildCatalog(scan: CatalogScan, previous?: Catalog): Catalog`는 로더가 제공한 `observations: { path, realPath?, parsed }[]`와 `status: complete | partial | failed`, 선택 `failures`를 받는다. `path`는 호출자가 준비한 프로젝트 상대 발견 경로이며 슬래시·대소문자·실경로를 정규화하지 않는다. 같은 ID나 realPath라도 발견 경로가 다르면 별도 문서다. 동일 경로의 재관측은 마지막 관측으로 갱신한다. core는 파일을 읽거나 실패 원문에서 데이터를 추측하지 않는다.
+
+`documents`는 발견 경로별 `CatalogDocument`다. `idPaths`, `namePaths`, `domainNamePaths`는 각각 ID→경로 집합, 전체 이름→경로 집합, 도메인→이름→경로 집합이다. 콜론을 연결 키로 사용하지 않는다. term.name과 knowledge.title은 통합 이름 공간이며 같은 도메인 중복은 모든 경로에 `duplicate_name`, ID 중복은 `duplicate_id`다. 다른 도메인의 동명은 허용하며 knowledge의 여러 도메인과 반복 도메인은 같은 경로 후보 하나다. 자료형·빈 값 오류 필드는 색인하지 않지만 ID 형식 오류·누락이나 다른 필드 오류가 확인 가능한 이름과 정상 본문을 버리지는 않는다.
+
+```ts
+import {
+  buildCatalog,
+  parseYaml,
+  planRename,
+  resolveReference,
+} from '@codosc/core';
+
+const catalog = buildCatalog({
+  status: 'complete',
+  observations: loadedFiles.map(({ relativePath, source, realPath }) => ({
+    path: relativePath,
+    realPath,
+    parsed: parseYaml(source, relativePath),
+  })),
+});
+const result = resolveReference(catalog, { name: '주문', domain: '판매' });
+const plan = planRename(catalog, {
+  targetPath: '.codocs/order.yaml',
+  newName: '판매주문',
+});
+```
+
+`resolveReference(catalog, { name, domain? }, sourcePath?)`는 정확 비교한다. 무도메인은 전체 이름 공간이고 작성 문서의 도메인을 우선하지 않는다. 반환 `status`는 `missing/ambiguous/self/unconfirmed/resolved`이며 `candidates`는 경로 오름차순의 확인 가능한 종류·이름·ID·도메인·경로·오류·확인 상태를 제공한다. 단일 대상에는 `target`이 있다. 본문 문법 오류는 `CatalogOccurrence.resolution.status: invalid`다. 문서의 `occurrences`는 TASK-001의 등장 객체·fieldPath·해석/실제 원문 UTF-16 범위를 그대로 유지한다. `documentDiagnostics`는 파싱·스키마·색인 오류이며 `diagnostics`는 여기에 문법·참조 의미 진단을 합친다. 대상의 문서 오류는 후보의 `errors`와 `reference_target_error` 경고로 보이지만 확인된 이름/경로의 직접 연결을 버리지 않는다.
+
+`references/referencedBy`는 확정 직접 연결만 경로별 중복 제거하고 경로 오름차순으로 제공한다. 반복 등장 위치는 모두 남는다. 부재·모호함·미확인·자기 참조는 역참조를 만들지 않는다. 다중 소속 도메인의 같은 발견 문서도 자기 참조이며 다른 문서 A↔B는 허용한다. 전이 연결·본문 확장은 없다.
+
+complete 재관측만 이전 미관측 문서를 제거한다. partial은 확인한 문서를 갱신하고 **모든 미관측 이전 경로를 보수적으로 unconfirmed로 보존**한다. 실패 파일·폴더 밖 경로도 partial의 부재만으로 삭제하지 않는다. failed는 새 관측을 무시하고 이전 색인을 미확인 상태로 보존한다. `failures`에는 IO 계층의 file/folder/unknown 범위와 선택 `Diagnostic<string>[]`를 유지한다. 스캔 실패와 문서 오류는 별도다. partial/failed는 미발견 신규 후보 가능성이 있으므로 현재 후보가 0개 또는 1개여도 모든 이름 검색을 unconfirmed로 반환하며 확정 연결 목록은 비운다. 이후 complete에서 확인·연결·충돌을 재계산한다. 입력 관측·원문·이전 Catalog는 변경하지 않는다. 반환 컬렉션의 Readonly 계약도 소비자가 지켜야 한다.
+
+`planRename(catalog, { targetPath, newName, updateReferences?, selections? }): RenamePlan`은 저장하지 않는 순수 수정안이다. `changes`에는 이름 필드 및 각 참조의 발견 경로·fieldPath·실제 offset/좌표·oldText/newText·targetPath·후보·선택 occurrenceIndex가 있다. oldText/newText는 **해석값**이며 YAML 따옴표·escape·folded 레이아웃을 그대로 교체할 raw patch가 아니다. writer가 원문 보존과 저장 안전성을 별도 구현해야 한다.
+
+참조 동시 변경은 기본 true이며 false면 이름 필드만 계획하고 미해결 영향을 남긴다. 확정 대상과 `selections: { sourcePath, occurrenceIndex, targetPath, domain? }[]`로 선택한 모호 후보를 유지하며 다른 후보 선택도 존중한다. 기존 명시 도메인은 바꾸지 않는다. 새 무도메인 표기가 모호하면 단일 소속 도메인을 명시하고, 다중 도메인이면 사용자 domain 선택이 없을 때 미해결이다. 콜론은 참조 내부에서 escape하고 새 표기의 문법 round trip이 불가능하면 미해결로 남긴다. 리터럴은 제외한다. 같은 도메인의 새 이름 충돌은 종류와 무관하게 `conflicts`로 반환하고 전체 변경을 차단한다. 불완전 색인도 충돌 부재를 확정하지 않아 차단한다.
+
+`status: ready | unresolved | blocked`는 저장 허용이 아니다. `impacts`는 무선택 모호 후보가 이름 변경 후 다른 단일 후보가 되는 경우도 이전/이후 후보와 실제 등장 위치로 보고한다. 미선택·잘못된 선택·도메인 미선택·참조 변경 비활성화 등을 자동 결정하지 않는다. `invalidSelections`는 존재하지 않는 등장·리터럴·중복 선택을 보고하며 이런 선택은 차단한다. `catalogDiagnosticCodes/catalogDiagnosticMessages`는 색인 코드·고정 한국어 문구를 소유하고 `DiagnosticCode`에도 코드 합집합을 추가한다. `CatalogDiagnostic`은 확인한 offsetRange와 충돌의 relatedPaths·domain도 제공한다.
+
+인접 `catalog/catalog.test.ts`는 경로/이름/ID 충돌, 정상 부분 정보, 전체 정확 검색, 반복·순환·자기 참조, 갱신·부분/실패/회복과 rename 선택·충돌·실제 위치·입력 불변을 검증한다. TASK-001의 parser/references 테스트도 그대로 수행한다. 1,000개 합성 문서의 구축/갱신·등장/연결 수 측정은 task-local `.workbench` 보고서에 남기며 제품의 2초/500ms·실제 IDE/MCP 목표를 달성했다는 근거가 아니다. 이번 계산 API 검증 환경은 Windows x64 / Node 24.21.0 / pnpm 10.34.5다. 실제 로더 연결·배포 소비는 후속 단계이며 UI·실제 rename·다중 파일 writer/복구·watcher·LSP/MCP 연결은 구현하지 않는다.

@@ -82,9 +82,42 @@ export const referenceDiagnosticMessages = {
 /** 코드 상수에서 도출한 참조 문법 진단 코드다. */
 export type ReferenceDiagnosticCode =
   (typeof referenceDiagnosticCodes)[keyof typeof referenceDiagnosticCodes];
-/** core의 파서·스키마 검증·참조 문법이 반환하는 진단 코드다. */
+/** 경로 색인·참조 의미 해석의 코드다. IO 실패 코드는 포함하지 않는다. */
+export const catalogDiagnosticCodes = {
+  /** 문자열 ID가 여러 발견 경로에 존재하면 모든 경로에 반환한다. */
+  duplicateId: 'duplicate_id',
+  /** 같은 도메인의 통합 이름 공간에 여러 경로가 있으면 반환한다. */
+  duplicateName: 'duplicate_name',
+  /** 완전한 색인에 이름 후보가 없을 때 반환한다. */
+  missingReference: 'missing_reference',
+  /** 완전한 색인에 이름 후보 경로가 여러 개일 때 반환한다. */
+  ambiguousReference: 'ambiguous_reference',
+  /** 단일 참조 대상이 출처의 발견 경로와 같으면 반환한다. */
+  selfReference: 'self_reference',
+  /** 스캔·후보가 미확인이라 부재·단일 대상을 확정할 수 없으면 반환한다. */
+  unconfirmedReference: 'unconfirmed_reference',
+  /** 확정 경로 대상에 문서 오류가 있을 때 연결을 유지하며 경고한다. */
+  referenceTargetError: 'reference_target_error',
+} as const;
+/** 색인 계층이 소유하는 고정 문구다. */
+export const catalogDiagnosticMessages = {
+  duplicateId: '같은 ID를 가진 발견 경로가 여러 개입니다.',
+  duplicateName: '같은 도메인에 같은 이름을 가진 문서가 여러 개입니다.',
+  missingReference: '참조 이름에 해당하는 문서가 없습니다.',
+  ambiguousReference: '참조 이름에 해당하는 문서가 여러 개입니다.',
+  selfReference: '같은 발견 문서를 자기 참조할 수 없습니다.',
+  unconfirmedReference: '스캔이 불완전하여 참조 대상을 확정할 수 없습니다.',
+  referenceTargetError: '확정 참조 대상에 문서 오류가 있습니다.',
+} as const;
+/** 상수에서 도출한 색인 진단 코드다. */
+export type CatalogDiagnosticCode =
+  (typeof catalogDiagnosticCodes)[keyof typeof catalogDiagnosticCodes];
+/** core의 파서·스키마 검증·참조 문법·색인이 반환하는 진단 코드다. */
 export type DiagnosticCode =
-  YamlDiagnosticCode | SchemaDiagnosticCode | ReferenceDiagnosticCode;
+  | YamlDiagnosticCode
+  | SchemaDiagnosticCode
+  | ReferenceDiagnosticCode
+  | CatalogDiagnosticCode;
 /** 오류와 경고를 구분하는 공통 심각도다. */
 export type DiagnosticSeverity = 'error' | 'warning';
 /** 시작 포함·끝 제외인 0 기반 UTF-16 원문 범위다. */
