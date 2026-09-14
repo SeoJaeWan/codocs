@@ -31,6 +31,12 @@ export interface WorkspaceAccessPolicy {
 /** 확인한 대상 종류다. Node Stats 같은 FS 내부 타입을 공개하지 않는다. */
 export type WorkspaceTargetKind = 'file' | 'directory' | 'other';
 
+/** 현재 대상 확인에서 얻은 0이 아닌 폴더 식별 정보다. 영구 파일 ID나 전역 중복 제거에 사용하지 않는다. */
+export interface WorkspaceDirectoryIdentity {
+  device: bigint;
+  inode: bigint;
+}
+
 /** 경계·대상 확인 결과다. 실패에는 얻지 못한 realPath를 넣지 않는다. */
 export type WorkspacePathResult =
   | {
@@ -39,6 +45,7 @@ export type WorkspacePathResult =
       path: string;
       realPath: string;
       kind: WorkspaceTargetKind;
+      directoryIdentity?: WorkspaceDirectoryIdentity;
       isSymbolicLink: boolean;
       scope: WorkspaceAccessScope;
       access: WorkspaceAccessPolicy;
@@ -57,6 +64,7 @@ interface CheckedTarget {
   logicalPath: string;
   realPath: string;
   kind: WorkspaceTargetKind;
+  directoryIdentity?: WorkspaceDirectoryIdentity;
   isSymbolicLink: boolean;
 }
 
@@ -71,7 +79,7 @@ function pathSegments(input: string): string[] {
 async function checkTarget(logicalPath: string): Promise<CheckedTarget> {
   const entry = await lstat(logicalPath);
   const realPath = await realpath(logicalPath);
-  const target = await stat(logicalPath);
+  const target = await stat(logicalPath, { bigint: true });
   return {
     logicalPath,
     realPath,
@@ -80,6 +88,9 @@ async function checkTarget(logicalPath: string): Promise<CheckedTarget> {
       : target.isFile()
         ? 'file'
         : 'other',
+    ...(target.isDirectory() && target.dev > 0n && target.ino > 0n
+      ? { directoryIdentity: { device: target.dev, inode: target.ino } }
+      : {}),
     isSymbolicLink: entry.isSymbolicLink(),
   };
 }
@@ -263,6 +274,9 @@ export async function resolveWorkspacePath(
     path: path.relative(root.projectRoot, current.logicalPath),
     realPath: current.realPath,
     kind: current.kind,
+    ...(current.directoryIdentity === undefined
+      ? {}
+      : { directoryIdentity: current.directoryIdentity }),
     isSymbolicLink: current.isSymbolicLink,
     scope,
     access: { read: true, write: true },
