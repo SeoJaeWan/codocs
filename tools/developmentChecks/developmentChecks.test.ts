@@ -326,6 +326,9 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
           target: 'ES2022',
           lib: ['ES2022'],
           types: [],
+          // 공통 설정처럼 외부 Zod 선언의 URL 전역 참조를 검사하지 않는다.
+          skipLibCheck: true,
+          exactOptionalPropertyTypes: true,
           rootDir: 'src',
           outDir: 'dist',
         },
@@ -350,18 +353,57 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
           module: 'NodeNext',
           moduleResolution: 'NodeNext',
           types: [],
+          exactOptionalPropertyTypes: true,
+          target: 'ES2022',
         },
         files: ['src/consumer.ts'],
       }),
     );
     writeFileSync(
       consumer,
-      "import { parseYaml, getValueRange } from '@codosc/core';\nconst result = parseYaml('name: test');\nexport const range = getValueRange(result, ['name']);\n",
+      `import { parseYaml, getValueRange, validateDocument } from '@codosc/core';
+import type {Term, Knowledge} from '@codosc/core';
+const parsed = parseYaml('name: test');
+export const range = getValueRange(parsed, ['name']);
+const result = validateDocument({data: parsed.success ? parsed.data : {}});
+if (result.success) {
+  const data: Term | Knowledge = result.data;
+  if (data.type === 'term') {const name: string = data.name; void name;}
+  else {const domains: string[] = data.domains; void domains;}
+} else {
+  // @ts-expect-error failure has no validated data
+  const absent = result.data;
+  void absent;
+}
+`,
     );
     execFileSync(process.execPath, [tsc, '-p', consumerConfig], {
       cwd: matching,
       encoding: 'utf8',
     });
+    const runtimeConsumer = path.join(
+      matching,
+      'packages/workspace/consumer.mjs',
+    );
+    writeFileSync(
+      runtimeConsumer,
+      `import assert from 'node:assert/strict';
+import {parseYaml, validateDocument} from '@codosc/core';
+const parsed = parseYaml('type: knowledge\\nid: fixture\\ntitle: タイトル\\nbody: Body\\ndomains: [Sales]\\n');
+assert.equal(parsed.success, true);
+const result = validateDocument({data: parsed.data});
+assert.equal(result.success, true);
+assert.deepEqual(result.errors, []);
+assert.deepEqual(result.warnings, []);
+assert.equal(Object.hasOwn(result.data, 'status'), false);
+console.log('Frozen validator consumer verified');`,
+    );
+    expect(
+      execFileSync(process.execPath, [runtimeConsumer], {
+        cwd: matching,
+        encoding: 'utf8',
+      }),
+    ).toContain('Frozen validator consumer verified');
     writeFileSync(
       consumer,
       "import type * as Hidden from '@codosc/core/src/index.js';\nexport type Value = typeof Hidden;\n",

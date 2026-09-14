@@ -6,6 +6,7 @@ import {
   offsetToPosition,
   parseYaml,
   yamlDiagnosticCodes,
+  yamlDiagnosticMessages,
 } from '../index.js';
 import type { FieldPath, OffsetRange, YamlParseResult } from '../index.js';
 
@@ -57,18 +58,49 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
     expect(Object.hasOwn(result.data, 'name')).toBe(false);
   });
   it.each([
-    ['앵커', 'a: &anchor 1\n', '&anchor'],
-    ['별칭', 'a: *unknown\n', '*unknown'],
-    ['병합 키', '<<: {a: 1}\n', '<<'],
-    ['사용자 태그', 'a: !custom hello\n', '!custom'],
-    ['복수 YAML 문서', '---\na: 1\n---\nb: 2\n', '---'],
-    ['중복 매핑 키', 'name: first\nname: second\n', 'name'],
+    [
+      '앵커',
+      'a: &anchor 1\n',
+      '&anchor',
+      yamlDiagnosticMessages.anchorNotSupported,
+    ],
+    [
+      '별칭',
+      'a: *unknown\n',
+      '*unknown',
+      yamlDiagnosticMessages.aliasNotSupported,
+    ],
+    [
+      '병합 키',
+      '<<: {a: 1}\n',
+      '<<',
+      yamlDiagnosticMessages.mergeKeyNotSupported,
+    ],
+    [
+      '사용자 태그',
+      'a: !custom hello\n',
+      '!custom',
+      yamlDiagnosticMessages.customTagNotSupported,
+    ],
+    [
+      '복수 YAML 문서',
+      '---\na: 1\n---\nb: 2\n',
+      '---',
+      yamlDiagnosticMessages.multipleDocumentsNotSupported,
+    ],
+    [
+      '중복 매핑 키',
+      'name: first\nname: second\n',
+      'name',
+      yamlDiagnosticMessages.duplicateKeyNotSupported,
+    ],
   ])(
     '%s가 있으면 unsupported_yaml_feature와 해당 구문의 위치를 반환한다',
     /** 오류 코드는 원인별 메시지·위치와 함께 반환한다. 실패해도 원문과 파일 경로는 보존하며 데이터와 필드 범위는 제공하지 않는다. */ (
-      cause,
+      _cause,
       source,
       expected,
+      message,
     ) => {
       const result = parseYaml(source, 'bad.yaml');
       expect(result.success).toBe(false);
@@ -77,11 +109,15 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
       const issue = result.diagnostics.find(
         (item) =>
           item.code === yamlDiagnosticCodes.unsupportedYamlFeature &&
-          item.message.includes(cause),
+          item.message === message,
       );
       expect(issue).toBeDefined();
       expect(slice(result, issue?.offsetRange)).toBe(expected);
-      expect(issue?.filePath).toBe('bad.yaml');
+      expect(issue?.path).toBe('bad.yaml');
+      expect(issue?.severity).toBe('error');
+      expect(issue).not.toHaveProperty('filePath');
+      expect(result).not.toHaveProperty('fields');
+      expect(result).not.toHaveProperty('rootRange');
       expect(getValueRange(result, ['name'])).toBeUndefined();
     },
   );
@@ -102,8 +138,16 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
     /** YAML 라이브러리가 불완전한 입력에서 일부 구조를 복구하더라도 파싱 성공으로 처리하지 않는다. */ (
       source,
     ) => {
-      const result = parseYaml(source);
+      const result = parseYaml(source, 'syntax.yaml');
       expect(result).toMatchObject({ success: false, source });
+      expect(result).not.toHaveProperty('fields');
+      expect(result).not.toHaveProperty('rootRange');
+      for (const issue of result.diagnostics) {
+        expect(issue).toMatchObject({ path: 'syntax.yaml', severity: 'error' });
+        expect(
+          issue.message.startsWith(yamlDiagnosticMessages.syntaxErrorPrefix),
+        ).toBe(true);
+      }
       expect(
         result.diagnostics.some(
           (item) => item.code === yamlDiagnosticCodes.invalidYaml,
@@ -113,10 +157,12 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
     },
   );
   it('닫는 대괄호 없이 원문이 끝나면 원문 끝을 문법 오류 위치로 진단한다', /** a: [😀의 끝은 UTF-16 offset 6이다. 누락된 문자의 위치를 나타내도록 시작과 끝이 모두 6인 범위와 좌표를 반환한다. */ () => {
-    const result = parseYaml('a: [😀');
+    const result = parseYaml('a: [😀', 'eof.yaml');
     expect(result.success).toBe(false);
     expect(result.diagnostics[0]).toMatchObject({
       code: yamlDiagnosticCodes.invalidYaml,
+      path: 'eof.yaml',
+      severity: 'error',
       offsetRange: { start: 6, end: 6 },
       range: {
         start: { line: 0, character: 6 },
@@ -132,26 +178,37 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
       expect(parseYaml(source)).toMatchObject({
         success: false,
         source,
-        diagnostics: [{ code: yamlDiagnosticCodes.invalidYaml }],
+        diagnostics: [
+          {
+            code: yamlDiagnosticCodes.invalidYaml,
+            message: yamlDiagnosticMessages.rootMustBeMapping,
+          },
+        ],
       });
     },
   );
   it.each([null, undefined, 1, {}, []])(
     '입력 %s가 문자열이 아니면 위치 없는 invalid_yaml을 반환한다',
-    /** null·undefined·숫자·객체·배열에는 YAML 원문이 없으므로 원문과 두 위치 범위 모두 undefined다. */ (
+    /** null·undefined·숫자·객체·배열에는 YAML 원문이 없으므로 원문은 undefined이며 확인할 수 없는 경로와 두 위치 범위는 생략한다. */ (
       input,
     ) => {
-      expect(parseYaml(input)).toMatchObject({
+      const result = parseYaml(input);
+      expect(result).toMatchObject({
         success: false,
         source: undefined,
         diagnostics: [
           {
             code: yamlDiagnosticCodes.invalidYaml,
-            range: undefined,
-            offsetRange: undefined,
+            severity: 'error',
+            message: yamlDiagnosticMessages.sourceMustBeString,
           },
         ],
       });
+      const issue = result.diagnostics[0];
+      for (const key of ['path', 'fieldPath', 'range', 'offsetRange'])
+        expect(issue).not.toHaveProperty(key);
+      for (const key of ['data', 'fields', 'rootRange'])
+        expect(result).not.toHaveProperty(key);
     },
   );
   it('표준 문자열 태그나 따옴표 안의 YAML 기호가 있으면 오류 없이 값을 해석한다', /** !!str은 숫자 표기를 문자열로 해석한다. 따옴표 안의 기호와 키는 앵커·별칭·태그·병합·문서 구문으로 처리하지 않는다. */ () => {
@@ -168,28 +225,37 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
       '%TAG !e! tag:example.com,2026:\n---\na: !e!thing 1\n',
     );
     expect(result.success).toBe(false);
-    const issue = result.diagnostics.find((item) =>
-      item.message.includes('사용자 태그'),
+    const issue = result.diagnostics.find(
+      (item) => item.message === yamlDiagnosticMessages.customTagNotSupported,
     );
     expect(issue).toMatchObject({
       code: yamlDiagnosticCodes.unsupportedYamlFeature,
     });
   });
   it.each([
-    ['앵커', 'a: [{b: &x 1}]\n', '&x'],
-    ['중복 매핑 키', 'a: {b: 1, b: 2}\n', 'b'],
+    [
+      '앵커',
+      'a: [{b: &x 1}]\n',
+      '&x',
+      yamlDiagnosticMessages.anchorNotSupported,
+    ],
+    [
+      '중복 매핑 키',
+      'a: {b: 1, b: 2}\n',
+      'b',
+      yamlDiagnosticMessages.duplicateKeyNotSupported,
+    ],
   ])(
     '중첩된 flow 구조 안에 %s가 있으면 unsupported_yaml_feature를 반환한다',
     /** 중첩 매핑과 flow 표기 자체는 허용한다. 배열 안 객체의 &x와 객체 안에서 두 번째로 등장하는 b가 각각 오류의 원인이다. */ (
-      cause,
+      _cause,
       source,
       expected,
+      message,
     ) => {
       const result = parseYaml(source);
       expect(result.success).toBe(false);
-      const issue = result.diagnostics.find((item) =>
-        item.message.includes(cause),
-      );
+      const issue = result.diagnostics.find((item) => item.message === message);
       expect(issue).toMatchObject({
         code: yamlDiagnosticCodes.unsupportedYamlFeature,
       });
@@ -215,8 +281,8 @@ describe('키·값·속성의 원문 범위와 UTF-16 좌표', /** 실제로 잘
     ) => {
       const result = parseYaml(`${tag} <<: {a: 1}\n`);
       expect(result.success).toBe(false);
-      const issue = result.diagnostics.find((item) =>
-        item.message.includes('병합 키'),
+      const issue = result.diagnostics.find(
+        (item) => item.message === yamlDiagnosticMessages.mergeKeyNotSupported,
       );
       expect(issue).toMatchObject({
         code: yamlDiagnosticCodes.unsupportedYamlFeature,
@@ -309,5 +375,63 @@ describe('키·값·속성의 원문 범위와 UTF-16 좌표', /** 실제로 잘
     const result = parseYaml('"a.b": {"0": x}\n');
     expect(slice(result, getValueRange(result, ['a.b', '0']))).toBe('x');
     expect(getValueRange(result, ['a', 'b'])).toBeUndefined();
+  });
+});
+
+describe('최상위 매핑의 확인된 원문 범위', /** 부모 위치로 사용하는 AST 범위를 원문의 고정 offset과 slice로 확인한다. */ () => {
+  it.each([
+    [
+      'LF 블록',
+      '---\n# 앞\nname: "한글 😀" # 옆\n# 뒤\n',
+      8,
+      26,
+      'name: "한글 😀" # 옆\n',
+    ],
+    [
+      'CRLF 블록',
+      '---\r\n# 앞\r\nname: "한글 😀" # 옆\r\n# 뒤\r\n',
+      10,
+      29,
+      'name: "한글 😀" # 옆\r\n',
+    ],
+    ['flow', '{name: "😀"} # 뒤\n', 0, 12, '{name: "😀"}'],
+    ['빈 매핑', '{}', 0, 2, '{}'],
+    ['EOF', 'name: 😀', 0, 8, 'name: 😀'],
+    ['블록 문자열', 'name: |\n  한😀\n# 뒤\n', 0, 14, 'name: |\n  한😀\n'],
+  ])(
+    '%s 매핑을 해석하면 문서 표시와 독립 주석을 제외한 AST rootRange를 반환한다',
+    /** AST의 매핑 값 끝을 사용한다. flow 뒤 주석은 제외하고 블록 매핑의 같은 줄 주석과 끝 개행은 포함하며 UTF-16 이모지 길이를 보존한다. */ (
+      _kind,
+      source,
+      start,
+      end,
+      expected,
+    ) => {
+      const result = parseYaml(source);
+      if (!result.success) throw new Error('정상 매핑이어야 한다');
+      expect(result.rootRange).toEqual({ start, end });
+      expect(slice(result, result.rootRange)).toBe(expected);
+      expect(result.source).toBe(source);
+    },
+  );
+  it.each(['name: &x a\n', 'name: [a', '', '- name\n'])(
+    '입력 %s의 파싱에 실패하면 복구 AST의 rootRange와 정상 필드를 제공하지 않는다',
+    /** 금지 구문·문법 오류·빈 문서·비매핑의 실패 결과에 부모 범위나 데이터가 누출되지 않는다. */ (
+      source,
+    ) => {
+      const result = parseYaml(source);
+      expect(result.success).toBe(false);
+      for (const key of ['data', 'fields', 'rootRange'])
+        expect(result).not.toHaveProperty(key);
+    },
+  );
+  it('비문자열 입력에 빈 경로를 전달하면 경로를 보존하고 확인되지 않은 위치를 생략한다', /** 빈 문자열도 호출자가 지정한 경로 메타데이터이므로 누락으로 취급하지 않는다. */ () => {
+    const result = parseYaml(null, '');
+    expect(result.diagnostics[0]).toMatchObject({
+      path: '',
+      severity: 'error',
+    });
+    expect(result.diagnostics[0]).not.toHaveProperty('range');
+    expect(result.diagnostics[0]).not.toHaveProperty('offsetRange');
   });
 });
