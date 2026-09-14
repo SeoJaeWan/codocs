@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  cpSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
@@ -286,10 +292,12 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
         path.join(root, 'packages', folder, 'package.json'),
         path.join(destination, 'package.json'),
       );
-      mkdirSync(path.join(destination, 'src'), { recursive: true });
-      copyFileSync(
-        path.join(root, 'packages', folder, 'src/index.ts'),
-        path.join(destination, 'src/index.ts'),
+      cpSync(
+        path.join(root, 'packages', folder, 'src'),
+        path.join(destination, 'src'),
+        {
+          recursive: true,
+        },
       );
     }
     execFileSync(
@@ -346,7 +354,10 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
         files: ['src/consumer.ts'],
       }),
     );
-    writeFileSync(consumer, "import '@codosc/core';\n");
+    writeFileSync(
+      consumer,
+      "import { parseYaml, getValueRange } from '@codosc/core';\nconst result = parseYaml('name: test');\nexport const range = getValueRange(result, ['name']);\n",
+    );
     execFileSync(process.execPath, [tsc, '-p', consumerConfig], {
       cwd: matching,
       encoding: 'utf8',

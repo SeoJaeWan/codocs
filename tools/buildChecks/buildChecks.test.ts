@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { bundleIde } from '../build/build.mjs';
 
@@ -24,6 +25,62 @@ function run(args: string[], cwd = consumer): string {
   return execFileSync(process.execPath, args, { cwd, encoding: 'utf8' });
 }
 
+/** 원본 또는 배포된 예제를 소스 없는 소비자의 공개 파서로 검사한다. */
+function checkExamples(directory: string): void {
+  const cases = [
+    {
+      relative: 'examples/.codocs/terms.yaml',
+      expected: {
+        type: 'term',
+        id: 'sample-order',
+        name: '가상 주문',
+        definition:
+          '가상 고객의 구매 요청이며 [[sample-fulfillment]] 절차를 따른다.',
+        domain: 'sample-sales',
+        examples: ['가상 주문 SAMPLE-001을 생성한다.'],
+      },
+    },
+    {
+      relative: 'examples/.codocs/knowledge.yaml',
+      expected: {
+        type: 'knowledge',
+        id: 'sample-fulfillment',
+        title: '가상 주문 처리',
+        body: '가상 프로젝트에서 [[sample-order]]를 확인한 뒤 가상 배송 상태를 기록한다.',
+        domains: ['sample-sales'],
+      },
+    },
+  ].map((item) => ({
+    ...item,
+    source: readFileSync(path.join(root, item.relative), 'utf8'),
+  }));
+  const script = `import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parseYaml, getKeyRange, getValueRange, getPropertyRange } from '@codosc/core';
+for (const item of ${JSON.stringify(cases)}) {
+  const filePath = path.join(process.argv[2], item.relative);
+  const source = readFileSync(filePath, 'utf8');
+  assert.equal(source, item.source);
+  const parsed = parseYaml(source, filePath);
+  assert.equal(parsed.success, true, JSON.stringify(parsed.diagnostics));
+  assert.equal(parsed.source, source);
+  assert.deepEqual(parsed.diagnostics, []);
+  assert.deepEqual(parsed.data, item.expected);
+  const key = getKeyRange(parsed, ['id']);
+  const value = getValueRange(parsed, ['id']);
+  const property = getPropertyRange(parsed, ['id']);
+  assert.ok(key && value && property);
+  assert.equal(source.slice(key.start, key.end), 'id');
+  assert.equal(source.slice(value.start, value.end), item.expected.id);
+  const newline = source.includes('\\r\\n') ? '\\r\\n' : '\\n';
+  assert.equal(source.slice(property.start, property.end), 'id: ' + item.expected.id + newline);
+}
+console.log('2 examples parsed');`;
+  writeFileSync(path.join(consumer, 'examples.mjs'), script);
+  expect(run(['examples.mjs', directory])).toContain('2 examples parsed');
+}
+
 /** 디렉터리 안의 실제 출력 파일을 상대 경로로 반환한다. */
 function outputFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -36,9 +93,40 @@ beforeAll(
   /** 이전 출력 없는 빌드와 소스 없는 별도 소비자를 준비한다. */ () => {
     // build 명령 자체가 모든 dist를 지우며, 이전 산출물로 성공하지 않는다.
     run(['tools/build/build.mjs', 'build'], root);
-    rmSync(fixture, { recursive: true, force: true });
+    const resolvedFixture = path.resolve(fixture);
+    if (
+      !resolvedFixture.startsWith(
+        path.resolve(root, '.workbench/fixtures') + path.sep,
+      )
+    )
+      throw new Error('Fixture path escapes workspace');
+    rmSync(resolvedFixture, { recursive: true, force: true });
     mkdirSync(consumer, { recursive: true });
-    writeFileSync(path.join(consumer, 'package.json'), '{"type":"module"}\n');
+    const coreManifest: unknown = JSON.parse(
+      readFileSync(path.join(root, 'packages/core/package.json'), 'utf8'),
+    );
+    if (
+      typeof coreManifest !== 'object' ||
+      coreManifest === null ||
+      !('dependencies' in coreManifest)
+    )
+      throw new Error('Core dependencies missing');
+    writeFileSync(
+      path.join(consumer, 'package.json'),
+      JSON.stringify({
+        type: 'module',
+        dependencies: coreManifest.dependencies,
+      }),
+    );
+    const coreRequire = createRequire(
+      path.join(root, 'packages/core/package.json'),
+    );
+    const yamlDirectory = path.dirname(
+      coreRequire.resolve('yaml/package.json'),
+    );
+    cpSync(yamlDirectory, path.join(consumer, 'node_modules/yaml'), {
+      recursive: true,
+    });
     for (let index = 0; index < folders.length; index++) {
       const folder = folders[index];
       const name = names[index];
@@ -59,6 +147,10 @@ beforeAll(
 );
 
 describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 없이 소비한다. */ () => {
+  it('기존 예제 두 파일은 단일 매핑으로 해석되고 ID·참조·본문을 유지한다', /** 공개 API로 실제 YAML과 원문 위치를 고정 기대값에 대조한다. */ () => {
+    checkExamples(root);
+  });
+
   it('Node subprocess가 ESM import 및 CJS require 진입점을 실제 로드한다', /** package 이름과 exports를 통해 모든 실제 출력을 로드한다. */ () => {
     const script = `import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -69,6 +161,15 @@ for (const name of ${JSON.stringify(names)}) {
 for (const name of ['language-server', 'vscode']) {
   if (typeof require('@codosc/' + name) !== 'object') throw new Error('Invalid CJS');
 }
+const { parseYaml, getValueRange, yamlDiagnosticCodes } = await import('@codosc/core');
+const parsed = parseYaml('name: "한글 😀"\\n');
+const range = getValueRange(parsed, ['name']);
+if (!parsed.success || parsed.data.name !== '한글 😀' || !range || parsed.source.slice(range.start, range.end) !== '"한글 😀"') throw new Error('Parser API failed');
+const invalid = parseYaml('name: [');
+if (invalid.success || !invalid.diagnostics.some(issue => issue.code === yamlDiagnosticCodes.invalidYaml)) throw new Error('Invalid YAML diagnostic failed');
+const unsupported = parseYaml('name: first\\nname: second');
+if (unsupported.success || !unsupported.diagnostics.some(issue => issue.code === yamlDiagnosticCodes.unsupportedYamlFeature)) throw new Error('Unsupported YAML diagnostic failed');
+if (!import.meta.resolve('yaml').startsWith(new URL('./node_modules/yaml/', import.meta.url).href)) throw new Error('Yaml dependency must be local');
 console.log('JS packages loaded');`;
     writeFileSync(path.join(consumer, 'consume.mjs'), script);
     expect(run(['consume.mjs'])).toContain('JS packages loaded');
@@ -79,13 +180,31 @@ console.log('JS packages loaded');`;
     }
   });
 
+  it('빌드된 파서에 문법 오류나 중복 키를 입력하면 약속한 오류 코드 문자열을 반환한다', /** 기능 테스트는 공통 상수를 사용하므로, 이 계약 테스트는 명시적인 문자열로 외부 반환 코드의 호환성을 따로 검증한다. */ () => {
+    const script = `import assert from 'node:assert/strict';
+import { parseYaml } from '@codosc/core';
+const invalid = parseYaml('name: [');
+assert.equal(invalid.success, false);
+assert.ok(invalid.diagnostics.some(issue => issue.code === 'invalid_yaml'));
+const unsupported = parseYaml('name: first\\nname: second');
+assert.equal(unsupported.success, false);
+assert.ok(unsupported.diagnostics.some(issue => issue.code === 'unsupported_yaml_feature'));
+console.log('Diagnostic code contract verified');`;
+    writeFileSync(path.join(consumer, 'diagnosticCodes.mjs'), script);
+    expect(run(['diagnosticCodes.mjs'])).toContain(
+      'Diagnostic code contract verified',
+    );
+  });
+
   it('별도 TS 소비자가 dist d.ts를 해석하고 금지 subpath를 거부한다', /** 타입 namespace를 출력 없이 검사하고 해석 경로를 확인한다. */ () => {
-    const code = names
-      .map(
-        (name, index) =>
-          `import type * as Package${index} from '@codosc/${name}';\nexport type Module${index} = typeof Package${index};`,
-      )
-      .join('\n');
+    const code =
+      names
+        .map(
+          (name, index) =>
+            `import type * as Package${index} from '@codosc/${name}';\nexport type Module${index} = typeof Package${index};`,
+        )
+        .join('\n') +
+      "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition, yamlDiagnosticCodes } from '@codosc/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic, YamlDiagnosticCode } from '@codosc/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\nexport const diagnosticCode: YamlDiagnosticCode = yamlDiagnosticCodes.invalidYaml;\nexport const returnedCodes: readonly YamlDiagnosticCode[] = diagnostics.map(issue => issue.code);\n";
     const config = {
       compilerOptions: {
         strict: true,
@@ -160,6 +279,9 @@ console.log('JS packages loaded');`;
           ),
         ).toBe(readFileSync(path.join(root, relative), 'utf8'));
       }
+      checkExamples(
+        path.join(consumer, 'node_modules/@codosc', folder, 'dist'),
+      );
     }
     expect(
       readFileSync(
@@ -256,6 +378,16 @@ console.log('JS packages loaded');`;
         expect(files).toContain('package/dist/' + relative);
       }
       expect(files).not.toContain('package/src/');
+      const extracted = path.join(fixture, 'packed', folder);
+      mkdirSync(extracted, { recursive: true });
+      execFileSync('tar', ['-xzf', archive, '-C', extracted]);
+      expect(
+        readFileSync(
+          path.join(extracted, 'package/dist/docs/guide/README.md'),
+          'utf8',
+        ),
+      ).toBe(readFileSync(path.join(root, 'docs/guide/README.md'), 'utf8'));
+      checkExamples(path.join(extracted, 'package/dist'));
       if (folder === 'vscode')
         expect(files).toContain('package/dist/server/index.cjs');
     }
@@ -300,7 +432,7 @@ console.log('JS packages loaded');`;
     const source = path.join(consumer, 'adapter.ts');
     writeFileSync(
       source,
-      "import '@codosc/core';\nimport '@codosc/workspace';\nexport const loaded = true;\n",
+      "import { parseYaml } from '@codosc/core';\nimport '@codosc/workspace';\nexport const loaded = parseYaml('name: bundled').success;\n",
     );
     await bundleIde([source], path.join(consumer, 'adapter.cjs'));
     expect(
