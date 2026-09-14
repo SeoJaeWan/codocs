@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { schemaDiagnosticCodes } from '../diagnostics/index.js';
+import {
+  schemaDiagnosticCodes,
+  schemaDiagnosticMessages,
+} from '../diagnostics/index.js';
 import type {
   Diagnostic,
   FieldPath,
@@ -39,17 +42,39 @@ function inspectJson(
   if (typeof value === 'number')
     return Number.isFinite(value)
       ? []
-      : [{ fieldPath, message: 'JSON 숫자는 유한해야 합니다.', unsafe: false }];
+      : [
+          {
+            fieldPath,
+            message: schemaDiagnosticMessages.nonFiniteNumber,
+            unsafe: false,
+          },
+        ];
   if (typeof value !== 'object')
-    return [{ fieldPath, message: 'JSON 값이어야 합니다.', unsafe: true }];
+    return [
+      {
+        fieldPath,
+        message: schemaDiagnosticMessages.jsonValueRequired,
+        unsafe: true,
+      },
+    ];
   if (ancestors.has(value))
     return [
-      { fieldPath, message: '순환 참조는 JSON 값이 아닙니다.', unsafe: true },
+      {
+        fieldPath,
+        message: schemaDiagnosticMessages.cyclicReference,
+        unsafe: true,
+      },
     ];
   const array = Array.isArray(value);
   const prototype: unknown = Object.getPrototypeOf(value);
   if (!array && prototype !== Object.prototype && prototype !== null)
-    return [{ fieldPath, message: 'JSON 객체이어야 합니다.', unsafe: true }];
+    return [
+      {
+        fieldPath,
+        message: schemaDiagnosticMessages.jsonObjectRequired,
+        unsafe: true,
+      },
+    ];
   ancestors.add(value);
   const issues: JsonIssue[] = [];
   const keys = Reflect.ownKeys(value);
@@ -75,7 +100,7 @@ function inspectJson(
     ) {
       issues.push({
         fieldPath: childPath,
-        message: '문자열 키의 JSON 데이터 속성이어야 합니다.',
+        message: schemaDiagnosticMessages.jsonDataPropertyRequired,
         unsafe: true,
       });
       continue;
@@ -87,7 +112,7 @@ function inspectJson(
       if (!Object.hasOwn(value, index))
         issues.push({
           fieldPath: [...fieldPath, index],
-          message: '빈 배열 원소는 JSON 값이 아닙니다.',
+          message: schemaDiagnosticMessages.missingArrayElement,
           unsafe: true,
         });
     }
@@ -101,12 +126,12 @@ const nonblank = z
   .refine(
     /** 공백 여부만 검사하고 원래 문자열은 변환하지 않는다. */ (value) =>
       value.trim().length > 0,
-    { message: '빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다.' },
+    { message: schemaDiagnosticMessages.blankString },
   );
 const id = nonblank.refine(
   /** 마지막 개행 앞에서 끝나는 정규식 매칭도 거부한다. */ (value) =>
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.exec(value)?.[0] === value,
-  { message: 'ID는 소문자·숫자를 하이픈으로 연결해야 합니다.' },
+  { message: schemaDiagnosticMessages.invalidId },
 );
 const userValue = z.custom<JsonValue>();
 const deprecatedAlias = z
@@ -274,7 +299,7 @@ function unknownWarnings(input: ValidateDocumentInput): SchemaDiagnostic[] {
             input,
             schemaDiagnosticCodes.unknownField,
             [...path, key],
-            '알려지지 않은 사용자 속성을 보존합니다.',
+            schemaDiagnosticMessages.unknownField,
           ),
         );
   }
@@ -288,11 +313,10 @@ function unknownWarnings(input: ValidateDocumentInput): SchemaDiagnostic[] {
   const aliases = ownValue(input.data, 'deprecatedAliases');
   if (type === 'term' && Array.isArray(aliases))
     for (let index = 0; index < aliases.length; index++)
-      collect(
-        ownValue(aliases, index),
-        ['name', 'message'],
-        ['deprecatedAliases', index],
-      );
+      collect(ownValue(aliases, index), Object.keys(deprecatedAlias.shape), [
+        'deprecatedAliases',
+        index,
+      ]);
   return warnings;
 }
 

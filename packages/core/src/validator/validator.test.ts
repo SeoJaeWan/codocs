@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseYaml,
   schemaDiagnosticCodes,
+  schemaDiagnosticMessages,
   validateDocument,
 } from '../index.js';
 import type {
@@ -133,23 +134,55 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
   );
 
   it.each([
-    ['name', '', schemaDiagnosticCodes.invalidFieldValue],
-    ['definition', ' \t\r\n', schemaDiagnosticCodes.invalidFieldValue],
-    ['domain', null, schemaDiagnosticCodes.invalidFieldType],
-    ['id', 'Bad-ID', schemaDiagnosticCodes.invalidFieldValue],
-    ['id', 'a--b', schemaDiagnosticCodes.invalidFieldValue],
-    ['id', 'a\n', schemaDiagnosticCodes.invalidFieldValue],
-    ['id', 7, schemaDiagnosticCodes.invalidFieldType],
-    ['type', 'other', schemaDiagnosticCodes.invalidFieldValue],
-    ['type', null, schemaDiagnosticCodes.invalidFieldType],
-    ['examples', null, schemaDiagnosticCodes.invalidFieldType],
-    ['deprecatedAliases', null, schemaDiagnosticCodes.invalidFieldType],
+    [
+      'name',
+      '',
+      schemaDiagnosticCodes.invalidFieldValue,
+      schemaDiagnosticMessages.blankString,
+    ],
+    [
+      'definition',
+      ' \t\r\n',
+      schemaDiagnosticCodes.invalidFieldValue,
+      schemaDiagnosticMessages.blankString,
+    ],
+    ['domain', null, schemaDiagnosticCodes.invalidFieldType, undefined],
+    [
+      'id',
+      'Bad-ID',
+      schemaDiagnosticCodes.invalidFieldValue,
+      schemaDiagnosticMessages.invalidId,
+    ],
+    [
+      'id',
+      'a--b',
+      schemaDiagnosticCodes.invalidFieldValue,
+      schemaDiagnosticMessages.invalidId,
+    ],
+    [
+      'id',
+      'a\n',
+      schemaDiagnosticCodes.invalidFieldValue,
+      schemaDiagnosticMessages.invalidId,
+    ],
+    ['id', 7, schemaDiagnosticCodes.invalidFieldType, undefined],
+    ['type', 'other', schemaDiagnosticCodes.invalidFieldValue, undefined],
+    ['type', null, schemaDiagnosticCodes.invalidFieldType, undefined],
+    ['examples', null, schemaDiagnosticCodes.invalidFieldType, undefined],
+    [
+      'deprecatedAliases',
+      null,
+      schemaDiagnosticCodes.invalidFieldType,
+      undefined,
+    ],
   ])(
     '알려진 %s 속성에 %j를 넣으면 약속한 오류로 실패한다',
-    /** 빈 문자열·null·ID·자료형을 구분한다. */ (key, value, code) => {
+    /** 빈 문자열·null·ID·자료형을 구분한다. */ (key, value, code, message) => {
       const result = validateUnchanged({ data: { ...term, [key]: value } });
       expect(result.success).toBe(false);
       expect(at(result.errors, [key]).code).toBe(code);
+      if (message !== undefined)
+        expect(at(result.errors, [key]).message).toBe(message);
       expect(
         result.errors.every((issue) => !Object.hasOwn(issue, 'range')),
       ).toBe(true);
@@ -267,6 +300,11 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       ['custom'],
       ['deprecatedAliases', 0, 'custom'],
     ]);
+    expect(result.warnings.map((issue) => issue.message)).toEqual([
+      schemaDiagnosticMessages.unknownField,
+      schemaDiagnosticMessages.unknownField,
+      schemaDiagnosticMessages.unknownField,
+    ]);
   });
 
   it.each([NaN, Infinity, -Infinity])(
@@ -278,6 +316,9 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       expect(result.success).toBe(false);
       expect(at(result.errors, ['custom', 'a.b', 1, 'value']).code).toBe(
         schemaDiagnosticCodes.invalidFieldValue,
+      );
+      expect(at(result.errors, ['custom', 'a.b', 1, 'value']).message).toBe(
+        schemaDiagnosticMessages.nonFiniteNumber,
       );
     },
   );
@@ -307,24 +348,36 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       },
     });
     const values = [
-      undefined,
-      cyclic,
-      new Date(),
-      new Map(),
-      1n,
-      /** 비JSON 함수를 입력하는 사례다. */ () => true,
-      getter,
-      [, 'hole'],
-      Object.assign([], { extra: 1 }),
-      { [Symbol('key')]: 'value' },
-    ];
-    for (const custom of values) {
+      [undefined, schemaDiagnosticMessages.jsonValueRequired],
+      [cyclic, schemaDiagnosticMessages.cyclicReference],
+      [new Date(), schemaDiagnosticMessages.jsonObjectRequired],
+      [new Map(), schemaDiagnosticMessages.jsonObjectRequired],
+      [1n, schemaDiagnosticMessages.jsonValueRequired],
+      [
+        /** 비JSON 함수를 입력하는 사례다. */ () => true,
+        schemaDiagnosticMessages.jsonValueRequired,
+      ],
+      [getter, schemaDiagnosticMessages.jsonDataPropertyRequired],
+      [[, 'hole'], schemaDiagnosticMessages.missingArrayElement],
+      [
+        Object.assign([], { extra: 1 }),
+        schemaDiagnosticMessages.jsonDataPropertyRequired,
+      ],
+      [
+        { [Symbol('key')]: 'value' },
+        schemaDiagnosticMessages.jsonDataPropertyRequired,
+      ],
+    ] as const;
+    for (const [custom, message] of values) {
       const data = { ...term, custom };
       const result = validateDocument({ data });
       expect(result.success).toBe(false);
       expect(data.custom).toBe(custom);
       expect(result).not.toHaveProperty('data');
       expect(result.warnings).toHaveLength(1);
+      expect(result.errors.some((issue) => issue.message === message)).toBe(
+        true,
+      );
     }
     expect(calls).toBe(0);
     expect(

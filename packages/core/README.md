@@ -28,6 +28,8 @@ if (parsed.success) {
 
 공통 진단은 `Diagnostic`의 `code/severity/message`와 선택적인 `path/fieldPath/range`를 사용한다. 확인되지 않은 메타데이터는 생략한다. YAML 오류 코드는 `src/diagnostics/index.ts`의 `yamlDiagnosticCodes`에서 관리하며 각 코드의 발생 조건을 주석으로 설명한다. `YamlDiagnosticCode`와 `YamlDiagnostic.code`의 타입도 이 정의에서 도출한다. 공개 진입점에서 두 정의를 가져올 수 있다. `schemaDiagnosticCodes`는 `missingRequiredField` (`missing_required_field`), `invalidFieldType` (`invalid_field_type`), `invalidFieldValue` (`invalid_field_value`), `unknownField` (`unknown_field`)를 제공한다. `DiagnosticCode`는 YAML과 스키마 코드의 합집합이며 `DiagnosticSeverity`는 `error/warning`이다. 문서 검증은 오류를 `errors`, 사용자 속성 경고를 `warnings`로 분리한다.
 
+고정 진단 문구는 같은 모듈의 `yamlDiagnosticMessages`와 `schemaDiagnosticMessages`에서 관리하며 공개 진입점에서 가져올 수 있다. 구현과 테스트는 해당 상수를 함께 참조한다. YAML 문법 오류는 `yamlDiagnosticMessages.syntaxErrorPrefix` 뒤에 라이브러리 상세 메시지를 이어 붙이며, Zod가 생성하는 상세 메시지도 그대로 유지한다.
+
 | 코드 상수                                    | 반환 코드                  | 발생 조건                                                                                      |
 | -------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------- |
 | `yamlDiagnosticCodes.invalidYaml`            | `invalid_yaml`             | 비문자열 입력, YAML 문법 오류, 빈 문서 또는 최상위 값이 매핑이 아닌 경우                       |

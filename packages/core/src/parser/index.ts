@@ -6,7 +6,10 @@ import {
   parseAllDocuments,
   Parser,
 } from 'yaml';
-import { yamlDiagnosticCodes } from '../diagnostics/index.js';
+import {
+  yamlDiagnosticCodes,
+  yamlDiagnosticMessages,
+} from '../diagnostics/index.js';
 import type {
   Diagnostic,
   FieldPath,
@@ -243,7 +246,7 @@ function rejectMergeKeys(
           diagnostic(
             source,
             yamlDiagnosticCodes.unsupportedYamlFeature,
-            '병합 키는 지원하지 않습니다.',
+            yamlDiagnosticMessages.mergeKeyNotSupported,
             path,
             pair.key.range ?? undefined,
           ),
@@ -291,7 +294,7 @@ export function parseYaml(input: unknown, path?: string): YamlParseResult {
         diagnostic(
           undefined,
           yamlDiagnosticCodes.invalidYaml,
-          'YAML 원문은 문자열이어야 합니다.',
+          yamlDiagnosticMessages.sourceMustBeString,
           path,
         ),
       ],
@@ -307,9 +310,9 @@ export function parseYaml(input: unknown, path?: string): YamlParseResult {
   const tokens = [...new Parser().parse(source)].flatMap(sourceTokens);
   for (const token of tokens) {
     const messages: Record<string, string> = {
-      anchor: '앵커는 지원하지 않습니다.',
-      alias: '별칭은 지원하지 않습니다.',
-      tag: '사용자 태그는 지원하지 않습니다.',
+      anchor: yamlDiagnosticMessages.anchorNotSupported,
+      alias: yamlDiagnosticMessages.aliasNotSupported,
+      tag: yamlDiagnosticMessages.customTagNotSupported,
     };
     if (
       token.type === 'tag' &&
@@ -342,7 +345,7 @@ export function parseYaml(input: unknown, path?: string): YamlParseResult {
       diagnostic(
         source,
         yamlDiagnosticCodes.unsupportedYamlFeature,
-        '복수 YAML 문서는 지원하지 않습니다.',
+        yamlDiagnosticMessages.multipleDocumentsNotSupported,
         path,
         start
           ? [Number(start.offset), Number(start.offset) + 3]
@@ -357,10 +360,10 @@ export function parseYaml(input: unknown, path?: string): YamlParseResult {
         issue.code === 'DUPLICATE_KEY' || issue.code === 'TAG_RESOLVE_FAILED';
       const message =
         issue.code === 'DUPLICATE_KEY'
-          ? '중복 매핑 키는 지원하지 않습니다.'
+          ? yamlDiagnosticMessages.duplicateKeyNotSupported
           : issue.code === 'TAG_RESOLVE_FAILED'
-            ? '사용자 태그는 지원하지 않습니다.'
-            : `YAML 문법 오류: ${issue.message}`;
+            ? yamlDiagnosticMessages.customTagNotSupported
+            : `${yamlDiagnosticMessages.syntaxErrorPrefix}${issue.message}`;
       const duplicateRange =
         issue.code === 'DUPLICATE_KEY'
           ? keyAtOffset(document.contents, issue.pos[0])
@@ -393,7 +396,7 @@ export function parseYaml(input: unknown, path?: string): YamlParseResult {
         diagnostic(
           source,
           yamlDiagnosticCodes.invalidYaml,
-          '최상위 YAML 값은 매핑이어야 합니다.',
+          yamlDiagnosticMessages.rootMustBeMapping,
           path,
           document?.contents && isNode(document.contents)
             ? (document.contents.range ?? undefined)
@@ -410,7 +413,7 @@ export function parseYaml(input: unknown, path?: string): YamlParseResult {
         diagnostic(
           source,
           yamlDiagnosticCodes.invalidYaml,
-          '최상위 YAML 값은 매핑이어야 합니다.',
+          yamlDiagnosticMessages.rootMustBeMapping,
           path,
         ),
       ],

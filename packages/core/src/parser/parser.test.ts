@@ -6,6 +6,7 @@ import {
   offsetToPosition,
   parseYaml,
   yamlDiagnosticCodes,
+  yamlDiagnosticMessages,
 } from '../index.js';
 import type { FieldPath, OffsetRange, YamlParseResult } from '../index.js';
 
@@ -57,18 +58,49 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
     expect(Object.hasOwn(result.data, 'name')).toBe(false);
   });
   it.each([
-    ['앵커', 'a: &anchor 1\n', '&anchor'],
-    ['별칭', 'a: *unknown\n', '*unknown'],
-    ['병합 키', '<<: {a: 1}\n', '<<'],
-    ['사용자 태그', 'a: !custom hello\n', '!custom'],
-    ['복수 YAML 문서', '---\na: 1\n---\nb: 2\n', '---'],
-    ['중복 매핑 키', 'name: first\nname: second\n', 'name'],
+    [
+      '앵커',
+      'a: &anchor 1\n',
+      '&anchor',
+      yamlDiagnosticMessages.anchorNotSupported,
+    ],
+    [
+      '별칭',
+      'a: *unknown\n',
+      '*unknown',
+      yamlDiagnosticMessages.aliasNotSupported,
+    ],
+    [
+      '병합 키',
+      '<<: {a: 1}\n',
+      '<<',
+      yamlDiagnosticMessages.mergeKeyNotSupported,
+    ],
+    [
+      '사용자 태그',
+      'a: !custom hello\n',
+      '!custom',
+      yamlDiagnosticMessages.customTagNotSupported,
+    ],
+    [
+      '복수 YAML 문서',
+      '---\na: 1\n---\nb: 2\n',
+      '---',
+      yamlDiagnosticMessages.multipleDocumentsNotSupported,
+    ],
+    [
+      '중복 매핑 키',
+      'name: first\nname: second\n',
+      'name',
+      yamlDiagnosticMessages.duplicateKeyNotSupported,
+    ],
   ])(
     '%s가 있으면 unsupported_yaml_feature와 해당 구문의 위치를 반환한다',
     /** 오류 코드는 원인별 메시지·위치와 함께 반환한다. 실패해도 원문과 파일 경로는 보존하며 데이터와 필드 범위는 제공하지 않는다. */ (
-      cause,
+      _cause,
       source,
       expected,
+      message,
     ) => {
       const result = parseYaml(source, 'bad.yaml');
       expect(result.success).toBe(false);
@@ -77,7 +109,7 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
       const issue = result.diagnostics.find(
         (item) =>
           item.code === yamlDiagnosticCodes.unsupportedYamlFeature &&
-          item.message.includes(cause),
+          item.message === message,
       );
       expect(issue).toBeDefined();
       expect(slice(result, issue?.offsetRange)).toBe(expected);
@@ -112,7 +144,9 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
       expect(result).not.toHaveProperty('rootRange');
       for (const issue of result.diagnostics) {
         expect(issue).toMatchObject({ path: 'syntax.yaml', severity: 'error' });
-        expect(issue.message).toMatch(/^YAML 문법 오류:/u);
+        expect(
+          issue.message.startsWith(yamlDiagnosticMessages.syntaxErrorPrefix),
+        ).toBe(true);
       }
       expect(
         result.diagnostics.some(
@@ -144,7 +178,12 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
       expect(parseYaml(source)).toMatchObject({
         success: false,
         source,
-        diagnostics: [{ code: yamlDiagnosticCodes.invalidYaml }],
+        diagnostics: [
+          {
+            code: yamlDiagnosticCodes.invalidYaml,
+            message: yamlDiagnosticMessages.rootMustBeMapping,
+          },
+        ],
       });
     },
   );
@@ -161,7 +200,7 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
           {
             code: yamlDiagnosticCodes.invalidYaml,
             severity: 'error',
-            message: 'YAML 원문은 문자열이어야 합니다.',
+            message: yamlDiagnosticMessages.sourceMustBeString,
           },
         ],
       });
@@ -186,28 +225,37 @@ describe('단일 YAML 매핑의 허용 구문과 오류 처리', /** 허용하�
       '%TAG !e! tag:example.com,2026:\n---\na: !e!thing 1\n',
     );
     expect(result.success).toBe(false);
-    const issue = result.diagnostics.find((item) =>
-      item.message.includes('사용자 태그'),
+    const issue = result.diagnostics.find(
+      (item) => item.message === yamlDiagnosticMessages.customTagNotSupported,
     );
     expect(issue).toMatchObject({
       code: yamlDiagnosticCodes.unsupportedYamlFeature,
     });
   });
   it.each([
-    ['앵커', 'a: [{b: &x 1}]\n', '&x'],
-    ['중복 매핑 키', 'a: {b: 1, b: 2}\n', 'b'],
+    [
+      '앵커',
+      'a: [{b: &x 1}]\n',
+      '&x',
+      yamlDiagnosticMessages.anchorNotSupported,
+    ],
+    [
+      '중복 매핑 키',
+      'a: {b: 1, b: 2}\n',
+      'b',
+      yamlDiagnosticMessages.duplicateKeyNotSupported,
+    ],
   ])(
     '중첩된 flow 구조 안에 %s가 있으면 unsupported_yaml_feature를 반환한다',
     /** 중첩 매핑과 flow 표기 자체는 허용한다. 배열 안 객체의 &x와 객체 안에서 두 번째로 등장하는 b가 각각 오류의 원인이다. */ (
-      cause,
+      _cause,
       source,
       expected,
+      message,
     ) => {
       const result = parseYaml(source);
       expect(result.success).toBe(false);
-      const issue = result.diagnostics.find((item) =>
-        item.message.includes(cause),
-      );
+      const issue = result.diagnostics.find((item) => item.message === message);
       expect(issue).toMatchObject({
         code: yamlDiagnosticCodes.unsupportedYamlFeature,
       });
@@ -233,8 +281,8 @@ describe('키·값·속성의 원문 범위와 UTF-16 좌표', /** 실제로 잘
     ) => {
       const result = parseYaml(`${tag} <<: {a: 1}\n`);
       expect(result.success).toBe(false);
-      const issue = result.diagnostics.find((item) =>
-        item.message.includes('병합 키'),
+      const issue = result.diagnostics.find(
+        (item) => item.message === yamlDiagnosticMessages.mergeKeyNotSupported,
       );
       expect(issue).toMatchObject({
         code: yamlDiagnosticCodes.unsupportedYamlFeature,

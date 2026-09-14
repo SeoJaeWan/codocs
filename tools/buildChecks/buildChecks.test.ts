@@ -217,7 +217,7 @@ console.log('Diagnostic code contract verified');`;
     writeFileSync(filePath, source);
     const script = `import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {parseYaml, validateDocument} from '@codosc/core';
+import {parseYaml, validateDocument, schemaDiagnosticMessages} from '@codosc/core';
 const filePath = process.argv[2];
 const source = readFileSync(filePath, 'utf8');
 const parsed = parseYaml(source, filePath);
@@ -240,6 +240,7 @@ for (const [code, fieldPath, slice] of expected) {
   assert.equal(issue.code, code);
   assert.equal(issue.severity, 'error');
   assert.equal(issue.path, filePath);
+  if (code === 'invalid_field_value') assert.equal(issue.message, schemaDiagnosticMessages.invalidId);
   const start = source.indexOf(slice);
   const offsetPosition = offset => {const lines = source.slice(0, offset).split('\\n'); return {line: lines.length - 1, character: lines.at(-1).length};};
   assert.deepEqual(issue.range, {start: offsetPosition(start), end: offsetPosition(start + slice.length)});
@@ -247,6 +248,7 @@ for (const [code, fieldPath, slice] of expected) {
 assert.equal(result.warnings.length, 1);
 const warning = result.warnings[0];
 assert.equal(warning.code, 'unknown_field');
+assert.equal(warning.message, schemaDiagnosticMessages.unknownField);
 assert.equal(warning.severity, 'warning');
 assert.equal(warning.path, filePath);
 assert.deepEqual(warning.fieldPath, ['aliases']);
