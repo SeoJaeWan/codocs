@@ -1,6 +1,6 @@
 # core
 
-IO 없는 .codocs YAML 파싱·원문 위치와 Zod 문서 스키마 검증을 제공한다. Node 내장 모듈과 IDE/LSP/MCP SDK에 직접 의존하지 않는다. 필수 속성·자료형·ID·JSON 값은 검증하며 참조 의미는 후속 계층의 책임이다. 파싱·스키마 성공이나 범위 조회는 저장·삭제 허용을 의미하지 않는다.
+IO 없는 .codocs YAML 파싱·원문 위치와 Zod 문서 스키마 검증을 제공한다. Node 내장 모듈과 IDE/LSP/MCP SDK에 직접 의존하지 않는다. 실제 프로젝트 선택·파일 IO·연결 경계·스캔 상태는 `@codosc/workspace`가 담당하며 core는 순수 함수·타입·상수를 제공한다. 필수 속성·자료형·ID·JSON 값은 검증하며 참조 의미는 후속 계층의 책임이다. 파싱·스키마 성공이나 범위 조회는 저장·삭제 허용을 의미하지 않는다.
 
 공개 진입점은 `@codosc/core`다. `src/index.ts`는 parser·diagnostics·validator를 재내보낸다. 직접 의존성은 정확히 고정한 `yaml@2.9.1`과 `zod@4.6.5`이며 lockfile에 기록한다. ESM JS와 선언 파일은 tsc로 `dist`에 생성한다. 추출 타입 선언은 Zod에 의존하고 `validateDocument`는 ZodError를 반환하지 않는다. strict, ES2022, NodeNext, 상대 `.js` import와 `types: []`를 유지한다.
 
@@ -26,7 +26,7 @@ if (parsed.success) {
 
 `parseYaml(input: unknown, path?: string)`는 문자열을 검사하고 Document/CST 토큰으로 원문 위치와 금지 구문을 확인한 후 데이터를 변환한다. 단일 문서와 최상위 매핑만 성공한다. 단일 `---`, 주석, 따옴표, 블록 문자열, 중첩 배열·객체와 flow 구조는 허용한다. 앵커, 별칭, 병합 키, 사용자 태그, 복수 문서와 중복 키는 `unsupported_yaml_feature`이며 일반 문법 오류와 비매핑은 `invalid_yaml`이다. 뒤의 중복 키 전체를 지목한다. 실패는 원문·진단만 제공하고 복구 AST에서 정상 데이터를 선택하지 않는다. 비문자열 입력에는 원문과 위치가 없다. `path`는 진단 메타데이터일 뿐 파일을 읽지 않는다. 파서 진단은 항상 `severity: 'error'`다.
 
-공통 진단은 `Diagnostic`의 `code/severity/message`와 선택적인 `path/fieldPath/range`를 사용한다. 확인되지 않은 메타데이터는 생략한다. YAML 오류 코드는 `src/diagnostics/index.ts`의 `yamlDiagnosticCodes`에서 관리하며 각 코드의 발생 조건을 주석으로 설명한다. `YamlDiagnosticCode`와 `YamlDiagnostic.code`의 타입도 이 정의에서 도출한다. 공개 진입점에서 두 정의를 가져올 수 있다. `schemaDiagnosticCodes`는 `missingRequiredField` (`missing_required_field`), `invalidFieldType` (`invalid_field_type`), `invalidFieldValue` (`invalid_field_value`), `unknownField` (`unknown_field`)를 제공한다. `DiagnosticCode`는 YAML과 스키마 코드의 합집합이며 `DiagnosticSeverity`는 `error/warning`이다. 문서 검증은 오류를 `errors`, 사용자 속성 경고를 `warnings`로 분리한다.
+공통 진단은 `Diagnostic`의 `code/severity/message`와 선택적인 `path/fieldPath/range`를 사용한다. 확인되지 않은 메타데이터는 생략한다. YAML 오류 코드는 `src/diagnostics/index.ts`의 `yamlDiagnosticCodes`에서 관리하며 각 코드의 발생 조건을 주석으로 설명한다. `YamlDiagnosticCode`와 `YamlDiagnostic.code`의 타입도 이 정의에서 도출한다. 공개 진입점에서 두 정의를 가져올 수 있다. `schemaDiagnosticCodes`는 `missingRequiredField` (`missing_required_field`), `invalidFieldType` (`invalid_field_type`), `invalidFieldValue` (`invalid_field_value`), `unknownField` (`unknown_field`)를 제공한다. `DiagnosticCode`는 core의 YAML·스키마 코드 합집합이다. 공통 형식 `Diagnostic<Code extends string = DiagnosticCode>`는 각 계층이 자기 코드 타입을 지정할 수 있으며 `DiagnosticSeverity`는 `error/warning`이다. 문서 검증은 오류를 `errors`, 사용자 속성 경고를 `warnings`로 분리한다.
 
 고정 진단 문구는 같은 모듈의 `yamlDiagnosticMessages`와 `schemaDiagnosticMessages`에서 관리하며 공개 진입점에서 가져올 수 있다. 구현과 테스트는 해당 상수를 함께 참조한다. YAML 문법 오류는 `yamlDiagnosticMessages.syntaxErrorPrefix` 뒤에 라이브러리 상세 메시지를 이어 붙이며, Zod가 생성하는 상세 메시지도 그대로 유지한다.
 
@@ -75,3 +75,7 @@ if (parsed.success) {
 독립 소비자는 실제 파일을 읽어 parser→validator를 실행하고 별도 객체·병합 수정 후보도 검사한다. 성공/실패의 입력 보존, 경고만 있는 성공, status 생략과 aliases 보존, 네 가지 외부 코드 리터럴·path/severity·UTF-16 범위를 고정 기대값으로 확인한다. `types: []`와 strict/exactOptionalPropertyTypes의 dist d.ts 소비자는 success 분기 및 Term/Knowledge 필드 타입을 사용하며 실패 data 접근·잘못된 필드 타입·내부 스키마 공개 접근을 거부한다. Node/TS 내부 subpath 거부와 실제 CJS bundle의 parser·validator 성공/오류 실행도 확인한다. frozen 설치 fixture는 복사한 core source를 빌드한 뒤 공개 JS·선언 validator를 소비한다. 테스트 생성물과 의존성은 작업 전용 `.workbench/fixtures`·node_modules·store에 격리한다.
 
 선언 소비의 `types: []`는 Node 전역 타입 자동 추가를 차단한다. Zod 4.6.5의 외부 선언은 `URL` 전역 타입을 참조하므로 이번 `skipLibCheck: false` 독립 소비자는 `lib: [ES2022, DOM]`으로 검증한다. `lib: [ES2022]`만 사용하는 저장소와 frozen fixture의 core emit은 공통 `skipLibCheck: true`를 사용한다. DOM 없이 외부 선언까지 검사하는 소비자의 성공은 보장하지 않는다. Zod 추출 선택 필드 타입에는 undefined가 포함되지만 validator는 명시적인 undefined 입력을 허용하지 않는다.
+
+workspace 전용 경로·IO·순환 진단 코드와 고정 문구는 `@codosc/workspace`가 소유하고 공개한다. core는 workspace 코드에 의존하지 않으며 공통 진단 형식만 제공한다. 실제 파일 확인·읽기·경로 해석은 workspace에서 수행한다.
+
+`pnpm exec vitest run tools/buildChecks -t workspace`는 core/workspace의 실제 tarball을 소스 없는 별도 소비자에 offline frozen 설치하고 `@codosc/workspace` 공개 로더를 실행한다. workspace가 core 공개 진입점의 parser→validator에 읽은 원문과 확인한 경로·위치를 전달하는지, 내용 오류가 스캔 누락과 구분되는지, 경고만 있는 성공과 사용자 값이 유지되는지 검사한다. 소비자의 공개 d.ts는 상태로 좁힌 검증 데이터와 IO 진단을 제공하며 Node/TS workspace 내부 subpath를 거부한다. 기존 core parser·schema JS/d.ts 검사는 `pnpm check:build`에서 그대로 실행한다. 이 workspace 배포 소비 검증 환경은 macOS arm64 / Node 24.21.0 / pnpm 10.34.5이며 다른 OS·Windows 정션은 미검증이다. 실제 저장·링크 교체 시 재검증·외부 watcher·색인·공유 대상 잠금은 후속 계층의 작업이다.

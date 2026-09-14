@@ -69,7 +69,7 @@ export const schemaDiagnosticMessages = {
 /** 코드 정의에서 도출한 스키마 진단 코드 타입이다. */
 export type SchemaDiagnosticCode =
   (typeof schemaDiagnosticCodes)[keyof typeof schemaDiagnosticCodes];
-/** 파서와 스키마 검증에서 공통으로 사용하는 진단 코드다. */
+/** core의 파서와 스키마 검증이 반환하는 진단 코드다. */
 export type DiagnosticCode = YamlDiagnosticCode | SchemaDiagnosticCode;
 /** 오류와 경고를 구분하는 공통 심각도다. */
 export type DiagnosticSeverity = 'error' | 'warning';
@@ -90,9 +90,9 @@ export interface SourceRange {
 }
 /** 매핑 키와 배열 인덱스로 구성한 경로다. */
 export type FieldPath = readonly (string | number)[];
-/** 파서와 스키마 검증의 공통 진단이며 확인할 수 없는 메타데이터는 생략한다. */
-export interface Diagnostic {
-  code: DiagnosticCode;
+/** 각 계층이 코드 타입을 지정하는 공통 진단이다. 기본 코드는 core 진단이며 미확인 메타데이터는 생략한다. */
+export interface Diagnostic<Code extends string = DiagnosticCode> {
+  code: Code;
   severity: DiagnosticSeverity;
   message: string;
   path?: string;

@@ -3,6 +3,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -158,6 +159,328 @@ beforeAll(
 );
 
 describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 없이 소비한다. */ () => {
+  it('workspace tarball만 설치한 JS·TS 소비자가 실제 문서를 로딩하고 내부 subpath를 거부한다', /** 소스 없는 배포 소비자의 실제 IO와 구분된 반환 타입 및 exports 경계를 검증한다. */ () => {
+    const directory = mkdtempSync(path.join(fixture, 'workspace packed '));
+    const packedConsumer = path.join(directory, 'consumer');
+    try {
+      mkdirSync(packedConsumer);
+      const pnpm = process.env.CODOSC_PNPM_CLI;
+      if (!pnpm?.endsWith('pnpm.cjs') || !existsSync(pnpm))
+        throw new Error('Set CODOSC_PNPM_CLI to the task-local pnpm.cjs');
+      for (const folder of ['core', 'workspace']) {
+        const archive = path.join(directory, folder + '.tgz');
+        run(
+          [
+            pnpm,
+            '--dir',
+            path.join(root, 'packages', folder),
+            'pack',
+            '--out',
+            archive,
+          ],
+          root,
+        );
+        const files = execFileSync('tar', ['-tzf', archive], {
+          encoding: 'utf8',
+        });
+        expect(files).toContain('package/dist/index.js');
+        expect(files).toContain('package/dist/index.d.ts');
+        expect(files).not.toContain('package/src/');
+      }
+      writeFileSync(
+        path.join(packedConsumer, 'package.json'),
+        JSON.stringify({
+          type: 'module',
+          dependencies: {
+            '@codosc/core': 'file:../core.tgz',
+            '@codosc/workspace': 'file:../workspace.tgz',
+          },
+          // private 패키지는 게시하지 않고 workspace의 core 의존성도 같은 실제 tarball에 고정한다.
+          pnpm: { overrides: { '@codosc/core': 'file:../core.tgz' } },
+        }),
+      );
+      const install = [
+        pnpm,
+        'install',
+        '--ignore-workspace',
+        '--store-dir',
+        path.join(root, '.workbench/pnpm-store'),
+        '--cache-dir',
+        path.join(directory, 'pnpm-cache'),
+      ];
+      // 새 tarball의 고정 의존 metadata는 전용 cache에서 준비하고 실제 설치는 offline/frozen으로 검사한다.
+      for (const options of [
+        ['--lockfile-only'],
+        ['--offline', '--frozen-lockfile'],
+      ]) {
+        const installed = spawnSync(
+          process.execPath,
+          [...install, ...options],
+          {
+            cwd: packedConsumer,
+            encoding: 'utf8',
+          },
+        );
+        expect(installed.status, installed.stdout + installed.stderr).toBe(0);
+      }
+      for (const name of ['core', 'workspace']) {
+        expect(
+          existsSync(
+            path.join(packedConsumer, 'node_modules/@codosc', name, 'src'),
+          ),
+        ).toBe(false);
+      }
+      writeFileSync(
+        path.join(packedConsumer, 'workspace.mjs'),
+        `import assert from 'node:assert/strict';
+import {mkdtemp, mkdir, writeFile, symlink, realpath, rm} from 'node:fs/promises';
+import path from 'node:path';
+import {loadWorkspace, resolveWorkspacePath, workspaceDiagnosticCodes, workspaceDiagnosticMessages} from '@codosc/workspace';
+import * as core from '@codosc/core';
+assert.equal(workspaceDiagnosticCodes.readFailed, 'workspace_read_failed');
+assert.equal(workspaceDiagnosticMessages.readFailed, '작업 경로를 읽을 수 없습니다.');
+assert.equal('workspaceDiagnosticCodes' in core, false);
+assert.equal('workspaceDiagnosticMessages' in core, false);
+assert.ok(import.meta.resolve('@codosc/workspace').startsWith(new URL('./node_modules/', import.meta.url).href));
+const temporary = await mkdtemp(path.join(process.cwd(), '실제 프로젝트 '));
+try {
+  const project = path.join(temporary, 'project');
+  const codocs = path.join(project, '.codocs');
+  const external = path.join(temporary, '외부 공통');
+  await mkdir(path.join(codocs, '하위 폴더'), {recursive: true});
+  await mkdir(external);
+  const termRaw = '# 원문 😀\\r\\ntype: term\\r\\nid: packed-term\\r\\nname: 용어\\r\\ndefinition: 정의\\r\\ndomain: 영역\\r\\ncustom: {nested: [null, true, 1]}\\r\\n';
+  const knowledgeRaw = 'type: knowledge\\nid: packed-knowledge\\ntitle: 제목\\nbody: 본문\\ndomains: [영역]\\n';
+  const parseRaw = 'name: [\\n';
+  const schemaRaw = 'type: term\\nname: ID 누락\\ndefinition: 정의\\ndomain: 영역\\n';
+  const externalFile = path.join(temporary, '외부 용어.yaml');
+  await writeFile(externalFile, termRaw);
+  await writeFile(path.join(external, '공유 지식.yml'), knowledgeRaw);
+  await writeFile(path.join(codocs, '하위 폴더', '파싱 오류.yaml'), parseRaw);
+  await writeFile(path.join(codocs, '하위 폴더', 'ID 누락.yml'), schemaRaw);
+  await symlink(externalFile, path.join(codocs, '연결 용어.yaml'), 'file');
+  const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+  await symlink(external, path.join(codocs, '공통A'), linkType);
+  await symlink(external, path.join(codocs, '공통B'), linkType);
+  await symlink(codocs, path.join(external, '돌아가기'), linkType);
+  const scan = await loadWorkspace({cwd: temporary, project: 'project'});
+  assert.equal(scan.status, 'complete');
+  assert.equal(scan.root.projectRoot, project);
+  assert.deepEqual(scan.failures, []);
+  assert.equal(scan.documents.length, 5);
+  assert.equal(scan.skippedCycles.length, 2);
+  for (const cycle of scan.skippedCycles) {
+    assert.equal(cycle.realPath, await realpath(codocs));
+    assert.equal(cycle.diagnostics[0].code, 'circular_directory_link');
+    assert.equal(cycle.diagnostics[0].severity, 'warning');
+  }
+  const byPath = new Map(scan.documents.map(document => [document.source.path, document]));
+  const term = byPath.get(path.join('.codocs', '연결 용어.yaml'));
+  assert.ok(term);
+  assert.equal(term.status, 'valid');
+  assert.equal(term.raw, termRaw);
+  assert.equal(term.source.logicalPath, path.join(codocs, '연결 용어.yaml'));
+  assert.equal(term.source.realPath, await realpath(externalFile));
+  assert.equal(term.data.type, 'term');
+  assert.equal(term.data.id, 'packed-term');
+  assert.equal(term.data.name, '용어');
+  assert.deepEqual(term.data.custom, {nested: [null, true, 1]});
+  assert.equal(term.scope.kind, 'linkedFile');
+  assert.deepEqual(term.access, {read: true, write: true});
+  assert.equal(term.diagnostics.length, 1);
+  const warning = term.diagnostics[0];
+  assert.equal(warning.code, 'unknown_field');
+  assert.equal(warning.severity, 'warning');
+  assert.equal(warning.path, term.source.path);
+  assert.deepEqual(warning.fieldPath, ['custom']);
+  assert.deepEqual(warning.range, {start: {line: 6, character: 0}, end: {line: 6, character: 6}});
+  for (const branch of ['공통A', '공통B']) {
+    const document = byPath.get(path.join('.codocs', branch, '공유 지식.yml'));
+    assert.ok(document);
+    assert.equal(document.status, 'valid');
+    assert.equal(document.raw, knowledgeRaw);
+    assert.equal(document.source.realPath, await realpath(path.join(external, '공유 지식.yml')));
+    assert.equal(document.data.id, 'packed-knowledge');
+    assert.equal(document.scope.kind, 'linkedDirectory');
+    assert.deepEqual(document.access, {read: true, write: true});
+  }
+  for (const [filename, raw, status, code] of [
+    ['파싱 오류.yaml', parseRaw, 'parseError', 'invalid_yaml'],
+    ['ID 누락.yml', schemaRaw, 'validationError', 'missing_required_field'],
+  ]) {
+    const sourcePath = path.join('.codocs', '하위 폴더', filename);
+    const document = byPath.get(sourcePath);
+    assert.ok(document);
+    assert.equal(document.status, status);
+    assert.equal(document.raw, raw);
+    assert.equal(document.source.logicalPath, path.join(project, sourcePath));
+    assert.equal(document.source.realPath, await realpath(path.join(project, sourcePath)));
+    assert.equal(Object.hasOwn(document, 'data'), false);
+    assert.ok(document.diagnostics.some(issue => issue.code === code && issue.path === sourcePath && issue.range));
+  }
+  const denied = await resolveWorkspacePath(scan.root, externalFile);
+  assert.equal(denied.success, false);
+  assert.equal(denied.status, 'denied');
+  for (const sourcePath of [['.codocs', '연결 용어.yaml', '..'].join(path.sep), ['.codocs', '공통A', '..', '형제.yaml'].join(path.sep)]) {
+    const result = await resolveWorkspacePath(scan.root, sourcePath);
+    assert.equal(result.success, false);
+    assert.equal(result.status, 'denied');
+  }
+  await symlink(path.join(temporary, '없는 파일.yaml'), path.join(codocs, '깨진 연결.yaml'), 'file');
+  const partial = await loadWorkspace({project});
+  assert.equal(partial.status, 'partial');
+  assert.equal(partial.documents.length, 5);
+  assert.equal(partial.failures.length, 1);
+  const failure = partial.failures[0];
+  assert.equal(failure.path, path.join('.codocs', '깨진 연결.yaml'));
+  assert.equal(failure.diagnostics[0].code, 'path_unavailable');
+  assert.equal(failure.diagnostics[0].ioCode, 'ENOENT');
+  for (const key of ['raw', 'realPath', 'id', 'range']) assert.equal(Object.hasOwn(failure, key), false);
+  const emptyProject = path.join(temporary, 'empty');
+  await mkdir(emptyProject);
+  const empty = await loadWorkspace({project: emptyProject});
+  assert.equal(empty.status, 'complete');
+  assert.deepEqual(empty.documents, []);
+  const failed = await loadWorkspace({project: path.join(temporary, 'missing')});
+  assert.equal(failed.status, 'failed');
+  assert.equal(Object.hasOwn(failed, 'root'), false);
+  assert.equal(failed.failures.length, 1);
+  for (const subpath of ['src/index.js', 'dist/index.js', 'dist/loader/index.js']) {
+    await assert.rejects(import('@codosc/workspace/' + subpath), {code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'});
+  }
+  console.log('Workspace packed JS contract verified');
+} finally {
+  await rm(temporary, {recursive: true, force: true});
+}`,
+      );
+      expect(run(['workspace.mjs'], packedConsumer)).toContain(
+        'Workspace packed JS contract verified',
+      );
+      const config = {
+        compilerOptions: {
+          strict: true,
+          exactOptionalPropertyTypes: true,
+          noEmit: true,
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          target: 'ES2022',
+          lib: ['ES2022', 'DOM'],
+          types: [],
+          skipLibCheck: false,
+        },
+        files: ['workspace.ts'],
+      };
+      writeFileSync(
+        path.join(packedConsumer, 'tsconfig.json'),
+        JSON.stringify(config),
+      );
+      writeFileSync(
+        path.join(packedConsumer, 'workspace.ts'),
+        `import {loadWorkspace, resolveWorkspacePath, workspaceDiagnosticCodes, workspaceDiagnosticMessages} from '@codosc/workspace';
+import type {WorkspaceScanResult, WorkspaceDocumentResult, WorkspaceScanDiagnostic, WorkspaceScanFailure, WorkspaceDocumentSource, WorkspaceSkippedCycle, WorkspaceDiagnostic, WorkspaceDiagnosticCode} from '@codosc/workspace';
+import type {Diagnostic, DiagnosticCode} from '@codosc/core';
+const workspaceCode: WorkspaceDiagnosticCode = workspaceDiagnosticCodes.readFailed;
+const workspaceIssue: WorkspaceDiagnostic = {code: workspaceCode, severity: 'error', message: workspaceDiagnosticMessages.readFailed};
+const commonIssue: Diagnostic<WorkspaceDiagnosticCode> = workspaceIssue;
+void commonIssue;
+// @ts-expect-error workspace codes exclude YAML parser codes
+const invalidWorkspaceCode: WorkspaceDiagnosticCode = 'invalid_yaml';
+// @ts-expect-error core codes exclude workspace IO codes
+const invalidCoreCode: DiagnosticCode = 'workspace_read_failed';
+// @ts-expect-error workspace diagnostic code type is owned by workspace
+import type {WorkspaceDiagnosticCode as RemovedCoreCode} from '@codosc/core';
+void invalidWorkspaceCode; void invalidCoreCode;
+const scan: WorkspaceScanResult = await loadWorkspace({project: 'project'});
+const documents: readonly WorkspaceDocumentResult[] = scan.documents;
+const failures: readonly WorkspaceScanFailure[] = scan.failures;
+const cycles: readonly WorkspaceSkippedCycle[] = scan.skippedCycles;
+const diagnostics: readonly WorkspaceScanDiagnostic[] = scan.diagnostics;
+void failures; void cycles;
+if (scan.status === 'complete' || scan.status === 'partial') {
+  const root: string = scan.root.projectRoot;
+  const checked = await resolveWorkspacePath(scan.root, '.codocs/terms.yaml');
+  if (checked.success) {const write: true = checked.access.write; void write;}
+  void root;
+} else {
+  const root: string | undefined = scan.root?.projectRoot;
+  void root;
+  // @ts-expect-error failed scans may not expose a confirmed root
+  const absent: string = scan.root.projectRoot;
+  void absent;
+}
+for (const document of documents) {
+  const source: WorkspaceDocumentSource = document.source;
+  const raw: string = document.raw;
+  void source; void raw;
+  if (document.status === 'valid') {
+    const id: string = document.data.id;
+    void id;
+    if (document.data.type === 'term') {
+      const name: string = document.data.name;
+      void name;
+      // @ts-expect-error term names remain strings
+      const wrong: number = document.data.name;
+      void wrong;
+    } else {
+      const domains: string[] = document.data.domains;
+      void domains;
+      // @ts-expect-error knowledge domains remain string arrays
+      const wrong: number[] = document.data.domains;
+      void wrong;
+    }
+  } else {
+    const status: 'parseError' | 'validationError' = document.status;
+    void status;
+    // @ts-expect-error read content errors have no validated data
+    const absent = document.data;
+    void absent;
+  }
+  // @ts-expect-error document status must be narrowed before reading data
+  const unnarrowed = document.data;
+  void unnarrowed;
+}
+for (const issue of diagnostics) {
+  if (issue.code === 'workspace_read_failed' || issue.code === 'path_unavailable') {
+    const ioCode: string | undefined = issue.ioCode;
+    void ioCode;
+  }
+}
+`,
+      );
+      const trace = run(
+        [tsc, '-p', 'tsconfig.json', '--traceResolution'],
+        packedConsumer,
+      );
+      const normalizedTrace = trace.replaceAll('\\', '/');
+      expect(normalizedTrace).toMatch(
+        /@codosc\/workspace[^\n]*\/dist\/index\.d\.ts/,
+      );
+      expect(normalizedTrace).toMatch(
+        /@codosc\/core[^\n]*\/dist\/index\.d\.ts/,
+      );
+      expect(normalizedTrace).not.toContain('/src/index.ts');
+      for (const subpath of [
+        'src/index.js',
+        'dist/index.js',
+        'dist/loader/index.js',
+      ]) {
+        writeFileSync(
+          path.join(packedConsumer, 'workspace.ts'),
+          `import type * as Hidden from '@codosc/workspace/${subpath}';\nexport type Value = typeof Hidden;\n`,
+        );
+        const failure = spawnSync(
+          process.execPath,
+          [tsc, '-p', 'tsconfig.json'],
+          { cwd: packedConsumer, encoding: 'utf8' },
+        );
+        expect(failure.status).toBe(2);
+        expect(failure.stdout + failure.stderr).toContain('TS2307');
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('기존 예제 두 파일은 단일 매핑으로 해석되고 ID·참조·본문을 유지한다', /** 공개 API로 실제 YAML과 원문 위치를 고정 기대값에 대조한다. */ () => {
     checkExamples(root);
   });
