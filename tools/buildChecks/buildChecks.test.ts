@@ -121,12 +121,14 @@ beforeAll(
     const coreRequire = createRequire(
       path.join(root, 'packages/core/package.json'),
     );
-    const yamlDirectory = path.dirname(
-      coreRequire.resolve('yaml/package.json'),
-    );
-    cpSync(yamlDirectory, path.join(consumer, 'node_modules/yaml'), {
-      recursive: true,
-    });
+    for (const dependency of ['yaml', 'zod']) {
+      const directory = path.dirname(
+        coreRequire.resolve(dependency + '/package.json'),
+      );
+      cpSync(directory, path.join(consumer, 'node_modules', dependency), {
+        recursive: true,
+      });
+    }
     for (let index = 0; index < folders.length; index++) {
       const folder = folders[index];
       const name = names[index];
@@ -161,7 +163,10 @@ for (const name of ${JSON.stringify(names)}) {
 for (const name of ['language-server', 'vscode']) {
   if (typeof require('@codosc/' + name) !== 'object') throw new Error('Invalid CJS');
 }
-const { parseYaml, getValueRange, yamlDiagnosticCodes } = await import('@codosc/core');
+const { parseYaml, getValueRange, yamlDiagnosticCodes, validateDocument } = await import('@codosc/core');
+const validated = validateDocument({ data: {type: 'term', id: 'order', name: '주문', definition: '정의', domain: '영역', custom: {nested: [null, 1, true]}} });
+if (!validated.success || validated.data.custom.nested[1] !== 1 || validated.warnings.length !== 1) throw new Error('Validator dependency failed');
+if (!import.meta.resolve('zod').startsWith(new URL('./node_modules/zod/', import.meta.url).href)) throw new Error('Zod dependency must be local');
 const parsed = parseYaml('name: "한글 😀"\\n');
 const range = getValueRange(parsed, ['name']);
 if (!parsed.success || parsed.data.name !== '한글 😀' || !range || parsed.source.slice(range.start, range.end) !== '"한글 😀"') throw new Error('Parser API failed');
@@ -204,7 +209,7 @@ console.log('Diagnostic code contract verified');`;
             `import type * as Package${index} from '@codosc/${name}';\nexport type Module${index} = typeof Package${index};`,
         )
         .join('\n') +
-      "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition, yamlDiagnosticCodes } from '@codosc/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic, YamlDiagnosticCode } from '@codosc/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\nexport const diagnosticCode: YamlDiagnosticCode = yamlDiagnosticCodes.invalidYaml;\nexport const returnedCodes: readonly YamlDiagnosticCode[] = diagnostics.map(issue => issue.code);\n";
+      "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition, yamlDiagnosticCodes, validateDocument } from '@codosc/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic, YamlDiagnosticCode, Term, Knowledge } from '@codosc/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\nexport const diagnosticCode: YamlDiagnosticCode = yamlDiagnosticCodes.invalidYaml;\nexport const returnedCodes: readonly YamlDiagnosticCode[] = diagnostics.map(issue => issue.code);\nconst validated = validateDocument({data: parsed.success ? parsed.data : {}});\nif (validated.success) {\n  const data: Term | Knowledge = validated.data;\n  if (data.type === 'term') { const name: string = data.name; void name; }\n  else { const domains: string[] = data.domains; void domains; }\n}\n";
     const config = {
       compilerOptions: {
         strict: true,
