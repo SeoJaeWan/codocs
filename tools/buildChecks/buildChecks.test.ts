@@ -161,10 +161,14 @@ for (const name of ${JSON.stringify(names)}) {
 for (const name of ['language-server', 'vscode']) {
   if (typeof require('@codosc/' + name) !== 'object') throw new Error('Invalid CJS');
 }
-const { parseYaml, getValueRange } = await import('@codosc/core');
+const { parseYaml, getValueRange, yamlDiagnosticCodes } = await import('@codosc/core');
 const parsed = parseYaml('name: "한글 😀"\\n');
 const range = getValueRange(parsed, ['name']);
 if (!parsed.success || parsed.data.name !== '한글 😀' || !range || parsed.source.slice(range.start, range.end) !== '"한글 😀"') throw new Error('Parser API failed');
+const invalid = parseYaml('name: [');
+if (invalid.success || !invalid.diagnostics.some(issue => issue.code === yamlDiagnosticCodes.invalidYaml)) throw new Error('Invalid YAML diagnostic failed');
+const unsupported = parseYaml('name: first\\nname: second');
+if (unsupported.success || !unsupported.diagnostics.some(issue => issue.code === yamlDiagnosticCodes.unsupportedYamlFeature)) throw new Error('Unsupported YAML diagnostic failed');
 if (!import.meta.resolve('yaml').startsWith(new URL('./node_modules/yaml/', import.meta.url).href)) throw new Error('Yaml dependency must be local');
 console.log('JS packages loaded');`;
     writeFileSync(path.join(consumer, 'consume.mjs'), script);
@@ -176,6 +180,22 @@ console.log('JS packages loaded');`;
     }
   });
 
+  it('빌드된 파서에 문법 오류나 중복 키를 입력하면 약속한 오류 코드 문자열을 반환한다', /** 기능 테스트는 공통 상수를 사용하므로, 이 계약 테스트는 명시적인 문자열로 외부 반환 코드의 호환성을 따로 검증한다. */ () => {
+    const script = `import assert from 'node:assert/strict';
+import { parseYaml } from '@codosc/core';
+const invalid = parseYaml('name: [');
+assert.equal(invalid.success, false);
+assert.ok(invalid.diagnostics.some(issue => issue.code === 'invalid_yaml'));
+const unsupported = parseYaml('name: first\\nname: second');
+assert.equal(unsupported.success, false);
+assert.ok(unsupported.diagnostics.some(issue => issue.code === 'unsupported_yaml_feature'));
+console.log('Diagnostic code contract verified');`;
+    writeFileSync(path.join(consumer, 'diagnosticCodes.mjs'), script);
+    expect(run(['diagnosticCodes.mjs'])).toContain(
+      'Diagnostic code contract verified',
+    );
+  });
+
   it('별도 TS 소비자가 dist d.ts를 해석하고 금지 subpath를 거부한다', /** 타입 namespace를 출력 없이 검사하고 해석 경로를 확인한다. */ () => {
     const code =
       names
@@ -184,7 +204,7 @@ console.log('JS packages loaded');`;
             `import type * as Package${index} from '@codosc/${name}';\nexport type Module${index} = typeof Package${index};`,
         )
         .join('\n') +
-      "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition } from '@codosc/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic } from '@codosc/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\n";
+      "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition, yamlDiagnosticCodes } from '@codosc/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic, YamlDiagnosticCode } from '@codosc/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\nexport const diagnosticCode: YamlDiagnosticCode = yamlDiagnosticCodes.invalidYaml;\nexport const returnedCodes: readonly YamlDiagnosticCode[] = diagnostics.map(issue => issue.code);\n";
     const config = {
       compilerOptions: {
         strict: true,

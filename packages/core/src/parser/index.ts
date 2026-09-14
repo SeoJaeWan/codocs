@@ -6,6 +6,8 @@ import {
   parseAllDocuments,
   Parser,
 } from 'yaml';
+import { yamlDiagnosticCodes } from '../diagnostics/index.js';
+import type { YamlDiagnosticCode } from '../diagnostics/index.js';
 
 /** 시작 포함·끝 제외인 0 기반 UTF-16 원문 범위다. */
 export interface OffsetRange {
@@ -26,7 +28,7 @@ export interface SourceRange {
 export type FieldPath = readonly (string | number)[];
 /** 문법 또는 지원하지 않는 YAML 구문의 오류다. */
 export interface YamlDiagnostic {
-  code: 'invalid_yaml' | 'unsupported_yaml_feature';
+  code: YamlDiagnosticCode;
   message: string;
   filePath: string | undefined;
   offsetRange: OffsetRange | undefined;
@@ -246,7 +248,7 @@ function rejectMergeKeys(
         diagnostics.push(
           diagnostic(
             source,
-            'unsupported_yaml_feature',
+            yamlDiagnosticCodes.unsupportedYamlFeature,
             '병합 키는 지원하지 않습니다.',
             filePath,
             pair.key.range ?? undefined,
@@ -294,7 +296,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
       diagnostics: [
         diagnostic(
           undefined,
-          'invalid_yaml',
+          yamlDiagnosticCodes.invalidYaml,
           'YAML 원문은 문자열이어야 합니다.',
           filePath,
         ),
@@ -324,10 +326,16 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
     const message = messages[String(token.type)];
     if (message)
       diagnostics.push(
-        diagnostic(source, 'unsupported_yaml_feature', message, filePath, [
-          Number(token.offset),
-          Number(token.offset) + String(token.source).length,
-        ]),
+        diagnostic(
+          source,
+          yamlDiagnosticCodes.unsupportedYamlFeature,
+          message,
+          filePath,
+          [
+            Number(token.offset),
+            Number(token.offset) + String(token.source).length,
+          ],
+        ),
       );
   }
   if (documents.length > 1) {
@@ -339,7 +347,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
     diagnostics.push(
       diagnostic(
         source,
-        'unsupported_yaml_feature',
+        yamlDiagnosticCodes.unsupportedYamlFeature,
         '복수 YAML 문서는 지원하지 않습니다.',
         filePath,
         start
@@ -371,7 +379,9 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
       diagnostics.push(
         diagnostic(
           source,
-          unsupported ? 'unsupported_yaml_feature' : 'invalid_yaml',
+          unsupported
+            ? yamlDiagnosticCodes.unsupportedYamlFeature
+            : yamlDiagnosticCodes.invalidYaml,
           message,
           filePath,
           offsets,
@@ -388,7 +398,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
       diagnostics: [
         diagnostic(
           source,
-          'invalid_yaml',
+          yamlDiagnosticCodes.invalidYaml,
           '최상위 YAML 값은 매핑이어야 합니다.',
           filePath,
           document?.contents && isNode(document.contents)
@@ -405,7 +415,7 @@ export function parseYaml(input: unknown, filePath?: string): YamlParseResult {
       diagnostics: [
         diagnostic(
           source,
-          'invalid_yaml',
+          yamlDiagnosticCodes.invalidYaml,
           '최상위 YAML 값은 매핑이어야 합니다.',
           filePath,
         ),
