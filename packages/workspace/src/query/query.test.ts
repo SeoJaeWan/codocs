@@ -249,7 +249,21 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     if (!first.success || !first.nextCursor)
       throw new Error('다음 cursor 없음');
     const cursor = first.nextCursor;
-    const tampered = `${cursor.slice(0, -1)}${cursor.endsWith('a') ? 'b' : 'a'}`;
+    const [encoded, signature] = cursor.split('.');
+    if (!encoded || !signature) throw new Error('서명 cursor 형식 오류');
+    const alphabet =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const lastIndex = alphabet.indexOf(signature.at(-1) ?? '');
+    if (lastIndex < 0 || (lastIndex & 3) !== 0)
+      throw new Error('canonical 서명 형식 오류');
+    const alternateSignature = `${signature.slice(0, -1)}${alphabet[lastIndex | 1]}`;
+    expect(Buffer.from(alternateSignature, 'base64url')).toEqual(
+      Buffer.from(signature, 'base64url'),
+    );
+    expect(
+      Buffer.from(alternateSignature, 'base64url').toString('base64url'),
+    ).toBe(signature);
+    const tampered = `${encoded}.${alternateSignature}`;
     expect(await session.list({ cursor: tampered })).toMatchObject({
       success: false,
       error: { code: workspaceQueryDiagnosticCodes.cursorExpired },

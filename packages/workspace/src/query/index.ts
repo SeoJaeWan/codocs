@@ -233,15 +233,16 @@ function decodeCursor(token: string): CursorPayload | undefined {
   if (parts.length !== 2) return undefined;
   const [encoded, signature] = parts;
   if (!encoded || !signature) return undefined;
-  const expected = createHmac('sha256', processCursorSecret)
-    .update(encoded, 'utf8')
-    .digest();
   let actual: Buffer;
   try {
     actual = Buffer.from(signature, 'base64url');
   } catch {
     return undefined;
   }
+  if (actual.toString('base64url') !== signature) return undefined;
+  const expected = createHmac('sha256', processCursorSecret)
+    .update(encoded, 'utf8')
+    .digest();
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected))
     return undefined;
   try {
