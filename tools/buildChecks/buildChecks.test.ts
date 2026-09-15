@@ -18,6 +18,11 @@ import {
   nameReferenceJs,
   nameReferenceTs,
 } from './nameReferences/index.js';
+import {
+  queryContractConfig,
+  queryContractJs,
+  queryContractTs,
+} from './queryContract/index.js';
 
 const root = process.cwd();
 const fixture = path.join(root, '.workbench/fixtures/빌드 소비자 with spaces');
@@ -188,6 +193,22 @@ describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 �
     expect(run([tsc, '-p', 'nameReferences.json'])).toBe('');
   });
 
+  it('MCP 공개 JS 소비자가 소스 없이 조회 handler와 package root 경계를 실행한다', /** 실제 dist만 복사한 소비자에서 목록·상세·입력 오류를 확인한다. */ () => {
+    writeFileSync(path.join(consumer, 'queryContract.mjs'), queryContractJs);
+    expect(run(['queryContract.mjs'])).toContain(
+      'MCP query JS contract verified',
+    );
+  });
+
+  it('MCP 공개 d.ts 소비자가 strict scanStatus와 결과 union을 좁힌다', /** 성공·실패 및 없음·충돌·본문 분기의 필드 존재를 검사한다. */ () => {
+    writeFileSync(path.join(consumer, 'queryContract.ts'), queryContractTs);
+    writeFileSync(
+      path.join(consumer, 'queryContract.json'),
+      JSON.stringify(queryContractConfig),
+    );
+    expect(run([tsc, '-p', 'queryContract.json'])).toBe('');
+  });
+
   it('이름 참조 tarball 소비자가 symlink 없이 공개 JS·d.ts와 내부 subpath 거부를 실행한다', /** 기존 링크 fixture 실패와 독립적으로 실제 pack 배포를 추출해 소비한다. */ () => {
     const directory = mkdtempSync(path.join(fixture, 'name packed '));
     const packed = path.join(directory, 'consumer');
@@ -283,24 +304,23 @@ describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 �
             '@codosc/core': 'file:../core.tgz',
             '@codosc/workspace': 'file:../workspace.tgz',
           },
-          // private 패키지는 게시하지 않고 workspace의 core 의존성도 같은 실제 tarball에 고정한다.
-          pnpm: { overrides: { '@codosc/core': 'file:../core.tgz' } },
         }),
+      );
+      // private workspace 의존성도 같은 실제 tarball로 해석하도록 소비자 전용 workspace를 고정한다.
+      writeFileSync(
+        path.join(packedConsumer, 'pnpm-workspace.yaml'),
+        "packages: ['.']\noverrides:\n  '@codosc/core': 'file:../core.tgz'\n",
       );
       const install = [
         pnpm,
         'install',
-        '--ignore-workspace',
         '--store-dir',
         path.join(root, '.workbench/pnpm-store'),
         '--cache-dir',
         path.join(directory, 'pnpm-cache'),
       ];
-      // 새 tarball의 고정 의존 metadata는 전용 cache에서 준비하고 실제 설치는 offline/frozen으로 검사한다.
-      for (const options of [
-        ['--lockfile-only'],
-        ['--offline', '--frozen-lockfile'],
-      ]) {
+      // 새 tarball과 전이 의존성을 전용 store에 준비한 뒤 실제 설치를 offline/frozen으로 반복한다.
+      for (const options of [[], ['--offline', '--frozen-lockfile']]) {
         const installed = spawnSync(
           process.execPath,
           [...install, ...options],
@@ -310,7 +330,17 @@ describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 �
           },
         );
         expect(installed.status, installed.stdout + installed.stderr).toBe(0);
+        rmSync(path.join(packedConsumer, 'node_modules'), {
+          recursive: true,
+          force: true,
+        });
       }
+      const restored = spawnSync(
+        process.execPath,
+        [...install, '--offline', '--frozen-lockfile'],
+        { cwd: packedConsumer, encoding: 'utf8' },
+      );
+      expect(restored.status, restored.stdout + restored.stderr).toBe(0);
       for (const name of ['core', 'workspace']) {
         expect(
           existsSync(

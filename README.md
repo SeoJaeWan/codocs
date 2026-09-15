@@ -1,6 +1,6 @@
 # codosc
 
-`.codocs` YAML 문서를 읽고 검증하여 이름 참조와 경로별 색인을 제공하는 모노레포다. 현재 구현은 파싱·검증·프로젝트 탐색·색인과 이름 변경 수정안 계산까지 포함한다. 실제 LSP/MCP 연결, VS Code activation, watcher와 다중 파일 rename 저장은 후속 계층의 책임이다.
+`.codocs` YAML 문서를 읽고 검증하여 이름 참조와 경로별 색인을 제공하는 모노레포다. 현재 구현은 파싱·검증·프로젝트 탐색·색인, 이름 변경 수정안 계산과 MCP 조회 직접 handler까지 포함한다. 실제 MCP SDK/stdio와 LSP 연결, VS Code activation, watcher와 다중 파일 rename 저장은 후속 계층의 책임이다.
 
 ## 패키지 구성
 
@@ -10,7 +10,7 @@
 | [`@codosc/workspace`](packages/workspace/README.md)            | 프로젝트 선택, 경로 경계, 파일 탐색과 core 연결 | 후속 LSP/MCP/UI             |
 | [`@codosc/language-server`](packages/languageServer/README.md) | workspace/core를 LSP 요청에 연결할 경계         | VS Code 확장                |
 | [`@codosc/vscode`](packages/vscode/README.md)                  | 언어 서버를 실행하고 VS Code와 연결할 경계      | VS Code 호스트              |
-| [`@codosc/mcp`](packages/mcp/README.md)                        | workspace/core를 MCP 요청에 연결할 경계         | MCP 클라이언트              |
+| [`@codosc/mcp`](packages/mcp/README.md)                        | 검증한 MCP 조회 입력을 workspace에 연결         | 후속 MCP SDK/stdio          |
 
 내부 의존성 방향은 다음과 같다.
 
@@ -29,6 +29,7 @@ mcp ──────────────────────> workspac
 ```ts
 import { buildWorkspaceCatalog, loadWorkspace } from '@codosc/workspace';
 import { planRename, resolveReference } from '@codosc/core';
+import { createCodocsQueryHandlers } from '@codosc/mcp';
 
 const scan = await loadWorkspace({ project: '../app' });
 const catalog = buildWorkspaceCatalog(scan);
@@ -42,6 +43,10 @@ const preview = planRename(catalog, {
   targetPath: '.codocs/order.yaml',
   newName: '가상 판매 주문',
 });
+
+const query = createCodocsQueryHandlers({ project: '../app' });
+const page = await query.codocsList({ domain: 'sample-sales' });
+const details = await query.codocsGet({ ids: ['sample-order'] });
 ```
 
 `loadWorkspace`가 실제 원문과 경로를 확인한다. core는 전달받은 값으로 결과를 계산할 뿐 파일을 읽거나 저장하지 않는다. `planRename`의 `ready` 상태도 저장 허용을 의미하지 않으며 후속 writer가 최신 원문, YAML 표기와 쓰기 가능 여부를 다시 확인해야 한다.
