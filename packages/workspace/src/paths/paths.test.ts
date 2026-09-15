@@ -1,7 +1,7 @@
 import {
   chmod,
-  mkdtemp,
   mkdir,
+  mkdtemp,
   realpath,
   rm,
   symlink,
@@ -11,21 +11,21 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  workspaceDiagnosticCodes,
+  workspaceDiagnosticMessages,
+} from '../diagnostics/index.js';
+import {
   resolveProjectRoot,
   resolveWorkspacePath,
   type WorkspacePathResult,
 } from '../index.js';
-import {
-  workspaceDiagnosticCodes,
-  workspaceDiagnosticMessages,
-} from '../diagnostics/index.js';
 
 let fixture: string;
 let project: string;
 let outside: string;
 beforeEach(
   /** 테스트마다 고유한 실제 파일 fixture를 생성한다. */ async () => {
-    fixture = await mkdtemp(path.join(tmpdir(), 'codosc-path-'));
+    fixture = await mkdtemp(path.join(tmpdir(), 'codocs-path-'));
     project = path.join(fixture, 'project');
     outside = path.join(fixture, 'outside');
     await mkdir(path.join(project, '.codocs'), { recursive: true });

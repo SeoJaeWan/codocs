@@ -1,23 +1,43 @@
-import {
-  catalogDiagnosticCodes,
-  catalogDiagnosticMessages,
-} from '../diagnostics/index.js';
+import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import type {
   CatalogDiagnosticCode,
   Diagnostic,
+  DiagnosticSeverity,
   FieldPath,
   OffsetRange,
   SourceRange,
 } from '../diagnostics/index.js';
 import {
+  catalogDiagnosticCodes,
+  catalogDiagnosticMessages,
+} from '../diagnostics/index.js';
+import type { YamlParseResult } from '../parser/index.js';
+import {
   getStringRange,
   offsetToPosition,
   parseYaml,
 } from '../parser/index.js';
-import type { YamlParseResult } from '../parser/index.js';
-import { extractReferences } from '../references/index.js';
+import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import type { ReferenceOccurrence } from '../references/index.js';
-import { validateDocument } from '../validator/index.js';
+import { extractReferences } from '../references/index.js';
+import { documentFields, validateDocument } from '../validator/index.js';
+import {
+  catalogConfirmations,
+  catalogFailureKinds,
+  referenceResolutionStatuses,
+  renameBlockingReasons,
+  renameImpactReasons,
+  renamePlanStatuses,
+  scanStatuses,
+  type CatalogConfirmation,
+  type CatalogFailureKind,
+  type ReferenceResolutionStatus,
+  type RenameBlockingReason,
+  type RenameImpactReason,
+  type RenamePlanStatus,
+  type ScanStatus,
+} from './domain-values.js';
+export * from './domain-values.js';
 
 /** 로더가 확인한 발견 경로와 파싱 결과다. 실경로는 진단 정보일 뿐 키가 아니다. */
 export interface CatalogObservation {
@@ -28,14 +48,17 @@ export interface CatalogObservation {
 /** IO 계층이 제공하는 실패 범위다. unknown은 범위를 확인하지 못한 실패다. */
 export type CatalogFailure =
   | {
-      kind: 'file' | 'folder';
+      kind: Exclude<CatalogFailureKind, typeof catalogFailureKinds.unknown>;
       path: string;
       diagnostics?: readonly Diagnostic<string>[];
     }
-  | { kind: 'unknown'; diagnostics?: readonly Diagnostic<string>[] };
+  | {
+      kind: typeof catalogFailureKinds.unknown;
+      diagnostics?: readonly Diagnostic<string>[];
+    };
 /** 전체/부분/실패 스캔의 중립 관측이다. 실패 시 observations는 채택하지 않는다. */
 export interface CatalogScan {
-  status: 'complete' | 'partial' | 'failed';
+  status: ScanStatus;
   observations: readonly CatalogObservation[];
   failures?: readonly CatalogFailure[];
 }
@@ -46,7 +69,7 @@ export interface CatalogIdentity {
   id?: string;
   name?: string;
   domains: readonly string[];
-  confirmation: 'confirmed' | 'unconfirmed';
+  confirmation: CatalogConfirmation;
 }
 /** 후보마다 오류와 확인 상태를 함께 제공한다. */
 export interface ReferenceCandidate extends CatalogIdentity {
@@ -60,8 +83,7 @@ export interface CatalogDiagnostic extends Diagnostic<CatalogDiagnosticCode> {
 }
 /** 문법 오류와 이름 해석을 구분하며 불확실한 검색을 부재·성공으로 확정하지 않는다. */
 export interface ReferenceResolution {
-  status:
-    'invalid' | 'missing' | 'ambiguous' | 'self' | 'unconfirmed' | 'resolved';
+  status: ReferenceResolutionStatus;
   candidates: readonly ReferenceCandidate[];
   target?: ReferenceCandidate;
 }
@@ -127,10 +149,45 @@ function addPath(
   paths.add(path);
   index.set(value, paths);
 }
+/** 진단 코드 원본에 대응하는 문구와 심각도다. */
+const catalogDiagnosticDefinitions = {
+  [catalogDiagnosticCodes.duplicateId]: {
+    message: catalogDiagnosticMessages.duplicateId,
+    severity: diagnosticSeverities.error,
+  },
+  [catalogDiagnosticCodes.duplicateName]: {
+    message: catalogDiagnosticMessages.duplicateName,
+    severity: diagnosticSeverities.error,
+  },
+  [catalogDiagnosticCodes.missingReference]: {
+    message: catalogDiagnosticMessages.missingReference,
+    severity: diagnosticSeverities.error,
+  },
+  [catalogDiagnosticCodes.ambiguousReference]: {
+    message: catalogDiagnosticMessages.ambiguousReference,
+    severity: diagnosticSeverities.error,
+  },
+  [catalogDiagnosticCodes.selfReference]: {
+    message: catalogDiagnosticMessages.selfReference,
+    severity: diagnosticSeverities.error,
+  },
+  [catalogDiagnosticCodes.unconfirmedReference]: {
+    message: catalogDiagnosticMessages.unconfirmedReference,
+    severity: diagnosticSeverities.warning,
+  },
+  [catalogDiagnosticCodes.referenceTargetError]: {
+    message: catalogDiagnosticMessages.referenceTargetError,
+    severity: diagnosticSeverities.warning,
+  },
+} satisfies Record<
+  CatalogDiagnosticCode,
+  { message: string; severity: DiagnosticSeverity }
+>;
+
 /** 원문에서 확인한 필드 또는 등장 위치만 진단에 붙인다. */
 function catalogDiagnostic(
   document: CatalogDocument,
-  key: keyof typeof catalogDiagnosticCodes,
+  code: CatalogDiagnosticCode,
   fieldPath?: FieldPath,
   occurrence?: ReferenceOccurrence,
   context?: { relatedPaths: readonly string[]; domain?: string },
@@ -158,12 +215,8 @@ function catalogDiagnostic(
       ? offsetToPosition(parsed.source, offsets.end)
       : undefined;
   return {
-    code: catalogDiagnosticCodes[key],
-    severity:
-      key === 'unconfirmedReference' || key === 'referenceTargetError'
-        ? 'warning'
-        : 'error',
-    message: catalogDiagnosticMessages[key],
+    code,
+    ...catalogDiagnosticDefinitions[code],
     path: document.path,
     ...(context
       ? {
@@ -180,7 +233,9 @@ function catalogDiagnostic(
 function candidate(document: CatalogDocument): ReferenceCandidate {
   return {
     ...linkIdentity(document),
-    errors: document.documentDiagnostics.filter((d) => d.severity === 'error'),
+    errors: document.documentDiagnostics.filter(
+      (d) => d.severity === diagnosticSeverities.error,
+    ),
   };
 }
 /** 직접 연결에 필요한 확인 가능한 메타데이터만 복사한다. */
@@ -209,16 +264,20 @@ export function resolveReference(
     return doc ? [candidate(doc)] : [];
   });
   if (
-    catalog.status !== 'complete' ||
-    candidates.some((c) => c.confirmation === 'unconfirmed')
+    catalog.status !== scanStatuses.complete ||
+    candidates.some((c) => c.confirmation === catalogConfirmations.unconfirmed)
   )
-    return { status: 'unconfirmed', candidates };
-  if (!candidates.length) return { status: 'missing', candidates };
-  if (candidates.length > 1) return { status: 'ambiguous', candidates };
+    return { status: referenceResolutionStatuses.unconfirmed, candidates };
+  if (!candidates.length)
+    return { status: referenceResolutionStatuses.missing, candidates };
+  if (candidates.length > 1)
+    return { status: referenceResolutionStatuses.ambiguous, candidates };
   const target = candidates[0];
-  if (!target) return { status: 'missing', candidates };
-  if (target.path === sourcePath) return { status: 'self', candidates, target };
-  return { status: 'resolved', candidates, target };
+  if (!target)
+    return { status: referenceResolutionStatuses.missing, candidates };
+  if (target.path === sourcePath)
+    return { status: referenceResolutionStatuses.self, candidates, target };
+  return { status: referenceResolutionStatuses.resolved, candidates, target };
 }
 /** 보관 기록에서 색인·충돌·직접 연결을 매번 재계산한다. */
 function calculate(
@@ -266,19 +325,25 @@ function calculate(
   /** 충돌의 모든 경로를 개별 진단한다. */
   function conflicts(
     paths: Set<string>,
-    key: 'duplicateId' | 'duplicateName',
+    code:
+      | typeof catalogDiagnosticCodes.duplicateId
+      | typeof catalogDiagnosticCodes.duplicateName,
     domain?: string,
   ): void {
     if (paths.size < 2) return;
     for (const path of paths) {
       const doc = documents.get(path);
       if (doc) {
-        const field = [key === 'duplicateId' ? 'id' : 'name'];
+        const field = [
+          code === catalogDiagnosticCodes.duplicateId
+            ? documentFields.id
+            : documentFields.name,
+        ];
         documents.set(path, {
           ...doc,
           documentDiagnostics: [
             ...doc.documentDiagnostics,
-            catalogDiagnostic(doc, key, field, undefined, {
+            catalogDiagnostic(doc, code, field, undefined, {
               relatedPaths: [...paths].sort(),
               ...(domain !== undefined ? { domain } : {}),
             }),
@@ -287,10 +352,11 @@ function calculate(
       }
     }
   }
-  for (const paths of idPaths.values()) conflicts(paths, 'duplicateId');
+  for (const paths of idPaths.values())
+    conflicts(paths, catalogDiagnosticCodes.duplicateId);
   for (const [domain, names] of domainNamePaths)
     for (const paths of names.values())
-      conflicts(paths, 'duplicateName', domain);
+      conflicts(paths, catalogDiagnosticCodes.duplicateName, domain);
   const backlinks = new Map<string, Set<string>>();
   for (const [path, doc] of documents) {
     const extracted = extractReferences(doc.observation.parsed, path);
@@ -304,27 +370,27 @@ function calculate(
         occurrence,
       ): CatalogOccurrence => {
         const resolution: ReferenceResolution =
-          occurrence.syntax === 'invalid'
-            ? { status: 'invalid', candidates: [] }
+          occurrence.syntax === referenceSyntaxStatuses.invalid
+            ? { status: referenceResolutionStatuses.invalid, candidates: [] }
             : resolveReference(catalog, occurrence, path);
         const key =
-          resolution.status === 'missing'
-            ? 'missingReference'
-            : resolution.status === 'ambiguous'
-              ? 'ambiguousReference'
-              : resolution.status === 'self'
-                ? 'selfReference'
-                : resolution.status === 'unconfirmed'
-                  ? 'unconfirmedReference'
+          resolution.status === referenceResolutionStatuses.missing
+            ? catalogDiagnosticCodes.missingReference
+            : resolution.status === referenceResolutionStatuses.ambiguous
+              ? catalogDiagnosticCodes.ambiguousReference
+              : resolution.status === referenceResolutionStatuses.self
+                ? catalogDiagnosticCodes.selfReference
+                : resolution.status === referenceResolutionStatuses.unconfirmed
+                  ? catalogDiagnosticCodes.unconfirmedReference
                   : undefined;
         if (key)
           diagnostics.push(
             catalogDiagnostic(doc, key, occurrence.fieldPath, occurrence),
           );
         if (
-          resolution.status === 'resolved' &&
+          resolution.status === referenceResolutionStatuses.resolved &&
           resolution.target &&
-          doc.confirmation === 'confirmed'
+          doc.confirmation === catalogConfirmations.confirmed
         ) {
           links.add(resolution.target.path);
           addPath(backlinks, resolution.target.path, path);
@@ -332,7 +398,7 @@ function calculate(
             diagnostics.push(
               catalogDiagnostic(
                 doc,
-                'referenceTargetError',
+                catalogDiagnosticCodes.referenceTargetError,
                 occurrence.fieldPath,
                 occurrence,
               ),
@@ -364,10 +430,13 @@ function calculate(
 /** complete만 삭제 근거로 삼아 구축·갱신한다. partial/failed의 미관측 이전 기록은 미확인으로 보존한다. */
 export function buildCatalog(scan: CatalogScan, previous?: Catalog): Catalog {
   const records = new Map<string, CatalogDocument>();
-  if (scan.status !== 'complete')
+  if (scan.status !== scanStatuses.complete)
     for (const [path, doc] of previous?.documents ?? [])
-      records.set(path, { ...doc, confirmation: 'unconfirmed' });
-  if (scan.status !== 'failed')
+      records.set(path, {
+        ...doc,
+        confirmation: catalogConfirmations.unconfirmed,
+      });
+  if (scan.status !== scanStatuses.failed)
     for (const observation of scan.observations) {
       const parsed = observation.parsed;
       const validation = parsed.success
@@ -383,7 +452,7 @@ export function buildCatalog(scan: CatalogScan, previous?: Catalog): Catalog {
         ? [...validation.errors, ...validation.warnings]
         : [...parsed.diagnostics];
       records.set(observation.path, {
-        ...identity(observation, 'confirmed'),
+        ...identity(observation, catalogConfirmations.confirmed),
         observation,
         documentDiagnostics,
         diagnostics: [],
@@ -428,14 +497,7 @@ export interface RenameImpact {
   occurrence: ReferenceOccurrence;
   before: ReferenceResolution;
   after: ReferenceResolution;
-  reason:
-    | 'selection_required'
-    | 'domain_required'
-    | 'invalid_selection'
-    | 'references_disabled'
-    | 'unconfirmed'
-    | 'unrepresentable'
-    | 'changed_resolution';
+  reason: RenameImpactReason;
 }
 /** 같은 도메인의 새 이름 충돌은 종류를 가리지 않고 변경을 차단한다. */
 export interface RenameConflict {
@@ -447,17 +509,12 @@ export interface RenamePlan {
   targetPath: string;
   oldName?: string;
   newName: string;
-  status: 'ready' | 'unresolved' | 'blocked';
+  status: RenamePlanStatus;
   changes: readonly RenameChange[];
   conflicts: readonly RenameConflict[];
   impacts: readonly RenameImpact[];
   invalidSelections: readonly RenameSelection[];
-  blockingReason?:
-    | 'target_unavailable'
-    | 'invalid_name'
-    | 'name_conflict'
-    | 'unconfirmed'
-    | 'invalid_selection';
+  blockingReason?: RenameBlockingReason;
 }
 /** 새 표기를 공개 문법 추출로 round trip 검증한다. 표현 불가능한 구성은 추측하지 않는다. */
 function referenceText(name: string, domain?: string): string | undefined {
@@ -476,7 +533,7 @@ function referenceText(name: string, domain?: string): string | undefined {
   );
   const occurrence = extracted.occurrences[0];
   return extracted.occurrences.length === 1 &&
-    occurrence?.syntax === 'valid' &&
+    occurrence?.syntax === referenceSyntaxStatuses.valid &&
     occurrence.name === name &&
     occurrence.domain === domain
     ? text
@@ -503,7 +560,7 @@ export function planRename(
   const initial: RenamePlan = {
     targetPath: request.targetPath,
     newName: request.newName,
-    status: 'blocked',
+    status: renamePlanStatuses.blocked,
     changes: [],
     conflicts: [],
     impacts: [],
@@ -515,11 +572,17 @@ export function planRename(
     target.name === undefined ||
     !target.observation.parsed.success
   )
-    return { ...initial, blockingReason: 'target_unavailable' };
+    return {
+      ...initial,
+      blockingReason: renameBlockingReasons.targetUnavailable,
+    };
   if (!nonblank(request.newName))
-    return { ...initial, blockingReason: 'invalid_name' };
-  if (catalog.status !== 'complete' || target.confirmation !== 'confirmed')
-    return { ...initial, blockingReason: 'unconfirmed' };
+    return { ...initial, blockingReason: renameBlockingReasons.invalidName };
+  if (
+    catalog.status !== scanStatuses.complete ||
+    target.confirmation !== catalogConfirmations.confirmed
+  )
+    return { ...initial, blockingReason: renameBlockingReasons.unconfirmed };
   const selections = request.selections ?? [];
   const invalidSelections = selections.filter(
     /** 존재하지 않는 등장·리터럴·중복 선택을 임의로 무시하지 않는다. */ (
@@ -533,7 +596,7 @@ export function planRename(
         !Number.isInteger(selection.occurrenceIndex) ||
         selection.occurrenceIndex < 0 ||
         !item ||
-        item.occurrence.syntax !== 'valid' ||
+        item.occurrence.syntax !== referenceSyntaxStatuses.valid ||
         selections.some(
           (other, otherIndex) =>
             index !== otherIndex &&
@@ -547,7 +610,7 @@ export function planRename(
     return {
       ...initial,
       invalidSelections,
-      blockingReason: 'invalid_selection',
+      blockingReason: renameBlockingReasons.invalidSelection,
     };
   const conflicts: RenameConflict[] = target.domains.flatMap(
     /** 모든 소속 도메인의 cross-kind 새 이름 충돌을 계산한다. */ (domain) => {
@@ -562,7 +625,11 @@ export function planRename(
     },
   );
   if (conflicts.length)
-    return { ...initial, conflicts, blockingReason: 'name_conflict' };
+    return {
+      ...initial,
+      conflicts,
+      blockingReason: renameBlockingReasons.nameConflict,
+    };
   const simulated = calculate(
     catalog.status,
     catalog.failures,
@@ -572,7 +639,7 @@ export function planRename(
   );
   const changes: RenameChange[] = [],
     impacts: RenameImpact[] = [];
-  const fieldPath = ['name'];
+  const fieldPath = [documentFields.name];
   const parsed = target.observation.parsed;
   const offsetRange = getStringRange(parsed, fieldPath, {
     start: 0,
@@ -585,7 +652,10 @@ export function planRename(
     ? offsetToPosition(parsed.source, offsetRange.end)
     : undefined;
   if (!offsetRange || !start || !end)
-    return { ...initial, blockingReason: 'target_unavailable' };
+    return {
+      ...initial,
+      blockingReason: renameBlockingReasons.targetUnavailable,
+    };
   if (target.name !== request.newName)
     changes.push({
       path: target.path,
@@ -604,7 +674,8 @@ export function planRename(
       occurrenceIndex++
     ) {
       const item = doc.occurrences[occurrenceIndex];
-      if (!item || item.occurrence.syntax !== 'valid') continue;
+      if (!item || item.occurrence.syntax !== referenceSyntaxStatuses.valid)
+        continue;
       const occurrence = item.occurrence,
         before = item.resolution;
       const after = resolveReference(simulated, occurrence, doc.path);
@@ -614,7 +685,7 @@ export function planRename(
       );
       const selected = selection
         ? before.candidates.find((c) => c.path === selection.targetPath)
-        : before.status === 'resolved'
+        : before.status === referenceResolutionStatuses.resolved
           ? before.target
           : undefined;
       /** 미해결 등장도 원문 위치와 전후 후보를 유지한다. */
@@ -629,7 +700,7 @@ export function planRename(
         });
       }
       if (selection && !selected) {
-        impact('invalid_selection');
+        impact(renameImpactReasons.invalidSelection);
         continue;
       }
       const affected =
@@ -639,22 +710,22 @@ export function planRename(
       if (!selected) {
         if (affected)
           impact(
-            before.status === 'unconfirmed'
-              ? 'unconfirmed'
+            before.status === referenceResolutionStatuses.unconfirmed
+              ? renameImpactReasons.unconfirmed
               : sameResolution(before, after)
-                ? 'selection_required'
-                : 'changed_resolution',
+                ? renameImpactReasons.selectionRequired
+                : renameImpactReasons.changedResolution,
           );
         continue;
       }
       if (selected.path === doc.path) {
-        if (affected) impact('invalid_selection');
+        if (affected) impact(renameImpactReasons.invalidSelection);
         continue;
       }
       const name =
         selected.path === target.path ? request.newName : selected.name;
       if (name === undefined) {
-        impact('invalid_selection');
+        impact(renameImpactReasons.invalidSelection);
         continue;
       }
       if (request.updateReferences === false) {
@@ -662,7 +733,7 @@ export function planRename(
           !sameResolution(before, after) ||
           (selected.path === target.path && target.name !== request.newName)
         )
-          impact('references_disabled');
+          impact(renameImpactReasons.referencesDisabled);
         continue;
       }
       let domain = occurrence.domain;
@@ -671,7 +742,7 @@ export function planRename(
           !selected.domains.includes(selection.domain) ||
           (domain !== undefined && domain !== selection.domain)
         ) {
-          impact('invalid_selection');
+          impact(renameImpactReasons.invalidSelection);
           continue;
         }
         if (domain === undefined) domain = selection.domain;
@@ -682,15 +753,15 @@ export function planRename(
         doc.path,
       );
       if (
-        proposed.status !== 'resolved' ||
+        proposed.status !== referenceResolutionStatuses.resolved ||
         proposed.target?.path !== selected.path
       ) {
         if (domain !== undefined) {
-          impact('invalid_selection');
+          impact(renameImpactReasons.invalidSelection);
           continue;
         }
         if (selected.domains.length !== 1) {
-          impact('domain_required');
+          impact(renameImpactReasons.domainRequired);
           continue;
         }
         domain = selected.domains[0];
@@ -700,16 +771,16 @@ export function planRename(
           doc.path,
         );
         if (
-          qualified.status !== 'resolved' ||
+          qualified.status !== referenceResolutionStatuses.resolved ||
           qualified.target?.path !== selected.path
         ) {
-          impact('invalid_selection');
+          impact(renameImpactReasons.invalidSelection);
           continue;
         }
       }
       const newText = referenceText(name, domain);
       if (newText === undefined) {
-        if (affected) impact('unrepresentable');
+        if (affected) impact(renameImpactReasons.unrepresentable);
         continue;
       }
       if (newText !== occurrence.text)
@@ -735,7 +806,9 @@ export function planRename(
   );
   return {
     ...initial,
-    status: impacts.length ? 'unresolved' : 'ready',
+    status: impacts.length
+      ? renamePlanStatuses.unresolved
+      : renamePlanStatuses.ready,
     changes,
     impacts,
   };

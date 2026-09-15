@@ -27,10 +27,10 @@ COD-8은 이름 기반 참조·경로별 색인·충돌 진단·순수 이름 �
 
 DEC-001은 core/references에 문법·위치, core/catalog에 색인·충돌·해석·직접/역참조·rename 계산, workspace에 로더·스캔 연결을 둔다. 실제 IO 의존성이 계산 계층에 발견되면 경계를 재검토한다. DEC-002는 파싱 성공 데이터와 원문 문자열 매핑을 로더에서 재사용 가능하게 보존한다. 메모리 실측에 따라 표현은 조정할 수 있다. DEC-007은 대상 경로·필드·실제 위치·후보를 가진 수정 계획이며 후속 writer의 원문 보존 계약과 통합할 때 표현을 재검토할 수 있다. 이 배치/표현 제안은 승인된 구현 방향이며 공개 계약 보존 하에서 함수명/내부 표현을 선택한다.
 
-DEC-003은 YAML 해석 문자열/원문 매핑을 parser와 stringMapping 책임으로 두며 지원 표기의 정확 매핑을 입증하지 못하면 재설계한다. DEC-004는 경로 문서와 ID/도메인 이름/전체 이름의 경로 집합을 분리하며 규모 측정 후 최적화할 수 있다. DEC-005는 등장/해석 기록과 확정 연결 목록을 분리하며 실제 소비 API에 따라 표현을 조정할 수 있다. DEC-006은 이전 색인·새 관측·실패 범위로 갱신을 계산하며 비용 측정의 병목에 따라 알고리즘을 조정할 수 있다.
+DEC-003은 YAML 해석 문자열/원문 매핑을 parser와 string-mapping 책임으로 두며 지원 표기의 정확 매핑을 입증하지 못하면 재설계한다. DEC-004는 경로 문서와 ID/도메인 이름/전체 이름의 경로 집합을 분리하며 규모 측정 후 최적화할 수 있다. DEC-005는 등장/해석 기록과 확정 연결 목록을 분리하며 실제 소비 API에 따라 표현을 조정할 수 있다. DEC-006은 이전 색인·새 관측·실패 범위로 갱신을 계산하며 비용 측정의 병목에 따라 알고리즘을 조정할 수 있다.
 
-- `@codosc/core`: parseYaml, extractReferences, buildCatalog, resolveReference, planRename 및 공개 진단 상수/타입.
-- `@codosc/workspace`: loadWorkspace, toCatalogScan, buildWorkspaceCatalog 및 공개 스캔/IO 진단 상수/타입.
+- `@codocs/core`: parseYaml, extractReferences, buildCatalog, resolveReference, planRename 및 공개 진단 상수/타입.
+- `@codocs/workspace`: loadWorkspace, toCatalogScan, buildWorkspaceCatalog 및 공개 스캔/IO 진단 상수/타입.
 - valid/validationError 문서는 성공 parsed 모델을 재사용하며 valid에만 검증 data를 제공한다. parseError에는 parsed/data가 없으며 YAML 진단만 있다.
 - Catalog는 Readonly 컬렉션 계약이다. 이름·후보·진단/등장 기록과 확정 연결 목록을 구분한다. core는 IO·입력 변경·AST/FS 내부 타입 공개를 하지 않는다.
 - RenamePlan의 ready/unresolved/blocked는 저장 허용이 아니다. oldText/newText는 해석값이며 YAML 따옴표·escape·folded layout을 그대로 바꿀 raw patch가 아니다.

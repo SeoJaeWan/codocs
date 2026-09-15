@@ -1,7 +1,4 @@
-import {
-  referenceDiagnosticCodes,
-  referenceDiagnosticMessages,
-} from '../diagnostics/index.js';
+import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import type {
   Diagnostic,
   FieldPath,
@@ -9,8 +6,15 @@ import type {
   ReferenceDiagnosticCode,
   SourceRange,
 } from '../diagnostics/index.js';
-import { getStringRange, offsetToPosition } from '../parser/index.js';
+import {
+  referenceDiagnosticCodes,
+  referenceDiagnosticMessages,
+} from '../diagnostics/index.js';
 import type { YamlParseResult } from '../parser/index.js';
+import { getStringRange, offsetToPosition } from '../parser/index.js';
+import { documentFields } from '../validator/index.js';
+import { referenceSyntaxStatuses } from './domain-values.js';
+export * from './domain-values.js';
 
 /** 참조 등장에 공통인 해석 문자열과 확인된 원문 위치다. */
 interface ReferenceLocation {
@@ -22,10 +26,17 @@ interface ReferenceLocation {
 }
 /** 유효·무효 문법을 구분하며 반복 및 무효 참조의 위치도 유지한다. */
 export type ReferenceOccurrence = ReferenceLocation &
-  ({ syntax: 'valid'; name: string; domain?: string } | { syntax: 'invalid' });
+  (
+    | {
+        syntax: typeof referenceSyntaxStatuses.valid;
+        name: string;
+        domain?: string;
+      }
+    | { syntax: typeof referenceSyntaxStatuses.invalid }
+  );
 /** 실제 등장 범위를 가진 참조 문법 오류다. */
 export interface ReferenceDiagnostic extends Diagnostic<ReferenceDiagnosticCode> {
-  severity: 'error';
+  severity: typeof diagnosticSeverities.error;
   fieldPath: FieldPath;
   offsetRange: OffsetRange;
   range: SourceRange;
@@ -65,11 +76,12 @@ function components(
 /** 자료형이 정상인 본문과 예문 경로만 고른다. */
 function bodyPaths(data: Record<string, unknown>): FieldPath[] {
   const paths: FieldPath[] = [];
-  if (typeof data.definition === 'string') paths.push(['definition']);
+  if (typeof data.definition === 'string')
+    paths.push([documentFields.definition]);
   if (Array.isArray(data.examples))
     for (let index = 0; index < data.examples.length; index++)
       if (typeof data.examples[index] === 'string')
-        paths.push(['examples', index]);
+        paths.push([documentFields.examples, index]);
   return paths;
 }
 /** YAML 성공 결과의 정해진 본문만 추출한다. 스키마 검증·ID·파일 IO에 의존하지 않고 입력을 변경하지 않는다. */
@@ -112,13 +124,13 @@ export function extractReferences(
       };
       occurrences.push(
         parts
-          ? { ...location, syntax: 'valid', ...parts }
-          : { ...location, syntax: 'invalid' },
+          ? { ...location, syntax: referenceSyntaxStatuses.valid, ...parts }
+          : { ...location, syntax: referenceSyntaxStatuses.invalid },
       );
       if (!parts)
         diagnostics.push({
           code: referenceDiagnosticCodes.invalidReference,
-          severity: 'error',
+          severity: diagnosticSeverities.error,
           message: referenceDiagnosticMessages.invalidReference,
           fieldPath: [...fieldPath],
           offsetRange: { ...offsetRange },

@@ -1,14 +1,18 @@
-import { constants } from 'node:fs';
-import { access, readFile, readdir } from 'node:fs/promises';
-import path from 'node:path';
 import {
+  catalogFailureKinds,
+  diagnosticSeverities,
   parseYaml,
+  scanStatuses,
   validateDocument,
   type Document,
+  type ScanStatus,
   type SchemaDiagnostic,
   type YamlDiagnostic,
   type YamlParseResult,
-} from '@codosc/core';
+} from '@codocs/core';
+import { constants } from 'node:fs';
+import { access, readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
 import {
   createWorkspaceDiagnostic,
   workspaceDiagnosticCodes,
@@ -16,13 +20,23 @@ import {
   type WorkspaceDiagnostic,
 } from '../diagnostics/index.js';
 import {
+  workspacePathFailureStatuses,
+  workspaceTargetKinds,
+} from '../paths/domain-values.js';
+import {
   resolveWorkspacePath,
   type WorkspaceAccessPolicy,
   type WorkspaceAccessScope,
   type WorkspacePathResult,
   type WorkspaceTargetKind,
 } from '../paths/index.js';
-import { resolveProjectRoot, type ProjectRoot } from '../projectRoot/index.js';
+import {
+  codocsDirectoryName,
+  resolveProjectRoot,
+  type ProjectRoot,
+} from '../project-root/index.js';
+import { workspaceDocumentStatuses } from './domain-values.js';
+export * from './domain-values.js';
 
 /** 읽은 문서의 발견 경로와 확인한 실제 파일이다. 경로 표기는 임의 변환하지 않는다. */
 export interface WorkspaceDocumentSource {
@@ -51,20 +65,23 @@ interface ReadDocument {
 export type WorkspaceDocumentResult = ReadDocument &
   (
     | {
-        status: 'valid';
+        status: typeof workspaceDocumentStatuses.valid;
         data: Document;
         parsed: Extract<YamlParseResult, { success: true }>;
       }
-    | { status: 'parseError'; diagnostics: readonly YamlDiagnostic[] }
     | {
-        status: 'validationError';
+        status: typeof workspaceDocumentStatuses.parseError;
+        diagnostics: readonly YamlDiagnostic[];
+      }
+    | {
+        status: typeof workspaceDocumentStatuses.validationError;
         parsed: Extract<YamlParseResult, { success: true }>;
       }
   );
 
 /** 확인하지 못한 파일·폴더 범위다. 얻지 못한 원문·실경로·ID·좌표는 없다. */
 export interface WorkspaceScanFailure {
-  kind: WorkspaceTargetKind | 'unknown';
+  kind: WorkspaceTargetKind | typeof catalogFailureKinds.unknown;
   path?: string;
   logicalPath?: string;
   realPath?: string;
@@ -90,8 +107,15 @@ interface WorkspaceScanResults {
 /** 탐색 완료 여부는 문서 유효성과 별개다. failed에서만 유효한 루트가 없을 수 있다. */
 export type WorkspaceScanResult = WorkspaceScanResults &
   (
-    | { status: 'complete' | 'partial'; root: ProjectRoot }
-    | { status: 'failed'; root?: ProjectRoot; projectRoot?: string }
+    | {
+        status: Exclude<ScanStatus, typeof scanStatuses.failed>;
+        root: ProjectRoot;
+      }
+    | {
+        status: typeof scanStatuses.failed;
+        root?: ProjectRoot;
+        projectRoot?: string;
+      }
   );
 
 /** 실제 대상을 확인한 성공 경로다. FS 내부 타입을 공개 반환값에 넣지 않는다. */
@@ -112,7 +136,7 @@ function parseDocument(
   if (!parsed.success)
     return {
       ...base,
-      status: 'parseError',
+      status: workspaceDocumentStatuses.parseError,
       diagnostics: parsed.diagnostics.map(
         /** core의 실제 좌표·코드를 유지하고 확인한 프로젝트 상대 경로만 추가한다. */
         (diagnostic) => ({ ...diagnostic, path: target.path }),
@@ -127,8 +151,19 @@ function parseDocument(
   });
   const diagnostics = [...validation.errors, ...validation.warnings];
   return validation.success
-    ? { ...base, status: 'valid', data: validation.data, parsed, diagnostics }
-    : { ...base, status: 'validationError', parsed, diagnostics };
+    ? {
+        ...base,
+        status: workspaceDocumentStatuses.valid,
+        data: validation.data,
+        parsed,
+        diagnostics,
+      }
+    : {
+        ...base,
+        status: workspaceDocumentStatuses.validationError,
+        parsed,
+        diagnostics,
+      };
 }
 
 /** 경로 확인 실패에서 얻은 값만 실패 범위로 보존한다. */
@@ -136,7 +171,7 @@ function pathFailure(
   result: Extract<WorkspacePathResult, { success: false }>,
 ): WorkspaceScanFailure {
   return {
-    kind: 'unknown',
+    kind: catalogFailureKinds.unknown,
     ...(result.path === undefined ? {} : { path: result.path }),
     ...(result.logicalPath === undefined
       ? {}
@@ -185,7 +220,7 @@ export async function loadWorkspace(
   if (!selected.success) {
     diagnostics.push(...selected.diagnostics);
     failures.push({
-      kind: 'directory',
+      kind: workspaceTargetKinds.directory,
       ...(selected.projectRoot === undefined
         ? {}
         : { logicalPath: selected.projectRoot }),
@@ -193,27 +228,27 @@ export async function loadWorkspace(
     });
     return {
       ...results,
-      status: 'failed',
+      status: scanStatuses.failed,
       ...(selected.projectRoot === undefined
         ? {}
         : { projectRoot: selected.projectRoot }),
     };
   }
   const root = selected.root;
-  const initial = await resolveWorkspacePath(root, '.codocs');
+  const initial = await resolveWorkspacePath(root, codocsDirectoryName);
   if (!initial.success) {
-    if (initial.status === 'missing')
-      return { ...results, status: 'complete', root };
+    if (initial.status === workspacePathFailureStatuses.missing)
+      return { ...results, status: scanStatuses.complete, root };
     failures.push(pathFailure(initial));
     diagnostics.push(...initial.diagnostics);
-    return { ...results, status: 'failed', root };
+    return { ...results, status: scanStatuses.failed, root };
   }
   // 전역 방문 집합이 아니라 현재 탐색 가지의 실제 폴더만 유지한다.
   const ancestors: ResolvedPath[] = [];
 
   /** 폴더 진입 시 조상을 추가하고 돌아올 때 반드시 제거한다. */
   async function visit(target: ResolvedPath): Promise<void> {
-    if (target.kind === 'directory') {
+    if (target.kind === workspaceTargetKinds.directory) {
       if (
         ancestors.some(
           /** 실제 경로 또는 확인한 0이 아닌 현재 폴더 식별 정보로만 같은 조상임을 판정한다. */
@@ -237,7 +272,7 @@ export async function loadWorkspace(
             workspaceDiagnosticMessages.circularDirectoryLink,
             target.path,
           ),
-          severity: 'warning',
+          severity: diagnosticSeverities.warning,
         };
         skippedCycles.push({
           path: target.path,
@@ -279,7 +314,11 @@ export async function loadWorkspace(
       }
       return;
     }
-    if (target.kind !== 'file' || !/\.ya?ml$/u.test(target.logicalPath)) return;
+    if (
+      target.kind !== workspaceTargetKinds.file ||
+      !/\.ya?ml$/u.test(target.logicalPath)
+    )
+      return;
     let raw: string;
     try {
       raw = await readFile(target.logicalPath, 'utf8');
@@ -303,9 +342,9 @@ export async function loadWorkspace(
     ...results,
     root,
     status: rootReadFailed
-      ? 'failed'
+      ? scanStatuses.failed
       : failures.length > 0
-        ? 'partial'
-        : 'complete',
+        ? scanStatuses.partial
+        : scanStatuses.complete,
   };
 }

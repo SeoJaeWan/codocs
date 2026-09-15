@@ -6,10 +6,7 @@ import {
   parseAllDocuments,
   Parser,
 } from 'yaml';
-import {
-  yamlDiagnosticCodes,
-  yamlDiagnosticMessages,
-} from '../diagnostics/index.js';
+import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import type {
   Diagnostic,
   FieldPath,
@@ -17,14 +14,18 @@ import type {
   SourcePosition,
   YamlDiagnosticCode,
 } from '../diagnostics/index.js';
-import { collectStringMappings } from '../stringMapping/index.js';
-import type { StringSourceMapping } from '../stringMapping/index.js';
-export type { StringSourceMapping } from '../stringMapping/index.js';
+import {
+  yamlDiagnosticCodes,
+  yamlDiagnosticMessages,
+} from '../diagnostics/index.js';
+import type { StringSourceMapping } from '../string-mapping/index.js';
+import { collectStringMappings } from '../string-mapping/index.js';
+export type { StringSourceMapping } from '../string-mapping/index.js';
 
 /** 문법 또는 지원하지 않는 YAML 구문의 오류다. */
 export interface YamlDiagnostic extends Diagnostic {
   code: YamlDiagnosticCode;
-  severity: 'error';
+  severity: typeof diagnosticSeverities.error;
   offsetRange?: OffsetRange;
 }
 /** 특정 속성의 세 가지 원문 범위를 구분한다. */
@@ -106,7 +107,7 @@ function diagnostic(
     start <= end;
   return {
     code,
-    severity: 'error',
+    severity: diagnosticSeverities.error,
     message,
     ...(path !== undefined ? { path } : {}),
     ...(valid

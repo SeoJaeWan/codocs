@@ -1,15 +1,18 @@
 import {
   buildCatalog,
+  catalogFailureKinds,
   type Catalog,
   type CatalogFailure,
   type CatalogObservation,
   type CatalogScan,
-} from '@codosc/core';
+} from '@codocs/core';
+import { workspaceDocumentStatuses } from '../loader/domain-values.js';
 import type {
   WorkspaceDocumentResult,
   WorkspaceScanFailure,
   WorkspaceScanResult,
 } from '../loader/index.js';
+import { workspaceTargetKinds } from '../paths/domain-values.js';
 
 /** 파싱 성공 모델을 재사용하며 파싱 실패에서 미검증 정보나 참조를 추측하지 않는다. */
 function observation(document: WorkspaceDocumentResult): CatalogObservation {
@@ -17,7 +20,7 @@ function observation(document: WorkspaceDocumentResult): CatalogObservation {
     path: document.source.path,
     realPath: document.source.realPath,
     parsed:
-      document.status === 'parseError'
+      document.status === workspaceDocumentStatuses.parseError
         ? {
             success: false,
             source: document.raw,
@@ -31,15 +34,19 @@ function observation(document: WorkspaceDocumentResult): CatalogObservation {
 function failure(scope: WorkspaceScanFailure): CatalogFailure {
   if (
     scope.path !== undefined &&
-    (scope.kind === 'file' || scope.kind === 'directory')
+    (scope.kind === workspaceTargetKinds.file ||
+      scope.kind === workspaceTargetKinds.directory)
   ) {
     return {
-      kind: scope.kind === 'directory' ? 'folder' : 'file',
+      kind:
+        scope.kind === workspaceTargetKinds.directory
+          ? catalogFailureKinds.folder
+          : catalogFailureKinds.file,
       path: scope.path,
       diagnostics: scope.diagnostics,
     };
   }
-  return { kind: 'unknown', diagnostics: scope.diagnostics };
+  return { kind: catalogFailureKinds.unknown, diagnostics: scope.diagnostics };
 }
 
 /**

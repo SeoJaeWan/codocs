@@ -1,5 +1,5 @@
 {
-  "name": "@codosc/workspace",
+  "name": "@codocs/workspace",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@codosc/core": "workspace:*"
+    "@codocs/core": "workspace:*"
   },
   "files": [
     "dist",

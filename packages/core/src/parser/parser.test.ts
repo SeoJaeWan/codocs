@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { FieldPath, OffsetRange, YamlParseResult } from '../index.js';
 import {
   getKeyRange,
   getPropertyRange,
@@ -8,7 +9,6 @@ import {
   yamlDiagnosticCodes,
   yamlDiagnosticMessages,
 } from '../index.js';
-import type { FieldPath, OffsetRange, YamlParseResult } from '../index.js';
 
 /** 위치 범위가 있으면 원문을 잘라 반환하고, 원문이나 범위가 없으면 undefined를 반환한다. */
 function slice(

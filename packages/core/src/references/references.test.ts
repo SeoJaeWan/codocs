@@ -5,6 +5,7 @@ import {
   referenceDiagnosticCodes,
   referenceDiagnosticMessages,
 } from '../index.js';
+import { referenceSyntaxStatuses } from './domain-values.js';
 
 describe('본문의 참조 문법과 오류 복구', /** 문자열 자료형을 확인한 본문만 추출한다. */ () => {
   it('공개 진단 상수를 조회하면 고정 코드와 한국어 문구를 반환한다', /** 공개 문자열 호환성은 구현 상수 참조와 별도로 검증한다. */ () => {
@@ -54,7 +55,9 @@ describe('본문의 참조 문법과 오류 복구', /** 문자열 자료형을 
     expect(result.diagnostics).toEqual([]);
     expect(
       result.occurrences.map((item) =>
-        item.syntax === 'valid' ? [item.name, item.domain] : null,
+        item.syntax === referenceSyntaxStatuses.valid
+          ? [item.name, item.domain]
+          : null,
       ),
     ).toEqual([
       ['이름', undefined],
@@ -176,7 +179,9 @@ describe('본문의 참조 문법과 오류 복구', /** 문자열 자료형을 
 `;
     expect(
       extractReferences(parseYaml(source)).occurrences.map((item) =>
-        item.syntax === 'valid' ? [item.name, item.domain] : null,
+        item.syntax === referenceSyntaxStatuses.valid
+          ? [item.name, item.domain]
+          : null,
       ),
     ).toEqual([
       ['a:b', undefined],

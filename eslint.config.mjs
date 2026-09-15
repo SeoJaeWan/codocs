@@ -1,8 +1,10 @@
+import { defineConfig } from 'eslint/config';
+import checkFile from 'eslint-plugin-check-file';
 import tseslint from 'typescript-eslint';
 import jsdoc from 'eslint-plugin-jsdoc';
-import codosc from './tools/developmentChecks/eslintRules.mjs';
+import codocs from './tools/development-checks/eslint-rules.mjs';
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: [
       '**/node_modules/**',
@@ -10,6 +12,37 @@ export default tseslint.config(
       '**/coverage/**',
       '.workbench/**',
     ],
+  },
+  {
+    files: [
+      '**/*.{ts,js,mjs,cjs}',
+      '.codocs/**/*.yaml',
+      'examples/.codocs/**/*.yaml',
+    ],
+    plugins: { 'check-file': checkFile },
+    rules: {
+      'check-file/filename-naming-convention': [
+        'error',
+        {
+          '**/*.{ts,js,mjs,cjs,yaml}': 'KEBAB_CASE',
+          '.codocs/**/*.yaml': 'KEBAB_CASE',
+          'examples/.codocs/**/*.yaml': 'KEBAB_CASE',
+        },
+        { ignoreMiddleExtensions: true },
+      ],
+      'check-file/folder-naming-convention': [
+        'error',
+        {
+          'packages/**/': 'KEBAB_CASE',
+          'tools/**/': 'KEBAB_CASE',
+          '.codocs/**/': 'KEBAB_CASE',
+        },
+      ],
+    },
+  },
+  {
+    files: ['.codocs/**/*.yaml', 'examples/.codocs/**/*.yaml'],
+    processor: 'check-file/eslint-processor-check-file',
   },
   {
     files: ['**/*.ts'],
@@ -20,7 +53,7 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    plugins: { codosc, jsdoc },
+    plugins: { codocs, jsdoc },
     rules: {
       '@typescript-eslint/no-floating-promises': [
         'error',
@@ -41,8 +74,9 @@ export default tseslint.config(
         { selector: 'property', modifiers: ['requiresQuotes'], format: null },
         { selector: 'import', format: ['camelCase', 'PascalCase'] },
       ],
-      'codosc/package-boundaries': 'error',
-      'codosc/korean-jsdoc': 'error',
+      'codocs/package-boundaries': 'error',
+      'codocs/no-raw-domain-value': 'error',
+      'codocs/korean-jsdoc': 'error',
       'jsdoc/require-jsdoc': [
         'error',
         {

@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type {
+  Catalog,
+  CatalogObservation,
+  CatalogScan,
+  RenameRequest,
+} from '../index.js';
 import {
   buildCatalog,
   catalogDiagnosticCodes,
@@ -7,12 +13,7 @@ import {
   planRename,
   resolveReference,
 } from '../index.js';
-import type {
-  Catalog,
-  CatalogObservation,
-  CatalogScan,
-  RenameRequest,
-} from '../index.js';
+import { catalogFailureKinds, scanStatuses } from './domain-values.js';
 
 /** 실제 YAML 문자열을 파싱한 중립 관측을 만든다. */
 function singleDomainDocument(
@@ -45,7 +46,7 @@ function multiDomainDocument(
 }
 /** complete 관측으로 구축한다. */
 function complete(...observations: CatalogObservation[]): Catalog {
-  return buildCatalog({ status: 'complete', observations });
+  return buildCatalog({ status: scanStatuses.complete, observations });
 }
 /** 발견 경로별 문서가 존재함을 먼저 확인한다. */
 function document(catalog: Catalog, path: string) {
@@ -63,7 +64,7 @@ function references(catalog: Catalog, request: RenameRequest) {
 describe('경로별 이름 색인', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
   it('출처 도메인과 같은 후보가 있어도 전체 동명 후보를 반환한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
     const catalog = buildCatalog({
-      status: 'complete',
+      status: scanStatuses.complete,
       observations: [
         {
           path: 'a.yaml',
@@ -344,7 +345,7 @@ describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 
     );
     const moved = buildCatalog(
       {
-        status: 'complete',
+        status: scanStatuses.complete,
         observations: [
           singleDomainDocument('b.yaml', 'A'),
           singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
@@ -358,7 +359,7 @@ describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 
     ]);
     const deleted = buildCatalog(
       {
-        status: 'complete',
+        status: scanStatuses.complete,
         observations: [singleDomainDocument('s.yaml', 'S', '판매', '[[A]]')],
       },
       moved,
@@ -375,7 +376,7 @@ describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 
     );
     const next = buildCatalog(
       {
-        status: 'complete',
+        status: scanStatuses.complete,
         observations: [
           singleDomainDocument('a.yaml', '새A', '구매', '설명', 'new'),
           singleDomainDocument('b.yaml', 'B'),
@@ -395,9 +396,9 @@ describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 
     expect(document(next, 's.yaml').referencedBy).toEqual([]);
   });
   it.each<{ failures: NonNullable<CatalogScan['failures']> }>([
-    { failures: [{ kind: 'file', path: 'a.yaml' }] },
-    { failures: [{ kind: 'folder', path: 'sub' }] },
-    { failures: [{ kind: 'unknown' }] },
+    { failures: [{ kind: catalogFailureKinds.file, path: 'a.yaml' }] },
+    { failures: [{ kind: catalogFailureKinds.folder, path: 'sub' }] },
+    { failures: [{ kind: catalogFailureKinds.unknown }] },
   ])(
     'partial 실패 범위 %j에서 이전 기록은 미확인으로 보존한다',
     /** 각 실패 범위의 보존 상태와 불확실한 검색을 검증한다. */ ({
@@ -409,7 +410,7 @@ describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 
       );
       const next = buildCatalog(
         {
-          status: 'partial',
+          status: scanStatuses.partial,
           observations: [
             singleDomainDocument('s.yaml', 'S', '판매', '[[A]] [[없음]]'),
           ],
@@ -429,12 +430,12 @@ describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 
   );
   it('partial에서 확인한 단일 후보도 미탐색 신규 후보 가능성 때문에 확정하지 않는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
     const next = buildCatalog({
-      status: 'partial',
+      status: scanStatuses.partial,
       observations: [
         singleDomainDocument('a.yaml', 'A'),
         singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
       ],
-      failures: [{ kind: 'folder', path: 'unknown' }],
+      failures: [{ kind: catalogFailureKinds.folder, path: 'unknown' }],
     });
     expect(document(next, 'a.yaml').confirmation).toBe('confirmed');
     expect(document(next, 's.yaml').occurrences[0]?.resolution).toMatchObject({
@@ -450,9 +451,9 @@ describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 
     );
     const next = buildCatalog(
       {
-        status: 'failed',
+        status: scanStatuses.failed,
         observations: [singleDomainDocument('a.yaml', '변경')],
-        failures: [{ kind: 'unknown' }],
+        failures: [{ kind: catalogFailureKinds.unknown }],
       },
       old,
     );
@@ -469,10 +470,13 @@ describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 
       singleDomainDocument('a.yaml', 'A'),
       singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
     );
-    const failed = buildCatalog({ status: 'failed', observations: [] }, old);
+    const failed = buildCatalog(
+      { status: scanStatuses.failed, observations: [] },
+      old,
+    );
     const recovered = buildCatalog(
       {
-        status: 'complete',
+        status: scanStatuses.complete,
         observations: [
           singleDomainDocument('a.yaml', 'A'),
           singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
@@ -490,7 +494,7 @@ describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 
     const obs = singleDomainDocument('a.yaml', 'A'),
       before = JSON.stringify(obs);
     const old = complete(obs);
-    buildCatalog({ status: 'partial', observations: [] }, old);
+    buildCatalog({ status: scanStatuses.partial, observations: [] }, old);
     expect(JSON.stringify(obs)).toBe(before);
     expect(document(old, 'a.yaml').confirmation).toBe('confirmed');
   });
@@ -618,7 +622,7 @@ describe('순수 이름 변경 수정안', /** 조건별 공개 상태와 관찰
     };
     const old = complete(singleDomainDocument('a.yaml'));
     const next = buildCatalog(
-      { status: 'partial', observations: [], failures: [failure] },
+      { status: scanStatuses.partial, observations: [], failures: [failure] },
       old,
     );
     expect(next.failures[0]?.diagnostics).toEqual(failure.diagnostics);
@@ -628,9 +632,9 @@ describe('순수 이름 변경 수정안', /** 조건별 공개 상태와 관찰
     const old = complete(singleDomainDocument('a.yaml', 'A'));
     const next = buildCatalog(
       {
-        status: 'partial',
+        status: scanStatuses.partial,
         observations: [{ path: 'a.yaml', parsed: parseYaml('name: "잘림') }],
-        failures: [{ kind: 'folder', path: 'sub' }],
+        failures: [{ kind: catalogFailureKinds.folder, path: 'sub' }],
       },
       old,
     );
@@ -838,7 +842,7 @@ describe('순수 이름 변경 수정안', /** 조건별 공개 상태와 관찰
   });
   it('미확인 색인에서는 새 이름 충돌의 부재를 확정하지 않는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
     const catalog = buildCatalog({
-      status: 'partial',
+      status: scanStatuses.partial,
       observations: [singleDomainDocument('a.yaml')],
     });
     expect(
