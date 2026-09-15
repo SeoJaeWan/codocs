@@ -1,4 +1,4 @@
-import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codosc/core';
+import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codocs/core';
 import {
   createWorkspaceQuerySession,
   type WorkspaceGetResponse,
@@ -6,7 +6,7 @@ import {
   type WorkspaceListResult,
   type WorkspaceQuerySession,
   type WorkspaceRefreshResult,
-} from '@codosc/workspace';
+} from '@codocs/workspace';
 
 const listKeys = new Set(['cursor', 'domain', 'kind', 'status']);
 const getKeys = new Set(['ids']);

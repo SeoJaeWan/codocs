@@ -8,7 +8,7 @@ import {
   type SchemaDiagnostic,
   type YamlDiagnostic,
   type YamlParseResult,
-} from '@codosc/core';
+} from '@codocs/core';
 import {
   createWorkspaceDiagnostic,
   workspaceDiagnosticCodes,
@@ -22,7 +22,7 @@ import {
   type WorkspacePathResult,
   type WorkspaceTargetKind,
 } from '../paths/index.js';
-import { resolveProjectRoot, type ProjectRoot } from '../projectRoot/index.js';
+import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
 
 /** 읽은 문서의 발견 경로와 확인한 실제 파일이다. 경로 표기는 임의 변환하지 않는다. */
 export interface WorkspaceDocumentSource {

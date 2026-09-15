@@ -1,5 +1,5 @@
 {
-  "name": "codosc",
+  "name": "codocs",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,11 +8,13 @@
     "typecheck": "node tools/build/build.mjs typecheck",
     "lint": "eslint .",
     "format:check": "prettier . --check",
-    "test": "vitest",
-    "check:development": "vitest run tools/developmentChecks",
+    "test": "node tools/check/run.mjs test",
+    "check:development": "node tools/check/run.mjs development",
     "build": "node tools/build/build.mjs build",
     "bundle": "node tools/build/build.mjs bundle",
-    "check:build": "vitest run tools/buildChecks"
+    "check:build": "node tools/check/run.mjs build",
+    "test:run": "node tools/check/run.mjs test:run",
+    "check": "node tools/check/run.mjs all"
   },
   "devDependencies": {
     "@types/node": "22.19.3",
@@ -22,6 +24,7 @@
     "prettier": "3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0",
-    "vitest": "5.0.0"
+    "vitest": "5.0.0",
+    "eslint-plugin-check-file": "3.3.2"
   }
 }

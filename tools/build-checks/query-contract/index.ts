@@ -2,8 +2,8 @@
 export const queryContractJs = String.raw`import assert from 'node:assert/strict';
 import {mkdir, writeFile, rm} from 'node:fs/promises';
 import path from 'node:path';
-import {createCodocsQueryHandlers} from '@codosc/mcp';
-import {queryDiagnosticCodes} from '@codosc/core';
+import {createCodocsQueryHandlers} from '@codocs/mcp';
+import {queryDiagnosticCodes} from '@codocs/core';
 const project = path.join(process.cwd(), 'mcp project');
 await mkdir(path.join(project, '.codocs'), {recursive: true});
 try {
@@ -28,8 +28,8 @@ try {
   assert.equal(get.results[1].diagnostics[0].code, queryDiagnosticCodes.notFound);
   const invalid = await handlers.codocsGet({ids: [], extra: true});
   assert.deepEqual(invalid, {success: false, scanStatus: 'failed', error: {code: queryDiagnosticCodes.invalidInput, severity: 'error', message: '조회 입력이 올바르지 않습니다.'}});
-  assert.ok(import.meta.resolve('@codosc/mcp').startsWith(new URL('./node_modules/', import.meta.url).href));
-  for (const subpath of ['src/index.js', 'dist/index.js', 'dist/query/index.js']) await assert.rejects(import('@codosc/mcp/' + subpath), {code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'});
+  assert.ok(import.meta.resolve('@codocs/mcp').startsWith(new URL('./node_modules/', import.meta.url).href));
+  for (const subpath of ['src/index.js', 'dist/index.js', 'dist/query/index.js']) await assert.rejects(import('@codocs/mcp/' + subpath), {code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'});
   console.log('MCP query JS contract verified');
 } finally { await rm(project, {recursive: true, force: true}); }`;
 
@@ -47,14 +47,14 @@ export const queryContractConfig = {
     types: [],
     skipLibCheck: false,
   },
-  files: ['queryContract.ts'],
+  files: ['query-contract.ts'],
 };
 
 /** strict NodeNext가 scanStatus와 ID별 결과 union을 완전하게 좁히는지 검사한다. */
-export const queryContractTs = String.raw`import {createCodocsQueryHandlers} from '@codosc/mcp';
-import {queryDiagnosticCodes} from '@codosc/core';
-import {workspaceQueryDiagnosticCodes} from '@codosc/workspace';
-import type {CodocsGetInput, CodocsGetResponse, CodocsListInput, CodocsListResponse} from '@codosc/mcp';
+export const queryContractTs = String.raw`import {createCodocsQueryHandlers} from '@codocs/mcp';
+import {queryDiagnosticCodes} from '@codocs/core';
+import {workspaceQueryDiagnosticCodes} from '@codocs/workspace';
+import type {CodocsGetInput, CodocsGetResponse, CodocsListInput, CodocsListResponse} from '@codocs/mcp';
 const handlers = createCodocsQueryHandlers({cwd: '.'});
 const listInput: CodocsListInput = {domain: '업무', kind: 'policy', status: 'confirmed'};
 const getInput: CodocsGetInput = {ids: ['a', 'b']};
@@ -102,6 +102,6 @@ const invalidCode: 'invalid_input' = queryDiagnosticCodes.invalidInput;
 const cursorCode: 'cursor_expired' = workspaceQueryDiagnosticCodes.cursorExpired;
 console.log(invalidCode, cursorCode);
 // @ts-expect-error 공개 exports에서 내부 구현 접근은 거부한다.
-import '@codosc/mcp/src/query/index.js';
+import '@codocs/mcp/src/query/index.js';
 // @ts-expect-error dist 내부 subpath도 공개하지 않는다.
-import '@codosc/mcp/dist/query/index.js';`;
+import '@codocs/mcp/dist/query/index.js';`;

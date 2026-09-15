@@ -1,21 +1,21 @@
-# codosc
+# codocs
 
 `.codocs` YAML 문서를 읽고 검증하여 이름 참조와 경로별 색인을 제공하는 모노레포다. 현재 구현은 파싱·검증·프로젝트 탐색·색인, 이름 변경 수정안 계산과 MCP 조회 직접 handler까지 포함한다. 실제 MCP SDK/stdio와 LSP 연결, VS Code activation, watcher와 다중 파일 rename 저장은 후속 계층의 책임이다.
 
 ## 패키지 구성
 
-| 패키지                                                         | 역할                                            | 사용하는 패키지·기능        |
-| -------------------------------------------------------------- | ----------------------------------------------- | --------------------------- |
-| [`@codosc/core`](packages/core/README.md)                      | IO 없는 YAML 파싱·검증·참조·색인 계산           | workspace와 후속 LSP/MCP/UI |
-| [`@codosc/workspace`](packages/workspace/README.md)            | 프로젝트 선택, 경로 경계, 파일 탐색과 core 연결 | 후속 LSP/MCP/UI             |
-| [`@codosc/language-server`](packages/languageServer/README.md) | workspace/core를 LSP 요청에 연결할 경계         | VS Code 확장                |
-| [`@codosc/vscode`](packages/vscode/README.md)                  | 언어 서버를 실행하고 VS Code와 연결할 경계      | VS Code 호스트              |
-| [`@codosc/mcp`](packages/mcp/README.md)                        | 검증한 MCP 조회 입력을 workspace에 연결         | 후속 MCP SDK/stdio          |
+| 패키지                                                          | 역할                                            | 사용하는 패키지·기능        |
+| --------------------------------------------------------------- | ----------------------------------------------- | --------------------------- |
+| [`@codocs/core`](packages/core/README.md)                       | IO 없는 YAML 파싱·검증·참조·색인 계산           | workspace와 후속 LSP/MCP/UI |
+| [`@codocs/workspace`](packages/workspace/README.md)             | 프로젝트 선택, 경로 경계, 파일 탐색과 core 연결 | 후속 LSP/MCP/UI             |
+| [`@codocs/language-server`](packages/language-server/README.md) | workspace/core를 LSP 요청에 연결할 경계         | VS Code 확장                |
+| [`@codocs/vscode`](packages/vscode/README.md)                   | 언어 서버를 실행하고 VS Code와 연결할 경계      | VS Code 호스트              |
+| [`@codocs/mcp`](packages/mcp/README.md)                         | 검증한 MCP 조회 입력을 workspace에 연결         | 후속 MCP SDK/stdio          |
 
 내부 의존성 방향은 다음과 같다.
 
 ```text
-vscode ──> languageServer ──> workspace ──> core
+vscode ──> language-server ──> workspace ──> core
                          └───────────────> core
 
 mcp ──────────────────────> workspace ──> core
@@ -27,9 +27,9 @@ mcp ──────────────────────> workspac
 ## 현재 데이터 흐름
 
 ```ts
-import { buildWorkspaceCatalog, loadWorkspace } from '@codosc/workspace';
-import { planRename, resolveReference } from '@codosc/core';
-import { createCodocsQueryHandlers } from '@codosc/mcp';
+import { buildWorkspaceCatalog, loadWorkspace } from '@codocs/workspace';
+import { planRename, resolveReference } from '@codocs/core';
+import { createCodocsQueryHandlers } from '@codocs/mcp';
 
 const scan = await loadWorkspace({ project: '../app' });
 const catalog = buildWorkspaceCatalog(scan);
@@ -81,6 +81,8 @@ src/feature/
 └── feature.test.ts
 ```
 
+파일·폴더는 kebab-case이며 ESLint의 check-file 규칙으로 검사한다. `README.md` 같은 도구 관례와 `.test.ts` 같은 복합 확장자는 유지한다.
+
 함수와 변수는 camelCase, 클래스와 타입은 PascalCase다. 공개 함수 반환 타입을 명시하고 선언 함수, 메서드와 변수에 할당한 함수에는 한국어 JSDoc을 작성한다. 외부 프로젝트 입력은 `unknown`으로 받고 구조와 의미를 확인한 뒤 내부 타입으로 사용한다.
 
 TypeScript 소스는 strict, ES2022, NodeNext, 명시적인 ESM package type과 로컬 `.js` import를 사용한다. 모든 패키지는 `types: []`로 루트 도구용 Node 타입의 자동 유입을 막는다. build에서 test/spec는 제외한다.
@@ -97,19 +99,19 @@ TypeScript 소스는 strict, ES2022, NodeNext, 명시적인 ESM package type과 
 
 버전은 `.node-version`, root `package.json`과 `pnpm-lock.yaml`에 고정한다.
 
-```text
-pnpm install --frozen-lockfile --store-dir .workbench/pnpm-store
-pnpm typecheck
-pnpm lint
-pnpm format:check
-pnpm exec vitest run packages/core/src packages/workspace/src
-pnpm check:development
-pnpm build
-pnpm bundle
-pnpm check:build
-git diff --check
+`.node-version`의 Node 버전을 활성화하고 지정된 pnpm을 설치한 뒤 실행한다. 별도 프로젝트 환경변수나 미리 채운 store는 필요하지 않다.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm test             # 기능 테스트 watch
+pnpm test:run         # 기능 테스트 단일 실행
+pnpm check:development # 개발 규칙·설치 계약
+pnpm check:build      # 실제 빌드·배포 패키지 소비
+pnpm check            # 타입·lint·서식·빌드·기능·개발·소비 검사를 순차 실행
 ```
 
-`typecheck`는 패키지 의존 순서대로 선언을 준비해 검사한다. 기능 테스트와 `check:build`는 `dist`를 공유하므로 위 순서대로 실행한다. `build`는 core/workspace/MCP의 ESM JS와 선언, languageServer/vscode의 CJS 번들을 만든다. `check:build`는 소스 없는 별도 소비자에서 공개 package root와 선언 파일을 사용하고 내부 subpath 접근을 거부하는지 확인한다.
+기능 테스트는 패키지 소스를 직접 사용하므로 빌드 없이 실행하고 변경을 감지한다. 개발·빌드 검사는 별도 설정으로 실행한다. 설치 검사는 실행별 임시 프로젝트와 store를 준비하며 첫 설치에는 네트워크가 필요하다. 이후 offline 재설치도 확인하고 임시 데이터를 정리한다.
+
+`typecheck`는 패키지 의존 순서대로 선언을 준비해 검사한다. `build`는 core/workspace/MCP의 ESM JS와 선언, language-server/vscode의 CJS 번들을 만든다. `check:build`는 필요한 빌드와 패키징을 직접 수행하고 소스 없는 별도 소비자에서 공개 package root와 선언 파일, 내부 subpath 접근 차단을 확인한다.
 
 생성된 `node_modules`, `dist`, coverage, tsbuildinfo, 런타임·store·fixture는 커밋하지 않는다.

@@ -11,7 +11,7 @@ import {
   isPathString,
   resolveProjectRoot,
   type ProjectRoot,
-} from '../projectRoot/index.js';
+} from '../project-root/index.js';
 
 /** 논리 .codocs 또는 가장 가까운 명시적 연결이 부여한 현 시점 접근 범위다. */
 export interface WorkspaceAccessScope {

@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { parseYaml, validateDocument } from '@codosc/core';
+import { parseYaml, validateDocument } from '@codocs/core';
 import { workspaceDiagnosticCodes } from '../diagnostics/index.js';
 import { loadWorkspace, resolveWorkspacePath } from '../index.js';
 
@@ -23,7 +23,7 @@ const raw =
   'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\n';
 beforeEach(
   /** 고유한 실제 프로젝트와 외부 폴더를 준비한다. */ async () => {
-    fixture = await mkdtemp(path.join(tmpdir(), 'codosc-loader-'));
+    fixture = await mkdtemp(path.join(tmpdir(), 'codocs-loader-'));
     project = path.join(fixture, 'project');
     codocs = path.join(project, '.codocs');
     outside = path.join(fixture, 'outside');

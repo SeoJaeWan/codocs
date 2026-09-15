@@ -2,8 +2,8 @@
 export const nameReferenceJs = String.raw`import assert from 'node:assert/strict';
 import {mkdir, writeFile, readFile, rm, rename} from 'node:fs/promises';
 import path from 'node:path';
-import {parseYaml, extractReferences, buildCatalog, resolveReference, planRename, referenceDiagnosticCodes, catalogDiagnosticCodes} from '@codosc/core';
-import {loadWorkspace, toCatalogScan, buildWorkspaceCatalog} from '@codosc/workspace';
+import {parseYaml, extractReferences, buildCatalog, resolveReference, planRename, referenceDiagnosticCodes, catalogDiagnosticCodes} from '@codocs/core';
+import {loadWorkspace, toCatalogScan, buildWorkspaceCatalog} from '@codocs/workspace';
 const term = (name, domain, id = 'same-id') => 'id: ' + id + '\nname: ' + name + '\ndefinition: 정의\ndomains: [' + domain + ']\n';
 const knowledge = (title, body) => 'id: source\nname: ' + title + '\ndefinition: ' + JSON.stringify(body) + '\ndomains: [판매]\n';
 const observe = (path, source) => ({path, realPath: '/same-real-path', parsed: parseYaml(source, path)});
@@ -140,8 +140,8 @@ try {
   assert.equal(buildWorkspaceCatalog(unavailable, workspaceCatalog).documents.size, 4);
 } finally { await rm(project, {recursive: true, force: true}); }
 for (const name of ['core', 'workspace']) {
-  assert.ok(import.meta.resolve('@codosc/' + name).startsWith(new URL('./node_modules/', import.meta.url).href));
-  for (const subpath of ['src/index.js', 'dist/index.js', 'dist/catalog/index.js']) await assert.rejects(import('@codosc/' + name + '/' + subpath), {code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'});
+  assert.ok(import.meta.resolve('@codocs/' + name).startsWith(new URL('./node_modules/', import.meta.url).href));
+  for (const subpath of ['src/index.js', 'dist/index.js', 'dist/catalog/index.js']) await assert.rejects(import('@codocs/' + name + '/' + subpath), {code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'});
 }
 console.log('Name reference JS contract verified');`;
 
@@ -159,14 +159,14 @@ export const nameReferenceConfig = {
     types: [],
     skipLibCheck: false,
   },
-  files: ['nameReferences.ts'],
+  files: ['name-references.ts'],
 };
 
 /** strict NodeNext에서 d.ts의 공개 타입·상태 분기·진단 코드 합집합을 확인한다. */
-export const nameReferenceTs = String.raw`import {parseYaml, extractReferences, buildCatalog, resolveReference, planRename, referenceDiagnosticCodes, catalogDiagnosticCodes} from '@codosc/core';
-import type {Catalog, CatalogScan, CatalogObservation, CatalogFailure, CatalogDocument, ReferenceResolution, RenamePlan, RenameSelection, DiagnosticCode, CatalogDiagnosticCode, ReferenceDiagnosticCode, Diagnostic} from '@codosc/core';
-import {loadWorkspace, toCatalogScan, buildWorkspaceCatalog} from '@codosc/workspace';
-import type {WorkspaceDocumentResult, WorkspaceScanResult} from '@codosc/workspace';
+export const nameReferenceTs = String.raw`import {parseYaml, extractReferences, buildCatalog, resolveReference, planRename, referenceDiagnosticCodes, catalogDiagnosticCodes} from '@codocs/core';
+import type {Catalog, CatalogScan, CatalogObservation, CatalogFailure, CatalogDocument, ReferenceResolution, RenamePlan, RenameSelection, DiagnosticCode, CatalogDiagnosticCode, ReferenceDiagnosticCode, Diagnostic} from '@codocs/core';
+import {loadWorkspace, toCatalogScan, buildWorkspaceCatalog} from '@codocs/workspace';
+import type {WorkspaceDocumentResult, WorkspaceScanResult} from '@codocs/workspace';
 const parsed = parseYaml('name: 주문\n');
 const observation: CatalogObservation = {path: '.codocs/a.yaml', parsed};
 const failure: CatalogFailure = {kind: 'folder', path: '.codocs'};
@@ -230,6 +230,6 @@ function inspect(document: WorkspaceDocumentResult): void {
 }
 workspaceScan.documents.forEach(inspect);
 // @ts-expect-error 공개 exports에서 내부 구현 접근은 거부한다.
-import '@codosc/core/dist/catalog/index.js';
+import '@codocs/core/dist/catalog/index.js';
 // @ts-expect-error 공개 exports에서 내부 구현 접근은 거부한다.
-import '@codosc/workspace/src/indexing/index.js';`;
+import '@codocs/workspace/src/indexing/index.js';`;

@@ -17,7 +17,7 @@ definition: |
 
   workspace는 프로젝트 선택·실제 읽기·경로·색인 연결과 향후 감지·저장·revision·잠금·대기열을 담당한다.
 
-  languageServer는 IDE 요청을 연결하고 vscode는 서버 실행·명령·탭을 담당한다.
+  language-server는 IDE 요청을 연결하고 vscode는 서버 실행·명령·탭을 담당한다.
 
   mcp는 AI 도구 요청을 연결한다.
 
@@ -39,7 +39,7 @@ definition: |
   ## 현재 상태
 
   core/workspace의 기반 기능과 빌드 경계는 존재한다.
-  languageServer/mcp/vscode 진입점은 빈 모듈이다.
+  language-server/mcp/vscode 진입점은 빈 모듈이다.
 
   위 실행·SDK·도구 계약이 이미 연결된 상태는 아니다.
 
@@ -51,7 +51,7 @@ definition: |
   MCP TypeScript SDK는 mcp 패키지에서 초기화·도구 등록·요청 응답을 연결하고 실제 처리는 workspace/core가 담당한다.
   도구 입력 스키마와 문서 스키마를 구분하며 SDK 버전은 Node.js·Zod 조합으로 검증한다.
 
-  vscode에는 vscode-languageclient, languageServer에는 vscode-languageserver·vscode-languageserver-textdocument를 둔다.
+  vscode에는 vscode-languageclient, language-server에는 vscode-languageserver·vscode-languageserver-textdocument를 둔다.
   LSP/Node IPC를 사용하며 SDK의 문서 동기화와 textdocument로 편집 중 코드의 버전·위치를 관리한다.
 
   다른 IDE에 코어를 재사용할 수 있어도 실제 연결·배포·시험은 별도로 수행한다.

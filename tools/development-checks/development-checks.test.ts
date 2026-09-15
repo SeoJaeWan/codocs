@@ -3,16 +3,29 @@ import {
   copyFileSync,
   cpSync,
   mkdirSync,
+  mkdtempSync,
+  rmSync,
   readFileSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import tseslint from 'typescript-eslint';
-import codosc from './eslintRules.mjs';
+import codocs from './eslint-rules.mjs';
+
+import { resolvePnpm } from '../check/runtime.mjs';
 
 const root = process.cwd();
+mkdirSync(path.join(root, '.workbench/fixtures'), { recursive: true });
+const suiteFixture = mkdtempSync(
+  path.join(root, '.workbench/fixtures/development-'),
+);
+afterAll(
+  /** 실행별 임시 프로젝트를 정리한다. */ () => {
+    rmSync(suiteFixture, { recursive: true, force: true, maxRetries: 3 });
+  },
+);
 const eslint = new ESLint({ cwd: root });
 
 /** 외부 JSON 값이 문자열 키를 가진 객체인지 확인한다. */
@@ -50,7 +63,7 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
     [
       'missing JSDoc',
       'function value(): number { return 1; }\nvalue();',
-      'codosc/korean-jsdoc',
+      'codocs/korean-jsdoc',
     ],
     [
       'plugin JSDoc',
@@ -60,12 +73,12 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
     [
       'English JSDoc',
       '/** Returns a value. */\nfunction value(): number { return 1; }\nvalue();',
-      'codosc/korean-jsdoc',
+      'codocs/korean-jsdoc',
     ],
     [
       'assigned function JSDoc',
       'const value = (): number => 1;\nvalue();',
-      'codosc/korean-jsdoc',
+      'codocs/korean-jsdoc',
     ],
     [
       'assigned plugin JSDoc',
@@ -80,7 +93,7 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
     [
       'method JSDoc',
       'class Example { value(): number { return 1; } }\nnew Example().value();',
-      'codosc/korean-jsdoc',
+      'codocs/korean-jsdoc',
     ],
     [
       'variable name',
@@ -99,30 +112,30 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
     ],
     [
       'subpath import',
-      "import '@codosc/core/src/index.js';",
-      'codosc/package-boundaries',
+      "import '@codocs/core/src/index.js';",
+      'codocs/package-boundaries',
     ],
     [
       'relative internal',
       "import '../../core/src/index.js';",
-      'codosc/package-boundaries',
+      'codocs/package-boundaries',
     ],
     [
       'relative entry',
       "import '../../core/src/index.ts';",
-      'codosc/package-boundaries',
+      'codocs/package-boundaries',
     ],
     [
       're-export internal',
       "export * from '../../core/src/index.js';",
-      'codosc/package-boundaries',
+      'codocs/package-boundaries',
     ],
     [
       'dynamic internal',
       "await import('../../core/src/index.js');",
-      'codosc/package-boundaries',
+      'codocs/package-boundaries',
     ],
-    ['wrong direction', "import '@codosc/mcp';", 'codosc/package-boundaries'],
+    ['wrong direction', "import '@codocs/mcp';", 'codocs/package-boundaries'],
   ])('%s rejects with %s', async (_label, code, ruleId) => {
     expect(await ruleIds(code)).toContain(ruleId);
   });
@@ -130,7 +143,7 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
   it('정상 진입점과 짧은 콜백 및 처리된 Promise를 허용한다', /** 정상 코드 전체의 규칙 결과를 확인한다. */ async () => {
     expect(
       await ruleIds(
-        "import '@codosc/core';\n[1].map((value) => value + 1);\nawait Promise.resolve(1);\n/** 값을 반환한다. */\nexport function value(): number { return 1; }",
+        "import '@codocs/core';\n[1].map((value) => value + 1);\nawait Promise.resolve(1);\n/** 값을 반환한다. */\nexport function value(): number { return 1; }",
       ),
     ).toEqual([]);
     expect(await ruleIds('export {};', 'core')).toEqual([]);
@@ -141,7 +154,7 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
       ),
     ).toEqual([]);
     expect(await ruleIds("import 'node:fs';", 'core')).toContain(
-      'codosc/package-boundaries',
+      'codocs/package-boundaries',
     );
   });
 
@@ -155,13 +168,13 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
     'core의 호스트 의존성 %s를 거부한다',
     /** 호스트 모듈을 순수 패키지에서 배제한다. */ async (specifier) => {
       expect(await ruleIds(`import '${specifier}';`, 'core')).toContain(
-        'codosc/package-boundaries',
+        'codocs/package-boundaries',
       );
     },
   );
 
   it('tsconfig 별칭으로 해석된 내부 소스 접근을 거부한다', /** 실제 TypeScript 경로 해석으로 우회 경로를 검사한다. */ async () => {
-    const fixture = path.join(root, '.workbench/fixtures/resolvedBoundary');
+    const fixture = path.join(suiteFixture, 'resolved-boundary');
     const workspace = path.join(fixture, 'packages/workspace/src');
     const core = path.join(fixture, 'packages/core/src');
     mkdirSync(workspace, { recursive: true });
@@ -186,8 +199,8 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
         {
           files: ['**/*.ts'],
           languageOptions: { parser: tseslint.parser },
-          plugins: { codosc },
-          rules: { 'codosc/package-boundaries': 'error' },
+          plugins: { codocs },
+          rules: { 'codocs/package-boundaries': 'error' },
         },
       ],
     });
@@ -198,7 +211,7 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
       results.flatMap((result) =>
         result.messages.map((message) => message.ruleId),
       ),
-    ).toEqual(['codosc/package-boundaries']);
+    ).toEqual(['codocs/package-boundaries']);
   });
 
   it('Promise 콜백 오용과 긴 콜백 설명 누락을 검출한다', /** 타입 기반 콜백 오류와 설명 범위를 확인한다. */ async () => {
@@ -209,8 +222,34 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
       await ruleIds(
         '[1].map((value) => {\n const next = value + 1;\n const result = next + 1;\n return result;\n});',
       ),
-    ).toContain('codosc/korean-jsdoc');
+    ).toContain('codocs/korean-jsdoc');
   });
+});
+
+describe('파일과 폴더 이름', /** 실제 ESLint 설정으로 경로 규칙을 확인한다. */ () => {
+  it.each([
+    ['tools/good-name/good-name.test.mjs', []],
+    ['tools/good-name/badName.mjs', ['check-file/filename-naming-convention']],
+    ['tools/badName/index.mjs', ['check-file/folder-naming-convention']],
+    ['.codocs/good-name/good-name.yaml', []],
+    [
+      '.codocs/good-name/badName.yaml',
+      ['check-file/filename-naming-convention'],
+    ],
+    ['.codocs/badName/index.yaml', ['check-file/folder-naming-convention']],
+  ])(
+    '%s의 이름 규칙을 검사한다',
+    /** 경로별 허용과 거부 결과를 확인한다. */ async (filename, expected) => {
+      const results = await eslint.lintText('', {
+        filePath: path.join(root, filename),
+      });
+      expect(
+        results.flatMap((result) =>
+          result.messages.map((message) => message.ruleId),
+        ),
+      ).toEqual(expected);
+    },
+  );
 });
 
 describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존 방향을 확인한다. */ () => {
@@ -233,9 +272,9 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
   it('다섯 패키지와 정확한 의존 방향 및 exports만 존재한다', /** 패키지 manifest를 외부 입력으로 검증한다. */ () => {
     const dependencies: Record<string, string[]> = {
       core: [],
-      workspace: ['@codosc/core'],
-      languageServer: ['@codosc/core', '@codosc/workspace'],
-      mcp: ['@codosc/core', '@codosc/workspace'],
+      workspace: ['@codocs/core'],
+      'language-server': ['@codocs/core', '@codocs/workspace'],
+      mcp: ['@codocs/core', '@codocs/workspace'],
       vscode: [],
     };
     for (const [folder, expected] of Object.entries(dependencies)) {
@@ -252,7 +291,7 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
       const actual: unknown = manifest.dependencies ?? {};
       if (!isRecord(actual)) throw new Error('Invalid dependencies');
       const internal = Object.entries(actual).filter(([name]) =>
-        name.startsWith('@codosc/'),
+        name.startsWith('@codocs/'),
       );
       expect(internal.map(([name]) => name)).toEqual(expected);
       expect(internal.every(([, version]) => version === 'workspace:*')).toBe(
@@ -262,14 +301,10 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
   });
 
   it('frozen 재설치는 성공하고 불일치 manifest 설치는 실패한다', /** 실제 pnpm 프로세스와 격리 fixture로 lockfile을 검증한다. */ () => {
-    const pnpm = path.join(root, '.workbench/runtime/package/bin/pnpm.cjs');
-    const fallback = process.env.npm_execpath;
-    const executable =
-      process.env.CODOSC_PNPM_CLI ??
-      (fallback?.endsWith('pnpm.cjs') ? fallback : pnpm);
+    const executable = resolvePnpm();
     const environment = { ...process.env };
     environment.CI = 'true';
-    const matching = path.join(root, '.workbench/fixtures/frozenMatching');
+    const matching = path.join(suiteFixture, 'frozen-matching');
     mkdirSync(matching, { recursive: true });
     for (const filename of [
       'package.json',
@@ -282,7 +317,7 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
     for (const folder of [
       'core',
       'workspace',
-      'languageServer',
+      'language-server',
       'vscode',
       'mcp',
     ]) {
@@ -307,7 +342,18 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
         'install',
         '--frozen-lockfile',
         '--store-dir',
-        path.join(root, '.workbench/pnpm-store'),
+        path.join(suiteFixture, 'pnpm-store'),
+      ],
+      { cwd: matching, encoding: 'utf8', env: environment },
+    );
+    execFileSync(
+      process.execPath,
+      [
+        executable,
+        'install',
+        '--frozen-lockfile',
+        '--store-dir',
+        path.join(suiteFixture, 'pnpm-store'),
         '--offline',
       ],
       { cwd: matching, encoding: 'utf8', env: environment },
@@ -361,8 +407,8 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
     );
     writeFileSync(
       consumer,
-      `import { parseYaml, getValueRange, validateDocument } from '@codosc/core';
-import type {Document} from '@codosc/core';
+      `import { parseYaml, getValueRange, validateDocument } from '@codocs/core';
+import type {Document} from '@codocs/core';
 const parsed = parseYaml('name: test');
 export const range = getValueRange(parsed, ['name']);
 const result = validateDocument({data: parsed.success ? parsed.data : {}});
@@ -388,7 +434,7 @@ if (result.success) {
     writeFileSync(
       runtimeConsumer,
       `import assert from 'node:assert/strict';
-import {parseYaml, validateDocument} from '@codosc/core';
+import {parseYaml, validateDocument} from '@codocs/core';
 const parsed = parseYaml('id: fixture\\nname: タイトル\\ndefinition: Body\\ndomains: [Sales]\\n');
 assert.equal(parsed.success, true);
 const result = validateDocument({data: parsed.data});
@@ -406,7 +452,7 @@ console.log('Frozen validator consumer verified');`,
     ).toContain('Frozen validator consumer verified');
     writeFileSync(
       consumer,
-      "import type * as Hidden from '@codosc/core/src/index.js';\nexport type Value = typeof Hidden;\n",
+      "import type * as Hidden from '@codocs/core/src/index.js';\nexport type Value = typeof Hidden;\n",
     );
     const importFailure = spawnSync(
       process.execPath,
@@ -415,7 +461,7 @@ console.log('Frozen validator consumer verified');`,
     );
     expect(importFailure.status).not.toBe(0);
     expect(importFailure.stdout + importFailure.stderr).toContain('TS2307');
-    const fixture = path.join(root, '.workbench/fixtures/frozenMismatch');
+    const fixture = path.join(suiteFixture, 'frozen-mismatch');
     mkdirSync(fixture, { recursive: true });
     writeFileSync(
       path.join(fixture, 'package.json'),
@@ -437,7 +483,7 @@ console.log('Frozen validator consumer verified');`,
         '--frozen-lockfile',
         '--ignore-workspace',
         '--store-dir',
-        path.join(root, '.workbench/pnpm-store'),
+        path.join(suiteFixture, 'pnpm-store'),
       ],
       { cwd: fixture, encoding: 'utf8', env: environment },
     );

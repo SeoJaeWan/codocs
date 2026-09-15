@@ -4,7 +4,7 @@ import {
   type CatalogFailure,
   type CatalogObservation,
   type CatalogScan,
-} from '@codosc/core';
+} from '@codocs/core';
 import type {
   WorkspaceDocumentResult,
   WorkspaceScanFailure,

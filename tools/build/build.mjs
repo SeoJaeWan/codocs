@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const root = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
-const folders = ['core', 'workspace', 'mcp', 'languageServer', 'vscode'];
+const folders = ['core', 'workspace', 'mcp', 'language-server', 'vscode'];
 const tsc = path.join(root, 'node_modules/typescript/bin/tsc');
 
 /** 별도 TypeScript 프로세스를 실행하고 실패 상태를 전달한다. */
@@ -63,11 +63,11 @@ function copyAssets() {
     );
   }
   cpSync(
-    path.join(root, 'packages/languageServer/dist/index.cjs'),
+    path.join(root, 'packages/language-server/dist/index.cjs'),
     path.join(root, 'packages/vscode/dist/server/index.cjs'),
   );
   cpSync(
-    path.join(root, 'packages/languageServer/dist/index.cjs.map'),
+    path.join(root, 'packages/language-server/dist/index.cjs.map'),
     path.join(root, 'packages/vscode/dist/server/index.cjs.map'),
   );
 }
@@ -106,7 +106,7 @@ async function main(mode) {
   // 독립 bundle은 JS transpile에만 tsc --noCheck를 사용한다.
   for (const folder of ['core', 'workspace', 'mcp'])
     compile(folder, mode === 'bundle' ? ['--noCheck'] : []);
-  for (const folder of ['languageServer', 'vscode']) {
+  for (const folder of ['language-server', 'vscode']) {
     if (mode === 'build') compile(folder, ['--emitDeclarationOnly']);
     await bundleIde(
       [path.join(root, 'packages', folder, 'src/index.ts')],

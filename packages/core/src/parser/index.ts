@@ -17,9 +17,9 @@ import type {
   SourcePosition,
   YamlDiagnosticCode,
 } from '../diagnostics/index.js';
-import { collectStringMappings } from '../stringMapping/index.js';
-import type { StringSourceMapping } from '../stringMapping/index.js';
-export type { StringSourceMapping } from '../stringMapping/index.js';
+import { collectStringMappings } from '../string-mapping/index.js';
+import type { StringSourceMapping } from '../string-mapping/index.js';
+export type { StringSourceMapping } from '../string-mapping/index.js';
 
 /** 문법 또는 지원하지 않는 YAML 구문의 오류다. */
 export interface YamlDiagnostic extends Diagnostic {

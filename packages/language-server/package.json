@@ -1,5 +1,5 @@
 {
-  "name": "@codosc/language-server",
+  "name": "@codocs/language-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,8 +15,8 @@
     "build": "node ../../tools/build/build.mjs build"
   },
   "dependencies": {
-    "@codosc/core": "workspace:*",
-    "@codosc/workspace": "workspace:*"
+    "@codocs/core": "workspace:*",
+    "@codocs/workspace": "workspace:*"
   },
   "files": [
     "dist",

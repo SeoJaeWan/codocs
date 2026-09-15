@@ -1,4 +1,4 @@
-import type { Diagnostic } from '@codosc/core';
+import type { Diagnostic } from '@codocs/core';
 
 /** workspace의 경로·IO·탐색 진단 코드와 발생 조건이다. */
 export const workspaceDiagnosticCodes = {

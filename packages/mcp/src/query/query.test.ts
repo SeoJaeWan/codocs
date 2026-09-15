@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codosc/core';
+import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codocs/core';
 import { createCodocsQueryHandlers } from './index.js';
 
 const backend = vi.hoisted(
@@ -11,7 +11,7 @@ const backend = vi.hoisted(
 );
 
 vi.mock(
-  '@codosc/workspace',
+  '@codocs/workspace',
   /** 실제 IO 대신 workspace 공개 결과 경계를 제어한다. */ () => ({
     /** 같은 조회 backend를 반환한다. */
     createWorkspaceQuerySession: () => backend,

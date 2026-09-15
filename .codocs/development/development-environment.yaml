@@ -6,12 +6,15 @@ definition: |
   ## 도구와 확인 방법
 
   pnpm workspaces로 내부 패키지를 관리한다.
-  Vitest는 동작 테스트, tsc는 타입 검사, ESLint·typescript-eslint·eslint-plugin-jsdoc은 규칙 검사, Prettier는 서식을 담당한다.
+  Vitest는 동작 테스트, tsc는 타입 검사, ESLint·typescript-eslint·eslint-plugin-jsdoc·eslint-plugin-check-file은 규칙 검사, Prettier는 서식을 담당한다.
 
   Vitest는 TypeScript 설정과 선택 실행의 편의성으로 선정했으며 Jest 대비 보편적인 속도 우위를 약속하지 않는다.
   정확한 설치 버전은 현재 manifest·lockfile·.node-version에서 확인한다.
 
-  기본 확인 명령은 pnpm typecheck·pnpm lint·pnpm format:check·pnpm test·pnpm build다.
+  pnpm test는 기능 watch, pnpm test:run은 기능 단일 실행이다.
+  pnpm check:development는 개발 규칙·설치 계약, pnpm check:build는 빌드·패키지 소비를 검사한다.
+  pnpm check는 준비와 전체 검사를 순차 실행하고 실패하면 중단한다.
+  지정된 Node·pnpm 외에 전용 환경변수나 미리 채운 store를 요구하지 않는다.
   현재 저장소의 추가 검증 명령과 실행 방법은 루트 README에서 확인한다.
 
   ## 실행 런타임
@@ -25,7 +28,7 @@ definition: |
   ## 빌드 산출물
 
   core/workspace는 tsc로 JavaScript와 타입 선언, mcp는 tsc로 실행 JavaScript를 만든다.
-  languageServer는 의존성과 함께 esbuild로 번들하고 vscode는 CommonJS 번들로 제공한다.
+  language-server는 의존성과 함께 esbuild로 번들하고 vscode는 CommonJS 번들로 제공한다.
 
   core/workspace/mcp 결과물은 ESM·NodeNext와 상대 .js import를 사용한다.
   esbuild가 타입 검사를 대신하지 않는다.

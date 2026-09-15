@@ -1,19 +1,19 @@
 # workspace
 
-`@codosc/workspace`는 사용자가 선택한 프로젝트의 `.codocs` 범위를 확인하고 실제 YAML 파일을 읽어 `@codosc/core`의 파싱·검증·색인 계산에 연결한다.
+`@codocs/workspace`는 사용자가 선택한 프로젝트의 `.codocs` 범위를 확인하고 실제 YAML 파일을 읽어 `@codocs/core`의 파싱·검증·색인 계산에 연결한다.
 
-공개 진입점은 `src/index.ts` 하나다. 다른 패키지는 `@codosc/workspace` 루트만 import하고 내부 기능 폴더에 직접 접근하지 않는다.
+공개 진입점은 `src/index.ts` 하나다. 다른 패키지는 `@codocs/workspace` 루트만 import하고 내부 기능 폴더에 직접 접근하지 않는다.
 
 ## 기능과 사용처
 
-| 기능                                    | 제공 값                                       | 이 기능을 사용하는 곳      |
-| --------------------------------------- | --------------------------------------------- | -------------------------- |
-| [diagnostics](src/diagnostics/index.ts) | workspace 진단과 IO 코드 추출                 | projectRoot, paths, loader |
-| [projectRoot](src/projectRoot/index.ts) | `resolveProjectRoot`, 선택 루트 모델          | paths, loader              |
-| [paths](src/paths/index.ts)             | `resolveWorkspacePath`, 링크 범위와 접근 정책 | loader, 후속 writer        |
-| [loader](src/loader/index.ts)           | `loadWorkspace`, 문서·실패·순환 스캔 결과     | indexing, 후속 MCP/LSP     |
-| [indexing](src/indexing/index.ts)       | `toCatalogScan`, `buildWorkspaceCatalog`      | 후속 검색·참조·rename 기능 |
-| [query](src/query/index.ts)             | 실제 scan 기반 list/get/refresh 조회 세션     | 후속 MCP 조회 어댑터       |
+| 기능                                      | 제공 값                                       | 이 기능을 사용하는 곳       |
+| ----------------------------------------- | --------------------------------------------- | --------------------------- |
+| [diagnostics](src/diagnostics/index.ts)   | workspace 진단과 IO 코드 추출                 | project-root, paths, loader |
+| [project-root](src/project-root/index.ts) | `resolveProjectRoot`, 선택 루트 모델          | paths, loader               |
+| [paths](src/paths/index.ts)               | `resolveWorkspacePath`, 링크 범위와 접근 정책 | loader, 후속 writer         |
+| [loader](src/loader/index.ts)             | `loadWorkspace`, 문서·실패·순환 스캔 결과     | indexing, 후속 MCP/LSP      |
+| [indexing](src/indexing/index.ts)         | `toCatalogScan`, `buildWorkspaceCatalog`      | 후속 검색·참조·rename 기능  |
+| [query](src/query/index.ts)               | 실제 scan 기반 list/get/refresh 조회 세션     | 후속 MCP 조회 어댑터        |
 
 ## 호출 흐름
 
@@ -51,7 +51,7 @@ partial의 이전 문서는 마지막 원문 revision과 `unconfirmed` 진단을
 
 ## 패키지 계약
 
-- 내부 의존성은 `@codosc/core`의 공개 진입점만 허용한다.
+- 내부 의존성은 `@codocs/core`의 공개 진입점만 허용한다.
 - ESM JS와 선언 파일을 `dist`에 생성한다.
 - strict, ES2022, NodeNext, 상대 `.js` import와 `types: []`를 유지한다.
 - 읽지 못한 원문, 실제 경로, ID나 좌표를 추측하지 않는다.
@@ -65,7 +65,7 @@ partial의 이전 문서는 마지막 원문 revision과 `unconfirmed` 진단을
 pnpm exec vitest run packages/workspace/src
 pnpm typecheck
 pnpm lint
-pnpm exec vitest run tools/buildChecks -t workspace
+pnpm exec vitest run tools/build-checks -t workspace
 ```
 
 build 검사는 실제 tarball의 공개 루트로 loader와 선언 파일을 소비하고 내부 subpath 접근을 거부하는지 확인한다.

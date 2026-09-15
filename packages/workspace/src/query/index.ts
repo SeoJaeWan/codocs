@@ -17,7 +17,7 @@ import {
   type CatalogListItem,
   type CatalogQueryDiagnostic,
   type Diagnostic,
-} from '@codosc/core';
+} from '@codocs/core';
 import {
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,

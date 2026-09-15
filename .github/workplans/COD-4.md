@@ -12,10 +12,10 @@ h2. 작업 순서와 선행 조건
 
 h2. 구현 범위
 
-- Node.js 24 LTS·pnpm workspaces와 core/workspace/languageServer/vscode/mcp 패키지 구성. 공개 진입점·내부 import 경계 설정.
+- Node.js 24 LTS·pnpm workspaces와 core/workspace/language-server/vscode/mcp 패키지 구성. 공개 진입점·내부 import 경계 설정.
 - TypeScript strict, unknown 입력 검증, 공개 반환 타입, camelCase/PascalCase, JSDoc 검사 범위를 ESLint에 반영.
 - Vitest·tsc·ESLint/typescript-eslint/jsdoc·Prettier 및 typecheck/lint/format:check/test/build 명령 구성.
-- core/workspace/mcp ESM·NodeNext·상대 .js import, vscode CommonJS/esbuild 및 languageServer 번들 골격. 정확한 버전 잠금.
+- core/workspace/mcp ESM·NodeNext·상대 .js import, vscode CommonJS/esbuild 및 language-server 번들 골격. 정확한 버전 잠금.
 - 기능/index.ts·기능/기능.test.ts 배치, 각 패키지 README와 docs/guide·examples/.codocs 위치 구성.
 
 h2. 검증 시나리오와 기대 결과

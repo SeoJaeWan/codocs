@@ -20,7 +20,7 @@ import {
   catalogDiagnosticCodes,
   resolveReference,
   type Document,
-} from '@codosc/core';
+} from '@codocs/core';
 import {
   buildWorkspaceCatalog,
   loadWorkspace,
@@ -98,7 +98,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     expectTypeOf(invalid.parsed.data).toEqualTypeOf<Record<string, unknown>>();
     expect(valid.parsed.success).toBe(true);
     expectTypeOf(failed.diagnostics).toMatchTypeOf<
-      readonly import('@codosc/core').YamlDiagnostic[]
+      readonly import('@codocs/core').YamlDiagnostic[]
     >();
     expect(invalid.parsed.source).toBe(raw);
     expect(invalid.parsed.data.examples).toEqual(['[[정상]]', 42, '[[정상]]']);

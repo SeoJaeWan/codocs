@@ -19,7 +19,7 @@ import {
 let fixture: string;
 beforeEach(
   /** 테스트마다 고유한 실제 파일 fixture를 생성한다. */ async () => {
-    fixture = await mkdtemp(path.join(tmpdir(), 'codosc-root-'));
+    fixture = await mkdtemp(path.join(tmpdir(), 'codocs-root-'));
   },
 );
 afterEach(async () => {

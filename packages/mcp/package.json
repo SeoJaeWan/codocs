@@ -1,5 +1,5 @@
 {
-  "name": "@codosc/mcp",
+  "name": "@codocs/mcp",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@codosc/core": "workspace:*",
-    "@codosc/workspace": "workspace:*"
+    "@codocs/core": "workspace:*",
+    "@codocs/workspace": "workspace:*"
   },
   "files": [
     "dist",

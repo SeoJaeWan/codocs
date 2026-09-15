@@ -4,17 +4,17 @@ import ts from 'typescript';
 import { builtinModules } from 'node:module';
 
 const packageNames = new Map([
-  ['core', '@codosc/core'],
-  ['workspace', '@codosc/workspace'],
-  ['languageServer', '@codosc/language-server'],
-  ['mcp', '@codosc/mcp'],
-  ['vscode', '@codosc/vscode'],
+  ['core', '@codocs/core'],
+  ['workspace', '@codocs/workspace'],
+  ['language-server', '@codocs/language-server'],
+  ['mcp', '@codocs/mcp'],
+  ['vscode', '@codocs/vscode'],
 ]);
 const allowedDependencies = {
   core: [],
-  workspace: ['@codosc/core'],
-  languageServer: ['@codosc/core', '@codosc/workspace'],
-  mcp: ['@codosc/core', '@codosc/workspace'],
+  workspace: ['@codocs/core'],
+  'language-server': ['@codocs/core', '@codocs/workspace'],
+  mcp: ['@codocs/core', '@codocs/workspace'],
   vscode: [],
 };
 

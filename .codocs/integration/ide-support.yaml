@@ -48,7 +48,7 @@ definition: |
 
   ## 구현 상태
 
-  matcher와 languageServer/vscode 기능은 후속 작업이다.
+  matcher와 language-server/vscode 기능은 후속 작업이다.
   현재 한글 지식 제목이 영어 코드와 자동 연결되는 것으로 가정하지 않는다.
 
   ## 코드 위치와 결과 표시

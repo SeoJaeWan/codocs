@@ -25,7 +25,7 @@ let project: string;
 let outside: string;
 beforeEach(
   /** 테스트마다 고유한 실제 파일 fixture를 생성한다. */ async () => {
-    fixture = await mkdtemp(path.join(tmpdir(), 'codosc-path-'));
+    fixture = await mkdtemp(path.join(tmpdir(), 'codocs-path-'));
     project = path.join(fixture, 'project');
     outside = path.join(fixture, 'outside');
     await mkdir(path.join(project, '.codocs'), { recursive: true });
