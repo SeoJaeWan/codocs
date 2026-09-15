@@ -4,10 +4,10 @@ import path from 'node:path';
 import {
   parseYaml,
   validateDocument,
-  type Knowledge,
+  type Document,
   type SchemaDiagnostic,
-  type Term,
   type YamlDiagnostic,
+  type YamlParseResult,
 } from '@codosc/core';
 import {
   createWorkspaceDiagnostic,
@@ -50,9 +50,16 @@ interface ReadDocument {
 /** 오류 문서에는 검증 성공 데이터를 제공하지 않는다. 경고만 있는 문서는 유효하다. */
 export type WorkspaceDocumentResult = ReadDocument &
   (
-    | { status: 'valid'; data: Term | Knowledge }
-    | { status: 'parseError' }
-    | { status: 'validationError' }
+    | {
+        status: 'valid';
+        data: Document;
+        parsed: Extract<YamlParseResult, { success: true }>;
+      }
+    | { status: 'parseError'; diagnostics: readonly YamlDiagnostic[] }
+    | {
+        status: 'validationError';
+        parsed: Extract<YamlParseResult, { success: true }>;
+      }
   );
 
 /** 확인하지 못한 파일·폴더 범위다. 얻지 못한 원문·실경로·ID·좌표는 없다. */
@@ -120,8 +127,8 @@ function parseDocument(
   });
   const diagnostics = [...validation.errors, ...validation.warnings];
   return validation.success
-    ? { ...base, status: 'valid', data: validation.data, diagnostics }
-    : { ...base, status: 'validationError', diagnostics };
+    ? { ...base, status: 'valid', data: validation.data, parsed, diagnostics }
+    : { ...base, status: 'validationError', parsed, diagnostics };
 }
 
 /** 경로 확인 실패에서 얻은 값만 실패 범위로 보존한다. */

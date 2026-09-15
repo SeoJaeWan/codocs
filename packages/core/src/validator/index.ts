@@ -137,32 +137,18 @@ const userValue = z.custom<JsonValue>();
 const deprecatedAlias = z
   .object({ name: nonblank, message: nonblank.optional() })
   .catchall(userValue);
-const termStructure = z
+const documentStructure = z
   .object({
-    type: z.literal('term'),
     id,
     name: nonblank,
     definition: nonblank,
-    domain: nonblank,
+    domains: z.array(nonblank).min(1),
     examples: z.array(nonblank).optional(),
     deprecatedAliases: z.array(deprecatedAlias).optional(),
-  })
-  .catchall(userValue);
-const knowledgeStructure = z
-  .object({
-    type: z.literal('knowledge'),
-    id,
-    title: nonblank,
-    body: nonblank,
-    domains: z.array(nonblank).min(1),
     kind: z.enum(['policy', 'procedure', 'decision', 'discussion']).optional(),
     status: z.enum(['proposed', 'confirmed', 'deprecated']).optional(),
   })
   .catchall(userValue);
-const documentStructure = z.discriminatedUnion('type', [
-  termStructure,
-  knowledgeStructure,
-]);
 
 /** Zod로 구조·JSON을 검사하면서 원래 값과 모든 사용자 키를 그대로 반환한다. */
 function preservingSchema<Schema extends z.ZodType>(
@@ -201,12 +187,10 @@ function preservingSchema<Schema extends z.ZodType>(
   );
 }
 
-/** type으로 분기하며 모든 사용자 JSON 값을 보존하는 문서 스키마다. */
+/** 모든 사용자 JSON 값을 보존하는 단일 문서 스키마다. */
 const documentSchema = preservingSchema(documentStructure);
-/** Zod term 스키마에서 추출한 성공 문서 타입이다. */
-export type Term = z.infer<typeof termStructure>;
-/** Zod knowledge 스키마에서 추출한 성공 문서 타입이다. */
-export type Knowledge = z.infer<typeof knowledgeStructure>;
+/** Zod 문서 스키마에서 추출한 성공 문서 타입이다. */
+export type Document = z.infer<typeof documentStructure>;
 
 /** 전체 문서 데이터와 호출자가 확인한 선택적인 원문 위치다. */
 export interface ValidateDocumentInput {
@@ -225,7 +209,7 @@ export interface SchemaDiagnostic extends Diagnostic {
 export type DocumentValidationResult =
   | {
       success: true;
-      data: Term | Knowledge;
+      data: Document;
       errors: readonly SchemaDiagnostic[];
       warnings: readonly SchemaDiagnostic[];
     }
@@ -281,8 +265,6 @@ function diagnostic(
 
 /** 알려진 업무 객체의 미등록 키만 경고하며 사용자 JSON 내부는 해석하지 않는다. */
 function unknownWarnings(input: ValidateDocumentInput): SchemaDiagnostic[] {
-  const type = ownValue(input.data, 'type');
-  if (type !== 'term' && type !== 'knowledge') return [];
   const warnings: SchemaDiagnostic[] = [];
   /** 직접 업무 속성만 검사하고 비문자열 키는 JSON 오류에 맡긴다. */
   function collect(
@@ -303,15 +285,9 @@ function unknownWarnings(input: ValidateDocumentInput): SchemaDiagnostic[] {
           ),
         );
   }
-  collect(
-    input.data,
-    Object.keys(
-      type === 'term' ? termStructure.shape : knowledgeStructure.shape,
-    ),
-    [],
-  );
+  collect(input.data, Object.keys(documentStructure.shape), []);
   const aliases = ownValue(input.data, 'deprecatedAliases');
-  if (type === 'term' && Array.isArray(aliases))
+  if (Array.isArray(aliases))
     for (let index = 0; index < aliases.length; index++)
       collect(ownValue(aliases, index), Object.keys(deprecatedAlias.shape), [
         'deprecatedAliases',

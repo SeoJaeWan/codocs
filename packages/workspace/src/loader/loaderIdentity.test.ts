@@ -21,8 +21,7 @@ vi.mock(
 let fixture: string;
 let project: string;
 let codocs: string;
-const raw =
-  'type: term\nid: term\nname: 이름\ndefinition: 정의\ndomain: 업무\n';
+const raw = 'id: term\nname: 이름\ndefinition: 정의\ndomains: [업무]\n';
 beforeEach(
   /** 실제 fixture는 별도이며 가상 식별 정보는 각 테스트에만 적용한다. */ async () => {
     fixture = await mkdtemp(path.join(tmpdir(), 'codosc-loader-identity-'));

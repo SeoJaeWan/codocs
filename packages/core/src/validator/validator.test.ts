@@ -14,17 +14,15 @@ import type {
 } from '../index.js';
 
 const term = {
-  type: 'term',
   id: 'sample-order',
   name: ' 가상 주문 😀 ',
   definition: '정의 [[sample-fulfillment]]',
-  domain: 'Sample Sales',
+  domains: ['Sample Sales'],
 };
 const knowledge = {
-  type: 'knowledge',
   id: 'sample-fulfillment',
-  title: '제목',
-  body: '본문 [[sample-order]]',
+  name: '제목',
+  definition: '본문 [[sample-order]]',
   domains: [' Sample Sales '],
 };
 
@@ -104,6 +102,51 @@ function issueSlice(source: string, issue: SchemaDiagnostic): string {
 }
 
 describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 보존을 검사한다. */ () => {
+  it('복수 도메인과 모든 선택 속성을 함께 검사하면 종류 구분 없이 원문을 보존한다', /** 단일 문서에 예문·이전 명칭·정책 상태를 함께 허용한다. */ () => {
+    const data = {
+      ...term,
+      domains: ['판매', '배송'],
+      examples: ['[[주문 처리]]'],
+      deprecatedAliases: [{ name: '이전 주문' }],
+      kind: 'policy',
+      status: 'confirmed',
+    };
+    const result = validateUnchanged({ data });
+    expect(result.success).toBe(true);
+    expect(result.warnings).toEqual([]);
+    if (result.success) {
+      expect(result.data).toEqual(data);
+      expect(result.data).not.toHaveProperty('type');
+    }
+  });
+
+  it('이전 형식을 검사하면 새 필수 필드를 대신 채우지 않고 이전 속성을 경고한다', /** 호환 변환 없이 사용자 속성으로 보존하며 필수 속성 누락을 진단한다. */ () => {
+    const legacy = {
+      type: 'knowledge',
+      id: 'legacy',
+      title: '이름',
+      body: '본문',
+      domain: '업무',
+    };
+    const result = validateUnchanged({ data: legacy });
+    expect(result.success).toBe(false);
+    expect(result.errors.map((issue) => issue.fieldPath)).toEqual([
+      ['name'],
+      ['definition'],
+      ['domains'],
+    ]);
+    expect(result.warnings.map((issue) => issue.fieldPath)).toEqual([
+      ['type'],
+      ['title'],
+      ['body'],
+      ['domain'],
+    ]);
+    const valid = { ...legacy, ...term };
+    const accepted = validateUnchanged({ data: valid });
+    expect(accepted.success).toBe(true);
+    if (accepted.success) expect(accepted.data).toEqual(valid);
+  });
+
   it.each([
     term,
     { ...term, examples: [], deprecatedAliases: [] },
@@ -146,7 +189,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       schemaDiagnosticCodes.invalidFieldValue,
       schemaDiagnosticMessages.blankString,
     ],
-    ['domain', null, schemaDiagnosticCodes.invalidFieldType, undefined],
+    ['domains', null, schemaDiagnosticCodes.invalidFieldType, undefined],
     [
       'id',
       'Bad-ID',
@@ -166,8 +209,6 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       schemaDiagnosticMessages.invalidId,
     ],
     ['id', 7, schemaDiagnosticCodes.invalidFieldType, undefined],
-    ['type', 'other', schemaDiagnosticCodes.invalidFieldValue, undefined],
-    ['type', null, schemaDiagnosticCodes.invalidFieldType, undefined],
     ['examples', null, schemaDiagnosticCodes.invalidFieldType, undefined],
     [
       'deprecatedAliases',
@@ -247,19 +288,19 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
   it('기존 문서와 수정 후보를 병합해 검사하면 같은 필수 계약을 적용하고 원본을 유지한다', /** 호출자가 만든 전체 후보에 기본값이나 저장 허용을 추가하지 않는다. */ () => {
     const original = { ...knowledge, custom: { nested: [null, ' Value '] } };
     const originalBefore = snapshot(original);
-    const candidate = { ...original, title: ' New Title ' };
+    const candidate = { ...original, name: ' New Title ' };
     const accepted = validateUnchanged({ data: candidate });
     expect(accepted.success).toBe(true);
     if (accepted.success) {
-      expect(accepted.data.title).toBe(' New Title ');
+      expect(accepted.data.name).toBe(' New Title ');
       expect(accepted.data).not.toHaveProperty('status');
       expect(accepted.data).not.toHaveProperty('saveAllowed');
     }
-    const { body: omitted, ...incomplete } = candidate;
+    const { definition: omitted, ...incomplete } = candidate;
     expect(omitted).toBeDefined();
     const rejected = validateUnchanged({ data: incomplete });
     expect(rejected.success).toBe(false);
-    expect(at(rejected.errors, ['body']).code).toBe(
+    expect(at(rejected.errors, ['definition']).code).toBe(
       schemaDiagnosticCodes.missingRequiredField,
     );
     expect(original).toEqual(originalBefore);
@@ -326,7 +367,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
   it.each(['.nan', '.inf', '-.inf'])(
     '실제 YAML %s를 파싱해 검사하면 비유한 수의 원문을 지목한다',
     /** 파서 성공은 스키마 성공을 보장하지 않는다. */ (value) => {
-      const source = `type: term\nid: order\nname: 이름\ndefinition: 정의\ndomain: 영역\ncustom:\n  nested: [${value}]\n`;
+      const source = `id: order\nname: 이름\ndefinition: 정의\ndomains: [영역]\ncustom:\n  nested: [${value}]\n`;
       const result = validateSource(source);
       expect(result.success).toBe(false);
       expect(
@@ -404,7 +445,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
 
   it.each([null, [], 'term', 1, false, {}])(
     '전체 문서가 %j이면 성공 문서 타입을 제공하지 않는다',
-    /** 문서 객체와 type 필수 계약을 검사한다. */ (data) => {
+    /** 문서 객체와 필수 속성 계약을 검사한다. */ (data) => {
       const result = validateUnchanged({ data });
       expect(result.success).toBe(false);
     },
@@ -418,11 +459,11 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
       const source = [
         '# 앞 주석',
         '---',
-        'type: term',
+
         'id: Bad-ID # 값 뒤 주석',
         'name: 이름',
         'definition: 정의',
-        'domain: 영역',
+        'domains: [영역]',
         'examples: ["😀", false]',
         'deprecatedAliases: [{message: "안내"}]',
         'aliases: [old]',
@@ -434,8 +475,8 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
       const element = at(result.errors, ['examples', 1]);
       expect(issueSlice(source, element)).toBe('false');
       expect(element.range).toEqual({
-        start: { line: 7, character: 17 },
-        end: { line: 7, character: 22 },
+        start: { line: 6, character: 17 },
+        end: { line: 6, character: 22 },
       });
       expect(
         issueSlice(source, at(result.errors, ['deprecatedAliases', 0, 'name'])),
@@ -450,10 +491,10 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
 
   it('최상위 필수 필드를 생략하면 문서 표시·독립 주석을 제외한 rootRange를 지목한다', /** 확인된 최상위 AST 매핑을 누락 속성의 부모로 사용한다. */ () => {
     const source =
-      '# 앞\n---\n{type: term, id: order, definition: 정의, domain: 영역} # 뒤\n';
+      '# 앞\n---\n{id: order, definition: 정의, domains: [영역]} # 뒤\n';
     const result = validateSource(source);
     expect(issueSlice(source, at(result.errors, ['name']))).toBe(
-      '{type: term, id: order, definition: 정의, domain: 영역}',
+      '{id: order, definition: 정의, domains: [영역]}',
     );
   });
 

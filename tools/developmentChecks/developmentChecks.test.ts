@@ -362,14 +362,14 @@ describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존
     writeFileSync(
       consumer,
       `import { parseYaml, getValueRange, validateDocument } from '@codosc/core';
-import type {Term, Knowledge} from '@codosc/core';
+import type {Document} from '@codosc/core';
 const parsed = parseYaml('name: test');
 export const range = getValueRange(parsed, ['name']);
 const result = validateDocument({data: parsed.success ? parsed.data : {}});
 if (result.success) {
-  const data: Term | Knowledge = result.data;
-  if (data.type === 'term') {const name: string = data.name; void name;}
-  else {const domains: string[] = data.domains; void domains;}
+  const data: Document = result.data;
+  const name: string = data.name; void name;
+  const domains: string[] = data.domains; void domains;
 } else {
   // @ts-expect-error failure has no validated data
   const absent = result.data;
@@ -389,7 +389,7 @@ if (result.success) {
       runtimeConsumer,
       `import assert from 'node:assert/strict';
 import {parseYaml, validateDocument} from '@codosc/core';
-const parsed = parseYaml('type: knowledge\\nid: fixture\\ntitle: タイトル\\nbody: Body\\ndomains: [Sales]\\n');
+const parsed = parseYaml('id: fixture\\nname: タイトル\\ndefinition: Body\\ndomains: [Sales]\\n');
 assert.equal(parsed.success, true);
 const result = validateDocument({data: parsed.data});
 assert.equal(result.success, true);

@@ -20,7 +20,7 @@ let project: string;
 let codocs: string;
 let outside: string;
 const raw =
-  'type: term\r\nid: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomain: 업무\r\n';
+  'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\n';
 beforeEach(
   /** 고유한 실제 프로젝트와 외부 폴더를 준비한다. */ async () => {
     fixture = await mkdtemp(path.join(tmpdir(), 'codosc-loader-'));
@@ -293,7 +293,7 @@ describe('경로별 workspace 문서 로더', /** 실제 IO의 경로와 스캔 
         {
           code: 'unknown_field',
           severity: 'warning',
-          range: { start: { line: 5, character: 0 } },
+          range: { start: { line: 4, character: 0 } },
         },
       ],
     });
