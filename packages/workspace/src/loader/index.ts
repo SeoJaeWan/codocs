@@ -4,9 +4,8 @@ import path from 'node:path';
 import {
   parseYaml,
   validateDocument,
-  type Knowledge,
+  type Document,
   type SchemaDiagnostic,
-  type Term,
   type YamlDiagnostic,
   type YamlParseResult,
 } from '@codosc/core';
@@ -53,7 +52,7 @@ export type WorkspaceDocumentResult = ReadDocument &
   (
     | {
         status: 'valid';
-        data: Term | Knowledge;
+        data: Document;
         parsed: Extract<YamlParseResult, { success: true }>;
       }
     | { status: 'parseError'; diagnostics: readonly YamlDiagnostic[] }

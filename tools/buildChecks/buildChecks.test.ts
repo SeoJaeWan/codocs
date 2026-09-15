@@ -35,24 +35,23 @@ function run(args: string[], cwd = consumer): string {
 function checkExamples(directory: string): void {
   const cases = [
     {
-      relative: 'examples/.codocs/terms.yaml',
+      relative: 'examples/.codocs/order.yaml',
       expected: {
-        type: 'term',
         id: 'sample-order',
         name: '가상 주문',
         definition:
           '가상 고객의 구매 요청이며 [[가상 주문 처리]] 절차를 따른다.',
-        domain: 'sample-sales',
+        domains: ['sample-sales'],
         examples: ['가상 주문 SAMPLE-001을 생성한다.'],
       },
     },
     {
-      relative: 'examples/.codocs/knowledge.yaml',
+      relative: 'examples/.codocs/fulfillment.yaml',
       expected: {
-        type: 'knowledge',
         id: 'sample-fulfillment',
-        title: '가상 주문 처리',
-        body: '가상 프로젝트에서 [[가상 주문]]를 확인한 뒤 가상 배송 상태를 기록한다.',
+        name: '가상 주문 처리',
+        definition:
+          '가상 프로젝트에서 [[가상 주문]]를 확인한 뒤 가상 배송 상태를 기록한다.',
         domains: ['sample-sales'],
       },
     },
@@ -338,10 +337,10 @@ try {
   const external = path.join(temporary, '외부 공통');
   await mkdir(path.join(codocs, '하위 폴더'), {recursive: true});
   await mkdir(external);
-  const termRaw = '# 원문 😀\\r\\ntype: term\\r\\nid: packed-term\\r\\nname: 용어\\r\\ndefinition: 정의\\r\\ndomain: 영역\\r\\ncustom: {nested: [null, true, 1]}\\r\\n';
-  const knowledgeRaw = 'type: knowledge\\nid: packed-knowledge\\ntitle: 제목\\nbody: 본문\\ndomains: [영역]\\n';
+  const termRaw = '# 원문 😀\\r\\nid: packed-term\\r\\nname: 용어\\r\\ndefinition: 정의\\r\\ndomains: [영역]\\r\\ncustom: {nested: [null, true, 1]}\\r\\n';
+  const knowledgeRaw = 'id: packed-knowledge\\nname: 제목\\ndefinition: 본문\\ndomains: [영역]\\n';
   const parseRaw = 'name: [\\n';
-  const schemaRaw = 'type: term\\nname: ID 누락\\ndefinition: 정의\\ndomain: 영역\\n';
+  const schemaRaw = 'name: ID 누락\\ndefinition: 정의\\ndomains: [영역]\\n';
   const externalFile = path.join(temporary, '외부 용어.yaml');
   await writeFile(externalFile, termRaw);
   await writeFile(path.join(external, '공유 지식.yml'), knowledgeRaw);
@@ -370,7 +369,7 @@ try {
   assert.equal(term.raw, termRaw);
   assert.equal(term.source.logicalPath, path.join(codocs, '연결 용어.yaml'));
   assert.equal(term.source.realPath, await realpath(externalFile));
-  assert.equal(term.data.type, 'term');
+  assert.equal(Object.hasOwn(term.data, 'type'), false);
   assert.equal(term.data.id, 'packed-term');
   assert.equal(term.data.name, '용어');
   assert.deepEqual(term.data.custom, {nested: [null, true, 1]});
@@ -382,7 +381,7 @@ try {
   assert.equal(warning.severity, 'warning');
   assert.equal(warning.path, term.source.path);
   assert.deepEqual(warning.fieldPath, ['custom']);
-  assert.deepEqual(warning.range, {start: {line: 6, character: 0}, end: {line: 6, character: 6}});
+  assert.deepEqual(warning.range, {start: {line: 5, character: 0}, end: {line: 5, character: 6}});
   for (const branch of ['공통A', '공통B']) {
     const document = byPath.get(path.join('.codocs', branch, '공유 지식.yml'));
     assert.ok(document);
@@ -504,19 +503,12 @@ for (const document of documents) {
   if (document.status === 'valid') {
     const id: string = document.data.id;
     void id;
-    if (document.data.type === 'term') {
-      const name: string = document.data.name;
-      void name;
-      // @ts-expect-error term names remain strings
-      const wrong: number = document.data.name;
-      void wrong;
-    } else {
-      const domains: string[] = document.data.domains;
-      void domains;
-      // @ts-expect-error knowledge domains remain string arrays
-      const wrong: number[] = document.data.domains;
-      void wrong;
-    }
+    const name: string = document.data.name;
+    const domains: string[] = document.data.domains;
+    void name; void domains;
+    // @ts-expect-error document names remain strings
+    const wrong: number = document.data.name;
+    void wrong;
   } else {
     const status: 'parseError' | 'validationError' = document.status;
     void status;
@@ -585,7 +577,7 @@ for (const name of ['language-server', 'vscode']) {
   if (typeof require('@codosc/' + name) !== 'object') throw new Error('Invalid CJS');
 }
 const { parseYaml, getValueRange, yamlDiagnosticCodes, validateDocument } = await import('@codosc/core');
-const validated = validateDocument({ data: {type: 'term', id: 'order', name: '주문', definition: '정의', domain: '영역', custom: {nested: [null, 1, true]}} });
+const validated = validateDocument({ data: {id: 'order', name: '주문', definition: '정의', domains: ['영역'], custom: {nested: [null, 1, true]}} });
 if (!validated.success || validated.data.custom.nested[1] !== 1 || validated.warnings.length !== 1) throw new Error('Validator dependency failed');
 if (!import.meta.resolve('zod').startsWith(new URL('./node_modules/zod/', import.meta.url).href)) throw new Error('Zod dependency must be local');
 const parsed = parseYaml('name: "한글 😀"\\n');
@@ -624,7 +616,7 @@ console.log('Diagnostic code contract verified');`;
 
   it('빌드된 검증기를 파일과 객체 후보에 사용하면 외부 진단 계약과 입력을 보존한다', /** 실제 파일을 읽고 제품 코드·심각도·경로·UTF-16 위치와 불변성을 검사한다. */ () => {
     const source =
-      '# 앞\n---\n{type: term, id: Bad-ID, definition: 정의, domain: 영역, examples: ["😀", false], aliases: [old]} # 뒤\n';
+      '# 앞\n---\n{id: Bad-ID, definition: 정의, domains: [영역], examples: ["😀", false], aliases: [old]} # 뒤\n';
     const filePath = path.join(consumer, 'invalid terms.yaml');
     writeFileSync(filePath, source);
     const script = `import assert from 'node:assert/strict';
@@ -666,7 +658,7 @@ assert.equal(warning.path, filePath);
 assert.deepEqual(warning.fieldPath, ['aliases']);
 const aliasStart = source.split('\\n')[2].indexOf('aliases');
 assert.deepEqual(warning.range, {start: {line: 2, character: aliasStart}, end: {line: 2, character: aliasStart + 'aliases'.length}});
-const candidate = {type: 'knowledge', id: 'sample', title: ' 标题 😀 ', body: ' Body [[sample-order]] ', domains: [' Sales '], aliases: [' Old '], custom: {nested: [null, true, 1.5, {'a.b': ' Value '}]}};
+const candidate = {id: 'sample', name: ' 标题 😀 ', definition: ' Body [[sample-order]] ', domains: [' Sales '], aliases: [' Old '], custom: {nested: [null, true, 1.5, {'a.b': ' Value '}]}};
 const candidateBefore = structuredClone(candidate);
 const accepted = validateDocument({data: candidate});
 assert.equal(accepted.success, true);
@@ -700,8 +692,10 @@ console.log('Validator external contract verified');`;
             `import type * as Package${index} from '@codosc/${name}';\nexport type Module${index} = typeof Package${index};`,
         )
         .join('\n') +
-      "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition, yamlDiagnosticCodes, validateDocument } from '@codosc/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic, YamlDiagnosticCode, Term, Knowledge } from '@codosc/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\nexport const diagnosticCode: YamlDiagnosticCode = yamlDiagnosticCodes.invalidYaml;\nexport const returnedCodes: readonly YamlDiagnosticCode[] = diagnostics.map(issue => issue.code);\nconst validated = validateDocument({data: parsed.success ? parsed.data : {}});\nif (validated.success) {\n  const data: Term | Knowledge = validated.data;\n  if (data.type === 'term') { const name: string = data.name; void name; }\n  else { const domains: string[] = data.domains; void domains; }\n}\n";
+      "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition, yamlDiagnosticCodes, validateDocument } from '@codosc/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic, YamlDiagnosticCode, Document } from '@codosc/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\nexport const diagnosticCode: YamlDiagnosticCode = yamlDiagnosticCodes.invalidYaml;\nexport const returnedCodes: readonly YamlDiagnosticCode[] = diagnostics.map(issue => issue.code);\nconst validated = validateDocument({data: parsed.success ? parsed.data : {}});\nif (validated.success) {\n  const data: Document = validated.data;\n  const name: string = data.name; void name;\n  const domains: string[] = data.domains; void domains;\n}\n";
     const validatorTypes = `
+// @ts-expect-error 이전 성공 타입은 단일 Document로 대체됐다.
+import type { Term, Knowledge } from '@codosc/core';
 import type { DocumentValidationResult, ValidateDocumentInput, JsonValue, SchemaDiagnostic, SchemaDiagnosticCode } from '@codosc/core';
 const input: ValidateDocumentInput = {data: {}};
 const result: DocumentValidationResult = validateDocument(input);
@@ -709,26 +703,20 @@ export const issues: readonly SchemaDiagnostic[] = [...result.errors, ...result.
 export const code: SchemaDiagnosticCode = 'invalid_field_value';
 export const json: JsonValue = {nested: [null, false, 1, 'value']};
 if (result.success) {
-  const document: Term | Knowledge = result.data;
+  const document: Document = result.data;
   const id: string = document.id;
   void id;
-  if (document.type === 'term') {
-    const fields: string[] = [document.name, document.definition, document.domain];
-    const examples: string[] | undefined = document.examples;
-    const aliases: {name: string; message?: string | undefined}[] | undefined = document.deprecatedAliases;
-    void fields; void examples; void aliases;
-    // @ts-expect-error term.name must remain a string
-    const wrong: number = document.name;
-    void wrong;
-  } else {
-    const fields: string[] = [document.title, document.body, ...document.domains];
-    const kind: 'policy' | 'procedure' | 'decision' | 'discussion' | undefined = document.kind;
-    const status: 'proposed' | 'confirmed' | 'deprecated' | undefined = document.status;
-    void fields; void kind; void status;
-    // @ts-expect-error knowledge.domains must remain a string array
-    const wrong: number[] = document.domains;
-    void wrong;
-  }
+  const fields: string[] = [document.name, document.definition, ...document.domains];
+  const examples: string[] | undefined = document.examples;
+  const aliases: {name: string; message?: string | undefined}[] | undefined = document.deprecatedAliases;
+  const kind: 'policy' | 'procedure' | 'decision' | 'discussion' | undefined = document.kind;
+  const status: 'proposed' | 'confirmed' | 'deprecated' | undefined = document.status;
+  void fields; void examples; void aliases; void kind; void status;
+  // @ts-expect-error document.name must remain a string
+  const wrongName: number = document.name;
+  // @ts-expect-error document.domains must remain a string array
+  const wrongDomains: number[] = document.domains;
+  void wrongName; void wrongDomains;
 } else {
   // @ts-expect-error failure must not expose validated data
   const absent = result.data;
@@ -836,8 +824,8 @@ void knowledgeStructure;
     for (const folder of ['mcp', 'vscode']) {
       for (const relative of [
         'docs/guide/README.md',
-        'examples/.codocs/terms.yaml',
-        'examples/.codocs/knowledge.yaml',
+        'examples/.codocs/order.yaml',
+        'examples/.codocs/fulfillment.yaml',
       ]) {
         expect(
           readFileSync(
@@ -939,8 +927,8 @@ void knowledgeStructure;
       });
       for (const relative of [
         'docs/guide/README.md',
-        'examples/.codocs/terms.yaml',
-        'examples/.codocs/knowledge.yaml',
+        'examples/.codocs/order.yaml',
+        'examples/.codocs/fulfillment.yaml',
       ]) {
         expect(files).toContain('package/dist/' + relative);
       }
@@ -1001,11 +989,11 @@ void knowledgeStructure;
       source,
       `import { parseYaml, validateDocument } from '@codosc/core';
 import '@codosc/workspace';
-const source = 'type: term\\nid: bundled\\nname: 名前 😀\\ndefinition: 定義\\ndomain: Sales\\n';
+const source = 'id: bundled\\nname: 名前 😀\\ndefinition: 定義\\ndomains: [Sales]\\n';
 const parsed = parseYaml(source);
 if (!parsed.success) throw new Error('Bundled parser failed');
 const result = validateDocument({data: parsed.data, source: parsed.source, fields: parsed.fields, ...(parsed.rootRange ? {rootRange: parsed.rootRange} : {})});
-if (!result.success || result.data.type !== 'term' || result.data.name !== '名前 😀' || result.errors.length || result.warnings.length) throw new Error('Bundled validator failed');
+if (!result.success || result.data.name !== '名前 😀' || result.errors.length || result.warnings.length) throw new Error('Bundled validator failed');
 const invalid = validateDocument({data: {...result.data, id: 'Bad-ID'}});
 if (invalid.success || invalid.errors[0]?.code !== 'invalid_field_value') throw new Error('Bundled validator error failed');
 export const loaded = true;

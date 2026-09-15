@@ -19,8 +19,7 @@ import {
 import {
   catalogDiagnosticCodes,
   resolveReference,
-  type Term,
-  type Knowledge,
+  type Document,
 } from '@codosc/core';
 import {
   buildWorkspaceCatalog,
@@ -55,14 +54,14 @@ async function file(name: string, raw: string): Promise<string> {
   await writeFile(target, raw);
   return target;
 }
-/** term fixture의 확인 가능한 속성이다. */
+/** 문서 fixture의 확인 가능한 속성이다. */
 function term(
   name: string,
   definition = '정의',
   id = name,
   domain = '업무',
 ): string {
-  return `type: term\nid: ${id}\nname: ${name}\ndefinition: '${definition}'\ndomain: ${domain}\n`;
+  return `id: ${id}\nname: ${name}\ndefinition: '${definition}'\ndomains: [${domain}]\n`;
 }
 /** 실제 루트에서 새 관측을 읽는다. */
 async function scan(): Promise<
@@ -77,9 +76,9 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
   it('검증 성공과 스키마 오류는 미검증 parsed를 보존하고 파싱 실패에는 추측 모델이 없다', /** 상태별 공개 데이터와 원문 위치를 확인한다. */ async () => {
     await file('valid.yaml', term('정상', '정의', 'valid'));
     const raw =
-      "type: term\r\nname: 오류\r\ndomain: 업무\r\ndefinition: '[[정상]]'\r\nexamples: ['[[정상]]', 42, '[[정상]]']\r\n";
+      "name: 오류\r\ndomains: [업무]\r\ndefinition: '[[정상]]'\r\nexamples: ['[[정상]]', 42, '[[정상]]']\r\n";
     await file('invalid.yaml', raw);
-    await file('parse.yaml', 'type: term\nname: [\n');
+    await file('parse.yaml', 'name: [\n');
     const result = await scan();
     const valid = result.documents.find((d) => d.status === 'valid');
     const invalid = result.documents.find(
@@ -95,7 +94,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
       failed.status !== 'parseError'
     )
       throw new Error('상태별 fixture 없음');
-    expectTypeOf(valid.data).toEqualTypeOf<Term | Knowledge>();
+    expectTypeOf(valid.data).toEqualTypeOf<Document>();
     expectTypeOf(invalid.parsed.data).toEqualTypeOf<Record<string, unknown>>();
     expect(valid.parsed.success).toBe(true);
     expectTypeOf(failed.diagnostics).toMatchTypeOf<
@@ -132,16 +131,16 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     ).toEqual(['[[정상]]', '[[정상]]', '[[정상]]']);
     expect(catalog.documents.get(failed.source.path)?.occurrences).toEqual([]);
   });
-  it('잘못된 본문 타입과 미확인 종류는 제외하고 정상 examples 원소만 추출한다', /** 타입을 추측하거나 문자열로 변환하지 않는다. */ async () => {
+  it('잘못된 본문 자료형과 사용자 필드는 제외하고 정상 examples 원소만 추출한다', /** 타입을 추측하거나 문자열로 변환하지 않는다. */ async () => {
     await file(
       'a.yaml',
-      'type: term\nname: A\ndomain: 업무\ndefinition: ["[[B]]"]\nexamples: [5, "[[B]]", { text: "[[B]]" }]\n',
+      'name: A\ndomains: [업무]\ndefinition: ["[[B]]"]\nexamples: [5, "[[B]]", { text: "[[B]]" }]\n',
     );
     await file('b.yaml', term('B'));
-    await file('unknown.yaml', 'name: 추측\nbody: "[[B]]"\n');
+    await file('unknown.yaml', 'name: 추측\ncustom: "[[B]]"\n');
     await file(
       'knowledge.yaml',
-      'type: knowledge\ntitle: 지식\ndomains: [업무]\nbody: ["[[B]]"]\n',
+      'name: 지식\ndomains: [업무]\ndefinition: ["[[B]]"]\n',
     );
     const catalog = buildWorkspaceCatalog(await scan());
     expect(
@@ -158,7 +157,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     await file('source.yaml', term('출발', '[[대상]]'));
     await file(
       'target.yaml',
-      'type: knowledge\ntitle: 대상\ndomains: [업무, 공통]\nbody: 본문\n',
+      'name: 대상\ndomains: [업무, 공통]\ndefinition: 본문\n',
     );
     const catalog = buildWorkspaceCatalog(await scan());
     const resolution = resolveReference(catalog, { name: '대상' });
@@ -231,7 +230,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
   it('다중 도메인 문서가 다른 소속 도메인으로 자신을 참조해도 직접 연결을 만들지 않는다', /** 자기 참조 여부는 도메인이 아니라 발견 경로로 판정한다. */ async () => {
     await file(
       'self.yaml',
-      'type: knowledge\nid: self\ntitle: 자신\ndomains: [업무, 공통]\nbody: "[[공통:자신]]"\n',
+      'id: self\nname: 자신\ndomains: [업무, 공통]\ndefinition: "[[공통:자신]]"\n',
     );
     const catalog = buildWorkspaceCatalog(await scan());
     const document = catalog.documents.get(discovered('self.yaml'));

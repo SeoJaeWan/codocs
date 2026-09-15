@@ -18,7 +18,6 @@ import type { YamlParseResult } from '../parser/index.js';
 import { extractReferences } from '../references/index.js';
 import type { ReferenceOccurrence } from '../references/index.js';
 import { validateDocument } from '../validator/index.js';
-import type { Knowledge, Term } from '../validator/index.js';
 
 /** 로더가 확인한 발견 경로와 파싱 결과다. 실경로는 진단 정보일 뿐 키가 아니다. */
 export interface CatalogObservation {
@@ -44,7 +43,6 @@ export interface CatalogScan {
 export interface CatalogIdentity {
   path: string;
   realPath?: string;
-  type?: Term['type'] | Knowledge['type'];
   id?: string;
   name?: string;
   domains: readonly string[];
@@ -97,29 +95,22 @@ export interface Catalog {
 function nonblank(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
-/** 종류별 확인 가능한 메타데이터를 스키마 전체 성공과 독립적으로 추출한다. */
+/** 확인 가능한 메타데이터를 스키마 전체 성공과 독립적으로 추출한다. */
 function identity(
   observation: CatalogObservation,
   confirmation: CatalogIdentity['confirmation'],
 ): CatalogIdentity {
   const parsed = observation.parsed;
   const data = parsed.success ? parsed.data : {};
-  const type =
-    data.type === 'term' || data.type === 'knowledge' ? data.type : undefined;
-  const name =
-    type === 'term' ? data.name : type === 'knowledge' ? data.title : undefined;
-  const domains =
-    type === 'term'
-      ? [data.domain].filter(nonblank)
-      : type === 'knowledge' && Array.isArray(data.domains)
-        ? data.domains.filter(nonblank)
-        : [];
+  const name = data.name;
+  const domains = Array.isArray(data.domains)
+    ? data.domains.filter(nonblank)
+    : [];
   return {
     path: observation.path,
     ...(observation.realPath !== undefined
       ? { realPath: observation.realPath }
       : {}),
-    ...(type ? { type } : {}),
     ...(nonblank(data.id) ? { id: data.id } : {}),
     ...(nonblank(name) ? { name } : {}),
     domains: [...new Set(domains)],
@@ -197,7 +188,6 @@ function linkIdentity(document: CatalogIdentity): CatalogIdentity {
   return {
     path: document.path,
     ...(document.realPath !== undefined ? { realPath: document.realPath } : {}),
-    ...(document.type !== undefined ? { type: document.type } : {}),
     ...(document.id !== undefined ? { id: document.id } : {}),
     ...(document.name !== undefined ? { name: document.name } : {}),
     domains: [...document.domains],
@@ -283,9 +273,7 @@ function calculate(
     for (const path of paths) {
       const doc = documents.get(path);
       if (doc) {
-        const field = [
-          key === 'duplicateId' ? 'id' : doc.type === 'term' ? 'name' : 'title',
-        ];
+        const field = [key === 'duplicateId' ? 'id' : 'name'];
         documents.set(path, {
           ...doc,
           documentDiagnostics: [
@@ -484,7 +472,7 @@ function referenceText(name: string, domain?: string): string | undefined {
   )
     return undefined;
   const extracted = extractReferences(
-    parseYaml(`type: knowledge\nbody: ${JSON.stringify(text)}\n`),
+    parseYaml(`definition: ${JSON.stringify(text)}\n`),
   );
   const occurrence = extracted.occurrences[0];
   return extracted.occurrences.length === 1 &&
@@ -525,7 +513,6 @@ export function planRename(
   if (
     !target ||
     target.name === undefined ||
-    !target.type ||
     !target.observation.parsed.success
   )
     return { ...initial, blockingReason: 'target_unavailable' };
@@ -585,7 +572,7 @@ export function planRename(
   );
   const changes: RenameChange[] = [],
     impacts: RenameImpact[] = [];
-  const fieldPath = [target.type === 'term' ? 'name' : 'title'];
+  const fieldPath = ['name'];
   const parsed = target.observation.parsed;
   const offsetRange = getStringRange(parsed, fieldPath, {
     start: 0,

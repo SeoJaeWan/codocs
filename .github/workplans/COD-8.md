@@ -2,14 +2,16 @@
 
 ## 범위와 현재 합의
 
-이 문서는 main 기반 COD-8의 현재 합의다. PR #5의 이전 ID 기반 참조 작업안을 대체하며 예전 feature 브랜치를 merge하지 않는다. ID는 전역 유일 식별 값이고 참조 키가 아니다. 계산 API와 실제 로더/스캔 연결, 공개 배포 소비자와 이름 기반 예제/문서를 이번 범위로 한다. UI·Hover·LSP/MCP 연결·watcher·실제 rename·다중 파일 writer/복구는 제외한다. 기존 validateDocument, MCP ID get/list, 단일 codocs_write 계약은 변경하지 않는다. Jira/PR/Memory의 외부 상태를 이 파일 변경으로 수정하지 않는다.
+COD-8은 이름 기반 참조·경로별 색인·충돌 진단·순수 이름 변경 계획과 실제 로더 연결을 구현한다. ID는 전역 유일 식별 값이고 본문 참조는 문서용 이름을 사용한다.
+리뷰에서 합의한 단일 문서 형식(id·name·definition·domains)으로 validator·공개 Document 타입·예제·소비자 검사를 통합한다. type과 Term/Knowledge 구분은 제거하며 이전 형식의 자동 변환은 제공하지 않는다.
+프로젝트 .codocs는 도메인별 문서 묶음과 공통 share 흐름으로 구성하고 작성 가이드·README의 역할을 정리한다. UI·Hover·LSP/MCP 연결·watcher·실제 rename·다중 파일 writer/복구는 후속 범위다.
 
 ## 요구사항 및 불변 조건
 
 - REQ-001 / INV-001: 프로젝트 상대 발견 경로별 문서를 보관한다. 동일 ID/realPath의 다른 발견 경로를 합치지 않는다. 전역 ID 충돌은 모든 경로에 진단한다.
-- REQ-002 / INV-002: term.name/knowledge.title은 통합 이름 공간이다. 같은 도메인의 중복은 종류와 무관하게 오류이며 다른 도메인의 동명은 허용한다. knowledge.domains 각각으로 검색하되 같은 발견 경로는 후보 하나다.
-- REQ-003 / INV-007: `[[이름]]`은 전체, `[[도메인:이름]]`은 지정 도메인의 term.name/knowledge.title 통합 이름 공간에서 정확 비교한다. 작성 문서 도메인 우선·trim·대소문자 보정·ID 패턴 제한이 없다. 후보 0/1/복수를 구분하고 확인한 종류·이름·도메인·ID·경로·대상 오류를 반환한다.
-- REQ-004 / INV-003: type을 확인한 term.definition/examples 문자열 원소, knowledge.body만 추출한다. 자료형 오류는 변환/종류 추측 없이 제외하고 정상 원소는 유지한다. 스키마 오류·ID 누락/충돌에서도 확인 가능한 이름과 참조를 보존한다. YAML 파싱 실패에서는 아무 문서 정보/참조도 추측하지 않는다.
+- REQ-002 / INV-002: name은 통합 이름 공간이다. 같은 도메인의 이름 중복은 오류이며 다른 도메인의 동명은 허용한다. domains 각각으로 검색하되 같은 발견 경로는 후보 하나다.
+- REQ-003 / INV-007: `[[이름]]`은 전체, `[[도메인:이름]]`은 지정 도메인의 name 통합 이름 공간에서 정확 비교한다. 작성 문서 도메인 우선·trim·대소문자 보정·ID 패턴 제한이 없다. 후보 0/1/복수를 구분하고 확인한 이름·도메인·ID·경로·대상 오류를 반환한다.
+- REQ-004 / INV-003: definition과 examples의 문자열 원소에서 추출한다. 전체 스키마 성공을 요구하지 않으며 자료형 오류는 강제 변환 없이 제외하고 정상 원소는 유지한다. 스키마 오류·ID 누락/충돌에서도 확인 가능한 이름과 참조를 보존한다. YAML 파싱 실패에서는 아무 문서 정보/참조도 추측하지 않는다.
 - REQ-005: YAML 해석 문자열에서 시작 직전 백슬래시 홀수는 리터럴, 짝수는 참조다. 첫 비이스케이프 콜론이 도메인 구분자이고 구성 내부 콜론은 `\:`다. 빈/잘못된 구성/미완성은 invalid_reference이며 닫히기 전 새 시작에서 앞 오류를 기록하고 복구한다. 원문/렌더링은 변환하지 않는다.
 - REQ-006: 모든 반복 등장에 fieldPath와 실제 YAML UTF-16 offset/좌표를 보존한다. 따옴표·Unicode escape·접힌/여러 줄·LF/CRLF의 해석 offset을 단순 가산하거나 raw 검색으로 위치를 추측하지 않는다.
 - REQ-007: references/referencedBy는 확정 직접 연결만 포함한다. 발견 경로별 중복 제거·경로 오름차순이며 확인한 이름·ID·경로를 제공한다. 오류/없음/모호함/자기 참조/미확인 등장과 진단은 남기되 후보에 역참조를 만들지 않는다. 확정 대상의 스키마 오류는 연결을 유지하며 경고한다. 전이 연결은 없다.
@@ -25,7 +27,7 @@
 
 DEC-001은 core/references에 문법·위치, core/catalog에 색인·충돌·해석·직접/역참조·rename 계산, workspace에 로더·스캔 연결을 둔다. 실제 IO 의존성이 계산 계층에 발견되면 경계를 재검토한다. DEC-002는 파싱 성공 데이터와 원문 문자열 매핑을 로더에서 재사용 가능하게 보존한다. 메모리 실측에 따라 표현은 조정할 수 있다. DEC-007은 대상 경로·필드·실제 위치·후보를 가진 수정 계획이며 후속 writer의 원문 보존 계약과 통합할 때 표현을 재검토할 수 있다. 이 배치/표현 제안은 승인된 구현 방향이며 공개 계약 보존 하에서 함수명/내부 표현을 선택한다.
 
-DEC-003은 YAML 해석 문자열/원문 매핑을 parser 책임으로 두며 지원 표기의 정확 매핑을 입증하지 못하면 재설계한다. DEC-004는 경로 문서와 ID/도메인 이름/전체 이름의 경로 집합을 분리하며 규모 측정 후 최적화할 수 있다. DEC-005는 등장/해석 기록과 확정 연결 목록을 분리하며 실제 소비 API에 따라 표현을 조정할 수 있다. DEC-006은 이전 색인·새 관측·실패 범위로 갱신을 계산하며 비용 측정의 병목에 따라 알고리즘을 조정할 수 있다.
+DEC-003은 YAML 해석 문자열/원문 매핑을 parser와 stringMapping 책임으로 두며 지원 표기의 정확 매핑을 입증하지 못하면 재설계한다. DEC-004는 경로 문서와 ID/도메인 이름/전체 이름의 경로 집합을 분리하며 규모 측정 후 최적화할 수 있다. DEC-005는 등장/해석 기록과 확정 연결 목록을 분리하며 실제 소비 API에 따라 표현을 조정할 수 있다. DEC-006은 이전 색인·새 관측·실패 범위로 갱신을 계산하며 비용 측정의 병목에 따라 알고리즘을 조정할 수 있다.
 
 - `@codosc/core`: parseYaml, extractReferences, buildCatalog, resolveReference, planRename 및 공개 진단 상수/타입.
 - `@codosc/workspace`: loadWorkspace, toCatalogScan, buildWorkspaceCatalog 및 공개 스캔/IO 진단 상수/타입.
@@ -37,12 +39,10 @@ DEC-003은 YAML 해석 문자열/원문 매핑을 parser 책임으로 두며 지
 
 사용자는 기존 참조 동시 변경을 선택적으로 끌 수 있고 모호 후보와 필요한 도메인을 선택한다. 실제 writer는 쓰기 불가 대상이 하나라도 있으면 전체 저장을 사전에 중단한다. 미리보기 뒤 원문이 바뀌면 최신 문서를 다시 읽어 최신 미리보기부터 재시작한다. 중간 저장 실패에서는 복구를 시도하고 복구 성공/실패 및 실제 파일 상태를 사용자에게 안내한다. 다중 파일 원자성을 보장하지 않는다. 이 합의는 후속 요구를 보존한 것이며 writer/복구 구현 완료 또는 현재 plan의 저장 허가가 아니다.
 
-## 검증과 배포 증거
+## 검증과 완료 범위
 
-각 task는 고유한 표준 worktree와 격리 Node 24.21.0 / pnpm 10.34.5 런타임·store·cache·tmp·fixture를 사용한다. dependency/manifest/lockfile을 변경하지 않는다. 기능은 한국어 인접 행동 시험, JSDoc/README와 함께 구현한다.
+Node.js 24.21.0과 pnpm 10.34.5로 타입·린트·서식·전체 Vitest 및 빌드 소비자 검사를 수행한다. 빌드 검사가 dist를 다시 만들므로 전체 테스트 파일은 순차 실행한다.
+소스 없는 JS·strict d.ts 소비자와 실제 tarball 설치로 공개 API·내부 subpath 거부·예제 참조를 검증한다. 이전 Term/Knowledge 타입 제거, 복수 도메인과 선택 속성의 동시 사용, 이전 필드의 보존·경고도 확인한다.
+.codocs의 형식·ID·이름·참조와 전체 목차 도달성, 각 도메인 소개의 하위 문서 직접 참조를 확인한다.
 
-TASK-004의 `tools/buildChecks -t '이름 참조'`는 기존 링크 fixture와 독립적인 소스 없는 JS·strict d.ts·실제 tarball 검사를 실행한다. tarball은 링크 없이 추출하고 고정 yaml/Zod 의존성을 명시적으로 복사한다. 이는 npm 설치/게시 성공이나 OS symlink 권한 검증이 아니다. strict/exactOptionalPropertyTypes/NodeNext/types: []/skipLibCheck: false와 외부 Zod URL 선언을 위한 ES2022+DOM을 사용한다. 소스/배포 guide·example 원문 일치와 실제 name/title 참조 해석도 검사한다.
-
-업데이트 전 고정 이름 기반 예제 검사는 옛 `[[sample-fulfillment]]` 기대 불일치로 실패해야 한다. 업데이트 후 두 예제는 parser→validator→catalog에서 서로 확정 연결/역참조 하나를 가진다. 새 공개 소비 시험은 모두 실제 통과해야 한다. 기존 Windows workspace 타르볼 파일 symlink EPERM 한 건을 삭제·skip·완화하지 않고 정확한 기존 실패 집합과 비교한다. 이전 COD-4 문서의 서식 실패도 범위 밖이며 숨기지 않는다. 전체 회귀/최종 acceptance는 INT-001에서 봉인한다. provisional continuation이 허용되더라도 acceptance 통과를 뜻하지 않는다.
-
-실제 IDE/MCP·VSIX·npm 게시·후속 writer·watcher와 제품 성능 목표의 완료를 이번 순수/로더/배포 시험으로 주장하지 않는다. push·PR 수정·사용자 브랜치 merge·worktree cleanup은 별도 수동 인계다.
+COD-4 작업 계획의 기존 서식 문제는 내용 변경 없이 정리한다. 실제 IDE/MCP·VSIX·npm 게시·후속 writer·watcher와 제품 성능 목표의 완료를 이번 검사로 주장하지 않는다.

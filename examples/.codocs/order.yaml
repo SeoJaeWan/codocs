@@ -1,8 +1,8 @@
 # 가상 프로젝트 예시이며 실제 업무 사실이 아니다.
-type: term
 id: sample-order
 name: 가상 주문
 definition: 가상 고객의 구매 요청이며 [[가상 주문 처리]] 절차를 따른다.
-domain: sample-sales
+domains:
+  - sample-sales
 examples:
   - '가상 주문 SAMPLE-001을 생성한다.'

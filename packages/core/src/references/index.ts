@@ -62,17 +62,14 @@ function components(
   if (!name.length || domain === '') return undefined;
   return { name, ...(domain !== undefined ? { domain } : {}) };
 }
-/** 종류를 확인한 정상 문자열 본문 경로만 고른다. */
+/** 자료형이 정상인 본문과 예문 경로만 고른다. */
 function bodyPaths(data: Record<string, unknown>): FieldPath[] {
   const paths: FieldPath[] = [];
-  if (data.type === 'term') {
-    if (typeof data.definition === 'string') paths.push(['definition']);
-    if (Array.isArray(data.examples))
-      for (let index = 0; index < data.examples.length; index++)
-        if (typeof data.examples[index] === 'string')
-          paths.push(['examples', index]);
-  } else if (data.type === 'knowledge' && typeof data.body === 'string')
-    paths.push(['body']);
+  if (typeof data.definition === 'string') paths.push(['definition']);
+  if (Array.isArray(data.examples))
+    for (let index = 0; index < data.examples.length; index++)
+      if (typeof data.examples[index] === 'string')
+        paths.push(['examples', index]);
   return paths;
 }
 /** YAML 성공 결과의 정해진 본문만 추출한다. 스키마 검증·ID·파일 IO에 의존하지 않고 입력을 변경하지 않는다. */

@@ -4,11 +4,11 @@ import {mkdir, writeFile, readFile, rm, rename} from 'node:fs/promises';
 import path from 'node:path';
 import {parseYaml, extractReferences, buildCatalog, resolveReference, planRename, referenceDiagnosticCodes, catalogDiagnosticCodes} from '@codosc/core';
 import {loadWorkspace, toCatalogScan, buildWorkspaceCatalog} from '@codosc/workspace';
-const term = (name, domain, id = 'same-id') => 'type: term\nid: ' + id + '\nname: ' + name + '\ndefinition: 정의\ndomain: ' + domain + '\n';
-const knowledge = (title, body) => 'type: knowledge\nid: source\ntitle: ' + title + '\nbody: ' + JSON.stringify(body) + '\ndomains: [판매]\n';
+const term = (name, domain, id = 'same-id') => 'id: ' + id + '\nname: ' + name + '\ndefinition: 정의\ndomains: [' + domain + ']\n';
+const knowledge = (title, body) => 'id: source\nname: ' + title + '\ndefinition: ' + JSON.stringify(body) + '\ndomains: [판매]\n';
 const observe = (path, source) => ({path, realPath: '/same-real-path', parsed: parseYaml(source, path)});
 const raw = knowledge('출처', '😀 [[주문]] [[판매:주문]] [[판매:주문]] [[없음]] [[출처]] [[]] \\[[주문]]');
-const records = [observe('.codocs/a.yaml', term('주문', '판매')), observe('.codocs/b.yaml', term('주문', '지원')), observe('.codocs/s.yaml', raw), observe('.codocs/error.yaml', 'type: term\nname: 오류 대상\ndefinition: 정의\ndomain: 판매\n'), observe('.codocs/bad.yaml', 'type: term\nname: 파싱 실패\ndefinition: "[[주문]]"\nx: [\n')];
+const records = [observe('.codocs/a.yaml', term('주문', '판매')), observe('.codocs/b.yaml', term('주문', '지원')), observe('.codocs/s.yaml', raw), observe('.codocs/error.yaml', 'name: 오류 대상\ndefinition: 정의\ndomains: [판매]\n'), observe('.codocs/bad.yaml', 'name: 파싱 실패\ndefinition: "[[주문]]"\nx: [\n')];
 const before = structuredClone(records);
 const catalog = buildCatalog({status: 'complete', observations: records});
 assert.equal(catalog.documents.size, 5);
@@ -20,7 +20,7 @@ const resolved = resolveReference(catalog, {name: '주문', domain: '판매'});
 assert.equal(resolved.status, 'resolved');
 assert.equal(resolved.target.path, '.codocs/a.yaml');
 assert.equal(resolved.target.name, '주문');
-assert.equal(resolved.target.type, 'term');
+assert.equal(Object.hasOwn(resolved.target, 'type'), false);
 assert.equal(resolved.target.id, 'same-id');
 assert.deepEqual(resolved.target.domains, ['판매']);
 assert.ok(resolved.target.errors.some(d => d.code === 'duplicate_id'));
@@ -32,16 +32,16 @@ assert.deepEqual(catalog.documents.get('.codocs/b.yaml').referencedBy, []);
 for (const item of source.occurrences) {
   const range = item.occurrence.offsetRange;
   assert.equal(raw.slice(range.start, range.end), item.occurrence.text);
-  assert.equal(item.occurrence.range.start.line, 3);
+  assert.equal(item.occurrence.range.start.line, 2);
 }
 assert.deepEqual(catalog.documents.get('.codocs/bad.yaml').occurrences, []);
 assert.equal(catalog.documents.get('.codocs/bad.yaml').name, undefined);
 const error = resolveReference(catalog, {name: '오류 대상'});
 assert.equal(error.status, 'resolved');
 assert.ok(error.target.errors.some(d => d.code === 'missing_required_field'));
-const mixed = extractReferences(parseYaml('type: term\nname: "[[메타]]"\ndefinition: 4\nexamples: ["[[정상]]", 7, "[[다른 정상]]"]\n'));
+const mixed = extractReferences(parseYaml('name: "[[메타]]"\ndefinition: 4\nexamples: ["[[정상]]", 7, "[[다른 정상]]"]\n'));
 assert.deepEqual(mixed.occurrences.map(x => x.syntax === 'valid' ? x.name : undefined), ['정상', '다른 정상']);
-const escaped = extractReferences(parseYaml("type: knowledge\nbody: '[[판매\\:동부:주문\\:확인]] \\[[리터럴]]'\n"));
+const escaped = extractReferences(parseYaml("definition: '[[판매\\:동부:주문\\:확인]] \\[[리터럴]]'\n"));
 assert.equal(escaped.occurrences.length, 1);
 assert.equal(escaped.occurrences[0].name, '주문:확인');
 assert.equal(escaped.occurrences[0].domain, '판매:동부');
@@ -82,7 +82,7 @@ assert.ok(qualifiedPlan.changes.some(x => x.oldText === '[[주문]]' && x.newTex
 const otherSelection = planRename(catalog, {targetPath: '.codocs/a.yaml', newName: '판매주문', selections: [{sourcePath: '.codocs/s.yaml', occurrenceIndex: 0, targetPath: '.codocs/b.yaml'}]});
 assert.equal(otherSelection.status, 'ready');
 assert.equal(otherSelection.changes.some(x => x.occurrenceIndex === 0), false);
-const multiCatalog = buildCatalog({status: 'complete', observations: [observe('.codocs/m.yaml', 'type: knowledge\nid: multi\ntitle: 다중 대상\nbody: 본문\ndomains: [판매, 동부]\n'), observe('.codocs/u.yaml', knowledge('사용', '[[다중 대상]]')), observe('.codocs/c.yaml', term('새 이름', '지원', 'other-id'))]});
+const multiCatalog = buildCatalog({status: 'complete', observations: [observe('.codocs/m.yaml', 'id: multi\nname: 다중 대상\ndefinition: 본문\ndomains: [판매, 동부]\n'), observe('.codocs/u.yaml', knowledge('사용', '[[다중 대상]]')), observe('.codocs/c.yaml', term('새 이름', '지원', 'other-id'))]});
 const multiPlan = planRename(multiCatalog, {targetPath: '.codocs/m.yaml', newName: '새 이름'});
 assert.equal(multiPlan.status, 'unresolved');
 assert.ok(multiPlan.impacts.some(x => x.reason === 'domain_required'));
@@ -99,7 +99,7 @@ try {
   const sourceRaw = knowledge('처리', '[[주문]]');
   await writeFile(targetPath, targetRaw);
   await writeFile(sourcePath, sourceRaw);
-  await writeFile(path.join(project, '.codocs', '오류.yaml'), 'type: term\nname: 이름 보존\ndefinition: "[[주문]]"\ndomain: 판매\n');
+  await writeFile(path.join(project, '.codocs', '오류.yaml'), 'name: 이름 보존\ndefinition: "[[주문]]"\ndomains: [판매]\n');
   await writeFile(path.join(project, '.codocs', '깨진.yaml'), 'name: [\n');
   const scan = await loadWorkspace({project});
   assert.equal(scan.status, 'complete');
@@ -114,7 +114,7 @@ try {
     } else {
       assert.equal(observation.parsed, doc.parsed);
       if (doc.status === 'validationError') assert.equal('data' in doc, false);
-      else assert.equal(doc.data.type === 'term' || doc.data.type === 'knowledge', true);
+      else assert.equal(typeof doc.data.name, 'string');
     }
   }
   const workspaceCatalog = buildWorkspaceCatalog(scan);
@@ -167,7 +167,7 @@ export const nameReferenceTs = String.raw`import {parseYaml, extractReferences, 
 import type {Catalog, CatalogScan, CatalogObservation, CatalogFailure, CatalogDocument, ReferenceResolution, RenamePlan, RenameSelection, DiagnosticCode, CatalogDiagnosticCode, ReferenceDiagnosticCode, Diagnostic} from '@codosc/core';
 import {loadWorkspace, toCatalogScan, buildWorkspaceCatalog} from '@codosc/workspace';
 import type {WorkspaceDocumentResult, WorkspaceScanResult} from '@codosc/workspace';
-const parsed = parseYaml('type: term\nname: 주문\n');
+const parsed = parseYaml('name: 주문\n');
 const observation: CatalogObservation = {path: '.codocs/a.yaml', parsed};
 const failure: CatalogFailure = {kind: 'folder', path: '.codocs'};
 const scan: CatalogScan = {status: 'complete', observations: [observation], failures: [failure]};
