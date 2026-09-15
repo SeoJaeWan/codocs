@@ -112,12 +112,37 @@ export const catalogDiagnosticMessages = {
 /** 상수에서 도출한 색인 진단 코드다. */
 export type CatalogDiagnosticCode =
   (typeof catalogDiagnosticCodes)[keyof typeof catalogDiagnosticCodes];
+/** 조회 투영에서 외부 계약으로 정규화하는 진단 코드다. */
+export const queryDiagnosticCodes = {
+  /** 전체 요청의 ID 배열이나 크기가 계약과 다르면 반환한다. */
+  invalidInput: 'invalid_input',
+  /** 완전한 Catalog에 요청한 ID가 없으면 반환한다. */
+  notFound: 'not_found',
+  /** 직접 참조 이름에 해당하는 대상 경로가 없으면 반환한다. */
+  referenceNotFound: 'reference_not_found',
+  /** 직접 참조 이름에 해당하는 대상 경로가 여러 개면 반환한다. */
+  referenceAmbiguous: 'reference_ambiguous',
+} as const;
+/** 조회 투영이 추가하는 고정 진단 문구다. */
+export const queryDiagnosticMessages = {
+  invalidInput: '조회 입력이 올바르지 않습니다.',
+  notFound: '요청한 ID의 문서가 없습니다.',
+  referenceNotFound: '참조 이름에 해당하는 문서가 없습니다.',
+  referenceAmbiguous: '참조 이름에 해당하는 문서가 여러 개입니다.',
+  referenceTargetMissingId: '확정 참조 대상에 ID가 없습니다.',
+  referenceTargetInvalidId: '확정 참조 대상의 ID가 올바르지 않습니다.',
+  referenceTargetDuplicateId: '확정 참조 대상의 ID가 중복되었습니다.',
+} as const;
+/** 상수에서 도출한 조회 진단 코드다. */
+export type QueryDiagnosticCode =
+  (typeof queryDiagnosticCodes)[keyof typeof queryDiagnosticCodes];
 /** core의 파서·스키마 검증·참조 문법·색인이 반환하는 진단 코드다. */
 export type DiagnosticCode =
   | YamlDiagnosticCode
   | SchemaDiagnosticCode
   | ReferenceDiagnosticCode
-  | CatalogDiagnosticCode;
+  | CatalogDiagnosticCode
+  | QueryDiagnosticCode;
 /** 오류와 경고를 구분하는 공통 심각도다. */
 export type DiagnosticSeverity = 'error' | 'warning';
 /** 시작 포함·끝 제외인 0 기반 UTF-16 원문 범위다. */
