@@ -13,6 +13,7 @@
 | [paths](src/paths/index.ts)             | `resolveWorkspacePath`, 링크 범위와 접근 정책 | loader, 후속 writer        |
 | [loader](src/loader/index.ts)           | `loadWorkspace`, 문서·실패·순환 스캔 결과     | indexing, 후속 MCP/LSP     |
 | [indexing](src/indexing/index.ts)       | `toCatalogScan`, `buildWorkspaceCatalog`      | 후속 검색·참조·rename 기능 |
+| [query](src/query/index.ts)             | 실제 scan 기반 list/get/refresh 조회 세션     | 후속 MCP 조회 어댑터       |
 
 ## 호출 흐름
 
@@ -28,6 +29,8 @@ toCatalogScan
 core.buildCatalog
        ↓
 Catalog
+       ↓
+WorkspaceQuerySession.list/get
 ```
 
 경로는 프로젝트 상대 발견 경로, 논리 절대 경로와 확인한 실제 경로를 구분한다. 같은 실제 파일에 여러 논리 경로로 도달하면 경로별 문서로 유지한다. ID나 실제 경로를 기준으로 자동 병합하지 않는다.
@@ -39,6 +42,10 @@ Catalog
 - `failed`: 프로젝트 루트 또는 `.codocs` 자체를 탐색할 수 없다.
 
 `partial`의 미관측 경로는 삭제 증거가 아니다. indexing은 이전 문서를 `unconfirmed`로 보존한다. `failed`도 이전 색인을 버리지 않는다.
+
+`createWorkspaceQuerySession`은 list/get마다 실제 파일을 다시 읽고 이전 Catalog와 revision을 연결한다. list는 ID 오름차순으로 50개씩 반환하며, 자체 포함 HMAC 커서는 같은 process와 필터·목록 projection에서만 유효하다. 본문만 바뀌면 커서를 유지하지만 표시 값·오류·충돌·포함 여부가 바뀌거나 `refresh()`를 호출하면 `cursor_expired`로 거부한다.
+
+partial의 이전 문서는 마지막 원문 revision과 `unconfirmed` 진단을 유지한다. 색인 밖 ID도 확정 `not_found`로 바꾸지 않는다. failed 조회는 원인을 `success:false`로 반환하고 내부에 보존한 이전 문서를 노출하지 않는다.
 
 경로 결과의 `access.read/write`는 Codocs가 허용한 범위만 뜻한다. OS 권한과 저장 시점의 링크 상태는 writer가 다시 확인해야 한다.
 
