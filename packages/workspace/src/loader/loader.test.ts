@@ -1,3 +1,4 @@
+import { parseYaml, scanStatuses, validateDocument } from '@codocs/core';
 import {
   chmod,
   link,
@@ -11,9 +12,9 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { parseYaml, validateDocument } from '@codocs/core';
 import { workspaceDiagnosticCodes } from '../diagnostics/index.js';
 import { loadWorkspace, resolveWorkspacePath } from '../index.js';
+import { workspaceDocumentStatuses } from './domain-values.js';
 
 let fixture: string;
 let project: string;
@@ -138,7 +139,8 @@ describe('경로별 workspace 문서 로더', /** 실제 IO의 경로와 스캔 
         /** 연결 종류를 비교한다. */ (item) => item.scope.kind,
       ),
     ).toEqual(['linkedFile', 'linkedDirectory']);
-    if (result.status === 'failed') throw new Error('정상 루트가 필요하다');
+    if (result.status === scanStatuses.failed)
+      throw new Error('정상 루트가 필요하다');
     for (const item of result.documents)
       expect(
         await resolveWorkspacePath(result.root, item.source.path),
@@ -219,7 +221,8 @@ describe('경로별 workspace 문서 로더', /** 실제 IO의 경로와 스캔 
       result.documents[1]?.source.realPath,
     );
     for (const item of result.documents) {
-      if (item.status !== 'valid') throw new Error('유효 문서가 필요하다');
+      if (item.status !== workspaceDocumentStatuses.valid)
+        throw new Error('유효 문서가 필요하다');
       expect(item.data.id).toBe('shared-term');
     }
   });
@@ -246,7 +249,8 @@ describe('경로별 workspace 문서 로더', /** 실제 IO의 경로와 스캔 
     expect(result.status).toBe('complete');
     expect(result.failures).toEqual([]);
     const invalid = result.documents.find(
-      /** 파싱 오류 파일을 선택한다. */ (item) => item.status === 'parseError',
+      /** 파싱 오류 파일을 선택한다. */ (item) =>
+        item.status === workspaceDocumentStatuses.parseError,
     );
     expect(invalid).toMatchObject({ raw: broken, status: 'parseError' });
     expect(invalid).not.toHaveProperty('data');
@@ -260,7 +264,7 @@ describe('경로별 workspace 문서 로더', /** 실제 IO의 경로와 스캔 
     );
     const absent = result.documents.find(
       /** 스키마 오류 파일을 선택한다. */ (item) =>
-        item.status === 'validationError',
+        item.status === workspaceDocumentStatuses.validationError,
     );
     expect(absent).toMatchObject({ raw: missing });
     expect(absent).not.toHaveProperty('data');

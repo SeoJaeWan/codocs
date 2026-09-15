@@ -1,7 +1,7 @@
 import {
   chmod,
-  mkdtemp,
   mkdir,
+  mkdtemp,
   realpath,
   rm,
   symlink,
@@ -11,14 +11,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  workspaceDiagnosticCodes,
+  workspaceDiagnosticMessages,
+} from '../diagnostics/index.js';
+import {
   resolveProjectRoot,
   resolveWorkspacePath,
   type WorkspacePathResult,
 } from '../index.js';
-import {
-  workspaceDiagnosticCodes,
-  workspaceDiagnosticMessages,
-} from '../diagnostics/index.js';
 
 let fixture: string;
 let project: string;

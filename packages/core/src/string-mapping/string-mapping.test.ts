@@ -5,6 +5,7 @@ import {
   getStringRange,
   parseYaml,
 } from '../index.js';
+import { referenceSyntaxStatuses } from '../references/domain-values.js';
 
 describe('해석 문자열의 실제 YAML 원문 매핑', /** 해석 offset을 원문에 단순 가산하지 않고 실제 토큰 구간을 확인한다. */ () => {
   it.each([
@@ -178,7 +179,8 @@ describe('해석 문자열의 실제 YAML 원문 매핑', /** 해석 offset을 �
       if (body.includes('이름'))
         expect(
           extractReferences(parsed).occurrences.map(
-            (item) => item.syntax === 'valid' && item.name,
+            (item) =>
+              item.syntax === referenceSyntaxStatuses.valid && item.name,
           ),
         ).toEqual(['이름']);
     },

@@ -6,15 +6,22 @@
 
 ## 기능과 사용처
 
-| 기능                                          | 제공 값                                              | 이 기능을 사용하는 곳                               |
-| --------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------- |
-| [diagnostics](src/diagnostics/index.ts)       | 공통 진단 코드·문구·위치 타입                        | core의 모든 기능, `workspace/diagnostics`           |
-| [parser](src/parser/index.ts)                 | `parseYaml`, 필드·문자열 범위 조회, offset 좌표 변환 | workspace loader, validator, references, catalog    |
-| [string-mapping](src/string-mapping/index.ts) | 해석 문자열과 YAML 원문 위치 연결                    | parser 내부의 `parseYaml`                           |
-| [validator](src/validator/index.ts)           | `validateDocument`, `Document`, `JsonValue`          | workspace loader, catalog                           |
-| [references](src/references/index.ts)         | `extractReferences`, 참조 등장·문법 진단             | catalog                                             |
-| [catalog](src/catalog/index.ts)               | `buildCatalog`, `resolveReference`, `planRename`     | workspace indexing, 후속 LSP/MCP/UI와 rename writer |
-| [query](src/query/index.ts)                   | `projectCatalogList`, `projectCatalogGet`            | workspace 조회 세션, 후속 MCP 어댑터                |
+| 기능·진입 파일                                | 역할                                                                     | 주요 제공 값                                         | 사용하는 곳                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------- | --------------------------------------------------- |
+| [diagnostics](src/diagnostics/index.ts)       | 공통 진단의 코드·문구·심각도와 원문 좌표 계약을 정의한다.                | 공통 진단 코드·문구·위치 타입                        | core의 모든 기능, `workspace/diagnostics`           |
+| [parser](src/parser/index.ts)                 | YAML 원문을 읽어 구조와 진단을 만들고 필드의 원문 위치를 찾는다.         | `parseYaml`, 필드·문자열 범위 조회, offset 좌표 변환 | workspace loader, validator, references, catalog    |
+| [string-mapping](src/string-mapping/index.ts) | YAML escape·줄 접기를 해석한 문자열을 원문 위치에 대응시킨다.            | 해석 문자열과 YAML 원문 위치 연결                    | parser 내부의 `parseYaml`                           |
+| [validator](src/validator/index.ts)           | 외부 문서의 구조와 값을 검증하고 원래 사용자 데이터를 보존한다.          | `validateDocument`, `Document`, `JsonValue`          | workspace loader, catalog                           |
+| [references](src/references/index.ts)         | 본문과 예시에서 이름 참조의 등장 위치와 문법 오류를 추출한다.            | `extractReferences`, 참조 등장·문법 진단             | catalog                                             |
+| [catalog](src/catalog/index.ts)               | 경로별 문서를 색인하고 참조 대상·충돌과 이름 변경 수정안을 계산한다.     | `buildCatalog`, `resolveReference`, `planRename`     | workspace indexing, 후속 LSP/MCP/UI와 rename writer |
+| [query](src/query/index.ts)                   | Catalog를 목록·상세 조회 결과로 변환하고 ID 충돌과 참조 진단을 구성한다. | `projectCatalogList`, `projectCatalogGet`            | workspace 조회 세션, 후속 MCP 어댑터                |
+
+## 파일별 역할
+
+- `src/index.ts`: 외부에 제공할 API와 타입을 패키지 루트에서 재내보낸다.
+- `src/기능/index.ts`: 위 표의 기능을 구현하고 관련 타입을 정의한다.
+- `src/기능/domain-values.ts`: 해당 기능의 상태·사유 값을 설명 있는 상수로 정의하고 타입을 도출한다. 문서 필드는 validator의 스키마 원본에서 도출한다.
+- `src/기능/*.test.ts`: 입력·출력·분기·경계 조건을 검증하는 실행 가능한 예시다.
 
 ## 호출 흐름
 

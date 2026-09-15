@@ -1,3 +1,4 @@
+import { catalogDiagnosticCodes, queryDiagnosticCodes } from '@codocs/core';
 import { createHash } from 'node:crypto';
 import {
   mkdir,
@@ -9,7 +10,6 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryDiagnosticCodes } from '@codocs/core';
 import {
   createWorkspaceQuerySession,
   workspaceQueryDiagnosticCodes,
@@ -102,7 +102,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     expect(
       alpha.diagnostics.some(
         /** 미확인 최신성 진단을 확인한다. */ (diagnostic) =>
-          diagnostic.code === 'unconfirmed_reference',
+          diagnostic.code === catalogDiagnosticCodes.unconfirmedReference,
       ),
     ).toBe(true);
     expect(partial.results[1]).toMatchObject({

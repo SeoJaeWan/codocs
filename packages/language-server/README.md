@@ -7,3 +7,7 @@ LSP 요청/응답을 workspace/core로 연결할 어댑터다. 허용 의존성�
 IDE target은 node20.19다. VS Code 1.100.0의 [고정 Node 설정](https://github.com/microsoft/vscode/blob/1.100.0/.nvmrc)이 20.19.0이므로 문법 하한 후보로 선택했다. 공유 TypeScript는 ES2022/NodeNext이며 types: []로 호스트 전역 타입을 자동 추가하지 않는다. 현재 소스에는 Node 런타임 API가 없다. target은 API를 polyfill하지 않으며 Node 20 및 VS Code 1.100.0의 실제 호환성을 검증한 결과가 아니다.
 
 기능과 test는 `src/기능/`에 함께 둔다. build에서 test/spec를 제외한다. 실제 CJS require/ESM import, d.ts 소비자와 의도적 tsc 오류 대비 독립 esbuild 성공을 시험한다. 서버 bundle/map은 vscode의 `dist/server/`에도 배치된다. 시험한 환경은 Windows x64 / Node 24.21.0 / pnpm 10.34.5다. 실제 LSP 연결/IDE 기능 및 npm 단독 설치 시험은 없다.
+
+## 현재 파일 역할
+
+`src/index.ts`는 후속 연동을 위한 패키지 진입점이다. 현재 빈 모듈이며 실제 LSP 요청 연결은 구현하지 않았다.

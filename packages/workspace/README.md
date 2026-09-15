@@ -6,14 +6,21 @@
 
 ## 기능과 사용처
 
-| 기능                                      | 제공 값                                       | 이 기능을 사용하는 곳       |
-| ----------------------------------------- | --------------------------------------------- | --------------------------- |
-| [diagnostics](src/diagnostics/index.ts)   | workspace 진단과 IO 코드 추출                 | project-root, paths, loader |
-| [project-root](src/project-root/index.ts) | `resolveProjectRoot`, 선택 루트 모델          | paths, loader               |
-| [paths](src/paths/index.ts)               | `resolveWorkspacePath`, 링크 범위와 접근 정책 | loader, 후속 writer         |
-| [loader](src/loader/index.ts)             | `loadWorkspace`, 문서·실패·순환 스캔 결과     | indexing, 후속 MCP/LSP      |
-| [indexing](src/indexing/index.ts)         | `toCatalogScan`, `buildWorkspaceCatalog`      | 후속 검색·참조·rename 기능  |
-| [query](src/query/index.ts)               | 실제 scan 기반 list/get/refresh 조회 세션     | 후속 MCP 조회 어댑터        |
+| 기능·진입 파일                            | 역할                                                                    | 주요 제공 값                                  | 사용하는 곳                       |
+| ----------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------- | --------------------------------- |
+| [diagnostics](src/diagnostics/index.ts)   | 경로·파일 IO 실패를 일관된 진단으로 만들고 실제 시스템 코드를 보존한다. | workspace 진단과 IO 코드 추출                 | project-root, paths, loader       |
+| [project-root](src/project-root/index.ts) | 입력으로 프로젝트 루트와 지식 폴더 위치를 확정한다.                     | `resolveProjectRoot`, 선택 루트 모델          | paths, loader                     |
+| [paths](src/paths/index.ts)               | 논리 경로와 링크의 실제 대상을 확인하고 허용된 접근 범위를 판단한다.    | `resolveWorkspacePath`, 링크 범위와 접근 정책 | loader, 후속 writer               |
+| [loader](src/loader/index.ts)             | 지식 폴더를 탐색하고 원문을 읽어 문서 결과와 읽기 실패 범위를 구분한다. | `loadWorkspace`, 문서·실패·순환 스캔 결과     | indexing, 후속 MCP/LSP            |
+| [indexing](src/indexing/index.ts)         | 스캔 관측을 core 색인 입력으로 변환하고 이전 관측과 연결한다.           | `toCatalogScan`, `buildWorkspaceCatalog`      | workspace query, 참조·rename 처리 |
+| [query](src/query/index.ts)               | 조회마다 스캔·색인을 갱신하고 revision·페이지·커서 수명을 관리한다.     | 실제 scan 기반 list/get/refresh 조회 세션     | MCP 조회 어댑터                   |
+
+## 파일별 역할
+
+- `src/index.ts`: 외부에 제공할 API와 타입을 패키지 루트에서 재내보낸다.
+- `src/기능/index.ts`: 위 표의 기능을 구현하고 관련 타입을 정의한다.
+- `src/기능/domain-values.ts`: 해당 기능의 상태·사유 값을 설명 있는 상수로 정의하고 타입을 도출한다. 문서 필드는 validator의 스키마 원본에서 도출한다.
+- `src/기능/*.test.ts`: 입력·출력·분기·경계 조건을 검증하는 실행 가능한 예시다.
 
 ## 호출 흐름
 
@@ -65,7 +72,7 @@ partial의 이전 문서는 마지막 원문 revision과 `unconfirmed` 진단을
 pnpm exec vitest run packages/workspace/src
 pnpm typecheck
 pnpm lint
-pnpm exec vitest run tools/build-checks -t workspace
+pnpm check:build
 ```
 
 build 검사는 실제 tarball의 공개 루트로 loader와 선언 파일을 소비하고 내부 subpath 접근을 거부하는지 확인한다.

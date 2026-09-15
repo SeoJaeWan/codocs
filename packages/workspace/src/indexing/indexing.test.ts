@@ -1,4 +1,11 @@
 import {
+  catalogDiagnosticCodes,
+  catalogFailureKinds,
+  resolveReference,
+  scanStatuses,
+  type Document,
+} from '@codocs/core';
+import {
   link,
   mkdir,
   mkdtemp,
@@ -13,14 +20,9 @@ import {
   beforeEach,
   describe,
   expect,
-  it,
   expectTypeOf,
+  it,
 } from 'vitest';
-import {
-  catalogDiagnosticCodes,
-  resolveReference,
-  type Document,
-} from '@codocs/core';
 import {
   buildWorkspaceCatalog,
   loadWorkspace,
@@ -29,6 +31,8 @@ import {
   workspaceDiagnosticMessages,
   type WorkspaceScanResult,
 } from '../index.js';
+import { workspaceDocumentStatuses } from '../loader/domain-values.js';
+import { workspaceTargetKinds } from '../paths/domain-values.js';
 
 let project: string;
 beforeEach(
@@ -68,7 +72,8 @@ async function scan(): Promise<
   Extract<WorkspaceScanResult, { status: 'complete' | 'partial' }>
 > {
   const result = await loadWorkspace({ cwd: project });
-  if (result.status === 'failed') throw new Error('실제 fixture 스캔 실패');
+  if (result.status === scanStatuses.failed)
+    throw new Error('실제 fixture 스캔 실패');
   return result;
 }
 
@@ -80,18 +85,22 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     await file('invalid.yaml', raw);
     await file('parse.yaml', 'name: [\n');
     const result = await scan();
-    const valid = result.documents.find((d) => d.status === 'valid');
-    const invalid = result.documents.find(
-      (d) => d.status === 'validationError',
+    const valid = result.documents.find(
+      (d) => d.status === workspaceDocumentStatuses.valid,
     );
-    const failed = result.documents.find((d) => d.status === 'parseError');
+    const invalid = result.documents.find(
+      (d) => d.status === workspaceDocumentStatuses.validationError,
+    );
+    const failed = result.documents.find(
+      (d) => d.status === workspaceDocumentStatuses.parseError,
+    );
     if (
       !valid ||
-      valid.status !== 'valid' ||
+      valid.status !== workspaceDocumentStatuses.valid ||
       !invalid ||
-      invalid.status !== 'validationError' ||
+      invalid.status !== workspaceDocumentStatuses.validationError ||
       !failed ||
-      failed.status !== 'parseError'
+      failed.status !== workspaceDocumentStatuses.parseError
     )
       throw new Error('상태별 fixture 없음');
     expectTypeOf(valid.data).toEqualTypeOf<Document>();
@@ -299,14 +308,18 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     ];
     const partial: WorkspaceScanResult = {
       ...initial,
-      status: 'partial',
+      status: scanStatuses.partial,
       documents: initial.documents.filter(
         (d) => d.source.path === discovered('a.yaml'),
       ),
       failures: [
-        { kind: 'directory', path: '.codocs', diagnostics },
-        { kind: 'file', path: discovered('b.yaml'), diagnostics },
-        { kind: 'unknown', diagnostics },
+        { kind: workspaceTargetKinds.directory, path: '.codocs', diagnostics },
+        {
+          kind: workspaceTargetKinds.file,
+          path: discovered('b.yaml'),
+          diagnostics,
+        },
+        { kind: catalogFailureKinds.unknown, diagnostics },
       ],
     };
     expect(toCatalogScan(partial).failures).toEqual([
@@ -329,7 +342,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
       'unconfirmed',
     );
     const failed = buildWorkspaceCatalog(
-      { ...partial, status: 'failed', documents: initial.documents },
+      { ...partial, status: scanStatuses.failed, documents: initial.documents },
       updated,
     );
     expect(failed.status).toBe('failed');
@@ -353,8 +366,14 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     const result = await scan();
     const input: WorkspaceScanResult = {
       ...result,
-      status: 'failed',
-      failures: [{ kind: 'directory', logicalPath: project, diagnostics: [] }],
+      status: scanStatuses.failed,
+      failures: [
+        {
+          kind: workspaceTargetKinds.directory,
+          logicalPath: project,
+          diagnostics: [],
+        },
+      ],
     };
     expect(toCatalogScan(input).failures).toEqual([
       { kind: 'unknown', diagnostics: [] },

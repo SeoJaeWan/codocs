@@ -9,8 +9,8 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import path from 'node:path';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bundleIde } from '../build/build.mjs';
 import {

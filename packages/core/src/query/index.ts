@@ -1,31 +1,46 @@
+import { referenceResolutionStatuses } from '../catalog/domain-values.js';
 import type {
   Catalog,
   CatalogDocument,
   CatalogIdentity,
   CatalogOccurrence,
 } from '../catalog/index.js';
-import {
-  catalogDiagnosticCodes,
-  catalogDiagnosticMessages,
-  queryDiagnosticCodes,
-  queryDiagnosticMessages,
-} from '../diagnostics/index.js';
+import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import type {
   Diagnostic,
   DiagnosticCode,
   OffsetRange,
 } from '../diagnostics/index.js';
+import {
+  catalogDiagnosticCodes,
+  catalogDiagnosticMessages,
+  queryDiagnosticCodes,
+  queryDiagnosticMessages,
+  referenceDiagnosticCodes,
+} from '../diagnostics/index.js';
+import {
+  documentKinds,
+  documentStatuses,
+  type DocumentKind,
+  type DocumentStatus,
+} from '../validator/domain-values.js';
 import type { JsonValue } from '../validator/index.js';
+import { documentFields, type DocumentField } from '../validator/index.js';
+import {
+  referenceIdFailureReasons,
+  type ReferenceIdFailureReason,
+} from './domain-values.js';
+export * from './domain-values.js';
 
 const validId = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
-const kinds = ['policy', 'procedure', 'decision', 'discussion'] as const;
-const statuses = ['proposed', 'confirmed', 'deprecated'] as const;
+const kinds = Object.values(documentKinds);
+const statuses = Object.values(documentStatuses);
 
 /** 목록에서 한 문서가 만족해야 하는 AND 조건이다. */
 export interface CatalogListFilters {
   domain?: string;
-  kind?: (typeof kinds)[number];
-  status?: (typeof statuses)[number];
+  kind?: DocumentKind;
+  status?: DocumentStatus;
 }
 
 /** 목록에 표시할 수 있는 유일 ID 문서다. */
@@ -35,8 +50,8 @@ export interface CatalogListDocumentItem {
   source: { path: string };
   confirmation: CatalogIdentity['confirmation'];
   domains?: readonly string[];
-  kind?: (typeof kinds)[number];
-  status?: (typeof statuses)[number];
+  kind?: DocumentKind;
+  status?: DocumentStatus;
   hasErrors: boolean;
   conflict: false;
 }
@@ -59,8 +74,6 @@ export interface CatalogListProjection {
 }
 
 /** 외부 참조 ID를 만들지 못한 이유다. */
-export type ReferenceIdFailureReason =
-  'missing_id' | 'invalid_id' | 'duplicate_id';
 
 /** Catalog 진단을 조회 결과에 필요한 관련 경로와 원인까지 확장한다. */
 export interface CatalogQueryDiagnostic extends Diagnostic<DiagnosticCode> {
@@ -136,11 +149,11 @@ function ownValue(value: unknown, key: string | number): unknown {
 }
 
 /** 특정 최상위 속성에 오류가 없을 때만 목록 메타데이터로 사용한다. */
-function validField(document: CatalogDocument, key: string): boolean {
+function validField(document: CatalogDocument, key: DocumentField): boolean {
   return !document.documentDiagnostics.some(
     /** 스키마 오류만 목록 메타데이터의 유효성을 막는다. */
     (diagnostic) =>
-      diagnostic.severity === 'error' &&
+      diagnostic.severity === diagnosticSeverities.error &&
       diagnostic.fieldPath?.[0] === key &&
       diagnostic.code !== catalogDiagnosticCodes.duplicateId &&
       diagnostic.code !== catalogDiagnosticCodes.duplicateName,
@@ -152,11 +165,11 @@ function idFailure(
   catalog: Catalog,
   document: CatalogDocument,
 ): ReferenceIdFailureReason | undefined {
-  if (document.id === undefined) return 'missing_id';
-  if (!validId.test(document.id) || !validField(document, 'id'))
-    return 'invalid_id';
+  if (document.id === undefined) return referenceIdFailureReasons.missingId;
+  if (!validId.test(document.id) || !validField(document, documentFields.id))
+    return referenceIdFailureReasons.invalidId;
   if ((catalog.idPaths.get(document.id)?.size ?? 0) !== 1)
-    return 'duplicate_id';
+    return referenceIdFailureReasons.duplicateId;
   return undefined;
 }
 
@@ -165,9 +178,9 @@ function listIdentity(document: CatalogDocument): boolean {
   return (
     document.id !== undefined &&
     validId.test(document.id) &&
-    validField(document, 'id') &&
+    validField(document, documentFields.id) &&
     document.name !== undefined &&
-    validField(document, 'name')
+    validField(document, documentFields.name)
   );
 }
 
@@ -175,9 +188,9 @@ function listIdentity(document: CatalogDocument): boolean {
 function documentDomains(
   document: CatalogDocument,
 ): readonly string[] | undefined {
-  if (!validField(document, 'domains')) return undefined;
+  if (!validField(document, documentFields.domains)) return undefined;
   const value = document.observation.parsed.success
-    ? ownValue(document.observation.parsed.data, 'domains')
+    ? ownValue(document.observation.parsed.data, documentFields.domains)
     : undefined;
   if (
     !Array.isArray(value) ||
@@ -193,7 +206,7 @@ function documentDomains(
 /** 작성된 선택 열거 속성이 유효할 때만 반환한다. */
 function documentEnum<const Values extends readonly string[]>(
   document: CatalogDocument,
-  key: 'kind' | 'status',
+  key: typeof documentFields.kind | typeof documentFields.status,
   values: Values,
 ): Values[number] | undefined {
   if (!validField(document, key) || !document.observation.parsed.success)
@@ -210,8 +223,8 @@ function matchesFilters(
   filters: CatalogListFilters,
 ): boolean {
   const domains = documentDomains(document);
-  const kind = documentEnum(document, 'kind', kinds);
-  const status = documentEnum(document, 'status', statuses);
+  const kind = documentEnum(document, documentFields.kind, kinds);
+  const status = documentEnum(document, documentFields.status, statuses);
   return (
     (filters.domain === undefined ||
       domains?.includes(filters.domain) === true) &&
@@ -249,8 +262,8 @@ export function projectCatalogList(
     const document = matching[0];
     if (!document?.name) continue;
     const domains = documentDomains(document);
-    const kind = documentEnum(document, 'kind', kinds);
-    const status = documentEnum(document, 'status', statuses);
+    const kind = documentEnum(document, documentFields.kind, kinds);
+    const status = documentEnum(document, documentFields.status, statuses);
     items.push({
       id,
       name: document.name,
@@ -260,7 +273,7 @@ export function projectCatalogList(
       ...(kind ? { kind } : {}),
       ...(status ? { status } : {}),
       hasErrors: document.diagnostics.some(
-        (diagnostic) => diagnostic.severity === 'error',
+        (diagnostic) => diagnostic.severity === diagnosticSeverities.error,
       ),
       conflict: false,
     });
@@ -338,16 +351,18 @@ function referenceIdDiagnostic(
     'fieldPath' | 'range' | 'offsetRange'
   >,
 ): CatalogQueryDiagnostic {
-  const message =
-    reason === 'missing_id'
-      ? queryDiagnosticMessages.referenceTargetMissingId
-      : reason === 'invalid_id'
-        ? queryDiagnosticMessages.referenceTargetInvalidId
-        : queryDiagnosticMessages.referenceTargetDuplicateId;
+  const messages = {
+    [referenceIdFailureReasons.missingId]:
+      queryDiagnosticMessages.referenceTargetMissingId,
+    [referenceIdFailureReasons.invalidId]:
+      queryDiagnosticMessages.referenceTargetInvalidId,
+    [referenceIdFailureReasons.duplicateId]:
+      queryDiagnosticMessages.referenceTargetDuplicateId,
+  } satisfies Record<ReferenceIdFailureReason, string>;
   return {
     code: catalogDiagnosticCodes.referenceTargetError,
-    severity: 'warning',
-    message,
+    severity: diagnosticSeverities.warning,
+    message: messages[reason],
     path,
     relatedPaths: [relatedPath],
     reason,
@@ -384,41 +399,44 @@ function queryDiagnostics(
   for (const item of document.occurrences) {
     const metadata = occurrenceMetadata(document.path, item);
     const resolution = item.resolution;
-    if (resolution.status === 'missing')
+    if (resolution.status === referenceResolutionStatuses.missing)
       diagnostics.push({
         code: queryDiagnosticCodes.referenceNotFound,
-        severity: 'error',
+        severity: diagnosticSeverities.error,
         message: queryDiagnosticMessages.referenceNotFound,
         ...metadata,
       });
-    else if (resolution.status === 'ambiguous')
+    else if (resolution.status === referenceResolutionStatuses.ambiguous)
       diagnostics.push({
         code: queryDiagnosticCodes.referenceAmbiguous,
-        severity: 'error',
+        severity: diagnosticSeverities.error,
         message: queryDiagnosticMessages.referenceAmbiguous,
         relatedPaths: resolution.candidates
           .map((candidate) => candidate.path)
           .sort(),
         ...metadata,
       });
-    else if (resolution.status === 'self')
+    else if (resolution.status === referenceResolutionStatuses.self)
       diagnostics.push({
-        code: 'invalid_reference',
-        severity: 'error',
+        code: referenceDiagnosticCodes.invalidReference,
+        severity: diagnosticSeverities.error,
         message: catalogDiagnosticMessages.selfReference,
         ...metadata,
       });
-    else if (resolution.status === 'unconfirmed')
+    else if (resolution.status === referenceResolutionStatuses.unconfirmed)
       diagnostics.push({
         code: catalogDiagnosticCodes.unconfirmedReference,
-        severity: 'warning',
+        severity: diagnosticSeverities.warning,
         message: catalogDiagnosticMessages.unconfirmedReference,
         relatedPaths: resolution.candidates
           .map((candidate) => candidate.path)
           .sort(),
         ...metadata,
       });
-    else if (resolution.status === 'resolved' && resolution.target) {
+    else if (
+      resolution.status === referenceResolutionStatuses.resolved &&
+      resolution.target
+    ) {
       const target = catalog.documents.get(resolution.target.path);
       if (!target) continue;
       const reason = idFailure(catalog, target);
@@ -429,7 +447,7 @@ function queryDiagnostics(
       else if (resolution.target.errors.length)
         diagnostics.push({
           code: catalogDiagnosticCodes.referenceTargetError,
-          severity: 'warning',
+          severity: diagnosticSeverities.warning,
           message: catalogDiagnosticMessages.referenceTargetError,
           relatedPaths: [target.path],
           ...metadata,
@@ -619,7 +637,7 @@ export function projectCatalogGet(
       success: false,
       error: {
         code: queryDiagnosticCodes.invalidInput,
-        severity: 'error',
+        severity: diagnosticSeverities.error,
         message: queryDiagnosticMessages.invalidInput,
       },
     };
@@ -634,7 +652,7 @@ export function projectCatalogGet(
           diagnostics: [
             {
               code: queryDiagnosticCodes.notFound,
-              severity: 'error',
+              severity: diagnosticSeverities.error,
               message: queryDiagnosticMessages.notFound,
             },
           ],
@@ -648,7 +666,7 @@ export function projectCatalogGet(
           diagnostics: [
             {
               code: catalogDiagnosticCodes.duplicateId,
-              severity: 'error',
+              severity: diagnosticSeverities.error,
               message: catalogDiagnosticMessages.duplicateId,
               relatedPaths: paths,
             },
@@ -664,7 +682,7 @@ export function projectCatalogGet(
             diagnostics: [
               {
                 code: queryDiagnosticCodes.notFound,
-                severity: 'error',
+                severity: diagnosticSeverities.error,
                 message: queryDiagnosticMessages.notFound,
               },
             ],

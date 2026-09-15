@@ -1,3 +1,4 @@
+import domainValueRule from './domain-value-rule.mjs';
 import { existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
@@ -29,6 +30,7 @@ function packageOf(filename) {
 /** 내부 ESLint 규칙 플러그인이다. @type {import('eslint').ESLint.Plugin} */
 const plugin = {
   rules: {
+    'no-raw-domain-value': domainValueRule,
     'package-boundaries': {
       meta: {
         type: 'problem',

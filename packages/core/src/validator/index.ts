@@ -1,8 +1,5 @@
 import { z } from 'zod';
-import {
-  schemaDiagnosticCodes,
-  schemaDiagnosticMessages,
-} from '../diagnostics/index.js';
+import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import type {
   Diagnostic,
   FieldPath,
@@ -10,8 +7,19 @@ import type {
   SchemaDiagnosticCode,
   SourceRange,
 } from '../diagnostics/index.js';
-import { offsetToPosition } from '../parser/index.js';
+import {
+  schemaDiagnosticCodes,
+  schemaDiagnosticMessages,
+} from '../diagnostics/index.js';
 import type { FieldRanges } from '../parser/index.js';
+import { offsetToPosition } from '../parser/index.js';
+import {
+  documentKinds,
+  documentStatuses,
+  type DocumentKind,
+  type DocumentStatus,
+} from './domain-values.js';
+export * from './domain-values.js';
 
 /** 사용자 속성이 보존할 수 있는 재귀 JSON 값이다. 숫자는 유한해야 한다. */
 export type JsonValue =
@@ -145,10 +153,33 @@ const documentStructure = z
     domains: z.array(nonblank).min(1),
     examples: z.array(nonblank).optional(),
     deprecatedAliases: z.array(deprecatedAlias).optional(),
-    kind: z.enum(['policy', 'procedure', 'decision', 'discussion']).optional(),
-    status: z.enum(['proposed', 'confirmed', 'deprecated']).optional(),
+    kind: z.enum(documentKinds).optional(),
+    status: z.enum(documentStatuses).optional(),
   })
   .catchall(userValue);
+
+/** 스키마 원본에서 도출한 문서 필드 이름이다. @domainValues */
+export const documentFields = {
+  /** 외부 조회에 사용하는 문서 식별자다. */
+  id: documentStructure.keyof().enum.id,
+  /** 이름 참조에서 사용하는 문서 이름이다. */
+  name: documentStructure.keyof().enum.name,
+  /** 문서의 주된 설명이며 참조를 추출한다. */
+  definition: documentStructure.keyof().enum.definition,
+  /** 문서가 속하는 도메인 이름 목록이다. */
+  domains: documentStructure.keyof().enum.domains,
+  /** 참조를 추출하는 예시 문자열 목록이다. */
+  examples: documentStructure.keyof().enum.examples,
+  /** 이전 이름과 전환 안내다. */
+  deprecatedAliases: documentStructure.keyof().enum.deprecatedAliases,
+  /** 문서 내용의 종류다. */
+  kind: documentStructure.keyof().enum.kind,
+  /** 문서 내용의 합의 상태다. */
+  status: documentStructure.keyof().enum.status,
+} satisfies Record<keyof typeof documentStructure.shape, string>;
+/** 스키마에서 도출한 문서 필드 이름이다. */
+export type DocumentField =
+  (typeof documentFields)[keyof typeof documentFields];
 
 /** Zod로 구조·JSON을 검사하면서 원래 값과 모든 사용자 키를 그대로 반환한다. */
 function preservingSchema<Schema extends z.ZodType>(
@@ -255,7 +286,10 @@ function diagnostic(
   const range = diagnosticRange(input, fieldPath, code);
   return {
     code,
-    severity: code === schemaDiagnosticCodes.unknownField ? 'warning' : 'error',
+    severity:
+      code === schemaDiagnosticCodes.unknownField
+        ? diagnosticSeverities.warning
+        : diagnosticSeverities.error,
     message,
     fieldPath: [...fieldPath],
     ...(input.path !== undefined ? { path: input.path } : {}),
@@ -345,4 +379,19 @@ export function validateDocument(
       ),
   );
   return { success: false, errors, warnings };
+}
+
+/** 문서 종류 원본 정의로 외부 값을 확인한다. */
+export function isDocumentKind(value: unknown): value is DocumentKind {
+  return (
+    typeof value === 'string' &&
+    Object.values(documentKinds).some((item) => item === value)
+  );
+}
+/** 문서 상태 원본 정의로 외부 값을 확인한다. */
+export function isDocumentStatus(value: unknown): value is DocumentStatus {
+  return (
+    typeof value === 'string' &&
+    Object.values(documentStatuses).some((item) => item === value)
+  );
 }

@@ -2,8 +2,9 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveWorkspacePath } from '../paths/index.js';
 import { loadWorkspace } from '../index.js';
+import { workspaceTargetKinds } from '../paths/domain-values.js';
+import { resolveWorkspacePath } from '../paths/index.js';
 
 vi.mock(
   '../paths/index.js',
@@ -85,7 +86,7 @@ describe('폴더 조상 식별의 보조 회귀 검사', /** 다른 OS에서 실
         input,
       ) => {
         const target = await original.resolveWorkspacePath(root, input);
-        return target.success && target.kind === 'directory'
+        return target.success && target.kind === workspaceTargetKinds.directory
           ? { ...target, directoryIdentity: { device: 0n, inode: 0n } }
           : target;
       },

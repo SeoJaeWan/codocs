@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codocs/core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCodocsQueryHandlers } from './index.js';
 
 const backend = vi.hoisted(

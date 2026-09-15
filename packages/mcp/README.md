@@ -2,6 +2,14 @@
 
 MCP 조회 입력을 검증하고 workspace/core의 결과를 공통 success 응답으로 연결하는 전송 독립 어댑터다. 허용 의존성은 `@codocs/workspace`, `@codocs/core`의 공개 진입점이다. SDK, stdio 등록, guide/write/validate/refresh 도구와 실행 프로세스는 후속 범위다.
 
+## 기능과 파일 역할
+
+| 파일                      | 역할                                                             | 제공 값·사용처                                      |
+| ------------------------- | ---------------------------------------------------------------- | --------------------------------------------------- |
+| `src/index.ts`            | 전송 계층에 공개할 handler API를 재내보낸다.                     | 패키지 공개 진입점                                  |
+| `src/query/index.ts`      | 외부 입력의 속성과 값을 검증하고 workspace 조회 세션을 호출한다. | `createCodocsQueryHandlers`, 후속 MCP SDK 등록 계층 |
+| `src/query/query.test.ts` | 잘못된 입력의 차단과 handler 응답을 검증한다.                    | 전송 연결 전의 어댑터 계약 확인                     |
+
 `createCodocsQueryHandlers(workspaceInput)`은 한 workspace 조회 세션을 공유하는 `codocsList`와 `codocsGet`을 반환한다. 두 함수는 외부 값을 `unknown`으로 받아 own data property만 확인하고 getter나 prototype 값을 읽지 않는다. `refresh`는 같은 세션의 목록 cursor를 명시적으로 만료하는 lifecycle 함수이며 아직 `codocs_refresh` 도구 등록을 뜻하지 않는다.
 
 ```ts

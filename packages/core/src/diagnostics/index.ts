@@ -1,4 +1,6 @@
-/** YAML 파서가 반환하는 오류 코드와 발생 조건이다. */
+import { type DiagnosticSeverity } from './domain-values.js';
+export * from './domain-values.js';
+/** YAML 파서가 반환하는 오류 코드와 발생 조건이다. @domainValues */
 export const yamlDiagnosticCodes = {
   /** 입력이 문자열이 아니거나, YAML 문법 오류가 있거나, 최상위 값이 매핑이 아니면 반환한다. 빈 문서도 포함한다. */
   invalidYaml: 'invalid_yaml',
@@ -32,7 +34,7 @@ export const yamlDiagnosticMessages = {
   syntaxErrorPrefix: 'YAML 문법 오류: ',
 } as const;
 
-/** 문서 스키마 검증이 반환하는 진단 코드와 발생 조건이다. */
+/** 문서 스키마 검증이 반환하는 진단 코드와 발생 조건이다. @domainValues */
 export const schemaDiagnosticCodes = {
   /** 필수 속성이 입력에 없으면 반환한다. */
   missingRequiredField: 'missing_required_field',
@@ -69,7 +71,7 @@ export const schemaDiagnosticMessages = {
 /** 코드 정의에서 도출한 스키마 진단 코드 타입이다. */
 export type SchemaDiagnosticCode =
   (typeof schemaDiagnosticCodes)[keyof typeof schemaDiagnosticCodes];
-/** 본문 참조 문법의 진단 코드다. 이름·ID 의미 해석은 별도 계층이 담당한다. */
+/** 본문 참조 문법의 진단 코드다. 이름·ID 의미 해석은 별도 계층이 담당한다. @domainValues */
 export const referenceDiagnosticCodes = {
   /** 빈 이름·도메인, 잘못된 구성, 닫히지 않은 참조 또는 중첩 시작이면 반환한다. */
   invalidReference: 'invalid_reference',
@@ -82,7 +84,7 @@ export const referenceDiagnosticMessages = {
 /** 코드 상수에서 도출한 참조 문법 진단 코드다. */
 export type ReferenceDiagnosticCode =
   (typeof referenceDiagnosticCodes)[keyof typeof referenceDiagnosticCodes];
-/** 경로 색인·참조 의미 해석의 코드다. IO 실패 코드는 포함하지 않는다. */
+/** 경로 색인·참조 의미 해석의 코드다. IO 실패 코드는 포함하지 않는다. @domainValues */
 export const catalogDiagnosticCodes = {
   /** 문자열 ID가 여러 발견 경로에 존재하면 모든 경로에 반환한다. */
   duplicateId: 'duplicate_id',
@@ -112,7 +114,7 @@ export const catalogDiagnosticMessages = {
 /** 상수에서 도출한 색인 진단 코드다. */
 export type CatalogDiagnosticCode =
   (typeof catalogDiagnosticCodes)[keyof typeof catalogDiagnosticCodes];
-/** 조회 투영에서 외부 계약으로 정규화하는 진단 코드다. */
+/** 조회 투영에서 외부 계약으로 정규화하는 진단 코드다. @domainValues */
 export const queryDiagnosticCodes = {
   /** 전체 요청의 ID 배열이나 크기가 계약과 다르면 반환한다. */
   invalidInput: 'invalid_input',
@@ -144,7 +146,7 @@ export type DiagnosticCode =
   | CatalogDiagnosticCode
   | QueryDiagnosticCode;
 /** 오류와 경고를 구분하는 공통 심각도다. */
-export type DiagnosticSeverity = 'error' | 'warning';
+
 /** 시작 포함·끝 제외인 0 기반 UTF-16 원문 범위다. */
 export interface OffsetRange {
   start: number;

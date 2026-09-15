@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { scanStatuses } from '../catalog/domain-values.js';
+import type { Catalog, CatalogObservation } from '../index.js';
 import {
   buildCatalog,
   parseYaml,
@@ -6,7 +8,7 @@ import {
   projectCatalogList,
   queryDiagnosticCodes,
 } from '../index.js';
-import type { Catalog, CatalogObservation } from '../index.js';
+import { documentKinds, documentStatuses } from '../validator/domain-values.js';
 
 interface DocumentOptions {
   definition?: string;
@@ -39,7 +41,7 @@ function observation(
 
 /** 완전한 관측을 Catalog로 계산한다. */
 function complete(...observations: CatalogObservation[]): Catalog {
-  return buildCatalog({ status: 'complete', observations });
+  return buildCatalog({ status: scanStatuses.complete, observations });
 }
 
 /** 성공한 상세 결과를 좁힌다. */
@@ -96,8 +98,8 @@ describe('Catalog 목록 투영', /** 목록의 포함·정렬·충돌 계약을
     expect(
       projectCatalogList(catalog, {
         domain: '판매',
-        kind: 'policy',
-        status: 'confirmed',
+        kind: documentKinds.policy,
+        status: documentStatuses.confirmed,
       }).items.map((item) => item.id),
     ).toEqual(['match']);
   });
@@ -112,7 +114,9 @@ describe('Catalog 목록 투영', /** 목록의 포함·정렬·충돌 계약을
     const all = projectCatalogList(catalog).items[0];
     expect(all).toMatchObject({ id: 'bad', hasErrors: true });
     expect(all).not.toHaveProperty('kind');
-    expect(projectCatalogList(catalog, { kind: 'policy' }).items).toEqual([]);
+    expect(
+      projectCatalogList(catalog, { kind: documentKinds.policy }).items,
+    ).toEqual([]);
   });
 
   it('중복 ID는 필터를 한 파일에서 판정하고 모든 경로만 정렬해 집계한다', /** 대표 문서 없는 충돌 항목을 검증한다. */ () => {
@@ -128,7 +132,7 @@ describe('Catalog 목록 투영', /** 목록의 포함·정렬·충돌 계약을
     );
     const item = projectCatalogList(catalog, {
       domain: '판매',
-      kind: 'policy',
+      kind: documentKinds.policy,
     }).items[0];
     expect(item).toEqual({
       id: 'shared',

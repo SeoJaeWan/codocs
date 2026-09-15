@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import {
-  parseYaml,
-  schemaDiagnosticCodes,
-  schemaDiagnosticMessages,
-  validateDocument,
-} from '../index.js';
+import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import type {
   DocumentValidationResult,
   FieldPath,
   SchemaDiagnostic,
   SourcePosition,
   ValidateDocumentInput,
+} from '../index.js';
+import {
+  parseYaml,
+  schemaDiagnosticCodes,
+  schemaDiagnosticMessages,
+  validateDocument,
 } from '../index.js';
 
 const term = {
@@ -48,10 +49,16 @@ function validateUnchanged(
   const before = snapshot(input);
   const result = validateDocument(input);
   expect(input).toEqual(before);
-  expect(result.errors.every((issue) => issue.severity === 'error')).toBe(true);
-  expect(result.warnings.every((issue) => issue.severity === 'warning')).toBe(
-    true,
-  );
+  expect(
+    result.errors.every(
+      (issue) => issue.severity === diagnosticSeverities.error,
+    ),
+  ).toBe(true);
+  expect(
+    result.warnings.every(
+      (issue) => issue.severity === diagnosticSeverities.warning,
+    ),
+  ).toBe(true);
   if (!result.success) expect(result).not.toHaveProperty('data');
   return result;
 }

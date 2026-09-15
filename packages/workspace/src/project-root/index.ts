@@ -1,3 +1,5 @@
+/** 프로젝트 지식 파일을 찾는 논리 루트 이름이다. */
+export const codocsDirectoryName = '.codocs';
 import { constants } from 'node:fs';
 import { access, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -142,7 +144,7 @@ export async function resolveProjectRoot(
         startCwd,
         projectRoot,
         realPath,
-        codocsPath: path.join(projectRoot, '.codocs'),
+        codocsPath: path.join(projectRoot, codocsDirectoryName),
       },
       diagnostics: [],
     };

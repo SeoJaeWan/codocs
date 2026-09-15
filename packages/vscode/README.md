@@ -9,3 +9,7 @@ node20.19 target은 VS Code 1.100.0의 [고정 Node 설정](https://github.com/m
 가이드와 가상 예시는 `dist/docs/guide`, `dist/examples/.codocs`에 배치하고 package files에 dist를 포함한다. 사용자 문서 저장 시 전체 재포맷 동작은 없다. 기능과 test는 `src/기능/`에 함께 두며 build에서 test/spec를 제외한다.
 
 실제 CJS require/ESM import, 소스 없는 TS d.ts 소비자, vscode external 및 packed asset 포함을 시험했다. 시험 환경은 Windows x64 / Node 24.21.0 / pnpm 10.34.5다. 모듈 로드는 VSIX activation/IDE 기능 시험의 대체가 아니다. VSIX 배포와 npm 단독 설치·게시를 구성하거나 검증하지 않았다.
+
+## 현재 파일 역할
+
+`src/index.ts`는 후속 연동을 위한 패키지 진입점이다. 현재 빈 모듈이며 실제 VS Code activation과 명령 등록은 구현하지 않았다.

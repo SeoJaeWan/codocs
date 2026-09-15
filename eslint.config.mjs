@@ -75,6 +75,7 @@ export default defineConfig(
         { selector: 'import', format: ['camelCase', 'PascalCase'] },
       ],
       'codocs/package-boundaries': 'error',
+      'codocs/no-raw-domain-value': 'error',
       'codocs/korean-jsdoc': 'error',
       'jsdoc/require-jsdoc': [
         'error',

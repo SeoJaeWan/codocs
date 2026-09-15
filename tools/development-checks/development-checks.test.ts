@@ -1,17 +1,17 @@
+import { ESLint } from 'eslint';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   cpSync,
   mkdirSync,
   mkdtempSync,
-  rmSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
-import { ESLint } from 'eslint';
-import { afterAll, describe, expect, it } from 'vitest';
 import tseslint from 'typescript-eslint';
+import { afterAll, describe, expect, it } from 'vitest';
 import codocs from './eslint-rules.mjs';
 
 import { resolvePnpm } from '../check/runtime.mjs';

@@ -2,20 +2,30 @@ import { lstat, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   createWorkspaceDiagnostic,
+  getIoErrorCode,
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
-  getIoErrorCode,
   type WorkspaceDiagnostic,
 } from '../diagnostics/index.js';
 import {
+  codocsDirectoryName,
   isPathString,
   resolveProjectRoot,
   type ProjectRoot,
 } from '../project-root/index.js';
+import {
+  workspacePathFailureStatuses,
+  workspaceScopeKinds,
+  workspaceTargetKinds,
+  type WorkspacePathFailureStatus,
+  type WorkspaceScopeKind,
+  type WorkspaceTargetKind,
+} from './domain-values.js';
+export * from './domain-values.js';
 
 /** 논리 .codocs 또는 가장 가까운 명시적 연결이 부여한 현 시점 접근 범위다. */
 export interface WorkspaceAccessScope {
-  kind: 'workspace' | 'linkedFile' | 'linkedDirectory';
+  kind: WorkspaceScopeKind;
   logicalPath: string;
   realPath: string;
 }
@@ -27,7 +37,6 @@ export interface WorkspaceAccessPolicy {
 }
 
 /** 확인한 대상 종류다. Node Stats 같은 FS 내부 타입을 공개하지 않는다. */
-export type WorkspaceTargetKind = 'file' | 'directory' | 'other';
 
 /** 현재 대상 확인에서 얻은 0이 아닌 폴더 식별 정보다. 영구 파일 ID나 전역 중복 제거에 사용하지 않는다. */
 export interface WorkspaceDirectoryIdentity {
@@ -51,7 +60,7 @@ export type WorkspacePathResult =
     }
   | {
       success: false;
-      status: 'denied' | 'missing' | 'unavailable';
+      status: WorkspacePathFailureStatus;
       logicalPath?: string;
       path?: string;
       diagnostics: readonly WorkspaceDiagnostic[];
@@ -82,10 +91,10 @@ async function checkTarget(logicalPath: string): Promise<CheckedTarget> {
     logicalPath,
     realPath,
     kind: target.isDirectory()
-      ? 'directory'
+      ? workspaceTargetKinds.directory
       : target.isFile()
-        ? 'file'
-        : 'other',
+        ? workspaceTargetKinds.file
+        : workspaceTargetKinds.other,
     ...(target.isDirectory() && target.dev > 0n && target.ino > 0n
       ? { directoryIdentity: { device: target.dev, inode: target.ino } }
       : {}),
@@ -96,7 +105,7 @@ async function checkTarget(logicalPath: string): Promise<CheckedTarget> {
 /** 거부·누락·대상 확인 실패를 확인된 논리 경로와 함께 반환한다. */
 function failure(
   root: ProjectRoot,
-  status: 'denied' | 'missing' | 'unavailable',
+  status: WorkspacePathFailureStatus,
   code: WorkspaceDiagnostic['code'],
   message: string,
   logicalPath?: string,
@@ -128,7 +137,7 @@ export async function resolveWorkspacePath(
   if (!isPathString(input)) {
     return failure(
       root,
-      'denied',
+      workspacePathFailureStatuses.denied,
       workspaceDiagnosticCodes.invalidWorkspacePath,
       workspaceDiagnosticMessages.invalidPath,
     );
@@ -142,7 +151,7 @@ export async function resolveWorkspacePath(
     if (!input.startsWith(projectPrefix))
       return failure(
         root,
-        'denied',
+        workspacePathFailureStatuses.denied,
         workspaceDiagnosticCodes.pathOutsideWorkspace,
         workspaceDiagnosticMessages.pathOutsideWorkspace,
       );
@@ -150,7 +159,7 @@ export async function resolveWorkspacePath(
   } else if (path.parse(input).root !== '') {
     return failure(
       root,
-      'denied',
+      workspacePathFailureStatuses.denied,
       workspaceDiagnosticCodes.pathOutsideWorkspace,
       workspaceDiagnosticMessages.pathOutsideWorkspace,
     );
@@ -162,10 +171,10 @@ export async function resolveWorkspacePath(
     (path.sep === '\\' && relativeInput.endsWith('/'))
   )
     segments.push('.');
-  if (segments.shift() !== '.codocs') {
+  if (segments.shift() !== codocsDirectoryName) {
     return failure(
       root,
-      'denied',
+      workspacePathFailureStatuses.denied,
       workspaceDiagnosticCodes.pathOutsideWorkspace,
       workspaceDiagnosticMessages.pathOutsideWorkspace,
     );
@@ -177,7 +186,7 @@ export async function resolveWorkspacePath(
   if (!validatedRoot.success)
     return {
       success: false,
-      status: 'unavailable',
+      status: workspacePathFailureStatuses.unavailable,
       diagnostics: validatedRoot.diagnostics,
     };
   const codocsPath = validatedRoot.root.codocsPath;
@@ -188,7 +197,9 @@ export async function resolveWorkspacePath(
   } catch (error: unknown) {
     return failure(
       root,
-      getIoErrorCode(error) === 'ENOENT' ? 'missing' : 'unavailable',
+      getIoErrorCode(error) === 'ENOENT'
+        ? workspacePathFailureStatuses.missing
+        : workspacePathFailureStatuses.unavailable,
       workspaceDiagnosticCodes.pathUnavailable,
       workspaceDiagnosticMessages.pathUnavailable,
       codocsPath,
@@ -200,23 +211,25 @@ export async function resolveWorkspacePath(
   } catch (error: unknown) {
     return failure(
       root,
-      'unavailable',
+      workspacePathFailureStatuses.unavailable,
       workspaceDiagnosticCodes.pathUnavailable,
       workspaceDiagnosticMessages.pathUnavailable,
       codocsPath,
       error,
     );
   }
-  if (current.kind !== 'directory')
+  if (current.kind !== workspaceTargetKinds.directory)
     return failure(
       root,
-      'unavailable',
+      workspacePathFailureStatuses.unavailable,
       workspaceDiagnosticCodes.notDirectory,
       workspaceDiagnosticMessages.notDirectory,
       codocsPath,
     );
   let scope: WorkspaceAccessScope = {
-    kind: current.isSymbolicLink ? 'linkedDirectory' : 'workspace',
+    kind: current.isSymbolicLink
+      ? workspaceScopeKinds.linkedDirectory
+      : workspaceScopeKinds.workspace,
     logicalPath: current.logicalPath,
     realPath: current.realPath,
   };
@@ -224,20 +237,20 @@ export async function resolveWorkspacePath(
     if (
       segment === '..' &&
       (current.logicalPath === scope.logicalPath ||
-        current.kind !== 'directory')
+        current.kind !== workspaceTargetKinds.directory)
     ) {
       return failure(
         root,
-        'denied',
+        workspacePathFailureStatuses.denied,
         workspaceDiagnosticCodes.pathOutsideWorkspace,
         workspaceDiagnosticMessages.pathOutsideWorkspace,
         current.logicalPath,
       );
     }
-    if (current.kind !== 'directory')
+    if (current.kind !== workspaceTargetKinds.directory)
       return failure(
         root,
-        'unavailable',
+        workspacePathFailureStatuses.unavailable,
         workspaceDiagnosticCodes.notDirectory,
         workspaceDiagnosticMessages.notDirectory,
         current.logicalPath,
@@ -252,7 +265,7 @@ export async function resolveWorkspacePath(
     } catch (error: unknown) {
       return failure(
         root,
-        'unavailable',
+        workspacePathFailureStatuses.unavailable,
         workspaceDiagnosticCodes.pathUnavailable,
         workspaceDiagnosticMessages.pathUnavailable,
         nextPath,
@@ -261,7 +274,10 @@ export async function resolveWorkspacePath(
     }
     if (current.isSymbolicLink)
       scope = {
-        kind: current.kind === 'directory' ? 'linkedDirectory' : 'linkedFile',
+        kind:
+          current.kind === workspaceTargetKinds.directory
+            ? workspaceScopeKinds.linkedDirectory
+            : workspaceScopeKinds.linkedFile,
         logicalPath: current.logicalPath,
         realPath: current.realPath,
       };

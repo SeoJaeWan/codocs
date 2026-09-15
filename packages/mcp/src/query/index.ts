@@ -1,4 +1,11 @@
-import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codocs/core';
+import {
+  diagnosticSeverities,
+  isDocumentKind,
+  isDocumentStatus,
+  queryDiagnosticCodes,
+  queryDiagnosticMessages,
+  scanStatuses,
+} from '@codocs/core';
 import {
   createWorkspaceQuerySession,
   type WorkspaceGetResponse,
@@ -91,31 +98,15 @@ function listInput(input: unknown): CodocsListInput | undefined {
   if (
     (properties.has('cursor') && typeof cursor !== 'string') ||
     (properties.has('domain') && typeof domain !== 'string') ||
-    (properties.has('kind') &&
-      kind !== 'policy' &&
-      kind !== 'procedure' &&
-      kind !== 'decision' &&
-      kind !== 'discussion') ||
-    (properties.has('status') &&
-      status !== 'proposed' &&
-      status !== 'confirmed' &&
-      status !== 'deprecated')
+    (properties.has('kind') && !isDocumentKind(kind)) ||
+    (properties.has('status') && !isDocumentStatus(status))
   )
     return undefined;
   return {
     ...(typeof cursor === 'string' ? { cursor } : {}),
     ...(typeof domain === 'string' ? { domain } : {}),
-    ...(kind === 'policy' ||
-    kind === 'procedure' ||
-    kind === 'decision' ||
-    kind === 'discussion'
-      ? { kind }
-      : {}),
-    ...(status === 'proposed' ||
-    status === 'confirmed' ||
-    status === 'deprecated'
-      ? { status }
-      : {}),
+    ...(isDocumentKind(kind) ? { kind } : {}),
+    ...(isDocumentStatus(status) ? { status } : {}),
   };
 }
 
@@ -135,10 +126,10 @@ function getInput(input: unknown): CodocsGetInput | undefined {
 function invalidInput(): CodocsListResponse & CodocsGetResponse {
   return {
     success: false,
-    scanStatus: 'failed',
+    scanStatus: scanStatuses.failed,
     error: {
       code: queryDiagnosticCodes.invalidInput,
-      severity: 'error',
+      severity: diagnosticSeverities.error,
       message: queryDiagnosticMessages.invalidInput,
     },
   };

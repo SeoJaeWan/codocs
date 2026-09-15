@@ -1,6 +1,7 @@
 import type { Diagnostic } from '@codocs/core';
+import { diagnosticSeverities } from '@codocs/core';
 
-/** workspace의 경로·IO·탐색 진단 코드와 발생 조건이다. */
+/** workspace의 경로·IO·탐색 진단 코드와 발생 조건이다. @domainValues */
 export const workspaceDiagnosticCodes = {
   /** 루트 선택 입력이 잘못됐거나 선택 대상이 디렉터리가 아니면 반환한다. */
   invalidProjectRoot: 'invalid_project_root',
@@ -77,7 +78,7 @@ export function createWorkspaceDiagnostic(
   const ioCode = getIoErrorCode(error);
   return {
     code,
-    severity: 'error',
+    severity: diagnosticSeverities.error,
     message,
     ...(sourcePath === undefined ? {} : { path: sourcePath }),
     ...(ioCode === undefined ? {} : { ioCode }),
