@@ -35,6 +35,7 @@ import {
   resolveProjectRoot,
   type ProjectRoot,
 } from '../project-root/index.js';
+import { decodeWorkspaceBytes } from '../revision/index.js';
 import { workspaceDocumentStatuses } from './domain-values.js';
 export * from './domain-values.js';
 
@@ -56,6 +57,8 @@ export type WorkspaceScanDiagnostic =
 interface ReadDocument {
   source: WorkspaceDocumentSource;
   raw: string;
+  revision: string;
+  utf8Lossless: boolean;
   scope: WorkspaceAccessScope;
   access: WorkspaceAccessPolicy;
   diagnostics: readonly WorkspaceDocumentDiagnostic[];
@@ -124,14 +127,22 @@ type ResolvedPath = Extract<WorkspacePathResult, { success: true }>;
 /** 확인한 파일 원문을 core 공개 파서·검증기에 그대로 전달한다. */
 function parseDocument(
   target: ResolvedPath,
-  raw: string,
+  bytes: Uint8Array,
 ): WorkspaceDocumentResult {
+  const { raw, revision, utf8Lossless } = decodeWorkspaceBytes(bytes);
   const source: WorkspaceDocumentSource = {
     path: target.path,
     logicalPath: target.logicalPath,
     realPath: target.realPath,
   };
-  const base = { source, raw, scope: target.scope, access: target.access };
+  const base = {
+    source,
+    raw,
+    revision,
+    utf8Lossless,
+    scope: target.scope,
+    access: target.access,
+  };
   const parsed = parseYaml(raw);
   if (!parsed.success)
     return {
@@ -319,16 +330,16 @@ export async function loadWorkspace(
       !/\.ya?ml$/u.test(target.logicalPath)
     )
       return;
-    let raw: string;
+    let bytes: Buffer;
     try {
-      raw = await readFile(target.logicalPath, 'utf8');
+      bytes = await readFile(target.logicalPath);
     } catch (error: unknown) {
       const failure = readFailure(target, error);
       failures.push(failure);
       diagnostics.push(...failure.diagnostics);
       return;
     }
-    const document = parseDocument(target, raw);
+    const document = parseDocument(target, bytes);
     documents.push(document);
     diagnostics.push(...document.diagnostics);
   }

@@ -1,4 +1,5 @@
 import { parseYaml, scanStatuses, validateDocument } from '@codocs/core';
+import { createHash } from 'node:crypto';
 import {
   chmod,
   link,
@@ -100,9 +101,47 @@ describe('경로별 workspace 문서 로더', /** 실제 IO의 경로와 스캔 
     expect(result.status).toBe('complete');
     expect(result.failures).toEqual([]);
     expect(result.documents).toMatchObject([
-      { status: 'valid', raw: source },
-      { status: 'parseError', raw: '' },
+      {
+        status: 'valid',
+        raw: source,
+        revision: createHash('sha256').update(source).digest('hex'),
+        utf8Lossless: true,
+      },
+      {
+        status: 'parseError',
+        raw: '',
+        revision: createHash('sha256').update('').digest('hex'),
+        utf8Lossless: true,
+      },
     ]);
+  });
+  it('잘못된 UTF-8 바이트를 읽으면 원본 byte revision과 디코딩 손실을 함께 보존한다', /** 실제 파일 읽기에서 같은 대체 문자로 다른 바이트를 합치지 않는다. */ async () => {
+    const prefix = Buffer.from(raw, 'utf8');
+    const files = [
+      {
+        name: 'a.yaml',
+        bytes: Buffer.concat([prefix, Buffer.from('# \x80\n', 'binary')]),
+      },
+      {
+        name: 'b.yaml',
+        bytes: Buffer.concat([prefix, Buffer.from('# \x81\n', 'binary')]),
+      },
+    ];
+    for (const item of files)
+      await writeFile(path.join(codocs, item.name), item.bytes);
+    const result = await loadWorkspace({ cwd: project });
+    expect(result.status).toBe('complete');
+    expect(result.documents).toHaveLength(2);
+    expect(result.documents[0]?.raw).toBe(result.documents[1]?.raw);
+    for (const [index, item] of files.entries()) {
+      expect(result.documents[index]).toMatchObject({
+        revision: createHash('sha256').update(item.bytes).digest('hex'),
+        utf8Lossless: false,
+      });
+    }
+    expect(result.documents[0]?.revision).not.toBe(
+      result.documents[1]?.revision,
+    );
   });
   it('상위에만 .codocs가 있는 하위 디렉터리에서 읽으면 선택한 루트의 정상 빈 프로젝트다', /** 상위 프로젝트를 선택하지 않는다. */ async () => {
     await document('parent.yaml');

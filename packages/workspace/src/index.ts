@@ -4,3 +4,4 @@ export * from './loader/index.js';
 export * from './paths/index.js';
 export * from './project-root/index.js';
 export * from './query/index.js';
+export * from './revision/index.js';
