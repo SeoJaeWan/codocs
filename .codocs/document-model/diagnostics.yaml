@@ -27,23 +27,6 @@ definition: |
   고정 문구의 관리 위치와 동적 메시지 조합은 [[코드 컨벤션]]에서 정의한다.
   문서 충돌·참조·저장 여부는 코드 하나로 추측하지 않고 해당 계약의 실제 결과를 함께 읽는다.
 
-  ## 외부 계약과 구현의 차이
-
-  외부 진단 계약과 현재 core의 코드 이름은 다음과 같이 다르다.
-
-  | 상황 | 외부 계약 | 현재 core |
-  | --- | --- | --- |
-  | 참조 대상 없음 | reference_not_found | missing_reference |
-  | 참조 대상 모호함 | reference_ambiguous | ambiguous_reference |
-  | 자기 참조 | invalid_reference | self_reference |
-
-  이는 의미가 같은 부분과 코드 이름이 다른 부분을 확인한 기록이다.
-  이 문서 작성으로 어느 쪽을 변경하거나 외부 API 매핑을 확정하지 않는다.
-
-  MCP/LSP 연결 시 코드 계약을 검토해야 한다.
-
-  relatedIds·suggestion 및 폐기 참조 경고 등 외부 진단 계약의 모든 항목이 현재 core Diagnostic에 모두 구현된 것은 아니다.
-
   ## 외부 진단 필드
 
   | 속성 | 필수 여부 | 의미 |
@@ -57,7 +40,7 @@ definition: |
   | relatedIds | 해당 시 | 관련 문서 ID |
   | suggestion | 해결 방법이 있을 때 | 다음 행동 안내 |
 
-  fieldPath가 ["deprecatedAliases", 0, "name"]이면 첫 번째 이전 명칭 항목의 name을 뜻한다.
+  fieldPath가 ["deprecatedAliases", 0, "id"]이면 첫 번째 이전 ID 항목의 id를 뜻한다.
   range의 start/end는 각각 line·character를 가지며 character는 화면 너비가 아닌 UTF-16 코드 단위 수다.
   [[YAML 파싱]]의 전체 원문 offset을 외부 range로 변환할 때 앞의 좌표 기준을 적용한다.
 
@@ -96,6 +79,6 @@ definition: |
 
   경고 코드는 unknown_field(사용자 정의 문서 속성), deprecated_reference(폐기 상태 지식 참조), similarity_check_failed(이름 일치 후보 검사 실패)를 사용한다. 오류 코드만으로 저장 여부를 추측하지 않도록 saved·indexUpdated 등 실제 결과 필드를 유지한다.
 
-  이 표는 외부 계약이며 앞의 현재 core 코드와의 차이를 함께 적용한다.
+  이 표는 외부 도구에 전달하는 진단 코드의 의미를 정의한다.
   unsupported_yaml_feature는 앵커·별칭·병합 키·태그·복수 문서·중복 키를 묶고 원인은 메시지와 위치로 구분한다.
   라이브러리의 오류·경고 분류를 그대로 노출하지 않고 제품 진단으로 변환한다.

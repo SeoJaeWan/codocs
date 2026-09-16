@@ -28,7 +28,3 @@ definition: |
   복구 실패·시간 초과도 success:true·saved:true·indexUpdated:false와 저장 revision·진단을 반환한다.
 
   refresh까지 실패하면 원인에 맞는 수정·재시작을 안내하고 무한 복구를 유도하지 않는다.
-
-  ## 구현 경계
-
-  실제 writer·watcher와 저장 후 복구는 후속 구현이다.
