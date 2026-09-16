@@ -1,0 +1,29 @@
+id: tool-result
+name: '도구 결과'
+domains:
+  - 'MCP'
+definition: |
+  Codocs 도구 요청의 처리 결과이며 SDK의 MCP 메시지 래퍼와 구분한다.
+  최상위 success는 요청 처리 여부다. 문서의 유효성·존재·파일 반영 여부를 모두 대신하지 않는다.
+
+  ## 요청과 개별 항목
+
+  입력·커서·탐색 등의 문제로 요청을 처리할 수 없으면 success:false와 공통 error를 반환한다.
+  요청을 처리했다면 빈 목록과 개별 ID의 부재·충돌·문서 오류도 success:true이며 개별 항목에서 문제를 표시한다.
+  validate가 문서 오류를 정상 보고하거나 refresh가 오류 문서를 포함해 재구성을 완료한 경우도 요청 처리 성공이다.
+
+  ## 탐색 상태의 응답
+
+  list/get의 scanStatus는 [[탐색 상태]]의 값을 전달한다.
+  complete에서만 없는 ID를 found:false와 not_found로 확정한다.
+  partial이면 success:true로 보유 결과를 반환하되 문서별 confirmation과 미확인 진단을 제공한다.
+  색인 밖 ID는 not_found로 확정하지 않고 확인 불가로 반환한다. totalCount는 보유 목록의 필터 결과 수이며 실제 전체 문서 수를 보장하지 않는다.
+  failed이면 원인과 함께 요청을 실패 처리하고 내부에 보존한 이전 자료를 최신 조회 결과로 노출하지 않는다.
+
+  문서별 confirmation과 원문·revision의 의미는 [[미확인 문서]], 이전 관측의 유지 조건은 [[불완전한 탐색에서 색인과 연결을 유지하는 절차]]에서 확인한다.
+
+  ## 파일 반영 결과
+
+  저장 도구는 [[저장]]의 saved·changed를 전달한다.
+  파일 반영 후 조회 가능 상태는 [[저장 후 색인 갱신 실패를 복구하는 절차]]의 indexUpdated로 구분한다.
+  오류 코드나 success 하나로 저장 여부를 추정하지 않는다. 구체 도구 입력과 필드는 [[조회]]에서 확인한다.

@@ -2,7 +2,6 @@ id: scan-consistency
 name: '불완전한 탐색에서 색인과 연결을 유지하는 절차'
 domains:
   - '작업 공간'
-  - '참조'
 kind: procedure
 status: confirmed
 definition: |
