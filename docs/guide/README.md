@@ -19,12 +19,12 @@ domains:
 examples:
   - 가상 주문 SAMPLE-001을 생성한다.
 deprecatedAliases:
-  - name: 이전 주문명
+  - id: previous-order
     message: 새 이름을 사용한다.
 ```
 
 필수 필드는 `id`, `name`, `definition`, `domains`다. `domains`에는 문자열이 하나 이상 있어야 한다.
-`examples`는 문자열 배열, `deprecatedAliases`는 필수 `name`과 선택 `message`를 가진 객체 배열이다. 두 선택 배열은 비어 있어도 된다.
+`examples`는 문자열 배열, `deprecatedAliases`는 현재 ID와 같은 형식을 따르는 필수 `id`와 선택 `message`를 가진 객체 배열이다. 두 선택 배열은 비어 있어도 된다.
 
 여러 도메인에 걸친 흐름도 같은 형식을 사용한다.
 
@@ -99,9 +99,11 @@ status: confirmed
 ## 이름과 폴더 구성
 
 `id`는 프로젝트 내 유일한 영어 식별자다. 코드 용어에 맞춰 변경할 수 있으며 향후 코드 매칭 기준으로 사용한다.
-`name`은 원하는 언어의 문서 이름이며 본문 참조의 기준이다. 코드 매칭·호버는 아직 구현 전이다.
+`name`은 원하는 언어의 문서 링크 식별자이며 본문 참조와 문서 표시의 기준이다. `name`은 코드 매칭 기준으로 사용하지 않는다.
 
-ID만 변경하고 문서용 이름을 유지하면 본문 참조는 유지된다. ID 중복 검사는 변경 이력을 추적하지 않으며 이전 ID를 자동 별칭으로 남기지 않는다.
+ID만 변경하고 문서용 이름을 유지하면 본문 참조는 유지된다. 코드 매칭은 현재 `id`와 `deprecatedAliases[].id`를 사용하며, 이전 ID에는 선택적인 `message`로 변경 안내를 남긴다. `aliases` 같은 사용자 필드는 코드 매칭이나 이름 참조에 사용하지 않는다.
+
+`deprecatedAliases`는 코드 매칭을 유지할 이전 ID의 객체 배열이다. 항목은 `id`를 반드시 가지며 현재 ID와 같은 형식 규칙을 적용한다. 이전 ID가 현재 ID와 같으면 `invalid_field_value` 경고가 발생하지만 작성한 항목은 자동 삭제하지 않는다. 예전 형식처럼 항목에 `name`만 작성하면 `unknown_field` 경고와 `missing_required_field` 오류가 함께 발생하며, 그 항목은 이전 ID로 매칭하지 않는다.
 
 폴더는 주제·도메인별로 묶을 수 있으며 제품이 고정 계층을 요구하지 않는다. 소속은 `domains`에 명시하고 파일 경로에서 추론하지 않는다.
 도메인 소개와 개별 문서는 같은 형식이며 종류별 폴더로 구분할 필요가 없다.
@@ -159,7 +161,7 @@ definition: "\\[[가상 주문]]"
 
 ID가 여러 발견 경로에 있으면 `duplicate_id`다. 같은 도메인에 같은 이름이 있으면 `duplicate_name`이다. 다른 도메인의 동명은 허용한다.
 
-일부 파일이나 폴더를 읽지 못한 상태에서는 보이지 않은 후보가 있을 수 있으므로 참조를 확정하지 않는다. 전체 탐색이 완료되면 부재·단일 대상·충돌을 다시 계산한다.
+일부 파일이나 폴더를 읽지 못한 상태에서는 `scanStatus: partial`과 함께 확인한 결과를 성공으로 제공한다. 이전 색인에서 보존한 문서는 `confirmation: unconfirmed`와 마지막 원문 `revision`을 유지하고, `unconfirmed_reference` 진단으로 최신성·존재를 보장하지 않음을 알린다. 보이지 않은 후보가 있을 수 있으므로 색인에 없는 ID를 `not_found`로 확정하지 않으며, 전체 탐색이 완료된 `scanStatus: complete`에서만 부재·단일 대상·충돌을 다시 계산한다. 프로젝트나 `.codocs` 자체를 탐색하지 못한 `failed`는 `success: false`와 원인을 반환한다.
 
 ## YAML 표기
 
