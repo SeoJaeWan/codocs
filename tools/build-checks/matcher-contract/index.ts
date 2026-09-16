@@ -5,7 +5,7 @@ import {buildCatalog, matchCode, matchIdentifier, matcherComparisonKinds, matche
 const observe = (path, source) => ({path, parsed: parseYaml(source, path)});
 const catalog = buildCatalog({status: scanStatuses.complete, observations: [
   observe('current.yaml', 'id: order-item\nname: 주문 항목\ndefinition: 설명\ndomains: [판매]\ndeprecatedAliases:\n  - id: legacy-order\n    message: 이전 주문 ID입니다.\n'),
-  observe('broken.yaml', 'id: broken\nname: 진단 문서\ndefinition: 설명\ndomains: [판매]\ndeprecatedAliases:\n  - name: old-name\n'),
+  observe('broken.yaml', 'id: broken\nname: 진단 문서\ndefinition: 설명\ndomains: [판매]\ndeprecatedAliases:\n  - message: ID 누락\n'),
 ]});
 
 const source = '😀 legacyOrders and orderItem';

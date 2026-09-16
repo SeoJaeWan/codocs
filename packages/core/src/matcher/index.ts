@@ -2,7 +2,11 @@ import pluralize from 'pluralize';
 import type { Catalog, CatalogDocument } from '../catalog/index.js';
 import { scanStatuses } from '../catalog/domain-values.js';
 import { diagnosticSeverities } from '../diagnostics/domain-values.js';
-import type { Diagnostic, OffsetRange } from '../diagnostics/index.js';
+import {
+  catalogDiagnosticCodes,
+  type Diagnostic,
+  type OffsetRange,
+} from '../diagnostics/index.js';
 import {
   matcherComparisonKinds,
   matcherEvidenceKinds,
@@ -232,14 +236,16 @@ function ownValue(value: unknown, key: string | number): unknown {
   return descriptor && 'value' in descriptor ? descriptor.value : undefined;
 }
 
-/** 특정 필드 오류가 있는지 확인한다. 다른 문서 오류가 ID 사용을 막지는 않는다. */
-function fieldHasError(
+/** 특정 필드의 형식 오류를 확인한다. 중복 ID는 모든 충돌 후보를 보존한다. */
+function fieldHasBlockingError(
   document: CatalogDocument,
   path: readonly (string | number)[],
 ): boolean {
   return document.documentDiagnostics.some(
+    /** 중복 ID 외의 오류가 해당 필드에 있는지 확인한다. */
     (diagnostic) =>
       diagnostic.severity === diagnosticSeverities.error &&
+      diagnostic.code !== catalogDiagnosticCodes.duplicateId &&
       diagnostic.fieldPath?.length === path.length &&
       diagnostic.fieldPath.every((part, index) => part === path[index]),
   );
@@ -254,7 +260,7 @@ function indexedIds(document: CatalogDocument): readonly IndexedId[] {
   if (
     typeof current === 'string' &&
     idPattern.test(current) &&
-    !fieldHasError(document, ['id'])
+    !fieldHasBlockingError(document, ['id'])
   )
     values.push({ id: current, kind: matcherEvidenceKinds.current });
   const aliases = ownValue(parsed.data, 'deprecatedAliases');
@@ -265,7 +271,7 @@ function indexedIds(document: CatalogDocument): readonly IndexedId[] {
     if (
       typeof id !== 'string' ||
       !idPattern.test(id) ||
-      fieldHasError(document, ['deprecatedAliases', index, 'id'])
+      fieldHasBlockingError(document, ['deprecatedAliases', index, 'id'])
     )
       continue;
     const message = ownValue(alias, 'message');
@@ -361,21 +367,23 @@ function findMatches(
   return matches;
 }
 
-/** ID·길이·정확성·위치·문서 ID 순으로 두 근거의 우선순위를 비교한다. */
+/** 의미 우선순위 뒤에 원문 위치와 근거 값으로 결정적인 순서를 부여한다. */
 function compareEvidence(
   left: CodeMatchEvidence,
   right: CodeMatchEvidence,
 ): number {
-  const rank = compareEvidenceRank(left, right);
+  const priority = compareEvidencePriority(left, right);
   return (
-    rank ||
+    priority ||
+    left.range.start - right.range.start ||
+    left.range.end - right.range.end ||
     left.sourceId.localeCompare(right.sourceId) ||
     (left.message ?? '').localeCompare(right.message ?? '')
   );
 }
 
-/** 문서 ID를 아직 보지 않고 매칭 자체의 우선순위만 비교한다. */
-function compareEvidenceRank(
+/** 현재·이전, 연속 토큰 수, 표기 일치만 매칭의 의미 우선순위로 비교한다. */
+function compareEvidencePriority(
   left: CodeMatchEvidence,
   right: CodeMatchEvidence,
 ): number {
@@ -389,8 +397,6 @@ function compareEvidenceRank(
     (left.comparison === matcherComparisonKinds.exact ? 1 : 0) -
     (right.comparison === matcherComparisonKinds.exact ? 1 : 0);
   if (exact) return -exact;
-  if (left.range.start !== right.range.start)
-    return left.range.start - right.range.start;
   return 0;
 }
 
@@ -534,8 +540,10 @@ export function matchCode(
       const leftEvidence = [...left.evidence].sort(compareEvidence)[0];
       const rightEvidence = [...right.evidence].sort(compareEvidence)[0];
       if (leftEvidence && rightEvidence) {
-        const compared = compareEvidenceRank(leftEvidence, rightEvidence);
+        const compared = compareEvidencePriority(leftEvidence, rightEvidence);
         if (compared) return compared;
+        if (leftEvidence.range.start !== rightEvidence.range.start)
+          return leftEvidence.range.start - rightEvidence.range.start;
       }
       return (
         left.id.localeCompare(right.id) || left.path.localeCompare(right.path)

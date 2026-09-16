@@ -216,22 +216,6 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
     if (result.success) expect(result.data).toEqual(data);
   });
 
-  it('이전 name 입력은 호환 변환 없이 unknown 경고와 id 누락 오류를 함께 반환한다', /** 이름은 문서 링크 정체성이며 이전 코드 ID를 대신하지 않는다. */ () => {
-    const data = {
-      ...term,
-      deprecatedAliases: [{ name: 'old-order' }],
-    };
-    const result = validateUnchanged({ data });
-    expect(result.success).toBe(false);
-    expect(at(result.errors, ['deprecatedAliases', 0, 'id']).code).toBe(
-      schemaDiagnosticCodes.missingRequiredField,
-    );
-    expect(at(result.warnings, ['deprecatedAliases', 0, 'name']).code).toBe(
-      schemaDiagnosticCodes.unknownField,
-    );
-    expect(result.warnings).toHaveLength(1);
-  });
-
   it.each([
     [
       'name',

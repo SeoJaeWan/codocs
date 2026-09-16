@@ -103,7 +103,7 @@ status: confirmed
 
 ID만 변경하고 문서용 이름을 유지하면 본문 참조는 유지된다. 코드 매칭은 현재 `id`와 `deprecatedAliases[].id`를 사용하며, 이전 ID에는 선택적인 `message`로 변경 안내를 남긴다. `aliases` 같은 사용자 필드는 코드 매칭이나 이름 참조에 사용하지 않는다.
 
-`deprecatedAliases`는 코드 매칭을 유지할 이전 ID의 객체 배열이다. 항목은 `id`를 반드시 가지며 현재 ID와 같은 형식 규칙을 적용한다. 이전 ID가 현재 ID와 같으면 `invalid_field_value` 경고가 발생하지만 작성한 항목은 자동 삭제하지 않는다. 예전 형식처럼 항목에 `name`만 작성하면 `unknown_field` 경고와 `missing_required_field` 오류가 함께 발생하며, 그 항목은 이전 ID로 매칭하지 않는다.
+`deprecatedAliases`는 코드 매칭을 유지할 이전 ID의 객체 배열이다. 항목은 `id`를 반드시 가지며 현재 ID와 같은 형식 규칙을 적용한다. 이전 ID가 현재 ID와 같으면 `invalid_field_value` 경고가 발생하지만 작성한 항목은 자동 삭제하지 않는다.
 
 폴더는 주제·도메인별로 묶을 수 있으며 제품이 고정 계층을 요구하지 않는다. 소속은 `domains`에 명시하고 파일 경로에서 추론하지 않는다.
 도메인 소개와 개별 문서는 같은 형식이며 종류별 폴더로 구분할 필요가 없다.
