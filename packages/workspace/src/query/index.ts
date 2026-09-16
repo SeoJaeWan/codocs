@@ -288,13 +288,10 @@ function scanFailure(scan: WorkspaceScanResult): WorkspaceQueryFailure {
   return { success: false, scanStatus: scanStatuses.failed, error };
 }
 
-/** 원문 문자열을 다시 포맷하지 않고 UTF-8 byte SHA-256으로 계산한다. */
+/** 같은 읽기에서 로더가 원본 바이트로 계산한 revision을 전달한다. */
 function scanRevisions(scan: WorkspaceScanResult): Map<string, string> {
   return new Map(
-    scan.documents.map((document) => [
-      document.source.path,
-      createHash('sha256').update(document.raw, 'utf8').digest('hex'),
-    ]),
+    scan.documents.map((document) => [document.source.path, document.revision]),
   );
 }
 

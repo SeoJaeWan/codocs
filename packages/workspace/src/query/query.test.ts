@@ -1,5 +1,6 @@
 import { catalogDiagnosticCodes, queryDiagnosticCodes } from '@codocs/core';
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import {
   mkdir,
   mkdtemp,
@@ -9,6 +10,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createWorkspaceQuerySession,
@@ -16,6 +18,7 @@ import {
 } from './index.js';
 
 let project: string;
+const execFileAsync = promisify(execFile);
 
 beforeEach(
   /** 각 사례가 독립적인 실제 프로젝트에서 시작한다. */ async () => {
@@ -70,6 +73,35 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         },
       ],
     });
+  });
+
+  it('오류 문서의 원문과 byte revision을 함께 조회하고 별도 프로세스에서도 같은 revision을 계산한다', /** 실제 파일의 잘못된 UTF-8을 재인코딩하지 않는다. */ async () => {
+    const raw =
+      'id: broken\nname: 오류 문서\ndefinition: 설명\ndomains: [도메인]\nvalue: .nan\n# �\n';
+    const bytes = Buffer.concat([
+      Buffer.from(raw.slice(0, -2), 'utf8'),
+      Buffer.from([0x80, 0x0a]),
+    ]);
+    const target = path.join(project, '.codocs', 'broken.yaml');
+    await writeFile(target, bytes);
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const get = await session.get(['broken']);
+    const revision = createHash('sha256').update(bytes).digest('hex');
+    expect(get).toMatchObject({
+      success: true,
+      scanStatus: 'complete',
+      results: [{ id: 'broken', found: true, rawYaml: raw, revision }],
+    });
+    const { stdout } = await execFileAsync(process.execPath, [
+      '--input-type=module',
+      '-e',
+      "import { readFileSync } from 'node:fs'; import { createHash } from 'node:crypto'; process.stdout.write(createHash('sha256').update(readFileSync(process.argv[1])).digest('hex'));",
+      target,
+    ]);
+    expect(stdout).toBe(revision);
+    expect(revision).not.toBe(
+      createHash('sha256').update(raw, 'utf8').digest('hex'),
+    );
   });
 
   it('partial은 이전 원문과 revision을 unconfirmed로 보존하고 색인 밖 ID를 not_found로 확정하지 않는다', /** 깨진 링크로 실제 partial 전환을 만든다. */ async () => {

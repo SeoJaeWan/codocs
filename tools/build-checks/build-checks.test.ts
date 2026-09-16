@@ -14,6 +14,11 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bundleIde } from '../build/build.mjs';
 import {
+  changePlanContractConfig,
+  changePlanContractJs,
+  changePlanContractTs,
+} from './change-plan-contract/index.js';
+import {
   nameReferenceConfig,
   nameReferenceJs,
   nameReferenceTs,
@@ -192,6 +197,28 @@ beforeAll(
 );
 
 describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 없이 소비한다. */ () => {
+  it('변경 후보 공개 JS 소비자가 바이트 revision·ID 변경·충돌·미저장을 확인한다', /** 배포 루트만 사용해 원문과 입력 불변을 확인한다. */ () => {
+    writeFileSync(
+      path.join(consumer, 'change-plan-contract.mjs'),
+      changePlanContractJs,
+    );
+    expect(run(['change-plan-contract.mjs'])).toContain(
+      'Change plan JS contract verified',
+    );
+  });
+
+  it('변경 후보 공개 d.ts 소비자가 strict 상태별 결과를 좁힌다', /** 배포 선언만으로 후보와 무변경의 필드 차이를 확인한다. */ () => {
+    writeFileSync(
+      path.join(consumer, 'change-plan-contract.ts'),
+      changePlanContractTs,
+    );
+    writeFileSync(
+      path.join(consumer, 'change-plan-contract.json'),
+      JSON.stringify(changePlanContractConfig),
+    );
+    expect(run([tsc, '-p', 'change-plan-contract.json'])).toBe('');
+  });
+
   it('매처 공개 JS 소비자가 현재·이전 ID 근거와 UTF-16 범위·부분 결과를 실행한다', /** pluralize를 포함한 실제 dist 소비자에서 코드 매칭 계약을 확인한다. */ () => {
     writeFileSync(
       path.join(consumer, 'matcher-contract.mjs'),
