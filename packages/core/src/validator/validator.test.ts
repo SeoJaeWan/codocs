@@ -114,7 +114,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       ...term,
       domains: ['판매', '배송'],
       examples: ['[[주문 처리]]'],
-      deprecatedAliases: [{ name: '이전 주문' }],
+      deprecatedAliases: [{ id: 'previous-order' }],
       kind: 'policy',
       status: 'confirmed',
     };
@@ -161,8 +161,8 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       ...term,
       examples: [' 예시 '],
       deprecatedAliases: [
-        { name: '이전 이름' },
-        { name: '이름', message: ' 안내 ' },
+        { id: 'previous-name' },
+        { id: 'previous-title', message: ' 안내 ' },
       ],
     },
     knowledge,
@@ -182,6 +182,39 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
         expect(result.data).not.toHaveProperty('status');
     },
   );
+
+  it('이전 ID 중복은 작성 순서와 값을 유지한 채 정상 문서로 반환한다', /** 변경 이력 항목을 검증 과정에서 임의로 합치지 않는다. */ () => {
+    const data = {
+      ...term,
+      deprecatedAliases: [
+        { id: 'previous-order', message: '첫 변경' },
+        { id: 'previous-order', message: '두 번째 변경' },
+      ],
+    };
+    const result = validateUnchanged({ data });
+    expect(result.success).toBe(true);
+    expect(result.warnings).toEqual([]);
+    if (result.success) expect(result.data).toEqual(data);
+  });
+
+  it('현재 ID와 같은 이전 ID는 값을 삭제하지 않고 해당 id 경로에 경고한다', /** 직접 YAML 편집으로 생긴 중복의 자동 정리를 수행하지 않는다. */ () => {
+    const data = {
+      ...term,
+      deprecatedAliases: [{ id: term.id, message: '기존 안내' }],
+    };
+    const result = validateUnchanged({ data });
+    expect(result.success).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        code: schemaDiagnosticCodes.invalidFieldValue,
+        severity: diagnosticSeverities.warning,
+        message: schemaDiagnosticMessages.deprecatedAliasMatchesCurrentId,
+        fieldPath: ['deprecatedAliases', 0, 'id'],
+      }),
+    ]);
+    if (result.success) expect(result.data).toEqual(data);
+  });
 
   it.each([
     [
@@ -269,13 +302,18 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       schemaDiagnosticCodes.invalidFieldType,
     ],
     [
-      { ...term, deprecatedAliases: [{ name: 'old', message: '' }] },
+      { ...term, deprecatedAliases: [{ id: 'old', message: '' }] },
       ['deprecatedAliases', 0, 'message'],
       schemaDiagnosticCodes.invalidFieldValue,
     ],
     [
+      { ...term, deprecatedAliases: [{ id: 'Bad-ID' }] },
+      ['deprecatedAliases', 0, 'id'],
+      schemaDiagnosticCodes.invalidFieldValue,
+    ],
+    [
       { ...term, deprecatedAliases: [{}] },
-      ['deprecatedAliases', 0, 'name'],
+      ['deprecatedAliases', 0, 'id'],
       schemaDiagnosticCodes.missingRequiredField,
     ],
     [
@@ -338,7 +376,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       ...term,
       aliases: ['old'],
       custom: { a: shared, b: shared },
-      deprecatedAliases: [{ name: 'old', custom: shared }],
+      deprecatedAliases: [{ id: 'old', custom: shared }],
     };
     const result = validateUnchanged({ data });
     expect(result.success).toBe(true);
@@ -486,7 +524,7 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
         end: { line: 6, character: 22 },
       });
       expect(
-        issueSlice(source, at(result.errors, ['deprecatedAliases', 0, 'name'])),
+        issueSlice(source, at(result.errors, ['deprecatedAliases', 0, 'id'])),
       ).toBe('{message: "안내"}');
       expect(issueSlice(source, at(result.warnings, ['aliases']))).toBe(
         'aliases',

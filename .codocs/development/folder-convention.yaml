@@ -9,25 +9,16 @@ definition: |
   예를 들어 string-mapping은 src/string-mapping/index.ts와 src/string-mapping/string-mapping.test.ts로 구성한다.
   작은 기능은 index.ts에 직접 작성하고 커지면 같은 폴더의 보조 파일로 분리한다.
 
-  ## 프로젝트 문서 배치
+  ## 프로젝트 문서
 
-  .codocs 최상위에는 전체 진입 문서인 index.yaml을 둔다.
-  각 도메인 폴더 최상위에 도메인 소개와 그 영역의 문서를 함께 둔다.
-  소개 문서가 하위 문서를 안내하는 방식은 [[도메인]]에서 정의한다.
-
-  문서의 주된 책임으로 폴더를 정한다.
-  여러 도메인에 속해도 주된 책임이 분명하면 해당 도메인 폴더에 둔다.
-  특정 도메인에 귀속하기 어려운 공통 흐름은 share 폴더에 둔다.
-  다른 도메인에서 참조한다는 이유만으로 문서를 옮기지 않는다.
-
-  소속은 [[문서 형식]]의 domains로 선언하며 폴더 위치와 별개다.
-  문서 종류에 따라 terms·knowledge 폴더를 만들지 않는다.
+  .codocs는 프로젝트의 용어·동작·정책을 설명하는 지식을 보관한다.
+  문서 작성 기준은 [[기본 작성 지침]]에서 확인한다.
 
   ## 파일과 폴더 이름
 
   이 프로젝트의 개발 소스와 .codocs 파일·폴더 이름은 kebab-case를 사용한다.
   예를 들어 knowledge-management.yaml, ide-support.yaml, document-model 폴더로 작성한다.
-  문서 ID는 파일명과 독립적이며 [[문서 형식]]의 ID 규칙을 적용한다.
+  문서 ID는 파일명과 독립적으로 정한다.
   ESLint의 eslint-plugin-check-file로 검사하고 .test.ts 같은 복합 확장자는 허용한다.
   외부 도구가 요구하는 파일명은 해당 도구의 규칙을 유지한다.
 

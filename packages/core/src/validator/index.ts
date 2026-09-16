@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import type {
   Diagnostic,
+  DiagnosticSeverity,
   FieldPath,
   OffsetRange,
   SchemaDiagnosticCode,
@@ -143,7 +144,7 @@ const id = nonblank.refine(
 );
 const userValue = z.custom<JsonValue>();
 const deprecatedAlias = z
-  .object({ name: nonblank, message: nonblank.optional() })
+  .object({ id, message: nonblank.optional() })
   .catchall(userValue);
 const documentStructure = z
   .object({
@@ -170,7 +171,7 @@ export const documentFields = {
   domains: documentStructure.keyof().enum.domains,
   /** 참조를 추출하는 예시 문자열 목록이다. */
   examples: documentStructure.keyof().enum.examples,
-  /** 이전 이름과 전환 안내다. */
+  /** 이전 ID와 전환 안내다. */
   deprecatedAliases: documentStructure.keyof().enum.deprecatedAliases,
   /** 문서 내용의 종류다. */
   kind: documentStructure.keyof().enum.kind,
@@ -282,19 +283,43 @@ function diagnostic(
   code: SchemaDiagnosticCode,
   fieldPath: FieldPath,
   message: string,
+  severity: DiagnosticSeverity = code === schemaDiagnosticCodes.unknownField
+    ? diagnosticSeverities.warning
+    : diagnosticSeverities.error,
 ): SchemaDiagnostic {
   const range = diagnosticRange(input, fieldPath, code);
   return {
     code,
-    severity:
-      code === schemaDiagnosticCodes.unknownField
-        ? diagnosticSeverities.warning
-        : diagnosticSeverities.error,
+    severity,
     message,
     fieldPath: [...fieldPath],
     ...(input.path !== undefined ? { path: input.path } : {}),
     ...(range ? { range } : {}),
   };
+}
+
+/** 현재 ID와 같은 이전 ID만 경고하며 사용자가 작성한 항목은 제거하지 않는다. */
+function deprecatedAliasWarnings(
+  input: ValidateDocumentInput,
+): SchemaDiagnostic[] {
+  const currentId = ownValue(input.data, 'id');
+  const aliases = ownValue(input.data, 'deprecatedAliases');
+  if (typeof currentId !== 'string' || !Array.isArray(aliases)) return [];
+  const warnings: SchemaDiagnostic[] = [];
+  for (let index = 0; index < aliases.length; index++) {
+    const alias = ownValue(aliases, index);
+    if (ownValue(alias, 'id') !== currentId) continue;
+    warnings.push(
+      diagnostic(
+        input,
+        schemaDiagnosticCodes.invalidFieldValue,
+        ['deprecatedAliases', index, 'id'],
+        schemaDiagnosticMessages.deprecatedAliasMatchesCurrentId,
+        diagnosticSeverities.warning,
+      ),
+    );
+  }
+  return warnings;
 }
 
 /** 알려진 업무 객체의 미등록 키만 경고하며 사용자 JSON 내부는 해석하지 않는다. */
@@ -362,7 +387,10 @@ function issueCode(
 export function validateDocument(
   input: ValidateDocumentInput,
 ): DocumentValidationResult {
-  const warnings = unknownWarnings(input);
+  const warnings = [
+    ...unknownWarnings(input),
+    ...deprecatedAliasWarnings(input),
+  ];
   const result = documentSchema.safeParse(input.data);
   if (result.success)
     return { success: true, data: result.data, errors: [], warnings };
