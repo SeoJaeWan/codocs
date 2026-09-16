@@ -23,6 +23,11 @@ import {
   queryContractJs,
   queryContractTs,
 } from './query-contract/index.js';
+import {
+  matcherContractConfig,
+  matcherContractJs,
+  matcherContractTs,
+} from './matcher-contract/index.js';
 
 import { resolvePnpm } from '../check/runtime.mjs';
 
@@ -159,7 +164,7 @@ beforeAll(
     const coreRequire = createRequire(
       path.join(root, 'packages/core/package.json'),
     );
-    for (const dependency of ['yaml', 'zod']) {
+    for (const dependency of ['pluralize', 'yaml', 'zod']) {
       const directory = path.dirname(
         coreRequire.resolve(dependency + '/package.json'),
       );
@@ -187,6 +192,28 @@ beforeAll(
 );
 
 describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 없이 소비한다. */ () => {
+  it('매처 공개 JS 소비자가 현재·이전 ID 근거와 UTF-16 범위·부분 결과를 실행한다', /** pluralize를 포함한 실제 dist 소비자에서 코드 매칭 계약을 확인한다. */ () => {
+    writeFileSync(
+      path.join(consumer, 'matcher-contract.mjs'),
+      matcherContractJs,
+    );
+    expect(run(['matcher-contract.mjs'])).toContain(
+      'Matcher JS contract verified',
+    );
+  });
+
+  it('매처 공개 d.ts 소비자가 strict 요청·후보·근거 union을 좁힌다', /** 소스 없는 strict 소비자가 공개 매처 타입과 이름 분리를 확인한다. */ () => {
+    writeFileSync(
+      path.join(consumer, 'matcher-contract.ts'),
+      matcherContractTs,
+    );
+    writeFileSync(
+      path.join(consumer, 'matcher-contract.json'),
+      JSON.stringify(matcherContractConfig),
+    );
+    expect(run([tsc, '-p', 'matcher-contract.json'])).toBe('');
+  });
+
   it('이름 참조 공개 JS 소비자가 추출·색인·갱신·rename 계획과 실제 파일 상태를 확인한다', /** 링크 없는 소스 없는 소비자에서 공개 루트 계산 계약을 실행한다. */ () => {
     writeFileSync(path.join(consumer, 'name-references.mjs'), nameReferenceJs);
     expect(run(['name-references.mjs'])).toContain(
@@ -258,7 +285,7 @@ describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 �
       ]);
       expect(existsSync(path.join(destination, 'src'))).toBe(false);
     }
-    for (const dependency of ['yaml', 'zod'])
+    for (const dependency of ['pluralize', 'yaml', 'zod'])
       cpSync(
         path.join(consumer, 'node_modules', dependency),
         path.join(packed, 'node_modules', dependency),
@@ -744,7 +771,7 @@ if (result.success) {
   void id;
   const fields: string[] = [document.name, document.definition, ...document.domains];
   const examples: string[] | undefined = document.examples;
-  const aliases: {name: string; message?: string | undefined}[] | undefined = document.deprecatedAliases;
+  const aliases: {id: string; message?: string | undefined}[] | undefined = document.deprecatedAliases;
   const kind: 'policy' | 'procedure' | 'decision' | 'discussion' | undefined = document.kind;
   const status: 'proposed' | 'confirmed' | 'deprecated' | undefined = document.status;
   void fields; void examples; void aliases; void kind; void status;
