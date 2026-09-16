@@ -1,0 +1,12 @@
+id: language-server
+name: 'Language Server'
+domains:
+  - 'Language Server'
+kind: procedure
+definition: |
+  편집 중 코드의 버전과 위치를 관리하고 LSP 요청에 문서 설명과 진단을 연결하는 패키지의 계약이다.
+
+  ## 용어와 계약
+
+  - [[문서 동기화]]: 편집 중 코드의 버전과 식별자 위치를 관리하는 방법을 확인한다.
+  - [[IDE 지원]]: 매칭 결과를 Hover·진단·자동완성·링크로 표현하는 기준을 확인한다.
