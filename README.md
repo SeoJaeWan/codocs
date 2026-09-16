@@ -67,7 +67,7 @@ const details = await query.codocsGet({ ids: ['sample-order'] });
 - 패키지 README는 기능별 공개 함수가 어디에서 사용되는지와 다른 기능과의 연결을 설명한다.
 - `.codocs`는 프로젝트의 개념과 정책·절차·결정의 근거를 설명한다. 내용의 합의·적용 상태는 `status`로 표현하고, 개발 진행도와 PR·이슈 배정은 기록하지 않는다. 진행 상황을 위한 별도 `.codocs` 문서도 만들지 않는다.
 - 구체적인 입력·출력과 분기 동작은 구현에 인접한 테스트가 실행 가능한 예시로 설명한다.
-- 사용자 작성 규칙은 `docs/guide`, 실행 가능한 사용자 문서는 `examples`에 둔다.
+- 작성 규칙은 `.codocs`의 [기본 작성 지침](.codocs/document-model/basic-writing-guidelines.yaml)과 연결된 문서에서 관리하고, 사용자 안내는 `docs/guide`에 반영한다. 실행 가능한 사용자 문서는 `examples`에 둔다.
 
 구현 동작을 README에 다시 나열하지 않는다. 공개 책임이나 사용처가 달라지면 패키지 README를 수정하고, 함수 동작이 달라지면 인접 테스트를 수정한다.
 
