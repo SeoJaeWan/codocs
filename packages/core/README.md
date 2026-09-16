@@ -14,6 +14,7 @@
 | [validator](src/validator/index.ts)           | 외부 문서의 구조와 값을 검증하고 원래 사용자 데이터를 보존한다.          | `validateDocument`, `Document`, `JsonValue`          | workspace loader, catalog                           |
 | [references](src/references/index.ts)         | 본문과 예시에서 이름 참조의 등장 위치와 문법 오류를 추출한다.            | `extractReferences`, 참조 등장·문법 진단             | catalog                                             |
 | [catalog](src/catalog/index.ts)               | 경로별 문서를 색인하고 참조 대상·충돌과 이름 변경 수정안을 계산한다.     | `buildCatalog`, `resolveReference`, `planRename`     | workspace indexing, 후속 LSP/MCP/UI와 rename writer |
+| [change-plan](src/change-plan/index.ts)       | 한 문서의 create/update 요청과 YAML 후보를 검증한다.                     | `planDocumentChange`, `changePlanStatuses`           | workspace 변경 계획과 후속 writer                   |
 | [query](src/query/index.ts)                   | Catalog를 목록·상세 조회 결과로 변환하고 ID 충돌과 참조 진단을 구성한다. | `projectCatalogList`, `projectCatalogGet`            | workspace 조회 세션, 후속 MCP 어댑터                |
 | [matcher](src/matcher/index.ts)               | 코드 원문에서 현재·이전 문서 ID를 찾아 후보와 근거를 계산한다.           | `matchCode`, `matchIdentifier`, `tokenizeCode`       | 후속 IDE/LSP·MCP·코드 탐색 어댑터                   |
 
@@ -43,6 +44,8 @@ workspace query
 ```
 
 `planRename`의 결과는 저장할 위치와 해석값을 계산한 미리보기다. YAML 표기 보존, 쓰기 가능 여부, 최신 원문 확인, 다중 파일 저장과 복구는 후속 writer의 책임이다.
+
+`planDocumentChange(input, context)`는 파일 IO 없이 실패(`failed`), 검증된 무변경(`unchanged`), 검증된 YAML 후보(`candidate`)를 반환한다. update에는 현재 ID와 읽기 시점의 revision, 최상위 `set`/`unset`을 전달하고 `context`에는 Catalog와 같은 읽기의 `source.path`·`raw`·`revision`·`utf8Lossless`를 제공한다. create에는 상대 YAML 경로와 전체 문서를 전달한다. 후보의 `raw`는 아직 저장되지 않았으며 update 후보의 `baseRevision`은 읽기 시점 버전이다. 원문 보존, ID 변경, 검증 범위의 세부 규칙은 [저장](../../.codocs/workspace/storage.yaml)에서 확인한다.
 
 ## 구현 연결
 

@@ -1,16 +1,16 @@
 # codocs
 
-`.codocs` YAML 문서를 읽고 검증하여 이름 참조와 경로별 색인을 제공하는 모노레포다. 현재 구현은 파싱·검증·프로젝트 탐색·색인, 이름 변경 수정안 계산과 MCP 조회 직접 handler까지 포함한다. 실제 MCP SDK/stdio와 LSP 연결, VS Code activation, watcher와 다중 파일 rename 저장은 후속 계층의 책임이다.
+`.codocs` YAML 문서를 읽고 검증하여 이름 참조와 경로별 색인을 제공하는 모노레포다. 현재 구현은 파싱·검증·프로젝트 탐색·색인, 단일 문서 변경 후보와 이름 변경 수정안 계산, MCP 조회 직접 handler까지 포함한다. 실제 MCP SDK/stdio와 LSP 연결, VS Code activation, watcher와 파일 저장은 후속 계층의 책임이다.
 
 ## 패키지 구성
 
-| 패키지                                                          | 역할                                            | 사용하는 패키지·기능        |
-| --------------------------------------------------------------- | ----------------------------------------------- | --------------------------- |
-| [`@codocs/core`](packages/core/README.md)                       | IO 없는 YAML 파싱·검증·참조·색인 계산           | workspace와 후속 LSP/MCP/UI |
-| [`@codocs/workspace`](packages/workspace/README.md)             | 프로젝트 선택, 경로 경계, 파일 탐색과 core 연결 | 후속 LSP/MCP/UI             |
-| [`@codocs/language-server`](packages/language-server/README.md) | workspace/core를 LSP 요청에 연결할 경계         | VS Code 확장                |
-| [`@codocs/vscode`](packages/vscode/README.md)                   | 언어 서버를 실행하고 VS Code와 연결할 경계      | VS Code 호스트              |
-| [`@codocs/mcp`](packages/mcp/README.md)                         | 검증한 MCP 조회 입력을 workspace에 연결         | 후속 MCP SDK/stdio          |
+| 패키지                                                          | 역할                                             | 사용하는 패키지·기능        |
+| --------------------------------------------------------------- | ------------------------------------------------ | --------------------------- |
+| [`@codocs/core`](packages/core/README.md)                       | IO 없는 YAML 파싱·검증·참조·색인·변경 후보 계산  | workspace와 후속 LSP/MCP/UI |
+| [`@codocs/workspace`](packages/workspace/README.md)             | 프로젝트 선택, 파일 탐색·바이트 버전과 core 연결 | 후속 LSP/MCP/UI             |
+| [`@codocs/language-server`](packages/language-server/README.md) | workspace/core를 LSP 요청에 연결할 경계          | VS Code 확장                |
+| [`@codocs/vscode`](packages/vscode/README.md)                   | 언어 서버를 실행하고 VS Code와 연결할 경계       | VS Code 호스트              |
+| [`@codocs/mcp`](packages/mcp/README.md)                         | 검증한 MCP 조회 입력을 workspace에 연결          | 후속 MCP SDK/stdio          |
 
 내부 의존성 방향은 다음과 같다.
 
@@ -27,8 +27,12 @@ mcp ──────────────────────> workspac
 ## 현재 데이터 흐름
 
 ```ts
-import { buildWorkspaceCatalog, loadWorkspace } from '@codocs/workspace';
-import { planRename, resolveReference } from '@codocs/core';
+import {
+  buildWorkspaceCatalog,
+  loadWorkspace,
+  planWorkspaceChange,
+} from '@codocs/workspace';
+import { changePlanStatuses, planRename, resolveReference } from '@codocs/core';
 import { createCodocsQueryHandlers } from '@codocs/mcp';
 
 const scan = await loadWorkspace({ project: '../app' });
@@ -44,12 +48,31 @@ const preview = planRename(catalog, {
   newName: '가상 판매 주문',
 });
 
+const source = scan.documents.find(
+  (item) => item.source.path === '.codocs/order.yaml',
+);
+if (source) {
+  const change = planWorkspaceChange(
+    {
+      mode: 'update',
+      id: 'sample-order',
+      revision: source.revision,
+      set: { id: 'sample-purchase' },
+    },
+    scan,
+    catalog,
+  );
+  if (change.status === changePlanStatuses.candidate) {
+    console.log(change.raw, change.baseRevision, change.revision);
+  }
+}
+
 const query = createCodocsQueryHandlers({ project: '../app' });
 const page = await query.codocsList({ domain: 'sample-sales' });
 const details = await query.codocsGet({ ids: ['sample-order'] });
 ```
 
-`loadWorkspace`가 실제 원문과 경로를 확인한다. core는 전달받은 값으로 결과를 계산할 뿐 파일을 읽거나 저장하지 않는다. `planRename`의 `ready` 상태도 저장 허용을 의미하지 않으며 후속 writer가 최신 원문, YAML 표기와 쓰기 가능 여부를 다시 확인해야 한다.
+`loadWorkspace`가 실제 원문과 경로를 확인하고 읽은 바이트의 revision을 전달한다. `planWorkspaceChange`는 같은 스캔에서 오류·검증된 무변경·검증된 YAML 후보를 구분한다. 후보는 저장 결과가 아니며 파일은 바뀌지 않는다. core의 `planDocumentChange`는 전달받은 값만으로 계산한다. 변경·저장 규칙은 [저장](.codocs/workspace/storage.yaml), revision의 의미는 [원문 버전](.codocs/workspace/revision.yaml)에서 확인한다. `planRename`의 `ready` 상태 역시 후속 writer가 최신 원문, YAML 표기와 쓰기 가능 여부를 다시 확인해야 한다.
 
 사용자가 작성하는 문서와 `[[이름]]` 문법은 [작성 가이드](docs/guide/README.md), 실행 가능한 가상 문서는 [`examples/.codocs`](examples/.codocs)에 있다.
 

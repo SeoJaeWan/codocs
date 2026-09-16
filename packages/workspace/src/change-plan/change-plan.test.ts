@@ -2,7 +2,7 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { changePlanStatuses } from '@codocs/core';
+import { changePlanStatuses, parseYaml } from '@codocs/core';
 import { describe, expect, it } from 'vitest';
 import { loadWorkspace } from '../loader/index.js';
 import { calculateRevision } from '../revision/index.js';
@@ -39,6 +39,98 @@ describe('작업 공간의 미저장 변경 계획', () => {
         );
       }
       expect(await readFile(file)).toEqual(bytes);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('실제 파일의 원문과 revision으로 ID 후보를 재파싱하고 충돌을 진단하되 저장하지 않는다', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'codocs-change-plan-flow-'));
+    try {
+      const folder = path.join(root, '.codocs');
+      await mkdir(folder);
+      const targetPath = path.join(folder, 'zone.yaml');
+      const targetBytes = Buffer.from(
+        '# 그대로 보존\r\nid: zone\r\nname: 구역\r\ndefinition: 설명\r\ndomains: [운영]\r\ndeprecatedAliases:\r\n  - id: return-zone\r\n    message: 기존 안내\r\n',
+      );
+      await writeFile(targetPath, targetBytes);
+      await writeFile(
+        path.join(folder, 'taken.yaml'),
+        'id: taken\nname: 다른 문서\ndefinition: 설명\ndomains: [운영]\n',
+      );
+      await writeFile(
+        path.join(folder, 'unrelated.yaml'),
+        'id: unrelated\nname: 오류 문서\ndomains: [운영]\n',
+      );
+      const scan = await loadWorkspace({ cwd: root });
+      const source = scan.documents.find(
+        (item) => item.source.path === '.codocs/zone.yaml',
+      );
+      expect(source?.raw).toBe(targetBytes.toString('utf8'));
+      expect(source?.revision).toBe(calculateRevision(targetBytes));
+      expect(source?.utf8Lossless).toBe(true);
+
+      const request = {
+        mode: 'update',
+        id: 'zone',
+        revision: source?.revision,
+        set: { id: 'next-zone' },
+      };
+      const result = planWorkspaceChange(request, scan);
+      expect(result.status).toBe(changePlanStatuses.candidate);
+      if (result.status === changePlanStatuses.candidate) {
+        expect(result.baseRevision).toBe(source?.revision);
+        expect(result.revision).toBe(
+          calculateRevision(Buffer.from(result.raw)),
+        );
+        expect(result.raw).toContain('# 그대로 보존\r\n');
+        expect(result.raw).toContain('message: 기존 안내\r\n');
+        const parsed = parseYaml(result.raw, '.codocs/zone.yaml');
+        expect(parsed.success).toBe(true);
+        if (parsed.success) expect(parsed.data).toEqual(result.data);
+        expect(result.data.deprecatedAliases).toEqual([
+          { id: 'return-zone', message: '기존 안내' },
+          { id: 'zone' },
+        ]);
+        expect(
+          result.diagnostics.some(
+            (issue) => issue.path === '.codocs/unrelated.yaml',
+          ),
+        ).toBe(false);
+        expect(Object.hasOwn(result, 'saved')).toBe(false);
+      }
+      expect(request.set.id).toBe('next-zone');
+      expect(source?.raw).toBe(targetBytes.toString('utf8'));
+      expect(await readFile(targetPath)).toEqual(targetBytes);
+
+      const collision = planWorkspaceChange(
+        { ...request, set: { id: 'taken' } },
+        scan,
+      );
+      expect(collision.status).toBe(changePlanStatuses.failed);
+      if (collision.status === changePlanStatuses.failed) {
+        expect(
+          collision.diagnostics.some((issue) => issue.code === 'duplicate_id'),
+        ).toBe(true);
+        expect(
+          collision.diagnostics.some(
+            (issue) => issue.path === '.codocs/unrelated.yaml',
+          ),
+        ).toBe(false);
+      }
+      const sameId = planWorkspaceChange(
+        { ...request, set: { id: 'zone' } },
+        scan,
+      );
+      expect(sameId.status).toBe(changePlanStatuses.unchanged);
+      if (sameId.status === changePlanStatuses.unchanged)
+        expect(sameId.revision).toBe(source?.revision);
+      const protectedList = planWorkspaceChange(
+        { ...request, set: { deprecatedAliases: [] } },
+        scan,
+      );
+      expect(protectedList.status).toBe(changePlanStatuses.failed);
+      expect(await readFile(targetPath)).toEqual(targetBytes);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
