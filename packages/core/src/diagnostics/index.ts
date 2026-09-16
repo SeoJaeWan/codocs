@@ -116,6 +116,36 @@ export const catalogDiagnosticMessages = {
 /** 상수에서 도출한 색인 진단 코드다. */
 export type CatalogDiagnosticCode =
   (typeof catalogDiagnosticCodes)[keyof typeof catalogDiagnosticCodes];
+/** 변경 후보 계산이 반환하는 오류 코드다. @domainValues */
+export const changePlanDiagnosticCodes = {
+  /** 요청 형태·속성 지정이 유효하지 않다. */
+  invalidRequest: 'invalid_change_request',
+  /** 현재 ID가 없거나 여러 경로와 충돌한다. */
+  targetUnavailable: 'change_target_unavailable',
+  /** 생성 경로가 이미 관측되었다. */
+  pathExists: 'change_path_exists',
+  /** 요청 revision과 읽은 원문 revision이 다르다. */
+  revisionMismatch: 'change_revision_mismatch',
+  /** 불완전한 관측으로 충돌을 확정할 수 없다. */
+  incompleteCatalog: 'change_incomplete_catalog',
+  /** UTF-8 디코딩 손실로 원문 보존 후보를 만들 수 없다. */
+  sourceNotLossless: 'source_not_lossless',
+  /** 후보의 재파싱 데이터가 기대 데이터와 다르다. */
+  candidateMismatch: 'candidate_mismatch',
+} as const;
+/** 후보 계산의 고정 진단 문구다. */
+export const changePlanDiagnosticMessages = {
+  invalidRequest: '변경 요청이 올바르지 않습니다.',
+  targetUnavailable: '현재 ID로 확인한 수정 대상이 없습니다.',
+  pathExists: '생성 경로에 이미 문서가 있습니다.',
+  revisionMismatch: '요청한 원문 버전이 현재 읽은 버전과 다릅니다.',
+  incompleteCatalog: '불완전한 관측에서 변경 후보의 충돌을 확정할 수 없습니다.',
+  sourceNotLossless: '원본 UTF-8 바이트를 손실 없이 보존할 수 없습니다.',
+  candidateMismatch: '후보를 다시 읽은 데이터가 요청한 데이터와 다릅니다.',
+} as const;
+/** 변경 후보 계산의 오류 코드다. */
+export type ChangePlanDiagnosticCode =
+  (typeof changePlanDiagnosticCodes)[keyof typeof changePlanDiagnosticCodes];
 /** 조회 투영에서 외부 계약으로 정규화하는 진단 코드다. @domainValues */
 export const queryDiagnosticCodes = {
   /** 전체 요청의 ID 배열이나 크기가 계약과 다르면 반환한다. */
@@ -146,6 +176,7 @@ export type DiagnosticCode =
   | SchemaDiagnosticCode
   | ReferenceDiagnosticCode
   | CatalogDiagnosticCode
+  | ChangePlanDiagnosticCode
   | QueryDiagnosticCode;
 /** 오류와 경고를 구분하는 공통 심각도다. */
 
