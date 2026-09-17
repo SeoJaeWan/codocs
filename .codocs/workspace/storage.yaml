@@ -79,6 +79,9 @@ definition: |
   허용 범위 안에서 .codocs와 필요한 부모 폴더가 없으면 생성한다.
 
   create 대상 파일이 이미 있으면 생성을 차단한다. 새 ID와 모든 소속 도메인의 이름 충돌도 검사한다. 자기 문서는 중복 대상으로 세지 않는다.
+  생성·수정 모두 ID는 프로젝트 전체에서 유일해야 하며, 이름이 완전히 같고 공통 도메인이 하나 이상인 다른 문서가 있으면 차단한다.
+  이름은 공백·영문 대소문자·단복수를 정규화하지 않고 해석된 문자열 그대로 비교한다.
+  도메인이 겹치지 않는 동명 문서는 허용하며 저장 후 별도 동명 문서 안내나 검사를 수행하지 않는다.
 
   사용자 속성도 set/unset과 보존·경고 규칙을 적용한다.
   경고만 있으면 저장 성공을 막지 않으며 무관한 다른 문서 오류 때문에 정상 쓰기를 전부 차단하지 않는다.
@@ -86,7 +89,7 @@ definition: |
   실패는 success:false·saved:false와 진단을 제공한다.
   검증된 무변경은 success:true·saved:false·changed:false·현재 revision을 반환하고 indexUpdated를 생략한다.
 
-  변경 저장 성공은 success·saved·changed와 id·source.path·revision·warnings, 색인·후보 검사 결과를 제공한다.
+  변경 저장 성공은 success·saved·changed와 id·source.path·revision·warnings, 색인 갱신 결과를 제공한다.
   반환할 revision은 반영한 새 파일 바이트에서 계산한다.
   문서 본문을 다시 반환하지 않는다.
 
