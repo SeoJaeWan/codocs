@@ -1,3 +1,4 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codocs/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCodocsQueryHandlers } from './index.js';
@@ -37,22 +38,50 @@ function invalidInput() {
   };
 }
 
-describe('MCP 직접 조회 handler', /** unknown 검증과 workspace 공통 envelope 전달을 검증한다. */ () => {
-  it('complete에서 정상·없음과 정상·충돌을 항목별 결과로 유지한다', /** 한 ID의 문제가 다른 결과나 최상위 성공을 바꾸지 않는지 확인한다. */ async () => {
-    const normal = {
-      id: 'normal',
-      found: true as const,
-      conflict: false as const,
-      source: { path: '.codocs/normal.yaml' },
-      confirmation: 'confirmed' as const,
-      document: { id: 'normal', definition: '본문' },
-      revision: 'revision',
-      references: ['target'],
-      referencedBy: ['source'],
-      diagnostics: [],
-    };
-    backend.get
-      .mockResolvedValueOnce({
+describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증', () => {
+  describe('상세 조회 응답 전달', () => {
+    it('유효한 ID 하나를 조회하면 작업 공간의 문서 응답을 그대로 반환한다', async () => {
+      const response = {
+        success: true,
+        scanStatus: 'complete',
+        results: [
+          {
+            id: 'normal',
+            found: true,
+            conflict: false,
+            source: { path: '.codocs/normal.yaml' },
+            confirmation: 'confirmed',
+            document: { id: 'normal' },
+            references: [],
+            referencedBy: [],
+            diagnostics: [],
+          },
+        ],
+      };
+      backend.get.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+      const input = { ids: ['normal'] };
+
+      const result = await handlers.codocsGet(input);
+
+      expect(result).toBe(response);
+      expect(backend.get).toHaveBeenCalledWith(input.ids);
+    });
+
+    it('정상 문서와 없는 ID를 함께 조회하면 항목별 결과를 그대로 반환한다', async () => {
+      const normal = {
+        id: 'normal',
+        found: true,
+        conflict: false,
+        source: { path: '.codocs/normal.yaml' },
+        confirmation: 'confirmed',
+        document: { id: 'normal', definition: '본문' },
+        revision: 'revision',
+        references: ['target'],
+        referencedBy: ['source'],
+        diagnostics: [],
+      };
+      const response = {
         success: true,
         scanStatus: 'complete',
         results: [
@@ -69,8 +98,19 @@ describe('MCP 직접 조회 handler', /** unknown 검증과 workspace 공통 env
             ],
           },
         ],
-      })
-      .mockResolvedValueOnce({
+      };
+      backend.get.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+      const input = { ids: ['normal', 'missing'] };
+
+      const result = await handlers.codocsGet(input);
+
+      expect(result).toBe(response);
+      expect(backend.get).toHaveBeenCalledWith(input.ids);
+    });
+
+    it('중복 ID와 정상 문서를 함께 조회하면 충돌 결과의 금지 필드를 덧붙이지 않는다', async () => {
+      const response = {
         success: true,
         scanStatus: 'complete',
         results: [
@@ -81,39 +121,34 @@ describe('MCP 직접 조회 handler', /** unknown 검증과 workspace 공통 env
             paths: ['.codocs/a.yaml', '.codocs/z.yaml'],
             diagnostics: [],
           },
-          normal,
+          {
+            id: 'normal',
+            found: true,
+            conflict: false,
+            source: { path: '.codocs/normal.yaml' },
+            confirmation: 'confirmed',
+            document: { id: 'normal' },
+            references: [],
+            referencedBy: [],
+            diagnostics: [],
+          },
         ],
-      });
-    const handlers = createCodocsQueryHandlers();
-    const mixed = await handlers.codocsGet({
-      ids: ['normal', 'missing'],
-    });
-    expect(mixed).toMatchObject({
-      success: true,
-      scanStatus: 'complete',
-    });
-    if (!mixed.success) throw new Error('상세 조회 실패');
-    expect(mixed.results).toEqual([
-      normal,
-      expect.objectContaining({ id: 'missing', found: false }),
-    ]);
-    const conflict = await handlers.codocsGet({
-      ids: ['shared', 'normal'],
-    });
-    if (!conflict.success) throw new Error('충돌 조회 실패');
-    expect(conflict.results[0]).toMatchObject({
-      found: true,
-      conflict: true,
-      paths: ['.codocs/a.yaml', '.codocs/z.yaml'],
-    });
-    for (const field of ['document', 'rawYaml', 'revision'])
-      expect(conflict.results[0]).not.toHaveProperty(field);
-    expect(conflict.results[1]).toBe(normal);
-  });
+      };
+      backend.get.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+      const input = { ids: ['shared', 'normal'] };
 
-  it('partial 미확인과 failed 비노출 envelope를 그대로 전달한다', /** workspace가 판정한 확인 상태와 필드 부재를 바꾸지 않는다. */ async () => {
-    backend.get
-      .mockResolvedValueOnce({
+      const result = await handlers.codocsGet(input);
+
+      expect(result).toBe(response);
+      if (!result.success) return;
+      expect(result.results[0]).not.toHaveProperty('document');
+      expect(result.results[0]).not.toHaveProperty('rawYaml');
+      expect(result.results[0]).not.toHaveProperty('revision');
+    });
+
+    it('부분 스캔의 미확인 조회 결과를 받으면 확인 상태를 그대로 전달한다', async () => {
+      const response = {
         success: true,
         scanStatus: 'partial',
         results: [
@@ -136,8 +171,19 @@ describe('MCP 직접 조회 handler', /** unknown 검증과 workspace 공통 env
             diagnostics: [],
           },
         ],
-      })
-      .mockResolvedValueOnce({
+      };
+      backend.get.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+      const input = { ids: ['alpha', 'outside'] };
+
+      const result = await handlers.codocsGet(input);
+
+      expect(result).toBe(response);
+      expect(backend.get).toHaveBeenCalledWith(input.ids);
+    });
+
+    it('작업 공간 조회가 실패하면 문서 결과를 만들지 않고 실패 응답을 전달한다', async () => {
+      const response = {
         success: false,
         scanStatus: 'failed',
         error: {
@@ -145,140 +191,187 @@ describe('MCP 직접 조회 handler', /** unknown 검증과 workspace 공통 env
           severity: 'error',
           message: '작업 경로를 읽을 수 없습니다.',
         },
-      });
-    const handlers = createCodocsQueryHandlers();
-    const partial = await handlers.codocsGet({
-      ids: ['alpha', 'outside'],
+      };
+      backend.get.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+      const input = { ids: ['alpha'] };
+
+      const result = await handlers.codocsGet(input);
+
+      expect(result).toBe(response);
+      expect(result).not.toHaveProperty('results');
     });
-    expect(partial).toMatchObject({ success: true, scanStatus: 'partial' });
-    if (!partial.success) throw new Error('부분 조회 실패');
-    expect(partial.results[0]).toMatchObject({
-      found: true,
-      confirmation: 'unconfirmed',
-      revision: 'previous',
-      document: { definition: '이전' },
-    });
-    expect(partial.results[1]).toEqual({
-      id: 'outside',
-      found: false,
-      confirmation: 'unconfirmed',
-      diagnostics: [],
-    });
-    const failed = await handlers.codocsGet({ ids: ['alpha'] });
-    expect(failed).toMatchObject({ success: false, scanStatus: 'failed' });
-    expect(failed).not.toHaveProperty('results');
   });
 
-  it('알 수 없는 속성·getter·잘못된 열거와 get 배열 전체를 실행 전에 거부한다', /** own data property가 아닌 입력에서 backend 호출이 없는지 확인한다. */ async () => {
-    const handlers = createCodocsQueryHandlers();
-    let reads = 0;
-    const getter = {};
-    Object.defineProperty(getter, 'ids', {
-      enumerable: true,
-      /** 접근자 입력이 실행되면 실패를 드러낸다. */
-      get: () => {
-        reads++;
-        return ['alpha'];
+  describe('요청 입력 검증과 backend 호출 방지', () => {
+    it.each([
+      { name: '알 수 없는 목록 속성', method: 'list', input: { limit: 10 } },
+      { name: '잘못된 종류 값', method: 'list', input: { kind: 'knowledge' } },
+      {
+        name: '명시적 undefined 상태',
+        method: 'list',
+        input: { status: undefined },
       },
-    });
-    const sparse = Array(1) as string[];
-    const revoked = Proxy.revocable({ ids: ['alpha'] }, {});
-    revoked.revoke();
-    const badInputs: readonly [string, unknown][] = [
-      ['list unknown', { limit: 10 }],
-      ['list enum', { kind: 'knowledge' }],
-      ['list explicit undefined', { status: undefined }],
-      ['get getter', getter],
-      ['get revoked proxy', revoked.proxy],
-      ['get empty', { ids: [] }],
-      ['get sparse', { ids: sparse }],
-      ['get unknown', { ids: ['alpha'], extra: true }],
-      [
-        'get 21 unique',
-        {
-          ids: Array.from(
-            { length: 21 },
-            /** 서로 다른 ID를 만든다. */ (_, index) => `id-${index}`,
-          ),
+      { name: '빈 ID 목록', method: 'get', input: { ids: [] } },
+      { name: '희소 ID 배열', method: 'get', input: { ids: Array(1) } },
+      {
+        name: '알 수 없는 상세 속성',
+        method: 'get',
+        input: { ids: ['alpha'], extra: true },
+      },
+      {
+        name: '21개 고유 ID',
+        method: 'get',
+        input: {
+          ids: Array.from({ length: 21 }, (_, index) => 'id-' + index),
         },
-      ],
-    ];
-    for (const [name, input] of badInputs) {
-      const result = name.startsWith('list')
-        ? await handlers.codocsList(input)
-        : await handlers.codocsGet(input);
-      expect(result, name).toEqual(invalidInput());
-    }
-    expect(reads).toBe(0);
-    expect(backend.list).not.toHaveBeenCalled();
-    expect(backend.get).not.toHaveBeenCalled();
-    backend.get.mockResolvedValue({
-      success: true,
-      scanStatus: 'complete',
-      results: [{ id: 'same', found: false, diagnostics: [] }],
+      },
+    ])(
+      '$name을 전달하면 입력 오류를 반환하고 backend를 호출하지 않는다',
+      async ({ method, input }) => {
+        const handlers = createCodocsQueryHandlers();
+
+        const result =
+          method === 'list'
+            ? await handlers.codocsList(input)
+            : await handlers.codocsGet(input);
+
+        expect(result).toEqual(invalidInput());
+        expect(backend.list).not.toHaveBeenCalled();
+        expect(backend.get).not.toHaveBeenCalled();
+      },
+    );
+
+    it('ID 속성이 접근자이면 접근자를 실행하지 않고 입력 오류를 반환한다', async () => {
+      const handlers = createCodocsQueryHandlers();
+      let reads = 0;
+      const input = Object.defineProperty({}, 'ids', {
+        enumerable: true,
+        /** 접근자 실행 여부를 관찰한다. */
+        get: () => {
+          reads++;
+          return ['alpha'];
+        },
+      });
+
+      const result = await handlers.codocsGet(input);
+
+      expect(result).toEqual(invalidInput());
+      expect(reads).toBe(0);
+      expect(backend.get).not.toHaveBeenCalled();
     });
-    expect(
-      await handlers.codocsGet({ ids: Array(21).fill('same') }),
-    ).toMatchObject({ success: true, results: [{ id: 'same' }] });
-    expect(backend.get).toHaveBeenCalledWith(['same']);
+
+    it('회수된 Proxy를 전달하면 입력 오류를 반환하고 backend를 호출하지 않는다', async () => {
+      const handlers = createCodocsQueryHandlers();
+      const revoked = Proxy.revocable({ ids: ['alpha'] }, {});
+      revoked.revoke();
+
+      const result = await handlers.codocsGet(revoked.proxy);
+
+      expect(result).toEqual(invalidInput());
+      expect(backend.get).not.toHaveBeenCalled();
+    });
+
+    it('같은 ID 21개를 전달하면 중복 제거한 한 ID로 backend를 호출한다', async () => {
+      const response = {
+        success: true,
+        scanStatus: 'complete',
+        results: [{ id: 'same', found: false, diagnostics: [] }],
+      };
+      backend.get.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+      const input = { ids: Array(21).fill('same') as string[] };
+
+      const result = await handlers.codocsGet(input);
+
+      expect(result).toBe(response);
+      expect(backend.get).toHaveBeenCalledWith(['same']);
+    });
   });
 
-  it('목록 필터와 cursor를 복사하고 모든 cursor 판정을 공통 envelope로 보존한다', /** 정상·불일치·변조·snapshot·refresh·재시작 결과를 변형하지 않는다. */ async () => {
-    const first = {
-      success: true,
-      scanStatus: 'complete',
-      items: [],
-      totalCount: 51,
-      returnedCount: 50,
-      nextCursor: 'cursor',
-    };
-    const expired = {
-      success: false,
-      scanStatus: 'complete',
-      error: {
-        code: 'cursor_expired',
-        severity: 'error',
-        message: '목록 커서가 만료되었습니다.',
+  describe('목록 조건과 cursor 응답 전달', () => {
+    it('목록 필터를 전달하면 backend에 같은 조건을 보내고 응답을 반환한다', async () => {
+      const response = {
+        success: true,
+        scanStatus: 'complete',
+        items: [],
+        totalCount: 51,
+        returnedCount: 50,
+        nextCursor: 'cursor',
+      };
+      backend.list.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+      const input = { domain: '업무', kind: 'policy', status: 'confirmed' };
+
+      const result = await handlers.codocsList(input);
+
+      expect(result).toBe(response);
+      expect(backend.list).toHaveBeenCalledWith(input);
+    });
+
+    it('cursor를 전달하면 backend에 cursor를 보내고 다음 페이지를 반환한다', async () => {
+      const response = {
+        success: true,
+        scanStatus: 'complete',
+        items: [],
+        totalCount: 51,
+        returnedCount: 1,
+        nextCursor: null,
+      };
+      backend.list.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+      const input = { cursor: 'cursor' };
+
+      const result = await handlers.codocsList(input);
+
+      expect(result).toBe(response);
+      expect(backend.list).toHaveBeenCalledWith(input);
+    });
+
+    it('cursor와 다른 도메인을 함께 전달하면 backend의 입력 오류를 그대로 반환한다', async () => {
+      const response = invalidInput();
+      backend.list.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+      const input = { cursor: 'cursor', domain: '다른 업무' };
+
+      const result = await handlers.codocsList(input);
+
+      expect(result).toBe(response);
+      expect(backend.list).toHaveBeenCalledWith(input);
+    });
+
+    it.each(['tampered', 'changed-snapshot', 'after-refresh', 'other-process'])(
+      '%s cursor가 만료되면 backend의 만료 오류를 그대로 반환한다',
+      async (cursor) => {
+        const response = {
+          success: false,
+          scanStatus: 'complete',
+          error: {
+            code: 'cursor_expired',
+            severity: 'error',
+            message: '목록 커서가 만료되었습니다.',
+          },
+        };
+        backend.list.mockResolvedValue(response);
+        const handlers = createCodocsQueryHandlers();
+        const input = { cursor };
+
+        const result = await handlers.codocsList(input);
+
+        expect(result).toBe(response);
+        expect(backend.list).toHaveBeenCalledWith(input);
       },
-    };
-    backend.list
-      .mockResolvedValueOnce(first)
-      .mockResolvedValueOnce({ ...first, returnedCount: 1 })
-      .mockResolvedValueOnce(invalidInput())
-      .mockResolvedValue(expired);
-    backend.refresh.mockResolvedValue({
-      success: true,
-      scanStatus: 'complete',
-    });
-    const handlers = createCodocsQueryHandlers();
-    expect(
-      await handlers.codocsList({
-        domain: '업무',
-        kind: 'policy',
-        status: 'confirmed',
-      }),
-    ).toBe(first);
-    expect(await handlers.codocsList({ cursor: 'cursor' })).toMatchObject({
-      success: true,
-    });
-    expect(
-      await handlers.codocsList({ cursor: 'cursor', domain: '다른 업무' }),
-    ).toEqual(invalidInput());
-    for (const cursor of [
-      'tampered',
-      'changed-snapshot',
-      'after-refresh',
-      'other-process',
-    ])
-      expect(await handlers.codocsList({ cursor })).toBe(expired);
-    await expect(handlers.refresh()).resolves.toEqual({
-      success: true,
-      scanStatus: 'complete',
-    });
-    expect(backend.list).toHaveBeenNthCalledWith(1, {
-      domain: '업무',
-      kind: 'policy',
-      status: 'confirmed',
+    );
+
+    it('새로 고침을 호출하면 같은 작업 공간 세션의 응답을 반환한다', async () => {
+      const response = { success: true, scanStatus: 'complete' };
+      backend.refresh.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+
+      const result = await handlers.refresh();
+
+      expect(result).toBe(response);
+      expect(backend.refresh).toHaveBeenCalledOnce();
     });
   });
 

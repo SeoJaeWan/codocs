@@ -1,3 +1,4 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   cpSync,
@@ -196,146 +197,98 @@ beforeAll(
   60_000,
 );
 
-describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 없이 소비한다. */ () => {
-  it('변경 후보 공개 JS 소비자가 바이트 revision·ID 변경·충돌·미저장을 확인한다', /** 배포 루트만 사용해 원문과 입력 불변을 확인한다. */ () => {
-    writeFileSync(
-      path.join(consumer, 'change-plan-contract.mjs'),
-      changePlanContractJs,
-    );
-    expect(run(['change-plan-contract.mjs'])).toContain(
-      'Change plan JS contract verified',
-    );
-  });
-
-  it('변경 후보 공개 d.ts 소비자가 strict 상태별 결과를 좁힌다', /** 배포 선언만으로 후보와 무변경의 필드 차이를 확인한다. */ () => {
-    writeFileSync(
-      path.join(consumer, 'change-plan-contract.ts'),
-      changePlanContractTs,
-    );
-    writeFileSync(
-      path.join(consumer, 'change-plan-contract.json'),
-      JSON.stringify(changePlanContractConfig),
-    );
-    expect(run([tsc, '-p', 'change-plan-contract.json'])).toBe('');
-  });
-
-  it('매처 공개 JS 소비자가 현재·이전 ID 근거와 UTF-16 범위·부분 결과를 실행한다', /** pluralize를 포함한 실제 dist 소비자에서 코드 매칭 계약을 확인한다. */ () => {
-    writeFileSync(
-      path.join(consumer, 'matcher-contract.mjs'),
-      matcherContractJs,
-    );
-    expect(run(['matcher-contract.mjs'])).toContain(
-      'Matcher JS contract verified',
-    );
-  });
-
-  it('매처 공개 d.ts 소비자가 strict 요청·후보·근거 union을 좁힌다', /** 소스 없는 strict 소비자가 공개 매처 타입과 이름 분리를 확인한다. */ () => {
-    writeFileSync(
-      path.join(consumer, 'matcher-contract.ts'),
-      matcherContractTs,
-    );
-    writeFileSync(
-      path.join(consumer, 'matcher-contract.json'),
-      JSON.stringify(matcherContractConfig),
-    );
-    expect(run([tsc, '-p', 'matcher-contract.json'])).toBe('');
-  });
-
-  it('이름 참조 공개 JS 소비자가 추출·색인·갱신·rename 계획과 실제 파일 상태를 확인한다', /** 링크 없는 소스 없는 소비자에서 공개 루트 계산 계약을 실행한다. */ () => {
-    writeFileSync(path.join(consumer, 'name-references.mjs'), nameReferenceJs);
-    expect(run(['name-references.mjs'])).toContain(
-      'Name reference JS contract verified',
-    );
-  });
-
-  it('이름 참조 공개 d.ts 소비자가 strict 상태 분기와 진단 코드 합집합을 좁힌다', /** 내부 subpath와 검증되지 않은 데이터 접근도 선언으로 거부한다. */ () => {
-    writeFileSync(path.join(consumer, 'name-references.ts'), nameReferenceTs);
-    writeFileSync(
-      path.join(consumer, 'name-references.json'),
-      JSON.stringify(nameReferenceConfig),
-    );
-    expect(run([tsc, '-p', 'name-references.json'])).toBe('');
-  });
-
-  it('MCP 공개 JS 소비자가 소스 없이 조회 handler와 package root 경계를 실행한다', /** 실제 dist만 복사한 소비자에서 목록·상세·입력 오류를 확인한다. */ () => {
-    writeFileSync(path.join(consumer, 'query-contract.mjs'), queryContractJs);
-    expect(run(['query-contract.mjs'])).toContain(
-      'MCP query JS contract verified',
-    );
-  });
-
-  it('MCP 공개 d.ts 소비자가 strict scanStatus와 결과 union을 좁힌다', /** 성공·실패 및 없음·충돌·본문 분기의 필드 존재를 검사한다. */ () => {
-    writeFileSync(path.join(consumer, 'query-contract.ts'), queryContractTs);
-    writeFileSync(
-      path.join(consumer, 'query-contract.json'),
-      JSON.stringify(queryContractConfig),
-    );
-    expect(run([tsc, '-p', 'query-contract.json'])).toBe('');
-  });
-
-  it('이름 참조 tarball 소비자가 symlink 없이 공개 JS·d.ts와 내부 subpath 거부를 실행한다', /** 기존 링크 fixture 실패와 독립적으로 실제 pack 배포를 추출해 소비한다. */ () => {
-    const directory = mkdtempSync(path.join(fixture, 'name packed '));
-    const packed = path.join(directory, 'consumer');
-    const pnpm = resolvePnpm();
-    mkdirSync(packed);
-    writeFileSync(
-      path.join(packed, 'package.json'),
-      JSON.stringify({ type: 'module' }),
-    );
-    for (const folder of ['core', 'workspace']) {
-      const archive = path.join(directory, folder + '.tgz');
-      run(
-        [
-          pnpm,
-          '--dir',
-          path.join(root, 'packages', folder),
-          'pack',
-          '--out',
-          archive,
-        ],
-        root,
+describe('빌드된 패키지의 외부 소비자 계약', () => {
+  describe('공개 JS와 선언 파일 소비', () => {
+    it('변경 후보 공개 JS 소비자가 바이트 revision·ID 변경·충돌·미저장을 확인한다', /** 배포 루트만 사용해 원문과 입력 불변을 확인한다. */ () => {
+      writeFileSync(
+        path.join(consumer, 'change-plan-contract.mjs'),
+        changePlanContractJs,
       );
-      const files = execFileSync('tar', ['-tzf', archive], {
-        encoding: 'utf8',
-      });
-      expect(files).toContain('package/dist/index.js');
-      expect(files).toContain('package/dist/index.d.ts');
-      expect(files).not.toContain('package/src/');
-      const destination = path.join(packed, 'node_modules/@codocs', folder);
-      mkdirSync(destination, { recursive: true });
-      execFileSync('tar', [
-        '-xzf',
-        archive,
-        '-C',
-        destination,
-        '--strip-components=1',
-      ]);
-      expect(existsSync(path.join(destination, 'src'))).toBe(false);
-    }
-    for (const dependency of ['pluralize', 'yaml', 'zod'])
-      cpSync(
-        path.join(consumer, 'node_modules', dependency),
-        path.join(packed, 'node_modules', dependency),
-        { recursive: true },
+      expect(run(['change-plan-contract.mjs'])).toContain(
+        'Change plan JS contract verified',
       );
-    writeFileSync(path.join(packed, 'name-references.mjs'), nameReferenceJs);
-    writeFileSync(path.join(packed, 'name-references.ts'), nameReferenceTs);
-    writeFileSync(
-      path.join(packed, 'name-references.json'),
-      JSON.stringify(nameReferenceConfig),
-    );
-    expect(run(['name-references.mjs'], packed)).toContain(
-      'Name reference JS contract verified',
-    );
-    expect(run([tsc, '-p', 'name-references.json'], packed)).toBe('');
+    });
+
+    it('변경 후보 공개 d.ts 소비자가 strict 상태별 결과를 좁힌다', /** 배포 선언만으로 후보와 무변경의 필드 차이를 확인한다. */ () => {
+      writeFileSync(
+        path.join(consumer, 'change-plan-contract.ts'),
+        changePlanContractTs,
+      );
+      writeFileSync(
+        path.join(consumer, 'change-plan-contract.json'),
+        JSON.stringify(changePlanContractConfig),
+      );
+      expect(run([tsc, '-p', 'change-plan-contract.json'])).toBe('');
+    });
+
+    it('매처 공개 JS 소비자가 현재·이전 ID 근거와 UTF-16 범위·부분 결과를 실행한다', /** pluralize를 포함한 실제 dist 소비자에서 코드 매칭 계약을 확인한다. */ () => {
+      writeFileSync(
+        path.join(consumer, 'matcher-contract.mjs'),
+        matcherContractJs,
+      );
+      expect(run(['matcher-contract.mjs'])).toContain(
+        'Matcher JS contract verified',
+      );
+    });
+
+    it('매처 공개 d.ts 소비자가 strict 요청·후보·근거 union을 좁힌다', /** 소스 없는 strict 소비자가 공개 매처 타입과 이름 분리를 확인한다. */ () => {
+      writeFileSync(
+        path.join(consumer, 'matcher-contract.ts'),
+        matcherContractTs,
+      );
+      writeFileSync(
+        path.join(consumer, 'matcher-contract.json'),
+        JSON.stringify(matcherContractConfig),
+      );
+      expect(run([tsc, '-p', 'matcher-contract.json'])).toBe('');
+    });
+
+    it('이름 참조 공개 JS 소비자가 추출·색인·갱신·rename 계획과 실제 파일 상태를 확인한다', /** 링크 없는 소스 없는 소비자에서 공개 루트 계산 계약을 실행한다. */ () => {
+      writeFileSync(
+        path.join(consumer, 'name-references.mjs'),
+        nameReferenceJs,
+      );
+      expect(run(['name-references.mjs'])).toContain(
+        'Name reference JS contract verified',
+      );
+    });
+
+    it('이름 참조 공개 d.ts 소비자가 strict 상태 분기와 진단 코드 합집합을 좁힌다', /** 내부 subpath와 검증되지 않은 데이터 접근도 선언으로 거부한다. */ () => {
+      writeFileSync(path.join(consumer, 'name-references.ts'), nameReferenceTs);
+      writeFileSync(
+        path.join(consumer, 'name-references.json'),
+        JSON.stringify(nameReferenceConfig),
+      );
+      expect(run([tsc, '-p', 'name-references.json'])).toBe('');
+    });
+
+    it('MCP 공개 JS 소비자가 소스 없이 조회 handler와 package root 경계를 실행한다', /** 실제 dist만 복사한 소비자에서 목록·상세·입력 오류를 확인한다. */ () => {
+      writeFileSync(path.join(consumer, 'query-contract.mjs'), queryContractJs);
+      expect(run(['query-contract.mjs'])).toContain(
+        'MCP query JS contract verified',
+      );
+    });
+
+    it('MCP 공개 d.ts 소비자가 strict scanStatus와 결과 union을 좁힌다', /** 성공·실패 및 없음·충돌·본문 분기의 필드 존재를 검사한다. */ () => {
+      writeFileSync(path.join(consumer, 'query-contract.ts'), queryContractTs);
+      writeFileSync(
+        path.join(consumer, 'query-contract.json'),
+        JSON.stringify(queryContractConfig),
+      );
+      expect(run([tsc, '-p', 'query-contract.json'])).toBe('');
+    });
   });
 
-  it('workspace tarball만 설치한 JS·TS 소비자가 실제 문서를 로딩하고 내부 subpath를 거부한다', /** 소스 없는 배포 소비자의 실제 IO와 구분된 반환 타입 및 exports 경계를 검증한다. */ () => {
-    const directory = mkdtempSync(path.join(fixture, 'workspace packed '));
-    const packedConsumer = path.join(directory, 'consumer');
-    try {
-      mkdirSync(packedConsumer);
+  describe('tarball 소비와 내부 경로 차단', () => {
+    it('이름 참조 tarball 소비자가 symlink 없이 공개 JS·d.ts와 내부 subpath 거부를 실행한다', /** 기존 링크 fixture 실패와 독립적으로 실제 pack 배포를 추출해 소비한다. */ () => {
+      const directory = mkdtempSync(path.join(fixture, 'name packed '));
+      const packed = path.join(directory, 'consumer');
       const pnpm = resolvePnpm();
+      mkdirSync(packed);
+      writeFileSync(
+        path.join(packed, 'package.json'),
+        JSON.stringify({ type: 'module' }),
+      );
       for (const folder of ['core', 'workspace']) {
         const archive = path.join(directory, folder + '.tgz');
         run(
@@ -355,62 +308,116 @@ describe('실제 빌드 package 소비자', /** JS와 선언 파일을 소스 �
         expect(files).toContain('package/dist/index.js');
         expect(files).toContain('package/dist/index.d.ts');
         expect(files).not.toContain('package/src/');
+        const destination = path.join(packed, 'node_modules/@codocs', folder);
+        mkdirSync(destination, { recursive: true });
+        execFileSync('tar', [
+          '-xzf',
+          archive,
+          '-C',
+          destination,
+          '--strip-components=1',
+        ]);
+        expect(existsSync(path.join(destination, 'src'))).toBe(false);
       }
-      writeFileSync(
-        path.join(packedConsumer, 'package.json'),
-        JSON.stringify({
-          type: 'module',
-          dependencies: {
-            '@codocs/core': 'file:../core.tgz',
-            '@codocs/workspace': 'file:../workspace.tgz',
-          },
-        }),
-      );
-      // private workspace 의존성도 같은 실제 tarball로 해석하도록 소비자 전용 workspace를 고정한다.
-      writeFileSync(
-        path.join(packedConsumer, 'pnpm-workspace.yaml'),
-        "packages: ['.']\noverrides:\n  '@codocs/core': 'file:../core.tgz'\n",
-      );
-      const install = [
-        pnpm,
-        'install',
-        '--store-dir',
-        path.join(directory, 'pnpm-store'),
-        '--cache-dir',
-        path.join(directory, 'pnpm-cache'),
-      ];
-      // 새 tarball과 전이 의존성을 전용 store에 준비한 뒤 실제 설치를 offline/frozen으로 반복한다.
-      for (const options of [[], ['--offline', '--frozen-lockfile']]) {
-        const installed = spawnSync(
-          process.execPath,
-          [...install, ...options],
-          {
-            cwd: packedConsumer,
-            encoding: 'utf8',
-          },
+      for (const dependency of ['pluralize', 'yaml', 'zod'])
+        cpSync(
+          path.join(consumer, 'node_modules', dependency),
+          path.join(packed, 'node_modules', dependency),
+          { recursive: true },
         );
-        expect(installed.status, installed.stdout + installed.stderr).toBe(0);
-        rmSync(path.join(packedConsumer, 'node_modules'), {
-          recursive: true,
-          force: true,
-        });
-      }
-      const restored = spawnSync(
-        process.execPath,
-        [...install, '--offline', '--frozen-lockfile'],
-        { cwd: packedConsumer, encoding: 'utf8' },
-      );
-      expect(restored.status, restored.stdout + restored.stderr).toBe(0);
-      for (const name of ['core', 'workspace']) {
-        expect(
-          existsSync(
-            path.join(packedConsumer, 'node_modules/@codocs', name, 'src'),
-          ),
-        ).toBe(false);
-      }
+      writeFileSync(path.join(packed, 'name-references.mjs'), nameReferenceJs);
+      writeFileSync(path.join(packed, 'name-references.ts'), nameReferenceTs);
       writeFileSync(
-        path.join(packedConsumer, 'workspace.mjs'),
-        `import assert from 'node:assert/strict';
+        path.join(packed, 'name-references.json'),
+        JSON.stringify(nameReferenceConfig),
+      );
+      expect(run(['name-references.mjs'], packed)).toContain(
+        'Name reference JS contract verified',
+      );
+      expect(run([tsc, '-p', 'name-references.json'], packed)).toBe('');
+    });
+
+    it('workspace tarball만 설치한 JS·TS 소비자가 실제 문서를 로딩하고 내부 subpath를 거부한다', /** 소스 없는 배포 소비자의 실제 IO와 구분된 반환 타입 및 exports 경계를 검증한다. */ () => {
+      const directory = mkdtempSync(path.join(fixture, 'workspace packed '));
+      const packedConsumer = path.join(directory, 'consumer');
+      try {
+        mkdirSync(packedConsumer);
+        const pnpm = resolvePnpm();
+        for (const folder of ['core', 'workspace']) {
+          const archive = path.join(directory, folder + '.tgz');
+          run(
+            [
+              pnpm,
+              '--dir',
+              path.join(root, 'packages', folder),
+              'pack',
+              '--out',
+              archive,
+            ],
+            root,
+          );
+          const files = execFileSync('tar', ['-tzf', archive], {
+            encoding: 'utf8',
+          });
+          expect(files).toContain('package/dist/index.js');
+          expect(files).toContain('package/dist/index.d.ts');
+          expect(files).not.toContain('package/src/');
+        }
+        writeFileSync(
+          path.join(packedConsumer, 'package.json'),
+          JSON.stringify({
+            type: 'module',
+            dependencies: {
+              '@codocs/core': 'file:../core.tgz',
+              '@codocs/workspace': 'file:../workspace.tgz',
+            },
+          }),
+        );
+        // private workspace 의존성도 같은 실제 tarball로 해석하도록 소비자 전용 workspace를 고정한다.
+        writeFileSync(
+          path.join(packedConsumer, 'pnpm-workspace.yaml'),
+          "packages: ['.']\noverrides:\n  '@codocs/core': 'file:../core.tgz'\n",
+        );
+        const install = [
+          pnpm,
+          'install',
+          '--store-dir',
+          path.join(directory, 'pnpm-store'),
+          '--cache-dir',
+          path.join(directory, 'pnpm-cache'),
+        ];
+        // 새 tarball과 전이 의존성을 전용 store에 준비한 뒤 실제 설치를 offline/frozen으로 반복한다.
+        for (const options of [[], ['--offline', '--frozen-lockfile']]) {
+          const installed = spawnSync(
+            process.execPath,
+            [...install, ...options],
+            {
+              cwd: packedConsumer,
+              encoding: 'utf8',
+            },
+          );
+          expect(installed.status, installed.stdout + installed.stderr).toBe(0);
+          rmSync(path.join(packedConsumer, 'node_modules'), {
+            recursive: true,
+            force: true,
+          });
+        }
+        const restored = spawnSync(
+          process.execPath,
+          [...install, '--offline', '--frozen-lockfile'],
+          { cwd: packedConsumer, encoding: 'utf8' },
+        );
+        expect(restored.status, restored.stdout + restored.stderr).toBe(0);
+        for (const name of ['core', 'workspace']) {
+          expect(
+            existsSync(
+              path.join(packedConsumer, 'node_modules/@codocs', name, 'src'),
+            ),
+          ).toBe(false);
+        }
+        writeFileSync(
+          path.join(packedConsumer, 'workspace.mjs'),
+          `import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, symlink, realpath, rm} from 'node:fs/promises';
 import path from 'node:path';
 import {loadWorkspace, resolveWorkspacePath, workspaceDiagnosticCodes, workspaceDiagnosticMessages} from '@codocs/workspace';
@@ -530,31 +537,31 @@ try {
 } finally {
   await rm(temporary, {recursive: true, force: true});
 }`,
-      );
-      expect(run(['workspace.mjs'], packedConsumer)).toContain(
-        'Workspace packed JS contract verified',
-      );
-      const config = {
-        compilerOptions: {
-          strict: true,
-          exactOptionalPropertyTypes: true,
-          noEmit: true,
-          module: 'NodeNext',
-          moduleResolution: 'NodeNext',
-          target: 'ES2022',
-          lib: ['ES2022', 'DOM'],
-          types: [],
-          skipLibCheck: false,
-        },
-        files: ['workspace.ts'],
-      };
-      writeFileSync(
-        path.join(packedConsumer, 'tsconfig.json'),
-        JSON.stringify(config),
-      );
-      writeFileSync(
-        path.join(packedConsumer, 'workspace.ts'),
-        `import {loadWorkspace, resolveWorkspacePath, workspaceDiagnosticCodes, workspaceDiagnosticMessages} from '@codocs/workspace';
+        );
+        expect(run(['workspace.mjs'], packedConsumer)).toContain(
+          'Workspace packed JS contract verified',
+        );
+        const config = {
+          compilerOptions: {
+            strict: true,
+            exactOptionalPropertyTypes: true,
+            noEmit: true,
+            module: 'NodeNext',
+            moduleResolution: 'NodeNext',
+            target: 'ES2022',
+            lib: ['ES2022', 'DOM'],
+            types: [],
+            skipLibCheck: false,
+          },
+          files: ['workspace.ts'],
+        };
+        writeFileSync(
+          path.join(packedConsumer, 'tsconfig.json'),
+          JSON.stringify(config),
+        );
+        writeFileSync(
+          path.join(packedConsumer, 'workspace.ts'),
+          `import {loadWorkspace, resolveWorkspacePath, workspaceDiagnosticCodes, workspaceDiagnosticMessages} from '@codocs/workspace';
 import type {WorkspaceScanResult, WorkspaceDocumentResult, WorkspaceScanDiagnostic, WorkspaceScanFailure, WorkspaceDocumentSource, WorkspaceSkippedCycle, WorkspaceDiagnostic, WorkspaceDiagnosticCode} from '@codocs/workspace';
 import type {Diagnostic, DiagnosticCode} from '@codocs/core';
 const workspaceCode: WorkspaceDiagnosticCode = workspaceDiagnosticCodes.readFailed;
@@ -617,54 +624,52 @@ for (const issue of diagnostics) {
   }
 }
 `,
-      );
-      const trace = run(
-        [tsc, '-p', 'tsconfig.json', '--traceResolution'],
-        packedConsumer,
-      );
-      const normalizedTrace = trace.replaceAll('\\', '/');
-      expect(normalizedTrace).toMatch(
-        /@codocs\/workspace[^\n]*\/dist\/index\.d\.ts/,
-      );
-      expect(normalizedTrace).toMatch(
-        /@codocs\/core[^\n]*\/dist\/index\.d\.ts/,
-      );
-      expect(normalizedTrace).not.toContain('/src/index.ts');
-      for (const subpath of [
-        'src/index.js',
-        'dist/index.js',
-        'dist/loader/index.js',
-      ]) {
-        writeFileSync(
-          path.join(packedConsumer, 'workspace.ts'),
-          `import type * as Hidden from '@codocs/workspace/${subpath}';\nexport type Value = typeof Hidden;\n`,
         );
-        const failure = spawnSync(
-          process.execPath,
-          [tsc, '-p', 'tsconfig.json'],
-          { cwd: packedConsumer, encoding: 'utf8' },
+        const trace = run(
+          [tsc, '-p', 'tsconfig.json', '--traceResolution'],
+          packedConsumer,
         );
-        expect(failure.status).toBe(2);
-        expect(failure.stdout + failure.stderr).toContain('TS2307');
+        const normalizedTrace = trace.replaceAll('\\', '/');
+        expect(normalizedTrace).toMatch(
+          /@codocs\/workspace[^\n]*\/dist\/index\.d\.ts/,
+        );
+        expect(normalizedTrace).toMatch(
+          /@codocs\/core[^\n]*\/dist\/index\.d\.ts/,
+        );
+        expect(normalizedTrace).not.toContain('/src/index.ts');
+        for (const subpath of [
+          'src/index.js',
+          'dist/index.js',
+          'dist/loader/index.js',
+        ]) {
+          writeFileSync(
+            path.join(packedConsumer, 'workspace.ts'),
+            `import type * as Hidden from '@codocs/workspace/${subpath}';\nexport type Value = typeof Hidden;\n`,
+          );
+          const failure = spawnSync(
+            process.execPath,
+            [tsc, '-p', 'tsconfig.json'],
+            { cwd: packedConsumer, encoding: 'utf8' },
+          );
+          expect(failure.status).toBe(2);
+          expect(failure.stdout + failure.stderr).toContain('TS2307');
+        }
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
       }
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
+    });
   });
 
-  it('기존 예제 두 파일은 단일 매핑으로 해석되고 ID·참조·본문을 유지한다', /** 공개 API로 실제 YAML과 원문 위치를 고정 기대값에 대조한다. */ () => {
-    checkExamples(root);
-  });
+  describe('실제 예제와 외부 런타임 계약', () => {
+    it('기존 예제 두 파일은 단일 매핑으로 해석되고 ID·참조·본문을 유지한다', /** 공개 API로 실제 YAML과 원문 위치를 고정 기대값에 대조한다. */ () => {
+      checkExamples(root);
+    });
 
-  it('Node subprocess가 ESM import 및 CJS require 진입점을 실제 로드한다', /** package 이름과 exports를 통해 모든 실제 출력을 로드한다. */ () => {
-    const script = `import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
+    it('Node subprocess가 ESM 공개 진입점을 가져오면 파서·검증기를 실행한다', () => {
+      const script = `
 for (const name of ${JSON.stringify(names)}) {
   const value = await import('@codocs/' + name);
   if (typeof value !== 'object') throw new Error('Invalid module: ' + name);
-}
-for (const name of ['language-server', 'vscode']) {
-  if (typeof require('@codocs/' + name) !== 'object') throw new Error('Invalid CJS');
 }
 const { parseYaml, getValueRange, yamlDiagnosticCodes, validateDocument } = await import('@codocs/core');
 const validated = validateDocument({ data: {id: 'order', name: '주문', definition: '정의', domains: ['영역'], custom: {nested: [null, 1, true]}} });
@@ -679,37 +684,56 @@ const unsupported = parseYaml('name: first\\nname: second');
 if (unsupported.success || !unsupported.diagnostics.some(issue => issue.code === yamlDiagnosticCodes.unsupportedYamlFeature)) throw new Error('Unsupported YAML diagnostic failed');
 if (!import.meta.resolve('yaml').startsWith(new URL('./node_modules/yaml/', import.meta.url).href)) throw new Error('Yaml dependency must be local');
 console.log('JS packages loaded');`;
-    writeFileSync(path.join(consumer, 'consume.mjs'), script);
-    expect(run(['consume.mjs'])).toContain('JS packages loaded');
-    for (const name of names) {
-      expect(
-        existsSync(path.join(consumer, 'node_modules/@codocs', name, 'src')),
-      ).toBe(false);
-    }
-  });
+      writeFileSync(path.join(consumer, 'consume.mjs'), script);
+      expect(run(['consume.mjs'])).toContain('JS packages loaded');
+      for (const name of names) {
+        expect(
+          existsSync(path.join(consumer, 'node_modules/@codocs', name, 'src')),
+        ).toBe(false);
+      }
+    });
 
-  it('빌드된 파서에 문법 오류나 중복 키를 입력하면 약속한 오류 코드 문자열을 반환한다', /** 기능 테스트는 공통 상수를 사용하므로, 이 계약 테스트는 명시적인 문자열로 외부 반환 코드의 호환성을 따로 검증한다. */ () => {
-    const script = `import assert from 'node:assert/strict';
-import { parseYaml } from '@codocs/core';
-const invalid = parseYaml('name: [');
-assert.equal(invalid.success, false);
-assert.ok(invalid.diagnostics.some(issue => issue.code === 'invalid_yaml'));
-const unsupported = parseYaml('name: first\\nname: second');
-assert.equal(unsupported.success, false);
-assert.ok(unsupported.diagnostics.some(issue => issue.code === 'unsupported_yaml_feature'));
-console.log('Diagnostic code contract verified');`;
-    writeFileSync(path.join(consumer, 'diagnosticCodes.mjs'), script);
-    expect(run(['diagnosticCodes.mjs'])).toContain(
-      'Diagnostic code contract verified',
+    it.each(['language-server', 'vscode'])(
+      'Node subprocess가 %s의 CJS 공개 진입점을 require하면 모듈을 반환한다',
+      (name) => {
+        const script = `const value = require('@codocs/${name}');
+if (typeof value !== 'object') throw new Error('Invalid CJS');
+console.log('CJS package loaded');`;
+        writeFileSync(path.join(consumer, 'consume.cjs'), script);
+        expect(run(['consume.cjs'])).toContain('CJS package loaded');
+      },
     );
-  });
 
-  it('빌드된 검증기를 파일과 객체 후보에 사용하면 외부 진단 계약과 입력을 보존한다', /** 실제 파일을 읽고 제품 코드·심각도·경로·UTF-16 위치와 불변성을 검사한다. */ () => {
-    const source =
-      '# 앞\n---\n{id: Bad-ID, definition: 정의, domains: [영역], examples: ["😀", false], aliases: [old]} # 뒤\n';
-    const filePath = path.join(consumer, 'invalid terms.yaml');
-    writeFileSync(filePath, source);
-    const script = `import assert from 'node:assert/strict';
+    it.each([
+      { name: '닫히지 않은 배열', source: 'name: [', code: 'invalid_yaml' },
+      {
+        name: '중복 키',
+        source: 'name: first\nname: second',
+        code: 'unsupported_yaml_feature',
+      },
+    ])(
+      '빌드된 파서에 $name을 입력하면 외부 오류 코드 $code를 반환한다',
+      ({ source, code }) => {
+        const script = `import assert from 'node:assert/strict';
+import { parseYaml } from '@codocs/core';
+const input = ${JSON.stringify(source)};
+const result = parseYaml(input);
+assert.equal(result.success, false);
+assert.ok(result.diagnostics.some(issue => issue.code === ${JSON.stringify(code)}));
+console.log('Diagnostic code contract verified');`;
+        writeFileSync(path.join(consumer, 'diagnosticCodes.mjs'), script);
+        expect(run(['diagnosticCodes.mjs'])).toContain(
+          'Diagnostic code contract verified',
+        );
+      },
+    );
+
+    it('빌드된 검증기를 파일과 객체 후보에 사용하면 외부 진단 계약과 입력을 보존한다', /** 실제 파일을 읽고 제품 코드·심각도·경로·UTF-16 위치와 불변성을 검사한다. */ () => {
+      const source =
+        '# 앞\n---\n{id: Bad-ID, definition: 정의, domains: [영역], examples: ["😀", false], aliases: [old]} # 뒤\n';
+      const filePath = path.join(consumer, 'invalid terms.yaml');
+      writeFileSync(filePath, source);
+      const script = `import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {parseYaml, validateDocument, schemaDiagnosticMessages} from '@codocs/core';
 const filePath = process.argv[2];
@@ -768,22 +792,22 @@ assert.equal(Object.hasOwn(rejected.errors[0], 'range'), false);
 assert.equal(Object.hasOwn(rejected, 'data'), false);
 assert.deepEqual(rejectedCandidate, rejectedBefore);
 console.log('Validator external contract verified');`;
-    writeFileSync(path.join(consumer, 'validatorContract.mjs'), script);
-    expect(run(['validatorContract.mjs', filePath])).toContain(
-      'Validator external contract verified',
-    );
-  });
+      writeFileSync(path.join(consumer, 'validatorContract.mjs'), script);
+      expect(run(['validatorContract.mjs', filePath])).toContain(
+        'Validator external contract verified',
+      );
+    });
 
-  it('별도 TS 소비자가 dist d.ts를 해석하고 금지 subpath를 거부한다', /** 타입 namespace를 출력 없이 검사하고 해석 경로를 확인한다. */ () => {
-    const code =
-      names
-        .map(
-          (name, index) =>
-            `import type * as Package${index} from '@codocs/${name}';\nexport type Module${index} = typeof Package${index};`,
-        )
-        .join('\n') +
-      "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition, yamlDiagnosticCodes, validateDocument } from '@codocs/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic, YamlDiagnosticCode, Document } from '@codocs/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\nexport const diagnosticCode: YamlDiagnosticCode = yamlDiagnosticCodes.invalidYaml;\nexport const returnedCodes: readonly YamlDiagnosticCode[] = diagnostics.map(issue => issue.code);\nconst validated = validateDocument({data: parsed.success ? parsed.data : {}});\nif (validated.success) {\n  const data: Document = validated.data;\n  const name: string = data.name; void name;\n  const domains: string[] = data.domains; void domains;\n}\n";
-    const validatorTypes = `
+    it('별도 TS 소비자가 dist d.ts를 해석하고 금지 subpath를 거부한다', /** 타입 namespace를 출력 없이 검사하고 해석 경로를 확인한다. */ () => {
+      const code =
+        names
+          .map(
+            (name, index) =>
+              `import type * as Package${index} from '@codocs/${name}';\nexport type Module${index} = typeof Package${index};`,
+          )
+          .join('\n') +
+        "\nimport { parseYaml, getKeyRange, getValueRange, getPropertyRange, offsetToPosition, yamlDiagnosticCodes, validateDocument } from '@codocs/core';\nimport type { YamlParseResult, FieldPath, OffsetRange, SourcePosition, YamlDiagnostic, YamlDiagnosticCode, Document } from '@codocs/core';\nconst parsed: YamlParseResult = parseYaml('name: test');\nconst path: FieldPath = ['name'];\nexport const ranges: (OffsetRange | undefined)[] = [getKeyRange(parsed, path), getValueRange(parsed, path), getPropertyRange(parsed, path)];\nexport const position: SourcePosition | undefined = offsetToPosition('😀', 2);\nexport const diagnostics: readonly YamlDiagnostic[] = parsed.diagnostics;\nexport const diagnosticCode: YamlDiagnosticCode = yamlDiagnosticCodes.invalidYaml;\nexport const returnedCodes: readonly YamlDiagnosticCode[] = diagnostics.map(issue => issue.code);\nconst validated = validateDocument({data: parsed.success ? parsed.data : {}});\nif (validated.success) {\n  const data: Document = validated.data;\n  const name: string = data.name; void name;\n  const domains: string[] = data.domains; void domains;\n}\n";
+      const validatorTypes = `
 // @ts-expect-error 이전 성공 타입은 단일 Document로 대체됐다.
 import type { Term, Knowledge } from '@codocs/core';
 import type { DocumentValidationResult, ValidateDocumentInput, JsonValue, SchemaDiagnostic, SchemaDiagnosticCode } from '@codocs/core';
@@ -825,250 +849,278 @@ void termStructure;
 import {knowledgeStructure} from '@codocs/core';
 void knowledgeStructure;
 `;
-    const config = {
-      compilerOptions: {
-        strict: true,
-        exactOptionalPropertyTypes: true,
-        noEmit: true,
-        module: 'NodeNext',
-        moduleResolution: 'NodeNext',
-        target: 'ES2022',
-        // Zod 선언의 URL 전역 참조도 실제 기본 라이브러리로 검사한다.
-        lib: ['ES2022', 'DOM'],
-        types: [],
-        skipLibCheck: false,
-      },
-      files: ['consume.ts'],
-    };
-    writeFileSync(path.join(consumer, 'tsconfig.json'), JSON.stringify(config));
-    writeFileSync(path.join(consumer, 'consume.ts'), code + validatorTypes);
-    const trace = run([tsc, '-p', 'tsconfig.json', '--traceResolution']);
-    for (const name of names) {
-      expect(trace.replaceAll('\\', '/')).toContain(
-        `@codocs/${name}/dist/index.d.ts`,
+      const config = {
+        compilerOptions: {
+          strict: true,
+          exactOptionalPropertyTypes: true,
+          noEmit: true,
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          target: 'ES2022',
+          // Zod 선언의 URL 전역 참조도 실제 기본 라이브러리로 검사한다.
+          lib: ['ES2022', 'DOM'],
+          types: [],
+          skipLibCheck: false,
+        },
+        files: ['consume.ts'],
+      };
+      writeFileSync(
+        path.join(consumer, 'tsconfig.json'),
+        JSON.stringify(config),
       );
-    }
-    expect(trace).not.toContain('/src/index.ts');
-    // 공개 입력 타입만 사용해도 root 선언의 Zod URL 의존성은 남는다.
-    writeFileSync(
-      path.join(consumer, 'consume.ts'),
-      "import type {ValidateDocumentInput} from '@codocs/core';\nexport const input: ValidateDocumentInput = {data: {}};\n",
-    );
-    writeFileSync(
-      path.join(consumer, 'tsconfig.json'),
-      JSON.stringify({
-        ...config,
-        compilerOptions: { ...config.compilerOptions, lib: ['ES2022'] },
-      }),
-    );
-    const esOnlyFailure = spawnSync(
-      process.execPath,
-      [tsc, '-p', 'tsconfig.json'],
-      { cwd: consumer, encoding: 'utf8' },
-    );
-    expect(esOnlyFailure.status).not.toBe(0);
-    expect(esOnlyFailure.stdout + esOnlyFailure.stderr).toContain(
-      "TS2304: Cannot find name 'URL'",
-    );
-    writeFileSync(path.join(consumer, 'tsconfig.json'), JSON.stringify(config));
-    writeFileSync(
-      path.join(consumer, 'consume.ts'),
-      "import type * as Hidden from '@codocs/core/src/index.js';\nexport type Value = typeof Hidden;\n",
-    );
-    const failure = spawnSync(process.execPath, [tsc, '-p', 'tsconfig.json'], {
-      cwd: consumer,
-      encoding: 'utf8',
+      writeFileSync(path.join(consumer, 'consume.ts'), code + validatorTypes);
+      const trace = run([tsc, '-p', 'tsconfig.json', '--traceResolution']);
+      for (const name of names) {
+        expect(trace.replaceAll('\\', '/')).toContain(
+          `@codocs/${name}/dist/index.d.ts`,
+        );
+      }
+      expect(trace).not.toContain('/src/index.ts');
+      // 공개 입력 타입만 사용해도 root 선언의 Zod URL 의존성은 남는다.
+      writeFileSync(
+        path.join(consumer, 'consume.ts'),
+        "import type {ValidateDocumentInput} from '@codocs/core';\nexport const input: ValidateDocumentInput = {data: {}};\n",
+      );
+      writeFileSync(
+        path.join(consumer, 'tsconfig.json'),
+        JSON.stringify({
+          ...config,
+          compilerOptions: { ...config.compilerOptions, lib: ['ES2022'] },
+        }),
+      );
+      const esOnlyFailure = spawnSync(
+        process.execPath,
+        [tsc, '-p', 'tsconfig.json'],
+        { cwd: consumer, encoding: 'utf8' },
+      );
+      expect(esOnlyFailure.status).not.toBe(0);
+      expect(esOnlyFailure.stdout + esOnlyFailure.stderr).toContain(
+        "TS2304: Cannot find name 'URL'",
+      );
+      writeFileSync(
+        path.join(consumer, 'tsconfig.json'),
+        JSON.stringify(config),
+      );
+      writeFileSync(
+        path.join(consumer, 'consume.ts'),
+        "import type * as Hidden from '@codocs/core/src/index.js';\nexport type Value = typeof Hidden;\n",
+      );
+      const failure = spawnSync(
+        process.execPath,
+        [tsc, '-p', 'tsconfig.json'],
+        {
+          cwd: consumer,
+          encoding: 'utf8',
+        },
+      );
+      expect(failure.status).not.toBe(0);
+      expect(failure.stdout + failure.stderr).toContain('TS2307');
     });
-    expect(failure.status).not.toBe(0);
-    expect(failure.stdout + failure.stderr).toContain('TS2307');
-  });
 
-  it('Node도 package 내부 subpath를 거부한다', /** runtime exports가 내부 접근을 차단하는지 실제 오류 코드로 확인한다. */ () => {
-    writeFileSync(
-      path.join(consumer, 'hidden.mjs'),
-      `try {
+    it('Node도 package 내부 subpath를 거부한다', /** runtime exports가 내부 접근을 차단하는지 실제 오류 코드로 확인한다. */ () => {
+      writeFileSync(
+        path.join(consumer, 'hidden.mjs'),
+        `try {
   await import('@codocs/core/dist/index.js');
   process.exit(1);
 } catch (error) {
   if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error;
   console.log(error.code);
 }`,
-    );
-    expect(run(['hidden.mjs'])).toContain('ERR_PACKAGE_PATH_NOT_EXPORTED');
-  });
-
-  it('각 출력 형식, test 제외 및 실제 배포 asset 복사를 확인한다', /** 가이드와 가상 YAML 및 서버 배치가 source와 동일한지 확인한다. */ () => {
-    for (const folder of folders) {
-      const directory = path.join(root, 'packages', folder, 'dist');
-      const extension = ['language-server', 'vscode'].includes(folder)
-        ? 'cjs'
-        : 'js';
-      expect(existsSync(path.join(directory, `index.${extension}`))).toBe(true);
-      expect(existsSync(path.join(directory, 'index.d.ts'))).toBe(true);
-      expect(
-        outputFiles(directory).every(
-          (file) => !/\.(test|spec)\.[cm]?[jt]s(?:\.map)?$/u.test(file),
-        ),
-      ).toBe(true);
-    }
-    for (const folder of ['mcp', 'vscode']) {
-      for (const relative of [
-        'docs/guide/README.md',
-        'examples/.codocs/order.yaml',
-        'examples/.codocs/fulfillment.yaml',
-      ]) {
-        expect(
-          readFileSync(
-            path.join(root, 'packages', folder, 'dist', relative),
-            'utf8',
-          ),
-        ).toBe(readFileSync(path.join(root, relative), 'utf8'));
-      }
-      checkExamples(
-        path.join(consumer, 'node_modules/@codocs', folder, 'dist'),
       );
-    }
-    expect(
-      readFileSync(
-        path.join(root, 'packages/vscode/dist/server/index.cjs'),
-        'utf8',
-      ),
-    ).toBe(
-      readFileSync(
-        path.join(root, 'packages/language-server/dist/index.cjs'),
-        'utf8',
-      ),
-    );
+      expect(run(['hidden.mjs'])).toContain('ERR_PACKAGE_PATH_NOT_EXPORTED');
+    });
   });
 
-  it('test 입력 파일을 실제 tsc 출력에서 제외한다', /** 실제 package build 설정으로 test 파일을 추가한 격리 source를 emit한다. */ () => {
-    const directory = path.join(fixture, 'exclude tests');
-    mkdirSync(path.join(directory, 'src'), { recursive: true });
-    writeFileSync(path.join(directory, 'package.json'), '{"type":"module"}');
-    writeFileSync(path.join(directory, 'src/index.ts'), 'export {};\n');
-    writeFileSync(
-      path.join(directory, 'src/ignored.test.ts'),
-      'export const ignored = true;\n',
-    );
-    writeFileSync(
-      path.join(directory, 'src/ignored.spec.ts'),
-      'export const ignored = true;\n',
-    );
-    const sourceConfig: unknown = JSON.parse(
-      readFileSync(
-        path.join(root, 'packages/core/tsconfig.build.json'),
-        'utf8',
-      ),
-    );
-    if (
-      typeof sourceConfig !== 'object' ||
-      sourceConfig === null ||
-      Array.isArray(sourceConfig)
-    )
-      throw new Error('Invalid build config');
-    writeFileSync(
-      path.join(directory, 'tsconfig.json'),
-      JSON.stringify({
-        ...sourceConfig,
-        extends: path.join(root, 'packages/core/tsconfig.json'),
-        include: ['src/**/*.ts'],
-        compilerOptions: {
-          noEmit: false,
-          declaration: true,
-          rootDir: 'src',
-          outDir: 'dist',
+  describe('산출물 구성과 배포 asset', () => {
+    describe('빌드 산출물의 파일 구성', () => {
+      it.each(folders)(
+        '%s를 빌드하면 실행 파일과 선언 파일을 만들고 테스트 파일을 제외한다',
+        (folder) => {
+          const directory = path.join(root, 'packages', folder, 'dist');
+          const extension = ['language-server', 'vscode'].includes(folder)
+            ? 'cjs'
+            : 'js';
+          expect(existsSync(path.join(directory, `index.${extension}`))).toBe(
+            true,
+          );
+          expect(existsSync(path.join(directory, 'index.d.ts'))).toBe(true);
+          expect(
+            outputFiles(directory).every(
+              (file) => !/\.(test|spec)\.[cm]?[jt]s(?:\.map)?$/u.test(file),
+            ),
+          ).toBe(true);
         },
-      }),
-    );
-    run([tsc, '-p', 'tsconfig.json'], directory);
-    expect(
-      outputFiles(path.join(directory, 'dist')).every(
-        (file) => !file.includes('ignored'),
-      ),
-    ).toBe(true);
-  });
-
-  it('pnpm pack 결과에 guide/example/server asset을 포함한다', /** 실제 tarball의 파일 목록으로 배포 asset 포함을 확인한다. */ () => {
-    const pnpm = resolvePnpm();
-    for (const folder of ['mcp', 'vscode']) {
-      const archive = path.join(fixture, folder + '.tgz');
-      run(
-        [
-          pnpm,
-          '--dir',
-          path.join(root, 'packages', folder),
-          'pack',
-          '--out',
-          archive,
-        ],
-        root,
       );
-      const files = execFileSync('tar', ['-tzf', archive], {
-        encoding: 'utf8',
+
+      it.each(['mcp', 'vscode'])(
+        '%s를 빌드하면 가이드와 예제 원문을 dist에 복사한다',
+        (folder) => {
+          for (const relative of [
+            'docs/guide/README.md',
+            'examples/.codocs/order.yaml',
+            'examples/.codocs/fulfillment.yaml',
+          ]) {
+            expect(
+              readFileSync(
+                path.join(root, 'packages', folder, 'dist', relative),
+                'utf8',
+              ),
+            ).toBe(readFileSync(path.join(root, relative), 'utf8'));
+          }
+          checkExamples(
+            path.join(consumer, 'node_modules/@codocs', folder, 'dist'),
+          );
+        },
+      );
+
+      it('VS Code 서버를 빌드하면 language-server 번들과 같은 내용을 배치한다', () => {
+        const server = readFileSync(
+          path.join(root, 'packages/vscode/dist/server/index.cjs'),
+          'utf8',
+        );
+        const built = readFileSync(
+          path.join(root, 'packages/language-server/dist/index.cjs'),
+          'utf8',
+        );
+        expect(server).toBe(built);
       });
-      for (const relative of [
-        'docs/guide/README.md',
-        'examples/.codocs/order.yaml',
-        'examples/.codocs/fulfillment.yaml',
-      ]) {
-        expect(files).toContain('package/dist/' + relative);
-      }
-      expect(files).not.toContain('package/src/');
-      const extracted = path.join(fixture, 'packed', folder);
-      mkdirSync(extracted, { recursive: true });
-      execFileSync('tar', ['-xzf', archive, '-C', extracted]);
-      expect(
+    });
+
+    it('test 입력 파일을 실제 tsc 출력에서 제외한다', /** 실제 package build 설정으로 test 파일을 추가한 격리 source를 emit한다. */ () => {
+      const directory = path.join(fixture, 'exclude tests');
+      mkdirSync(path.join(directory, 'src'), { recursive: true });
+      writeFileSync(path.join(directory, 'package.json'), '{"type":"module"}');
+      writeFileSync(path.join(directory, 'src/index.ts'), 'export {};\n');
+      writeFileSync(
+        path.join(directory, 'src/ignored.test.ts'),
+        'export const ignored = true;\n',
+      );
+      writeFileSync(
+        path.join(directory, 'src/ignored.spec.ts'),
+        'export const ignored = true;\n',
+      );
+      const sourceConfig: unknown = JSON.parse(
         readFileSync(
-          path.join(extracted, 'package/dist/docs/guide/README.md'),
+          path.join(root, 'packages/core/tsconfig.build.json'),
           'utf8',
         ),
-      ).toBe(readFileSync(path.join(root, 'docs/guide/README.md'), 'utf8'));
-      checkExamples(path.join(extracted, 'package/dist'));
-      if (folder === 'vscode')
-        expect(files).toContain('package/dist/server/index.cjs');
-    }
-  });
-
-  it('실제 tsc 오류와 같은 source의 독립 esbuild 성공을 구분한다', /** 의도적 타입 오류는 타입 검사에서 실패하고 번들은 실행 가능함을 보여 준다. */ async () => {
-    const directory = path.join(fixture, 'type error');
-    mkdirSync(directory, { recursive: true });
-    writeFileSync(path.join(directory, 'package.json'), '{"type":"module"}');
-    const source = path.join(directory, 'index.ts');
-    writeFileSync(
-      source,
-      'export const value: number = "intentional-type-error";\n',
-    );
-    writeFileSync(
-      path.join(directory, 'tsconfig.json'),
-      JSON.stringify({
-        extends: path.join(root, 'tsconfig.runtime.json'),
-        compilerOptions: { noEmit: true, types: [] },
-        files: ['index.ts'],
-      }),
-    );
-    const failure = spawnSync(process.execPath, [tsc, '-p', 'tsconfig.json'], {
-      cwd: directory,
-      encoding: 'utf8',
+      );
+      if (
+        typeof sourceConfig !== 'object' ||
+        sourceConfig === null ||
+        Array.isArray(sourceConfig)
+      )
+        throw new Error('Invalid build config');
+      writeFileSync(
+        path.join(directory, 'tsconfig.json'),
+        JSON.stringify({
+          ...sourceConfig,
+          extends: path.join(root, 'packages/core/tsconfig.json'),
+          include: ['src/**/*.ts'],
+          compilerOptions: {
+            noEmit: false,
+            declaration: true,
+            rootDir: 'src',
+            outDir: 'dist',
+          },
+        }),
+      );
+      run([tsc, '-p', 'tsconfig.json'], directory);
+      expect(
+        outputFiles(path.join(directory, 'dist')).every(
+          (file) => !file.includes('ignored'),
+        ),
+      ).toBe(true);
     });
-    expect(failure.status).not.toBe(0);
-    expect(failure.stdout + failure.stderr).toContain('TS2322');
-    await bundleIde([source], path.join(directory, 'index.cjs'));
-    expect(
-      run(
-        [
-          '-e',
-          "if (require('./index.cjs').value !== 'intentional-type-error') process.exit(1);",
-        ],
-        directory,
-      ),
-    ).toBe('');
+
+    it('pnpm pack 결과에 guide/example/server asset을 포함한다', /** 실제 tarball의 파일 목록으로 배포 asset 포함을 확인한다. */ () => {
+      const pnpm = resolvePnpm();
+      for (const folder of ['mcp', 'vscode']) {
+        const archive = path.join(fixture, folder + '.tgz');
+        run(
+          [
+            pnpm,
+            '--dir',
+            path.join(root, 'packages', folder),
+            'pack',
+            '--out',
+            archive,
+          ],
+          root,
+        );
+        const files = execFileSync('tar', ['-tzf', archive], {
+          encoding: 'utf8',
+        });
+        for (const relative of [
+          'docs/guide/README.md',
+          'examples/.codocs/order.yaml',
+          'examples/.codocs/fulfillment.yaml',
+        ]) {
+          expect(files).toContain('package/dist/' + relative);
+        }
+        expect(files).not.toContain('package/src/');
+        const extracted = path.join(fixture, 'packed', folder);
+        mkdirSync(extracted, { recursive: true });
+        execFileSync('tar', ['-xzf', archive, '-C', extracted]);
+        expect(
+          readFileSync(
+            path.join(extracted, 'package/dist/docs/guide/README.md'),
+            'utf8',
+          ),
+        ).toBe(readFileSync(path.join(root, 'docs/guide/README.md'), 'utf8'));
+        checkExamples(path.join(extracted, 'package/dist'));
+        if (folder === 'vscode')
+          expect(files).toContain('package/dist/server/index.cjs');
+      }
+    });
   });
 
-  it('CJS 서버 bundle에서 ESM package를 소비하고 vscode를 external로 유지한다', /** 실제 package import와 호스트 모듈 external 처리를 같은 빌드 함수로 검사한다. */ async () => {
-    const source = path.join(consumer, 'adapter.ts');
-    writeFileSync(
-      source,
-      `import { parseYaml, validateDocument } from '@codocs/core';
+  describe('번들 생성과 호스트 모듈 분리', () => {
+    it('실제 tsc 오류와 같은 source의 독립 esbuild 성공을 구분한다', /** 의도적 타입 오류는 타입 검사에서 실패하고 번들은 실행 가능함을 보여 준다. */ async () => {
+      const directory = path.join(fixture, 'type error');
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(path.join(directory, 'package.json'), '{"type":"module"}');
+      const source = path.join(directory, 'index.ts');
+      writeFileSync(
+        source,
+        'export const value: number = "intentional-type-error";\n',
+      );
+      writeFileSync(
+        path.join(directory, 'tsconfig.json'),
+        JSON.stringify({
+          extends: path.join(root, 'tsconfig.runtime.json'),
+          compilerOptions: { noEmit: true, types: [] },
+          files: ['index.ts'],
+        }),
+      );
+      const failure = spawnSync(
+        process.execPath,
+        [tsc, '-p', 'tsconfig.json'],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+        },
+      );
+      expect(failure.status).not.toBe(0);
+      expect(failure.stdout + failure.stderr).toContain('TS2322');
+      await bundleIde([source], path.join(directory, 'index.cjs'));
+      expect(
+        run(
+          [
+            '-e',
+            "if (require('./index.cjs').value !== 'intentional-type-error') process.exit(1);",
+          ],
+          directory,
+        ),
+      ).toBe('');
+    });
+
+    it('CJS 서버 bundle에서 ESM 패키지를 가져오면 공개 함수를 실행한다', /** 실제 package import와 호스트 모듈 external 처리를 같은 빌드 함수로 검사한다. */ async () => {
+      const source = path.join(consumer, 'adapter.ts');
+      writeFileSync(
+        source,
+        `import { parseYaml, validateDocument } from '@codocs/core';
 import '@codocs/workspace';
 const source = 'id: bundled\\nname: 名前 😀\\ndefinition: 定義\\ndomains: [Sales]\\n';
 const parsed = parseYaml(source);
@@ -1079,25 +1131,31 @@ const invalid = validateDocument({data: {...result.data, id: 'Bad-ID'}});
 if (invalid.success || invalid.errors[0]?.code !== 'invalid_field_value') throw new Error('Bundled validator error failed');
 export const loaded = true;
 `,
-    );
-    await bundleIde([source], path.join(consumer, 'adapter.cjs'));
-    expect(
-      run(['-e', "if (!require('./adapter.cjs').loaded) process.exit(1);"]),
-    ).toBe('');
-    writeFileSync(
-      source,
-      "import * as vscode from 'vscode';\nexport const host = vscode;\n",
-    );
-    const output = await bundleIde([source], path.join(consumer, 'host.cjs'), [
-      'vscode',
-    ]);
-    expect(
-      Object.values(output.metafile.outputs).flatMap((file) => file.imports),
-    ).toContainEqual(
-      expect.objectContaining({ path: 'vscode', external: true }),
-    );
-    expect(readFileSync(path.join(consumer, 'host.cjs'), 'utf8')).toContain(
-      'require("vscode")',
-    );
+      );
+      await bundleIde([source], path.join(consumer, 'adapter.cjs'));
+      expect(
+        run(['-e', "if (!require('./adapter.cjs').loaded) process.exit(1);"]),
+      ).toBe('');
+    });
+    it('CJS 서버 bundle에서 vscode를 가져오면 호스트 모듈을 external로 유지한다', async () => {
+      const source = path.join(consumer, 'host-adapter.ts');
+      writeFileSync(
+        source,
+        "import * as vscode from 'vscode';\nexport const host = vscode;\n",
+      );
+      const output = await bundleIde(
+        [source],
+        path.join(consumer, 'host.cjs'),
+        ['vscode'],
+      );
+      expect(
+        Object.values(output.metafile.outputs).flatMap((file) => file.imports),
+      ).toContainEqual(
+        expect.objectContaining({ path: 'vscode', external: true }),
+      );
+      expect(readFileSync(path.join(consumer, 'host.cjs'), 'utf8')).toContain(
+        'require("vscode")',
+      );
+    });
   });
 });

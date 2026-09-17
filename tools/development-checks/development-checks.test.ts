@@ -1,3 +1,4 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { ESLint } from 'eslint';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -31,16 +32,6 @@ const eslint = new ESLint({ cwd: root });
 /** 외부 JSON 값이 문자열 키를 가진 객체인지 확인한다. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** 실제 설정과 타입 프로그램으로 검사 결과의 규칙 ID를 반환한다. */
-async function ruleIds(code: string, owner = 'workspace'): Promise<string[]> {
-  const results = await eslint.lintText(code, {
-    filePath: path.join(root, 'packages', owner, 'src/index.ts'),
-  });
-  return results.flatMap((result) =>
-    result.messages.map((message) => message.ruleId ?? 'parser'),
-  );
 }
 
 describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정상 코드 fixture를 구성한다. */ () => {
@@ -136,42 +127,65 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
       'codocs/package-boundaries',
     ],
     ['wrong direction', "import '@codocs/mcp';", 'codocs/package-boundaries'],
-  ])('%s rejects with %s', async (_label, code, ruleId) => {
-    expect(await ruleIds(code)).toContain(ruleId);
-  });
+  ])(
+    '%s 코드를 검사하면 %s 규칙 오류를 반환한다',
+    async (_label, code, ruleId) => {
+      const results = await eslint.lintText(code, {
+        filePath: path.join(root, 'packages/workspace/src/index.ts'),
+      });
+      expect(
+        results.flatMap((result) =>
+          result.messages.map((message) => message.ruleId),
+        ),
+      ).toContain(ruleId);
+    },
+  );
 
-  it('정상 진입점과 짧은 콜백 및 처리된 Promise를 허용한다', /** 정상 코드 전체의 규칙 결과를 확인한다. */ async () => {
-    expect(
-      await ruleIds(
-        "import '@codocs/core';\n[1].map((value) => value + 1);\nawait Promise.resolve(1);\n/** 값을 반환한다. */\nexport function value(): number { return 1; }",
-      ),
-    ).toEqual([]);
-    expect(await ruleIds('export {};', 'core')).toEqual([]);
-    expect(
-      await ruleIds(
-        "import 'yaml';\nimport 'zod';\nimport 'pluralize';",
-        'core',
-      ),
-    ).toEqual([]);
-    expect(await ruleIds("import 'node:fs';", 'core')).toContain(
-      'codocs/package-boundaries',
-    );
+  describe('허용된 코드와 패키지 경계', () => {
+    it('공개 진입점과 처리된 Promise를 검사하면 규칙 오류를 반환하지 않는다', async () => {
+      const code =
+        "import '@codocs/core';\n[1].map((value) => value + 1);\nawait Promise.resolve(1);\n/** 값을 반환한다. */\nexport function value(): number { return 1; }";
+      const results = await eslint.lintText(code, {
+        filePath: path.join(root, 'packages/workspace/src/index.ts'),
+      });
+      expect(results.flatMap((result) => result.messages)).toEqual([]);
+    });
+
+    it('core의 빈 진입점을 검사하면 규칙 오류를 반환하지 않는다', async () => {
+      const code = 'export {};';
+      const results = await eslint.lintText(code, {
+        filePath: path.join(root, 'packages/core/src/index.ts'),
+      });
+      expect(results.flatMap((result) => result.messages)).toEqual([]);
+    });
+
+    it('core의 허용된 외부 의존성을 가져오면 경계 오류를 반환하지 않는다', async () => {
+      const code = "import 'yaml';\nimport 'zod';\nimport 'pluralize';";
+      const results = await eslint.lintText(code, {
+        filePath: path.join(root, 'packages/core/src/index.ts'),
+      });
+      expect(results.flatMap((result) => result.messages)).toEqual([]);
+    });
   });
 
   it.each([
     'node:fs/promises',
+    'node:fs',
     'fs',
     'vscode',
     'vscode-languageserver/node',
     '@modelcontextprotocol/sdk/server/index.js',
-  ])(
-    'core의 호스트 의존성 %s를 거부한다',
-    /** 호스트 모듈을 순수 패키지에서 배제한다. */ async (specifier) => {
-      expect(await ruleIds(`import '${specifier}';`, 'core')).toContain(
-        'codocs/package-boundaries',
-      );
-    },
-  );
+  ])('core가 %s를 가져오면 패키지 경계 오류를 반환한다', async (specifier) => {
+    const code = `import '${specifier}';`;
+    const results = await eslint.lintText(code, {
+      filePath: path.join(root, 'packages/core/src/index.ts'),
+    });
+    expect(
+      results.flatMap((result) =>
+        result.messages.map((message) => message.ruleId),
+      ),
+    ).toContain('codocs/package-boundaries');
+  });
 
   it('tsconfig 별칭으로 해석된 내부 소스 접근을 거부한다', /** 실제 TypeScript 경로 해석으로 우회 경로를 검사한다. */ async () => {
     const fixture = path.join(suiteFixture, 'resolved-boundary');
@@ -214,13 +228,27 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
     ).toEqual(['codocs/package-boundaries']);
   });
 
-  it('Promise 콜백 오용과 긴 콜백 설명 누락을 검출한다', /** 타입 기반 콜백 오류와 설명 범위를 확인한다. */ async () => {
+  it('비동기 forEach 콜백을 검사하면 Promise 오용 오류를 반환한다', async () => {
+    const code = '[1].forEach(async () => { await Promise.resolve(1); });';
+    const results = await eslint.lintText(code, {
+      filePath: path.join(root, 'packages/workspace/src/index.ts'),
+    });
     expect(
-      await ruleIds('[1].forEach(async () => { await Promise.resolve(1); });'),
+      results.flatMap((result) =>
+        result.messages.map((message) => message.ruleId),
+      ),
     ).toContain('@typescript-eslint/no-misused-promises');
+  });
+
+  it('설명 없는 긴 콜백을 검사하면 한국어 JSDoc 오류를 반환한다', async () => {
+    const code =
+      '[1].map((value) => {\n const next = value + 1;\n const result = next + 1;\n return result;\n});';
+    const results = await eslint.lintText(code, {
+      filePath: path.join(root, 'packages/workspace/src/index.ts'),
+    });
     expect(
-      await ruleIds(
-        '[1].map((value) => {\n const next = value + 1;\n const result = next + 1;\n return result;\n});',
+      results.flatMap((result) =>
+        result.messages.map((message) => message.ruleId),
       ),
     ).toContain('codocs/korean-jsdoc');
   });
@@ -253,54 +281,68 @@ describe('파일과 폴더 이름', /** 실제 ESLint 설정으로 경로 규칙
 });
 
 describe('설치와 패키지 계약', /** 설치와 공개 진입점 및 의존 방향을 확인한다. */ () => {
-  it('실제 Node 버전과 직접 도구 의존성이 정확하게 고정돼 있다', /** 런타임과 manifest 고정을 외부 입력 검증 후 확인한다. */ () => {
-    expect(process.versions.node).toBe(
-      readFileSync(path.join(root, '.node-version'), 'utf8').trim(),
-    );
-    const manifest: unknown = JSON.parse(
-      readFileSync(path.join(root, 'package.json'), 'utf8'),
-    );
-    if (!isRecord(manifest) || !isRecord(manifest.devDependencies))
-      throw new Error('Invalid root manifest');
-    expect(manifest.packageManager).toBe('pnpm@10.34.5');
-    for (const [name, version] of Object.entries(manifest.devDependencies)) {
-      expect(typeof version, name).toBe('string');
-      expect(version, name).toMatch(/^\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$/u);
-    }
-  });
+  describe('루트 도구와 패키지 manifest', () => {
+    it('.node-version을 읽으면 실행 중인 Node 버전과 일치한다', () => {
+      const declared = readFileSync(
+        path.join(root, '.node-version'),
+        'utf8',
+      ).trim();
+      expect(process.versions.node).toBe(declared);
+    });
 
-  it('다섯 패키지와 정확한 의존 방향 및 exports만 존재한다', /** 패키지 manifest를 외부 입력으로 검증한다. */ () => {
-    const dependencies: Record<string, string[]> = {
-      core: [],
-      workspace: ['@codocs/core'],
-      'language-server': ['@codocs/core', '@codocs/workspace'],
-      mcp: ['@codocs/core', '@codocs/workspace'],
-      vscode: [],
-    };
-    for (const [folder, expected] of Object.entries(dependencies)) {
+    it('루트 manifest를 읽으면 pnpm 버전이 고정돼 있다', () => {
       const manifest: unknown = JSON.parse(
-        readFileSync(
-          path.join(root, 'packages', folder, 'package.json'),
-          'utf8',
-        ),
+        readFileSync(path.join(root, 'package.json'), 'utf8'),
       );
-      expect(manifest).toMatchObject({ private: true });
-      if (!isRecord(manifest)) throw new Error('Invalid manifest');
-      if (!isRecord(manifest.exports)) throw new Error('Invalid exports');
-      expect(Object.keys(manifest.exports)).toEqual(['.']);
-      const actual: unknown = manifest.dependencies ?? {};
-      if (!isRecord(actual)) throw new Error('Invalid dependencies');
-      const internal = Object.entries(actual).filter(([name]) =>
-        name.startsWith('@codocs/'),
+      if (!isRecord(manifest)) throw new Error('Invalid root manifest');
+      expect(manifest.packageManager).toBe('pnpm@10.34.5');
+    });
+
+    it('루트 개발 의존성을 읽으면 모든 버전이 정확한 값으로 고정돼 있다', () => {
+      const manifest: unknown = JSON.parse(
+        readFileSync(path.join(root, 'package.json'), 'utf8'),
       );
-      expect(internal.map(([name]) => name)).toEqual(expected);
-      expect(internal.every(([, version]) => version === 'workspace:*')).toBe(
-        true,
-      );
-    }
+      if (!isRecord(manifest) || !isRecord(manifest.devDependencies))
+        throw new Error('Invalid root manifest');
+      for (const [name, version] of Object.entries(manifest.devDependencies)) {
+        expect(typeof version, name).toBe('string');
+        expect(version, name).toMatch(/^\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$/u);
+      }
+    });
+
+    it.each([
+      ['core', []],
+      ['workspace', ['@codocs/core']],
+      ['language-server', ['@codocs/core', '@codocs/workspace']],
+      ['mcp', ['@codocs/core', '@codocs/workspace']],
+      ['vscode', []],
+    ] as const)(
+      '%s manifest를 읽으면 내부 의존 방향과 공개 진입점이 일치한다',
+      (folder, expected) => {
+        const manifest: unknown = JSON.parse(
+          readFileSync(
+            path.join(root, 'packages', folder, 'package.json'),
+            'utf8',
+          ),
+        );
+        expect(manifest).toMatchObject({ private: true });
+        if (!isRecord(manifest) || !isRecord(manifest.exports))
+          throw new Error('Invalid package manifest');
+        expect(Object.keys(manifest.exports)).toEqual(['.']);
+        const dependencies: unknown = manifest.dependencies ?? {};
+        if (!isRecord(dependencies)) throw new Error('Invalid dependencies');
+        const internal = Object.entries(dependencies).filter(([name]) =>
+          name.startsWith('@codocs/'),
+        );
+        expect(internal.map(([name]) => name)).toEqual(expected);
+        expect(internal.every(([, version]) => version === 'workspace:*')).toBe(
+          true,
+        );
+      },
+    );
   });
 
-  it('frozen 재설치는 성공하고 불일치 manifest 설치는 실패한다', /** 실제 pnpm 프로세스와 격리 fixture로 lockfile을 검증한다. */ () => {
+  it('frozen 재설치 후 공개 JS·타입 소비자를 실행하면 배포 경계를 지킨다', /** 실제 pnpm 프로세스와 격리 fixture로 lockfile을 검증한다. */ () => {
     const executable = resolvePnpm();
     const environment = { ...process.env };
     environment.CI = 'true';
@@ -461,6 +503,11 @@ console.log('Frozen validator consumer verified');`,
     );
     expect(importFailure.status).not.toBe(0);
     expect(importFailure.stdout + importFailure.stderr).toContain('TS2307');
+  });
+  it('manifest와 lockfile이 불일치하면 frozen 설치가 거부된다', () => {
+    const executable = resolvePnpm();
+    const environment = { ...process.env };
+    environment.CI = 'true';
     const fixture = path.join(suiteFixture, 'frozen-mismatch');
     mkdirSync(fixture, { recursive: true });
     writeFileSync(

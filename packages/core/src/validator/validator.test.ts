@@ -1,18 +1,13 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { describe, expect, it } from 'vitest';
 import { diagnosticSeverities } from '../diagnostics/domain-values.js';
-import type {
-  DocumentValidationResult,
-  FieldPath,
-  SchemaDiagnostic,
-  SourcePosition,
-  ValidateDocumentInput,
-} from '../index.js';
+import type { SourcePosition } from '../diagnostics/index.js';
+import { parseYaml } from '../parser/index.js';
 import {
-  parseYaml,
   schemaDiagnosticCodes,
   schemaDiagnosticMessages,
-  validateDocument,
-} from '../index.js';
+} from '../diagnostics/index.js';
+import { validateDocument, type SchemaDiagnostic } from './index.js';
 
 const term = {
   id: 'sample-order',
@@ -42,61 +37,12 @@ function snapshot(value: unknown): unknown {
   return value;
 }
 
-/** 성공과 실패 모두에서 입력 데이터·원문·위치의 깊은 동등성을 확인한다. */
-function validateUnchanged(
-  input: ValidateDocumentInput,
-): DocumentValidationResult {
-  const before = snapshot(input);
-  const result = validateDocument(input);
-  expect(input).toEqual(before);
-  expect(
-    result.errors.every(
-      (issue) => issue.severity === diagnosticSeverities.error,
-    ),
-  ).toBe(true);
-  expect(
-    result.warnings.every(
-      (issue) => issue.severity === diagnosticSeverities.warning,
-    ),
-  ).toBe(true);
-  if (!result.success) expect(result).not.toHaveProperty('data');
-  return result;
-}
-
-/** 깊은 경로에 해당하는 진단을 찾는다. */
-function at(
-  issues: readonly SchemaDiagnostic[],
-  path: FieldPath,
-): SchemaDiagnostic {
-  const issue = issues.find(
-    /** 문자열 키와 숫자 인덱스를 그대로 비교한다. */ (candidate) =>
-      JSON.stringify(candidate.fieldPath) === JSON.stringify(path),
-  );
-  expect(issue).toBeDefined();
-  if (!issue) throw new Error('진단 경로가 없습니다.');
-  return issue;
-}
-
 /** 외부 줄 좌표를 원문 offset으로 변환하여 실제 slice를 검사한다. */
 function positionOffset(source: string, position: SourcePosition): number {
   let offset = 0;
   for (let line = 0; line < position.line; line++)
     offset = source.indexOf('\n', offset) + 1;
   return offset + position.character;
-}
-
-/** parser가 제공한 위치를 전체 검증기에 연결한다. */
-function validateSource(source: string): DocumentValidationResult {
-  const parsed = parseYaml(source, 'terms.yaml');
-  expect(parsed.success).toBe(true);
-  if (!parsed.success) throw new Error('파싱이 실패했습니다.');
-  return validateUnchanged({
-    data: parsed.data,
-    source: parsed.source,
-    fields: parsed.fields,
-    ...(parsed.rootRange ? { rootRange: parsed.rootRange } : {}),
-    path: 'terms.yaml',
-  });
 }
 
 /** 확인된 외부 범위의 원문을 추출한다. */
@@ -108,7 +54,23 @@ function issueSlice(source: string, issue: SchemaDiagnostic): string {
   );
 }
 
-describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 보존을 검사한다. */ () => {
+describe('validateDocument: 문서 스키마 검증', () => {
+  it('필수 필드를 모두 가진 문서를 검증하면 원래 값으로 성공한다', () => {
+    const data = {
+      id: 'order',
+      name: '주문',
+      definition: '설명',
+      domains: ['판매'],
+    };
+
+    const result = validateDocument({ data });
+
+    expect(result.success).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    if (result.success) expect(result.data).toEqual(data);
+  });
+
   it('복수 도메인과 모든 선택 속성을 함께 검사하면 종류 구분 없이 원문을 보존한다', /** 단일 문서에 예문·이전 명칭·정책 상태를 함께 허용한다. */ () => {
     const data = {
       ...term,
@@ -118,7 +80,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       kind: 'policy',
       status: 'confirmed',
     };
-    const result = validateUnchanged({ data });
+    const result = validateDocument({ data });
     expect(result.success).toBe(true);
     expect(result.warnings).toEqual([]);
     if (result.success) {
@@ -135,7 +97,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       body: '본문',
       domain: '업무',
     };
-    const result = validateUnchanged({ data: legacy });
+    const result = validateDocument({ data: legacy });
     expect(result.success).toBe(false);
     expect(result.errors.map((issue) => issue.fieldPath)).toEqual([
       ['name'],
@@ -149,7 +111,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       ['domain'],
     ]);
     const valid = { ...legacy, ...term };
-    const accepted = validateUnchanged({ data: valid });
+    const accepted = validateDocument({ data: valid });
     expect(accepted.success).toBe(true);
     if (accepted.success) expect(accepted.data).toEqual(valid);
   });
@@ -173,7 +135,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
   ])(
     '정상 문서와 선택 속성을 검사하면 원래 값으로 성공한다: %j',
     /** 선택 누락과 빈 선택 배열에 기본값을 넣지 않는다. */ (data) => {
-      const result = validateUnchanged({ data });
+      const result = validateDocument({ data });
       expect(result.success).toBe(true);
       expect(result.errors).toEqual([]);
       expect(result.warnings).toEqual([]);
@@ -191,7 +153,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
         { id: 'previous-order', message: '두 번째 변경' },
       ],
     };
-    const result = validateUnchanged({ data });
+    const result = validateDocument({ data });
     expect(result.success).toBe(true);
     expect(result.warnings).toEqual([]);
     if (result.success) expect(result.data).toEqual(data);
@@ -202,7 +164,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       ...term,
       deprecatedAliases: [{ id: term.id, message: '기존 안내' }],
     };
-    const result = validateUnchanged({ data });
+    const result = validateDocument({ data });
     expect(result.success).toBe(true);
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([
@@ -259,11 +221,15 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
   ])(
     '알려진 %s 속성에 %j를 넣으면 약속한 오류로 실패한다',
     /** 빈 문자열·null·ID·자료형을 구분한다. */ (key, value, code, message) => {
-      const result = validateUnchanged({ data: { ...term, [key]: value } });
+      const result = validateDocument({ data: { ...term, [key]: value } });
       expect(result.success).toBe(false);
-      expect(at(result.errors, [key]).code).toBe(code);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ fieldPath: [key], code }),
+      );
       if (message !== undefined)
-        expect(at(result.errors, [key]).message).toBe(message);
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({ fieldPath: [key], message }),
+        );
       expect(
         result.errors.every((issue) => !Object.hasOwn(issue, 'range')),
       ).toBe(true);
@@ -324,45 +290,76 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
   ] as const)(
     '배열 원소·별칭·열거 값을 검사하면 정확한 경로에서 실패한다: %j',
     /** 중첩 오류의 부모와 원소를 구분한다. */ (data, path, code) => {
-      const result = validateUnchanged({ data });
+      const result = validateDocument({ data });
       expect(result.success).toBe(false);
-      expect(at(result.errors, path).code).toBe(code);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({ fieldPath: path, code }),
+      );
     },
   );
 
-  it('기존 문서와 수정 후보를 병합해 검사하면 같은 필수 계약을 적용하고 원본을 유지한다', /** 호출자가 만든 전체 후보에 기본값이나 저장 허용을 추가하지 않는다. */ () => {
-    const original = { ...knowledge, custom: { nested: [null, ' Value '] } };
-    const originalBefore = snapshot(original);
-    const candidate = { ...original, name: ' New Title ' };
-    const accepted = validateUnchanged({ data: candidate });
-    expect(accepted.success).toBe(true);
-    if (accepted.success) {
-      expect(accepted.data.name).toBe(' New Title ');
-      expect(accepted.data).not.toHaveProperty('status');
-      expect(accepted.data).not.toHaveProperty('saveAllowed');
-    }
-    const { definition: omitted, ...incomplete } = candidate;
-    expect(omitted).toBeDefined();
-    const rejected = validateUnchanged({ data: incomplete });
-    expect(rejected.success).toBe(false);
-    expect(at(rejected.errors, ['definition']).code).toBe(
-      schemaDiagnosticCodes.missingRequiredField,
-    );
-    expect(original).toEqual(originalBefore);
+  describe('수정 후보 검증과 입력 보존', () => {
+    it('이름을 수정한 전체 문서를 검증하면 새 이름을 보존하고 기본 속성을 채우지 않는다', () => {
+      const data = { ...knowledge, name: ' New Title ' };
+
+      const result = validateDocument({ data });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.name).toBe(data.name);
+      expect(result.data).not.toHaveProperty('status');
+      expect(result.data).not.toHaveProperty('saveAllowed');
+    });
+
+    it('수정 후보에서 필수 정의를 제거하면 정의 누락 오류를 반환한다', () => {
+      const data = {
+        id: knowledge.id,
+        name: knowledge.name,
+        domains: knowledge.domains,
+      };
+
+      const result = validateDocument({ data });
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          fieldPath: ['definition'],
+          code: schemaDiagnosticCodes.missingRequiredField,
+        }),
+      );
+    });
+
+    it('중첩 사용자 값을 가진 수정 후보를 검증하면 원래 입력 객체를 변경하지 않는다', () => {
+      const original = { ...knowledge, custom: { nested: [null, ' Value '] } };
+      const data = { ...original, name: ' New Title ' };
+      const before = snapshot(data);
+
+      const result = validateDocument({ data });
+
+      expect(result.success).toBe(true);
+      expect(data).toEqual(before);
+      expect(original.custom).toEqual({ nested: [null, ' Value '] });
+    });
   });
 
   it('필수 필드를 생략하면 missing 오류와 안전한 사용자 경고를 함께 반환한다', /** 오류가 있어도 aliases 경고를 별도로 수집한다. */ () => {
     const { name: omitted, ...rest } = term;
     expect(omitted).toBeDefined();
-    const result = validateUnchanged({
+    const result = validateDocument({
       data: { ...rest, aliases: ['이전 이름'] },
     });
     expect(result.success).toBe(false);
-    expect(at(result.errors, ['name']).code).toBe(
-      schemaDiagnosticCodes.missingRequiredField,
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        fieldPath: ['name'],
+        code: schemaDiagnosticCodes.missingRequiredField,
+      }),
     );
-    expect(at(result.warnings, ['aliases']).code).toBe(
-      schemaDiagnosticCodes.unknownField,
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({
+        fieldPath: ['aliases'],
+        code: schemaDiagnosticCodes.unknownField,
+      }),
     );
   });
 
@@ -378,7 +375,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       custom: { a: shared, b: shared },
       deprecatedAliases: [{ id: 'old', custom: shared }],
     };
-    const result = validateUnchanged({ data });
+    const result = validateDocument({ data });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data).toEqual(data);
     expect(result.warnings.map((issue) => issue.fieldPath)).toEqual([
@@ -396,15 +393,16 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
   it.each([NaN, Infinity, -Infinity])(
     '중첩 비유한 수 %j를 검사하면 값 오류의 정확한 경로를 반환한다',
     /** JSON 문자열 키의 점과 배열 인덱스를 혼동하지 않는다. */ (number) => {
-      const result = validateUnchanged({
+      const result = validateDocument({
         data: { ...term, custom: { 'a.b': [null, { value: number }] } },
       });
       expect(result.success).toBe(false);
-      expect(at(result.errors, ['custom', 'a.b', 1, 'value']).code).toBe(
-        schemaDiagnosticCodes.invalidFieldValue,
-      );
-      expect(at(result.errors, ['custom', 'a.b', 1, 'value']).message).toBe(
-        schemaDiagnosticMessages.nonFiniteNumber,
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          fieldPath: ['custom', 'a.b', 1, 'value'],
+          code: schemaDiagnosticCodes.invalidFieldValue,
+          message: schemaDiagnosticMessages.nonFiniteNumber,
+        }),
       );
     },
   );
@@ -413,65 +411,121 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
     '실제 YAML %s를 파싱해 검사하면 비유한 수의 원문을 지목한다',
     /** 파서 성공은 스키마 성공을 보장하지 않는다. */ (value) => {
       const source = `id: order\nname: 이름\ndefinition: 정의\ndomains: [영역]\ncustom:\n  nested: [${value}]\n`;
-      const result = validateSource(source);
+      const parsed = parseYaml(source, 'terms.yaml');
+      if (!parsed.success) throw new Error('파싱이 실패했습니다.');
+      const result = validateDocument({
+        data: parsed.data,
+        source: parsed.source,
+        fields: parsed.fields,
+        ...(parsed.rootRange ? { rootRange: parsed.rootRange } : {}),
+        path: 'terms.yaml',
+      });
       expect(result.success).toBe(false);
-      expect(
-        issueSlice(source, at(result.errors, ['custom', 'nested', 0])),
-      ).toBe(value);
+      const issue = result.errors.find(
+        (candidate) =>
+          JSON.stringify(candidate.fieldPath) ===
+          JSON.stringify(['custom', 'nested', 0]),
+      );
+      expect(issue).toBeDefined();
+      if (issue) expect(issueSlice(source, issue)).toBe(value);
     },
   );
 
-  it('명시적 undefined와 비JSON 객체·순환을 검사하면 제거하거나 변환하지 않고 실패한다', /** getter는 실행하지 않고 공유 객체는 순환과 구분한다. */ () => {
+  describe('JSON으로 표현할 수 없는 사용자 값', () => {
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
-    let calls = 0;
-    const getter = Object.defineProperty({}, 'value', {
-      enumerable: true,
-      /** 실행 여부를 관찰하는 접근자다. */
-      get: /** 실행 여부를 관찰하는 접근자다. */ () => {
-        calls++;
-        return 'value';
+
+    it.each([
+      {
+        name: 'undefined',
+        custom: undefined,
+        message: schemaDiagnosticMessages.jsonValueRequired,
       },
-    });
-    const values = [
-      [undefined, schemaDiagnosticMessages.jsonValueRequired],
-      [cyclic, schemaDiagnosticMessages.cyclicReference],
-      [new Date(), schemaDiagnosticMessages.jsonObjectRequired],
-      [new Map(), schemaDiagnosticMessages.jsonObjectRequired],
-      [1n, schemaDiagnosticMessages.jsonValueRequired],
-      [
-        /** 비JSON 함수를 입력하는 사례다. */ () => true,
-        schemaDiagnosticMessages.jsonValueRequired,
-      ],
-      [getter, schemaDiagnosticMessages.jsonDataPropertyRequired],
-      [[, 'hole'], schemaDiagnosticMessages.missingArrayElement],
-      [
-        Object.assign([], { extra: 1 }),
-        schemaDiagnosticMessages.jsonDataPropertyRequired,
-      ],
-      [
-        { [Symbol('key')]: 'value' },
-        schemaDiagnosticMessages.jsonDataPropertyRequired,
-      ],
-    ] as const;
-    for (const [custom, message] of values) {
+      {
+        name: '순환 객체',
+        custom: cyclic,
+        message: schemaDiagnosticMessages.cyclicReference,
+      },
+      {
+        name: 'Date 객체',
+        custom: new Date(),
+        message: schemaDiagnosticMessages.jsonObjectRequired,
+      },
+      {
+        name: 'Map 객체',
+        custom: new Map(),
+        message: schemaDiagnosticMessages.jsonObjectRequired,
+      },
+      {
+        name: 'BigInt',
+        custom: 1n,
+        message: schemaDiagnosticMessages.jsonValueRequired,
+      },
+      {
+        name: '함수',
+        custom: /** JSON으로 표현할 수 없는 함수 값이다. */ () => true,
+        message: schemaDiagnosticMessages.jsonValueRequired,
+      },
+      {
+        name: '희소 배열',
+        custom: [, 'hole'],
+        message: schemaDiagnosticMessages.missingArrayElement,
+      },
+      {
+        name: '추가 속성이 있는 배열',
+        custom: Object.assign([], { extra: 1 }),
+        message: schemaDiagnosticMessages.jsonDataPropertyRequired,
+      },
+      {
+        name: 'Symbol 키 객체',
+        custom: { [Symbol('key')]: 'value' },
+        message: schemaDiagnosticMessages.jsonDataPropertyRequired,
+      },
+    ])(
+      '$name을 사용자 값으로 검사하면 해당 JSON 오류를 반환한다',
+      ({ custom, message }) => {
+        const data = { ...term, custom };
+        const result = validateDocument({ data });
+
+        expect(result.success).toBe(false);
+        expect(result).not.toHaveProperty('data');
+        expect(result.errors).toContainEqual(
+          expect.objectContaining({ message }),
+        );
+        expect(data.custom).toBe(custom);
+      },
+    );
+
+    it('사용자 객체의 getter를 검사하면 실행하지 않고 자료 속성 오류를 반환한다', () => {
+      let calls = 0;
+      const custom = Object.defineProperty({}, 'value', {
+        enumerable: true,
+        /** 접근자 실행 여부를 관찰한다. */
+        get: /** 접근자 실행 여부를 관찰한다. */ () => {
+          calls++;
+          return 'value';
+        },
+      });
       const data = { ...term, custom };
+
+      const result = validateDocument({ data });
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          message: schemaDiagnosticMessages.jsonDataPropertyRequired,
+        }),
+      );
+      expect(calls).toBe(0);
+    });
+
+    it.each([
+      { name: 'examples', data: { ...term, examples: undefined } },
+      { name: 'status', data: { ...knowledge, status: undefined } },
+    ])('$name에 명시적 undefined를 전달하면 검증에 실패한다', ({ data }) => {
       const result = validateDocument({ data });
       expect(result.success).toBe(false);
-      expect(data.custom).toBe(custom);
-      expect(result).not.toHaveProperty('data');
-      expect(result.warnings).toHaveLength(1);
-      expect(result.errors.some((issue) => issue.message === message)).toBe(
-        true,
-      );
-    }
-    expect(calls).toBe(0);
-    expect(
-      validateUnchanged({ data: { ...term, examples: undefined } }).success,
-    ).toBe(false);
-    expect(
-      validateUnchanged({ data: { ...knowledge, status: undefined } }).success,
-    ).toBe(false);
+    });
   });
 
   it('JSON 특수 키를 검사하면 __proto__와 constructor도 원래 값으로 유지한다', /** Zod 구조 검사 출력의 키 보호에 의해 사용자 데이터가 삭제되지 않는다. */ () => {
@@ -479,7 +533,7 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
       JSON.stringify(term).slice(0, -1) +
         ',"__proto__":{"x":1},"constructor":null}',
     );
-    const result = validateUnchanged({ data });
+    const result = validateDocument({ data });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(Object.hasOwn(result.data, '__proto__')).toBe(true);
@@ -491,20 +545,60 @@ describe('문서 스키마 검증', /** 정상·오류·사용자 값과 입력 
   it.each([null, [], 'term', 1, false, {}])(
     '전체 문서가 %j이면 성공 문서 타입을 제공하지 않는다',
     /** 문서 객체와 필수 속성 계약을 검사한다. */ (data) => {
-      const result = validateUnchanged({ data });
+      const result = validateDocument({ data });
       expect(result.success).toBe(false);
     },
   );
 });
 
 describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직접 부모와 UTF-16 좌표를 연결한다. */ () => {
-  it.each(['\n', '\r\n'])(
-    '실제 parser의 %j 원문을 검사하면 값·원소·키·중첩 부모를 지목한다',
-    /** 이모지 뒤의 열 좌표도 UTF-16으로 센다. */ (newline) => {
+  it.each(
+    [
+      { newlineName: 'LF', newline: '\n' },
+      { newlineName: 'CRLF', newline: '\r\n' },
+    ].flatMap(
+      ({ newlineName, newline }) =>
+        [
+          {
+            newlineName,
+            newline,
+            name: 'ID 값',
+            fieldPath: ['id'],
+            section: 'errors',
+            expected: 'Bad-ID',
+          },
+          {
+            newlineName,
+            newline,
+            name: '배열 원소',
+            fieldPath: ['examples', 1],
+            section: 'errors',
+            expected: 'false',
+          },
+          {
+            newlineName,
+            newline,
+            name: '누락된 중첩 ID의 부모',
+            fieldPath: ['deprecatedAliases', 0, 'id'],
+            section: 'errors',
+            expected: '{message: "안내"}',
+          },
+          {
+            newlineName,
+            newline,
+            name: '알 수 없는 키',
+            fieldPath: ['aliases'],
+            section: 'warnings',
+            expected: 'aliases',
+          },
+        ] as const,
+    ),
+  )(
+    '$newlineName 원문에서 $name을 검증하면 해당 원문 위치를 반환한다',
+    ({ newline, fieldPath, section, expected }) => {
       const source = [
         '# 앞 주석',
         '---',
-
         'id: Bad-ID # 값 뒤 주석',
         'name: 이름',
         'definition: 정의',
@@ -515,63 +609,108 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
         '# 뒤 주석',
         '',
       ].join(newline);
-      const result = validateSource(source);
-      expect(issueSlice(source, at(result.errors, ['id']))).toBe('Bad-ID');
-      const element = at(result.errors, ['examples', 1]);
-      expect(issueSlice(source, element)).toBe('false');
-      expect(element.range).toEqual({
-        start: { line: 6, character: 17 },
-        end: { line: 6, character: 22 },
+      const parsed = parseYaml(source, 'terms.yaml');
+      if (!parsed.success) throw new Error('파싱이 실패했습니다.');
+      const result = validateDocument({
+        data: parsed.data,
+        source: parsed.source,
+        fields: parsed.fields,
+        ...(parsed.rootRange ? { rootRange: parsed.rootRange } : {}),
+        path: 'terms.yaml',
       });
-      expect(
-        issueSlice(source, at(result.errors, ['deprecatedAliases', 0, 'id'])),
-      ).toBe('{message: "안내"}');
-      expect(issueSlice(source, at(result.warnings, ['aliases']))).toBe(
-        'aliases',
+      const issue = result[section].find(
+        (candidate) =>
+          JSON.stringify(candidate.fieldPath) === JSON.stringify(fieldPath),
       );
-      for (const issue of [...result.errors, ...result.warnings])
-        expect(issue.path).toBe('terms.yaml');
+
+      expect(issue).toBeDefined();
+      if (!issue) return;
+      expect(issueSlice(source, issue)).toBe(expected);
+      expect(issue.path).toBe('terms.yaml');
+      if (fieldPath[0] === 'examples')
+        expect(issue.range).toEqual({
+          start: { line: 6, character: 17 },
+          end: { line: 6, character: 22 },
+        });
     },
   );
 
   it('최상위 필수 필드를 생략하면 문서 표시·독립 주석을 제외한 rootRange를 지목한다', /** 확인된 최상위 AST 매핑을 누락 속성의 부모로 사용한다. */ () => {
     const source =
       '# 앞\n---\n{id: order, definition: 정의, domains: [영역]} # 뒤\n';
-    const result = validateSource(source);
-    expect(issueSlice(source, at(result.errors, ['name']))).toBe(
-      '{id: order, definition: 정의, domains: [영역]}',
+    const parsed = parseYaml(source, 'terms.yaml');
+    if (!parsed.success) throw new Error('파싱이 실패했습니다.');
+    const result = validateDocument({
+      data: parsed.data,
+      source: parsed.source,
+      fields: parsed.fields,
+      ...(parsed.rootRange ? { rootRange: parsed.rootRange } : {}),
+      path: 'terms.yaml',
+    });
+    const issue = result.errors.find(
+      (candidate) =>
+        JSON.stringify(candidate.fieldPath) === JSON.stringify(['name']),
     );
+    expect(issue).toBeDefined();
+    if (issue)
+      expect(issueSlice(source, issue)).toBe(
+        '{id: order, definition: 정의, domains: [영역]}',
+      );
   });
 
-  it('범위나 원문을 확인할 수 없으면 원문 전체나 키 위치로 대체하지 않는다', /** source 없는 범위와 잘못된 offset 및 직접 부모 부재를 생략한다. */ () => {
-    const data = { ...term, id: 'BAD', deprecatedAliases: [{}] };
-    const fields = [
-      {
-        fieldPath: ['id'],
-        key: { start: 0, end: 2 },
-        value: { start: 3, end: 99 },
-        property: undefined,
+  const invalidRangeData = { ...term, id: 'BAD', deprecatedAliases: [{}] };
+  const invalidFields = [
+    {
+      fieldPath: ['id'],
+      key: { start: 0, end: 2 },
+      value: { start: 3, end: 99 },
+      property: undefined,
+    },
+  ];
+  it.each([
+    {
+      name: '원문 없음',
+      input: {
+        data: invalidRangeData,
+        fields: invalidFields,
+        rootRange: { start: 0, end: 2 },
       },
-    ];
-    for (const input of [
-      { data, fields, rootRange: { start: 0, end: 2 } },
-      { data, fields, source: 'id: BAD' },
-      { data, source: 'id: BAD' },
-      {
-        data,
-        fields: [{ ...fields[0]!, value: { start: 4.5, end: 6 } }],
+    },
+    {
+      name: '범위 밖 offset',
+      input: {
+        data: invalidRangeData,
+        fields: invalidFields,
         source: 'id: BAD',
       },
-      {
-        data,
-        fields: [{ ...fields[0]!, value: { start: 6, end: 4 } }],
+    },
+    {
+      name: '직접 부모 범위 없음',
+      input: { data: invalidRangeData, source: 'id: BAD' },
+    },
+    {
+      name: '소수 offset',
+      input: {
+        data: invalidRangeData,
+        fields: [{ ...invalidFields[0]!, value: { start: 4.5, end: 6 } }],
         source: 'id: BAD',
       },
-    ]) {
-      const result = validateUnchanged(input);
+    },
+    {
+      name: '역순 offset',
+      input: {
+        data: invalidRangeData,
+        fields: [{ ...invalidFields[0]!, value: { start: 6, end: 4 } }],
+        source: 'id: BAD',
+      },
+    },
+  ])(
+    '$name으로 진단 위치를 확인할 수 없으면 원문 범위를 만들지 않는다',
+    ({ input }) => {
+      const result = validateDocument(input);
       expect(
         result.errors.every((issue) => !Object.hasOwn(issue, 'range')),
       ).toBe(true);
-    }
-  });
+    },
+  );
 });

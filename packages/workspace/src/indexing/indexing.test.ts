@@ -1,19 +1,11 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import {
   catalogDiagnosticCodes,
   catalogFailureKinds,
-  resolveReference,
   scanStatuses,
   type Document,
 } from '@codocs/core';
-import {
-  link,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
+import { link, mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   afterEach,
@@ -24,13 +16,11 @@ import {
   it,
 } from 'vitest';
 import {
-  buildWorkspaceCatalog,
-  loadWorkspace,
-  toCatalogScan,
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
-  type WorkspaceScanResult,
-} from '../index.js';
+} from '../diagnostics/index.js';
+import { buildWorkspaceCatalog, toCatalogScan } from './index.js';
+import { loadWorkspace, type WorkspaceScanResult } from '../loader/index.js';
 import { workspaceDocumentStatuses } from '../loader/domain-values.js';
 import { workspaceTargetKinds } from '../paths/domain-values.js';
 
@@ -58,17 +48,8 @@ async function file(name: string, raw: string): Promise<string> {
   await writeFile(target, raw);
   return target;
 }
-/** 문서 fixture의 확인 가능한 속성이다. */
-function term(
-  name: string,
-  definition = '정의',
-  id = name,
-  domain = '업무',
-): string {
-  return `id: ${id}\nname: ${name}\ndefinition: '${definition}'\ndomains: [${domain}]\n`;
-}
 /** 실제 루트에서 새 관측을 읽는다. */
-async function scan(): Promise<
+async function loadSuccessfulWorkspaceScan(): Promise<
   Extract<WorkspaceScanResult, { status: 'complete' | 'partial' }>
 > {
   const result = await loadWorkspace({ cwd: project });
@@ -78,80 +59,131 @@ async function scan(): Promise<
 }
 
 describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관측의 계약을 구분한다. */ () => {
-  it('검증 성공과 스키마 오류는 미검증 parsed를 보존하고 파싱 실패에는 추측 모델이 없다', /** 상태별 공개 데이터와 원문 위치를 확인한다. */ async () => {
-    await file('valid.yaml', term('정상', '정의', 'valid'));
-    const raw =
-      "name: 오류\r\ndomains: [업무]\r\ndefinition: '[[정상]]'\r\nexamples: ['[[정상]]', 42, '[[정상]]']\r\n";
-    await file('invalid.yaml', raw);
-    await file('parse.yaml', 'name: [\n');
-    const result = await scan();
-    const valid = result.documents.find(
-      (d) => d.status === workspaceDocumentStatuses.valid,
-    );
-    const invalid = result.documents.find(
-      (d) => d.status === workspaceDocumentStatuses.validationError,
-    );
-    const failed = result.documents.find(
-      (d) => d.status === workspaceDocumentStatuses.parseError,
-    );
-    if (
-      !valid ||
-      valid.status !== workspaceDocumentStatuses.valid ||
-      !invalid ||
-      invalid.status !== workspaceDocumentStatuses.validationError ||
-      !failed ||
-      failed.status !== workspaceDocumentStatuses.parseError
-    )
-      throw new Error('상태별 fixture 없음');
-    expectTypeOf(valid.data).toEqualTypeOf<Document>();
-    expectTypeOf(invalid.parsed.data).toEqualTypeOf<Record<string, unknown>>();
-    expect(valid.parsed.success).toBe(true);
-    expectTypeOf(failed.diagnostics).toMatchTypeOf<
-      readonly import('@codocs/core').YamlDiagnostic[]
-    >();
-    expect(invalid.parsed.source).toBe(raw);
-    expect(invalid.parsed.data.examples).toEqual(['[[정상]]', 42, '[[정상]]']);
-    expect(invalid).not.toHaveProperty('data');
-    expect(failed).not.toHaveProperty('data');
-    expect(failed).not.toHaveProperty('parsed');
-    const input = toCatalogScan(result);
-    expect(
-      input.observations.find((d) => d.path === invalid.source.path)?.parsed,
-    ).toBe(invalid.parsed);
-    expect(
-      input.observations.find((d) => d.path === failed.source.path)?.parsed,
-    ).toEqual({
-      success: false,
-      source: failed.raw,
-      diagnostics: failed.diagnostics,
+  describe('스캔 문서의 Catalog 관측 변환', () => {
+    it('검증된 문서를 변환하면 파싱 결과를 같은 관측으로 전달한다', async () => {
+      await file(
+        'valid.yaml',
+        "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\n",
+      );
+      const scan = await loadSuccessfulWorkspaceScan();
+      const source = scan.documents[0];
+      if (!source || source.status !== workspaceDocumentStatuses.valid)
+        throw new Error('검증된 문서가 없습니다.');
+      expectTypeOf(source.data).toEqualTypeOf<Document>();
+
+      const result = toCatalogScan(scan);
+
+      expect(result.observations[0]?.parsed).toBe(source.parsed);
+      expect(result.observations[0]?.path).toBe(source.source.path);
     });
-    const catalog = buildWorkspaceCatalog(result);
-    const document = catalog.documents.get(invalid.source.path);
-    expect(document?.name).toBe('오류');
-    expect(document?.id).toBeUndefined();
-    expect(document?.occurrences).toHaveLength(3);
-    expect(document?.references.map((d) => d.path)).toEqual([
-      valid.source.path,
-    ]);
-    expect(
-      document?.occurrences.map((d) =>
-        raw.slice(d.occurrence.offsetRange.start, d.occurrence.offsetRange.end),
-      ),
-    ).toEqual(['[[정상]]', '[[정상]]', '[[정상]]']);
-    expect(catalog.documents.get(failed.source.path)?.occurrences).toEqual([]);
+
+    it('필수 ID가 빠진 문서를 변환하면 확인된 파싱 데이터와 원문을 보존한다', async () => {
+      const raw = "name: 오류\r\ndomains: [업무]\r\ndefinition: '[[정상]]'\r\n";
+      await file('invalid.yaml', raw);
+      const scan = await loadSuccessfulWorkspaceScan();
+      const source = scan.documents[0];
+      if (
+        !source ||
+        source.status !== workspaceDocumentStatuses.validationError
+      )
+        throw new Error('검증 오류 문서가 없습니다.');
+      expectTypeOf(source.parsed.data).toEqualTypeOf<Record<string, unknown>>();
+
+      const result = toCatalogScan(scan);
+
+      expect(source.parsed.source).toBe(raw);
+      expect(result.observations[0]?.parsed).toBe(source.parsed);
+    });
+
+    it('파싱에 실패한 문서를 변환하면 원문과 진단만 가진 관측을 반환한다', async () => {
+      const raw = 'name: [\n';
+      await file('parse.yaml', raw);
+      const scan = await loadSuccessfulWorkspaceScan();
+      const source = scan.documents[0];
+      if (!source || source.status !== workspaceDocumentStatuses.parseError)
+        throw new Error('파싱 오류 문서가 없습니다.');
+
+      const result = toCatalogScan(scan);
+
+      expect(result.observations[0]?.parsed).toEqual({
+        success: false,
+        source: raw,
+        diagnostics: source.diagnostics,
+      });
+    });
+  });
+
+  describe('관측을 문서 참조로 색인', () => {
+    it('문서 하나를 색인하면 발견 경로와 이름을 가진 문서를 반환한다', async () => {
+      const raw =
+        "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\n";
+      await file('valid.yaml', raw);
+      const scan = await loadSuccessfulWorkspaceScan();
+
+      const catalog = buildWorkspaceCatalog(scan);
+
+      expect(catalog.documents.get(discovered('valid.yaml'))).toMatchObject({
+        path: discovered('valid.yaml'),
+        id: 'valid',
+        name: '정상',
+      });
+    });
+
+    it('ID가 없는 문서가 다른 문서를 참조하면 이름과 참조 위치를 연결한다', async () => {
+      await file(
+        'valid.yaml',
+        "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\n",
+      );
+      const raw =
+        "name: 오류\r\ndomains: [업무]\r\ndefinition: '[[정상]]'\r\nexamples: ['[[정상]]', 42, '[[정상]]']\r\n";
+      await file('invalid.yaml', raw);
+      const scan = await loadSuccessfulWorkspaceScan();
+
+      const catalog = buildWorkspaceCatalog(scan);
+      const document = catalog.documents.get(discovered('invalid.yaml'));
+
+      expect(document?.name).toBe('오류');
+      expect(document?.id).toBeUndefined();
+      expect(document?.occurrences).toHaveLength(3);
+      expect(document?.references.map((item) => item.path)).toEqual([
+        discovered('valid.yaml'),
+      ]);
+      expect(
+        document?.occurrences.map((item) =>
+          raw.slice(
+            item.occurrence.offsetRange.start,
+            item.occurrence.offsetRange.end,
+          ),
+        ),
+      ).toEqual(['[[정상]]', '[[정상]]', '[[정상]]']);
+    });
+
+    it('파싱에 실패한 문서를 색인하면 참조 위치를 만들지 않는다', async () => {
+      await file('parse.yaml', 'name: [\n');
+      const scan = await loadSuccessfulWorkspaceScan();
+
+      const catalog = buildWorkspaceCatalog(scan);
+
+      expect(
+        catalog.documents.get(discovered('parse.yaml'))?.occurrences,
+      ).toEqual([]);
+    });
   });
   it('잘못된 본문 자료형과 사용자 필드는 제외하고 정상 examples 원소만 추출한다', /** 타입을 추측하거나 문자열로 변환하지 않는다. */ async () => {
     await file(
       'a.yaml',
       'name: A\ndomains: [업무]\ndefinition: ["[[B]]"]\nexamples: [5, "[[B]]", { text: "[[B]]" }]\n',
     );
-    await file('b.yaml', term('B'));
+    await file(
+      'b.yaml',
+      "id: B\nname: B\ndefinition: '정의'\ndomains: [업무]\n",
+    );
     await file('unknown.yaml', 'name: 추측\ncustom: "[[B]]"\n');
     await file(
       'knowledge.yaml',
       'name: 지식\ndomains: [업무]\ndefinition: ["[[B]]"]\n',
     );
-    const catalog = buildWorkspaceCatalog(await scan());
+    const catalog = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
     expect(
       catalog.documents.get(discovered('a.yaml'))?.occurrences,
     ).toHaveLength(1);
@@ -163,29 +195,33 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     ).toEqual([]);
   });
   it('스키마 오류 대상도 확인한 이름과 경로로 직접 연결하고 대상 오류를 반환한다', /** 다중 도메인 대상의 경로는 후보 하나다. */ async () => {
-    await file('source.yaml', term('출발', '[[대상]]'));
+    await file(
+      'source.yaml',
+      "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\n",
+    );
     await file(
       'target.yaml',
       'name: 대상\ndomains: [업무, 공통]\ndefinition: 본문\n',
     );
-    const catalog = buildWorkspaceCatalog(await scan());
-    const resolution = resolveReference(catalog, { name: '대상' });
-    expect(resolution.status).toBe('resolved');
-    expect(resolution.candidates).toHaveLength(1);
-    expect(resolution.target?.errors.length).toBeGreaterThan(0);
+    const catalog = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
+    const resolution = catalog.documents.get(discovered('source.yaml'))
+      ?.occurrences[0]?.resolution;
+    expect(resolution?.status).toBe('resolved');
+    expect(resolution?.candidates).toHaveLength(1);
+    expect(resolution?.target?.errors.length).toBeGreaterThan(0);
     expect(
       catalog.documents
         .get(discovered('target.yaml'))
         ?.referencedBy.map((d) => d.path),
     ).toEqual([discovered('source.yaml')]);
-    expect(
-      resolveReference(catalog, { name: '대상', domain: '공통' }).target?.path,
-    ).toBe(discovered('target.yaml'));
   });
   it('실제 hardlink의 ID가 같아도 발견 경로별 문서와 충돌 진단을 유지한다', /** 파일 ID와 실경로를 병합 키로 사용하지 않는다. */ async () => {
-    const target = await file('first.yaml', term('공유', '정의', 'same'));
+    const target = await file(
+      'first.yaml',
+      "id: same\nname: 공유\ndefinition: '정의'\ndomains: [업무]\n",
+    );
     await link(target, path.join(project, discovered('second.yml')));
-    const result = await scan();
+    const result = await loadSuccessfulWorkspaceScan();
     const catalog = buildWorkspaceCatalog(result);
     expect(result.documents).toHaveLength(2);
     expect(catalog.documents.size).toBe(2);
@@ -209,11 +245,23 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     expect(buildWorkspaceCatalog(aliased).documents.size).toBe(2);
   });
   it('모호한 후보에는 역참조가 없고 같은 발견 문서의 자기 참조는 제외하며 순환은 유지한다', /** 확정 직접 연결과 모든 등장 기록을 구분한다. */ async () => {
-    await file('a.yaml', term('A', '[[B]] [[A]] [[중복]] [[B]]'));
-    await file('b.yaml', term('B', '[[A]]'));
-    await file('c.yaml', term('중복', '정의', 'c', '업무'));
-    await file('d.yaml', term('중복', '정의', 'd', '공통'));
-    const catalog = buildWorkspaceCatalog(await scan());
+    await file(
+      'a.yaml',
+      "id: A\nname: A\ndefinition: '[[B]] [[A]] [[중복]] [[B]]'\ndomains: [업무]\n",
+    );
+    await file(
+      'b.yaml',
+      "id: B\nname: B\ndefinition: '[[A]]'\ndomains: [업무]\n",
+    );
+    await file(
+      'c.yaml',
+      "id: c\nname: 중복\ndefinition: '정의'\ndomains: [업무]\n",
+    );
+    await file(
+      'd.yaml',
+      "id: d\nname: 중복\ndefinition: '정의'\ndomains: [공통]\n",
+    );
+    const catalog = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
     expect(
       catalog.documents
         .get(discovered('a.yaml'))
@@ -241,7 +289,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
       'self.yaml',
       'id: self\nname: 자신\ndomains: [업무, 공통]\ndefinition: "[[공통:자신]]"\n',
     );
-    const catalog = buildWorkspaceCatalog(await scan());
+    const catalog = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
     const document = catalog.documents.get(discovered('self.yaml'));
     expect(document?.occurrences[0]?.resolution.status).toBe('self');
     expect(
@@ -252,131 +300,233 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     expect(document?.references).toEqual([]);
     expect(document?.referencedBy).toEqual([]);
   });
-  it('실제 파일 변경·이동·삭제와 충돌 해소 후 이전 연결과 진단을 재계산한다', /** complete 관측으로 오래된 키와 연결을 교체한다. */ async () => {
-    const source = await file('source.yaml', term('출발', '[[대상]]'));
-    const target = await file('target.yaml', term('대상', '정의', 'shared'));
-    const duplicate = await file(
-      'duplicate.yaml',
-      term('대상', '정의', 'shared'),
-    );
-    const first = buildWorkspaceCatalog(await scan());
-    expect(
-      first.documents.get(discovered('source.yaml'))?.occurrences[0]?.resolution
-        .status,
-    ).toBe('ambiguous');
-    await rm(duplicate);
-    await rename(target, path.join(project, discovered('moved.yaml')));
-    const second = buildWorkspaceCatalog(await scan(), first);
-    expect(second.documents.has(discovered('target.yaml'))).toBe(false);
-    expect(
-      second.documents
-        .get(discovered('source.yaml'))
-        ?.references.map((d) => d.path),
-    ).toEqual([discovered('moved.yaml')]);
-    expect(second.documents.get(discovered('moved.yaml'))?.diagnostics).toEqual(
-      [],
-    );
-    await file('moved.yaml', term('새이름', '정의', 'new-id', '공통'));
-    await file('source.yaml', term('출발', '[[공통:새이름]]'));
-    const third = buildWorkspaceCatalog(await scan(), second);
-    expect(third.idPaths.has('shared')).toBe(false);
-    expect(
-      third.documents.get(discovered('source.yaml'))?.references[0]?.name,
-    ).toBe('새이름');
-    await rm(path.join(project, discovered('moved.yaml')));
-    const fourth = buildWorkspaceCatalog(await scan(), third);
-    expect(
-      fourth.documents.get(discovered('source.yaml'))?.occurrences[0]
-        ?.resolution.status,
-    ).toBe('missing');
-    expect(await readFile(source, 'utf8')).toBe(
-      term('출발', '[[공통:새이름]]'),
-    );
+  describe('파일 변화 후 Catalog 연결 재계산', () => {
+    it('이름 충돌 문서를 지우고 대상을 이동하면 이동한 경로로 참조를 연결한다', async () => {
+      await file(
+        'source.yaml',
+        "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\n",
+      );
+      const target = await file(
+        'target.yaml',
+        "id: shared\nname: 대상\ndefinition: '정의'\ndomains: [업무]\n",
+      );
+      const duplicate = await file(
+        'duplicate.yaml',
+        "id: shared\nname: 대상\ndefinition: '정의'\ndomains: [업무]\n",
+      );
+      const first = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
+      expect(
+        first.documents.get(discovered('source.yaml'))?.occurrences[0]
+          ?.resolution.status,
+      ).toBe('ambiguous');
+      await rm(duplicate);
+      await rename(target, path.join(project, discovered('moved.yaml')));
+
+      const result = buildWorkspaceCatalog(
+        await loadSuccessfulWorkspaceScan(),
+        first,
+      );
+
+      expect(result.documents.has(discovered('target.yaml'))).toBe(false);
+      expect(
+        result.documents
+          .get(discovered('source.yaml'))
+          ?.references.map((item) => item.path),
+      ).toEqual([discovered('moved.yaml')]);
+      expect(
+        result.documents.get(discovered('moved.yaml'))?.diagnostics,
+      ).toEqual([]);
+    });
+
+    it('대상 이름과 ID를 수정하면 이전 ID를 버리고 수정된 이름으로 연결한다', async () => {
+      await file(
+        'source.yaml',
+        "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\n",
+      );
+      await file(
+        'target.yaml',
+        "id: shared\nname: 대상\ndefinition: '정의'\ndomains: [업무]\n",
+      );
+      const first = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
+      await file(
+        'target.yaml',
+        "id: new-id\nname: 새이름\ndefinition: '정의'\ndomains: [공통]\n",
+      );
+      await file(
+        'source.yaml',
+        "id: 출발\nname: 출발\ndefinition: '[[공통:새이름]]'\ndomains: [업무]\n",
+      );
+
+      const result = buildWorkspaceCatalog(
+        await loadSuccessfulWorkspaceScan(),
+        first,
+      );
+
+      expect(result.idPaths.has('shared')).toBe(false);
+      expect(
+        result.documents.get(discovered('source.yaml'))?.references[0]?.name,
+      ).toBe('새이름');
+    });
+
+    it('참조 대상을 삭제하면 이전 연결을 제거하고 대상 없음으로 판정한다', async () => {
+      await file(
+        'source.yaml',
+        "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\n",
+      );
+      const target = await file(
+        'target.yaml',
+        "id: target\nname: 대상\ndefinition: '정의'\ndomains: [업무]\n",
+      );
+      const first = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
+      await rm(target);
+
+      const result = buildWorkspaceCatalog(
+        await loadSuccessfulWorkspaceScan(),
+        first,
+      );
+
+      expect(
+        result.documents.get(discovered('source.yaml'))?.occurrences[0]
+          ?.resolution.status,
+      ).toBe('missing');
+      expect(
+        result.documents.get(discovered('source.yaml'))?.references,
+      ).toEqual([]);
+    });
   });
-  it('순수 partial·failed 입력은 실패 범위와 IO 진단을 전달하고 복구까지 이전 자료를 미확인으로 보존한다', /** 순수 상태 전달 검증이며 OS 실패 시험이 아니다. */ async () => {
-    await file('a.yaml', term('A', '[[B]]'));
-    await file('b.yaml', term('B'));
-    const initial = await scan();
-    const previous = buildWorkspaceCatalog(initial);
-    const diagnostics = [
-      {
-        code: workspaceDiagnosticCodes.readFailed,
-        severity: 'error' as const,
-        message: workspaceDiagnosticMessages.readFailed,
-        ioCode: 'EACCES',
-      },
-    ];
-    const partial: WorkspaceScanResult = {
-      ...initial,
-      status: scanStatuses.partial,
-      documents: initial.documents.filter(
-        (d) => d.source.path === discovered('a.yaml'),
-      ),
-      failures: [
-        { kind: workspaceTargetKinds.directory, path: '.codocs', diagnostics },
+
+  describe('부분·실패 스캔의 관측과 이전 색인 보존', () => {
+    it('부분 스캔의 폴더·파일·미확인 실패를 변환하면 확인한 범위와 진단을 유지한다', async () => {
+      const initial = await loadSuccessfulWorkspaceScan();
+      const diagnostics = [
         {
-          kind: workspaceTargetKinds.file,
-          path: discovered('b.yaml'),
-          diagnostics,
+          code: workspaceDiagnosticCodes.readFailed,
+          severity: 'error' as const,
+          message: workspaceDiagnosticMessages.readFailed,
+          ioCode: 'EACCES',
         },
-        { kind: catalogFailureKinds.unknown, diagnostics },
-      ],
-    };
-    expect(toCatalogScan(partial).failures).toEqual([
-      { kind: 'folder', path: '.codocs', diagnostics },
-      { kind: 'file', path: discovered('b.yaml'), diagnostics },
-      { kind: 'unknown', diagnostics },
-    ]);
-    const updated = buildWorkspaceCatalog(partial, previous);
-    expect(updated.documents.get(discovered('b.yaml'))?.confirmation).toBe(
-      'unconfirmed',
-    );
-    expect(
-      updated.documents.get(discovered('a.yaml'))?.occurrences[0]?.resolution
-        .status,
-    ).toBe('unconfirmed');
-    expect(updated.documents.get(discovered('b.yaml'))?.referencedBy).toEqual(
-      [],
-    );
-    expect(resolveReference(updated, { name: '신규 미탐색' }).status).toBe(
-      'unconfirmed',
-    );
-    const failed = buildWorkspaceCatalog(
-      { ...partial, status: scanStatuses.failed, documents: initial.documents },
-      updated,
-    );
-    expect(failed.status).toBe('failed');
-    expect(failed.documents.size).toBe(2);
-    expect(failed.documents.get(discovered('b.yaml'))?.observation).toBe(
-      updated.documents.get(discovered('b.yaml'))?.observation,
-    );
-    expect(failed.documents.get(discovered('b.yaml'))?.confirmation).toBe(
-      'unconfirmed',
-    );
-    expect(failed.failures[0]?.diagnostics).toBe(diagnostics);
-    const recovered = buildWorkspaceCatalog(await scan(), failed);
-    expect(recovered.status).toBe('complete');
-    expect(
-      recovered.documents
-        .get(discovered('a.yaml'))
-        ?.references.map((d) => d.path),
-    ).toEqual([discovered('b.yaml')]);
-  });
-  it('확인한 실패 상대 경로가 없으면 절대 논리 경로를 폴더 삭제 범위로 추측하지 않는다', /** 확인되지 않은 범위는 unknown으로 전달한다. */ async () => {
-    const result = await scan();
-    const input: WorkspaceScanResult = {
-      ...result,
-      status: scanStatuses.failed,
-      failures: [
+      ];
+      const input: WorkspaceScanResult = {
+        ...initial,
+        status: scanStatuses.partial,
+        failures: [
+          {
+            kind: workspaceTargetKinds.directory,
+            path: '.codocs',
+            diagnostics,
+          },
+          {
+            kind: workspaceTargetKinds.file,
+            path: discovered('b.yaml'),
+            diagnostics,
+          },
+          { kind: catalogFailureKinds.unknown, diagnostics },
+        ],
+      };
+
+      const result = toCatalogScan(input);
+
+      expect(result.failures).toEqual([
+        { kind: 'folder', path: '.codocs', diagnostics },
+        { kind: 'file', path: discovered('b.yaml'), diagnostics },
+        { kind: 'unknown', diagnostics },
+      ]);
+    });
+
+    it('부분·실패 스캔 뒤 복구하면 이전 자료를 미확인으로 보존한 뒤 연결을 다시 확인한다', async () => {
+      await file(
+        'a.yaml',
+        "id: A\nname: A\ndefinition: '[[B]]'\ndomains: [업무]\n",
+      );
+      await file(
+        'b.yaml',
+        "id: B\nname: B\ndefinition: '정의'\ndomains: [업무]\n",
+      );
+      const initial = await loadSuccessfulWorkspaceScan();
+      const previous = buildWorkspaceCatalog(initial);
+      const diagnostics = [
         {
-          kind: workspaceTargetKinds.directory,
-          logicalPath: project,
-          diagnostics: [],
+          code: workspaceDiagnosticCodes.readFailed,
+          severity: 'error' as const,
+          message: workspaceDiagnosticMessages.readFailed,
+          ioCode: 'EACCES',
         },
-      ],
-    };
-    expect(toCatalogScan(input).failures).toEqual([
-      { kind: 'unknown', diagnostics: [] },
-    ]);
+      ];
+      const partial: WorkspaceScanResult = {
+        ...initial,
+        status: scanStatuses.partial,
+        documents: initial.documents.filter(
+          (d) => d.source.path === discovered('a.yaml'),
+        ),
+        failures: [
+          {
+            kind: workspaceTargetKinds.directory,
+            path: '.codocs',
+            diagnostics,
+          },
+          {
+            kind: workspaceTargetKinds.file,
+            path: discovered('b.yaml'),
+            diagnostics,
+          },
+          { kind: catalogFailureKinds.unknown, diagnostics },
+        ],
+      };
+      const updated = buildWorkspaceCatalog(partial, previous);
+      expect(updated.documents.get(discovered('b.yaml'))?.confirmation).toBe(
+        'unconfirmed',
+      );
+      expect(
+        updated.documents.get(discovered('a.yaml'))?.occurrences[0]?.resolution
+          .status,
+      ).toBe('unconfirmed');
+      expect(updated.documents.get(discovered('b.yaml'))?.referencedBy).toEqual(
+        [],
+      );
+      const failed = buildWorkspaceCatalog(
+        {
+          ...partial,
+          status: scanStatuses.failed,
+          documents: initial.documents,
+        },
+        updated,
+      );
+      expect(failed.status).toBe('failed');
+      expect(failed.documents.size).toBe(2);
+      expect(failed.documents.get(discovered('b.yaml'))?.observation).toBe(
+        updated.documents.get(discovered('b.yaml'))?.observation,
+      );
+      expect(failed.documents.get(discovered('b.yaml'))?.confirmation).toBe(
+        'unconfirmed',
+      );
+      expect(failed.failures[0]?.diagnostics).toBe(diagnostics);
+      const recovered = buildWorkspaceCatalog(
+        await loadSuccessfulWorkspaceScan(),
+        failed,
+      );
+      expect(recovered.status).toBe('complete');
+      expect(
+        recovered.documents
+          .get(discovered('a.yaml'))
+          ?.references.map((d) => d.path),
+      ).toEqual([discovered('b.yaml')]);
+    });
+    it('확인한 실패 상대 경로가 없으면 절대 논리 경로를 폴더 삭제 범위로 추측하지 않는다', /** 확인되지 않은 범위는 unknown으로 전달한다. */ async () => {
+      const result = await loadSuccessfulWorkspaceScan();
+      const input: WorkspaceScanResult = {
+        ...result,
+        status: scanStatuses.failed,
+        failures: [
+          {
+            kind: workspaceTargetKinds.directory,
+            logicalPath: project,
+            diagnostics: [],
+          },
+        ],
+      };
+      expect(toCatalogScan(input).failures).toEqual([
+        { kind: 'unknown', diagnostics: [] },
+      ]);
+    });
   });
 });

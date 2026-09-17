@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadWorkspace } from '../index.js';
+import { loadWorkspace } from './index.js';
 import { workspaceTargetKinds } from '../paths/domain-values.js';
 import { resolveWorkspacePath } from '../paths/index.js';
 
@@ -45,7 +45,7 @@ afterEach(
   },
 );
 
-describe('폴더 조상 식별의 보조 회귀 검사', /** 다른 OS에서 실행했다는 증거로 사용하지 않는 보조 검사다. */ () => {
+describe('loadWorkspace: 연결 폴더의 순환 식별', /** 내부 경로 확인 결과를 바꾸어 OS별 식별 정보 조건을 재현한다. */ () => {
   it('같은 실제 폴더의 realPath 표기가 다르면 현재 bigint 폴더 정보로 순환을 중단한다', /** 실제 폴더 IO를 유지하며 서로 다른 실경로 표기만 모의한다. */ async () => {
     await writeFile(path.join(codocs, 'ok.yaml'), raw);
     await symlink(codocs, path.join(codocs, 'back'), 'dir');

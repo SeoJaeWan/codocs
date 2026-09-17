@@ -1,4 +1,11 @@
-import { catalogDiagnosticCodes, queryDiagnosticCodes } from '@codocs/core';
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
+import {
+  diagnosticSeverities,
+  documentKinds,
+  documentStatuses,
+  queryDiagnosticCodes,
+  scanStatuses,
+} from '@codocs/core';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import {
@@ -15,6 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createWorkspaceQuerySession,
   workspaceQueryDiagnosticCodes,
+  workspaceQueryDiagnosticMessages,
 } from './index.js';
 
 let project: string;
@@ -42,36 +50,47 @@ async function file(name: string, raw: string): Promise<string> {
   return target;
 }
 
-/** 목록에 필요한 필드를 가진 문서를 만든다. */
-function document(id: string, name = id, definition = '본문'): string {
-  return `id: ${id}\nname: ${name}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: '${definition}'\n`;
-}
-
 describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검증한다. */ () => {
-  it('원문 UTF-8 byte의 SHA-256 revision과 scanStatus를 list/get에 제공한다', /** 원문 개행을 유지한 revision을 확인한다. */ async () => {
-    const raw =
-      "id: alpha\r\nname: 알파\r\ndomains: [업무]\r\ndefinition: '본문'\r\n";
-    await file('alpha.yaml', raw);
-    const session = createWorkspaceQuerySession({ cwd: project });
-    const list = await session.list();
-    expect(list).toMatchObject({
-      success: true,
-      scanStatus: 'complete',
-      totalCount: 1,
-      returnedCount: 1,
-      nextCursor: null,
+  describe('문서 목록과 상세 조회', () => {
+    it('문서 하나가 있는 프로젝트를 목록 조회하면 한 항목과 완료 상태를 반환한다', async () => {
+      const raw =
+        "id: alpha\r\nname: 알파\r\ndomains: [업무]\r\ndefinition: '본문'\r\n";
+      await file('alpha.yaml', raw);
+      const session = createWorkspaceQuerySession({ cwd: project });
+
+      const result = await session.list();
+
+      expect(result).toMatchObject({
+        success: true,
+        scanStatus: 'complete',
+        totalCount: 1,
+        returnedCount: 1,
+        nextCursor: null,
+      });
+      if (result.success)
+        expect(result.items[0]).toMatchObject({ id: 'alpha' });
     });
-    const get = await session.get(['alpha']);
-    expect(get).toMatchObject({
-      success: true,
-      scanStatus: 'complete',
-      results: [
-        {
-          id: 'alpha',
-          found: true,
-          revision: createHash('sha256').update(raw, 'utf8').digest('hex'),
-        },
-      ],
+
+    it('CRLF 문서를 상세 조회하면 원본 UTF-8 바이트의 revision을 반환한다', async () => {
+      const raw =
+        "id: alpha\r\nname: 알파\r\ndomains: [업무]\r\ndefinition: '본문'\r\n";
+      await file('alpha.yaml', raw);
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const ids = ['alpha'];
+
+      const result = await session.get(ids);
+
+      expect(result).toMatchObject({
+        success: true,
+        scanStatus: 'complete',
+        results: [
+          {
+            id: ids[0],
+            found: true,
+            revision: createHash('sha256').update(raw, 'utf8').digest('hex'),
+          },
+        ],
+      });
     });
   });
 
@@ -104,56 +123,92 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     );
   });
 
-  it('partial은 이전 원문과 revision을 unconfirmed로 보존하고 색인 밖 ID를 not_found로 확정하지 않는다', /** 깨진 링크로 실제 partial 전환을 만든다. */ async () => {
-    const raw = document('alpha', '알파', '이전 본문');
-    const target = await file('alpha.yaml', raw);
-    await file('beta.yaml', document('beta', '베타'));
-    const session = createWorkspaceQuerySession({ cwd: project });
-    const complete = await session.get(['alpha']);
-    if (!complete.success) throw new Error('초기 조회 실패');
-    const completeResult = complete.results[0];
-    if (!completeResult?.found || completeResult.conflict)
-      throw new Error('초기 문서 없음');
-    const revision = completeResult.revision;
-    await rm(target);
-    await symlink('missing-target.yaml', target);
+  describe('부분 스캔 후 이전 조회 결과 보존', () => {
+    it('문서 경로가 깨진 링크로 바뀌면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
+      const raw =
+        "id: alpha\nname: 알파\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: '이전 본문'\n";
+      const target = await file('alpha.yaml', raw);
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const initial = await session.get(['alpha']);
+      if (
+        !initial.success ||
+        !initial.results[0]?.found ||
+        initial.results[0].conflict
+      )
+        throw new Error('초기 문서 조회 실패');
+      const revision = initial.results[0].revision;
+      await rm(target);
+      await symlink('missing-target.yaml', target);
 
-    const partial = await session.get(['alpha', 'outside']);
-    expect(partial).toMatchObject({ success: true, scanStatus: 'partial' });
-    if (!partial.success) throw new Error('partial 조회 실패');
-    const alpha = partial.results[0];
-    expect(alpha).toMatchObject({
-      id: 'alpha',
-      found: true,
-      confirmation: 'unconfirmed',
-      revision,
+      const result = await session.get(['alpha']);
+
+      expect(result).toMatchObject({
+        success: true,
+        scanStatus: 'partial',
+        results: [
+          {
+            id: 'alpha',
+            found: true,
+            confirmation: 'unconfirmed',
+            revision,
+            document: { definition: '이전 본문' },
+          },
+        ],
+      });
     });
-    if (!alpha?.found || alpha.conflict || !('document' in alpha))
-      throw new Error('보존 문서 없음');
-    expect(alpha.document).toMatchObject({ definition: '이전 본문' });
-    expect(
-      alpha.diagnostics.some(
-        /** 미확인 최신성 진단을 확인한다. */ (diagnostic) =>
-          diagnostic.code === catalogDiagnosticCodes.unconfirmedReference,
-      ),
-    ).toBe(true);
-    expect(partial.results[1]).toMatchObject({
-      id: 'outside',
-      found: false,
-      confirmation: 'unconfirmed',
+
+    it('부분 스캔에서 색인 밖 ID를 조회하면 부재로 확정하지 않는다', async () => {
+      const target = await file(
+        'alpha.yaml',
+        'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      await session.get(['alpha']);
+      await rm(target);
+      await symlink('missing-target.yaml', target);
+
+      const result = await session.get(['outside']);
+
+      expect(result).toMatchObject({
+        success: true,
+        scanStatus: 'partial',
+        results: [{ id: 'outside', found: false, confirmation: 'unconfirmed' }],
+      });
+      if (result.success)
+        expect(result.results[0]?.diagnostics).not.toContainEqual(
+          expect.objectContaining({ code: queryDiagnosticCodes.notFound }),
+        );
     });
-    expect(partial.results[1]?.diagnostics).not.toContainEqual(
-      expect.objectContaining({ code: queryDiagnosticCodes.notFound }),
-    );
-    expect(await session.list()).toMatchObject({
-      success: true,
-      scanStatus: 'partial',
-      totalCount: 2,
+
+    it('부분 스캔에서 목록을 조회하면 이전 항목을 포함한 개수를 반환한다', async () => {
+      const target = await file(
+        'alpha.yaml',
+        'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+      );
+      await file(
+        'beta.yaml',
+        'id: beta\nname: beta\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      await session.list();
+      await rm(target);
+      await symlink('missing-target.yaml', target);
+
+      const result = await session.list();
+
+      expect(result).toMatchObject({
+        success: true,
+        scanStatus: 'partial',
+        totalCount: 2,
+      });
     });
   });
 
   it('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 깨진 .codocs로 실제 failed 전환을 만든다. */ async () => {
-    await file('alpha.yaml', document('alpha'));
+    await file(
+      'alpha.yaml',
+      'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+    );
     const session = createWorkspaceQuerySession({ cwd: project });
     expect(await session.get(['alpha'])).toMatchObject({ success: true });
     const codocs = path.join(project, '.codocs');
@@ -173,11 +228,11 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     for (let index = 59; index >= 0; index--)
       await file(
         `doc-${index}.yaml`,
-        document(`doc-${String(index).padStart(2, '0')}`),
+        `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
       );
     await file(
       'other.yaml',
-      document('other').replace('domains: [업무]', 'domains: [기타]'),
+      'id: other\nname: other\ndomains: [기타]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     const first = await session.list({ domain: '업무' });
@@ -203,115 +258,287 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     });
   });
 
-  it('본문만 바뀐 cursor는 유지하고 표시 projection 변경과 조건 불일치는 거부한다', /** 실제 파일 변경 뒤 같은 token을 재사용한다. */ async () => {
-    for (let index = 0; index < 51; index++)
+  describe('목록 표시 변경에 따른 cursor 유효성', () => {
+    it('본문만 변경하면 기존 cursor로 다음 페이지를 조회한다', async () => {
+      for (let index = 0; index < 51; index++)
+        await file(
+          `doc-${index}.yaml`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+        );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const first = await session.list();
+      if (!first.success || !first.nextCursor)
+        throw new Error('다음 cursor 없음');
       await file(
-        `doc-${index}.yaml`,
-        document(`doc-${String(index).padStart(2, '0')}`),
+        'doc-50.yaml',
+        'id: doc-50\nname: doc-50\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 새 본문\n',
       );
-    const session = createWorkspaceQuerySession({ cwd: project });
-    const first = await session.list({ domain: '업무' });
-    if (!first.success || !first.nextCursor)
-      throw new Error('다음 cursor 없음');
 
-    await file('doc-50.yaml', document('doc-50', 'doc-50', '새 본문'));
-    expect(await session.list({ cursor: first.nextCursor })).toMatchObject({
-      success: true,
-      returnedCount: 1,
-    });
-    const mismatch = await session.list({
-      cursor: first.nextCursor,
-      domain: '기타',
-    });
-    expect(mismatch).toMatchObject({
-      success: false,
-      error: { code: queryDiagnosticCodes.invalidInput },
+      const result = await session.list({ cursor: first.nextCursor });
+
+      expect(result).toMatchObject({ success: true, returnedCount: 1 });
     });
 
-    await file('doc-50.yaml', document('doc-50', '표시 이름 변경'));
-    expect(await session.list({ cursor: first.nextCursor })).toMatchObject({
-      success: false,
-      error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
-    });
-  });
+    it('cursor와 최초 목록의 도메인과 다른 필터를 전달하면 입력 오류를 반환한다', async () => {
+      for (let index = 0; index < 51; index++)
+        await file(
+          `doc-${index}.yaml`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+        );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const first = await session.list({ domain: '업무' });
+      if (!first.success || !first.nextCursor)
+        throw new Error('다음 cursor 없음');
 
-  it('포함·hasErrors·conflict 변화는 각각 기존 cursor를 만료한다', /** 목록 projection의 모든 판정 값을 실제 파일로 바꾼다. */ async () => {
-    for (let index = 0; index < 51; index++)
+      const result = await session.list({
+        cursor: first.nextCursor,
+        domain: '기타',
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: queryDiagnosticCodes.invalidInput },
+      });
+    });
+
+    it('목록에 표시되는 문서 이름이 바뀌면 기존 cursor를 만료한다', async () => {
+      for (let index = 0; index < 51; index++)
+        await file(
+          `doc-${index}.yaml`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+        );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const first = await session.list();
+      if (!first.success || !first.nextCursor)
+        throw new Error('다음 cursor 없음');
       await file(
-        `doc-${index}.yaml`,
-        document(`doc-${String(index).padStart(2, '0')}`),
+        'doc-50.yaml',
+        'id: doc-50\nname: 표시 이름 변경\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
       );
-    const session = createWorkspaceQuerySession({ cwd: project });
-    let first = await session.list();
-    if (!first.success || !first.nextCursor)
-      throw new Error('포함 변화 cursor 없음');
-    await file('new.yaml', document('new'));
-    expect(await session.list({ cursor: first.nextCursor })).toMatchObject({
-      success: false,
-      error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+
+      const result = await session.list({ cursor: first.nextCursor });
+
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+      });
     });
 
-    first = await session.list();
-    if (!first.success || !first.nextCursor)
-      throw new Error('오류 변화 cursor 없음');
-    await file('new.yaml', document('new', 'new', '[[Missing]]'));
-    expect(await session.list({ cursor: first.nextCursor })).toMatchObject({
-      success: false,
-      error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
-    });
+    it.each([
+      { name: '새 문서 추가', changed: 'new' },
+      { name: '문서 오류 발생', changed: 'error' },
+      { name: 'ID 충돌 발생', changed: 'conflict' },
+    ])(
+      '$name으로 목록 표시가 바뀌면 기존 cursor를 만료한다',
+      async ({ changed }) => {
+        for (let index = 0; index < 51; index++)
+          await file(
+            `doc-${index}.yaml`,
+            `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          );
+        const session = createWorkspaceQuerySession({ cwd: project });
+        const first = await session.list();
+        if (!first.success || !first.nextCursor)
+          throw new Error('다음 cursor 없음');
+        if (changed === 'new')
+          await file(
+            'new.yaml',
+            'id: new\nname: new\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+          );
+        if (changed === 'error')
+          await file(
+            'doc-50.yaml',
+            "id: doc-50\nname: doc-50\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: '[[Missing]]'\n",
+          );
+        if (changed === 'conflict')
+          await file(
+            'duplicate.yaml',
+            'id: doc-50\nname: duplicate\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+          );
 
-    first = await session.list();
-    if (!first.success || !first.nextCursor)
-      throw new Error('충돌 변화 cursor 없음');
-    await file('duplicate.yaml', document('new', 'duplicate'));
-    expect(await session.list({ cursor: first.nextCursor })).toMatchObject({
-      success: false,
-      error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
-    });
-  });
+        const result = await session.list({ cursor: first.nextCursor });
 
-  it('변조·명시 refresh·새 process 비밀키의 cursor를 첫 페이지 대신 거부한다', /** 각 만료 원인이 동일한 안전한 오류로 끝나는지 확인한다. */ async () => {
-    for (let index = 0; index < 51; index++)
-      await file(
-        `doc-${index}.yaml`,
-        document(`doc-${String(index).padStart(2, '0')}`),
-      );
-    const session = createWorkspaceQuerySession({ cwd: project });
-    const first = await session.list();
-    if (!first.success || !first.nextCursor)
-      throw new Error('다음 cursor 없음');
-    const cursor = first.nextCursor;
-    const [encoded, signature] = cursor.split('.');
-    if (!encoded || !signature) throw new Error('서명 cursor 형식 오류');
-    const alphabet =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-    const lastIndex = alphabet.indexOf(signature.at(-1) ?? '');
-    if (lastIndex < 0 || (lastIndex & 3) !== 0)
-      throw new Error('canonical 서명 형식 오류');
-    const alternateSignature = `${signature.slice(0, -1)}${alphabet[lastIndex | 1]}`;
-    expect(Buffer.from(alternateSignature, 'base64url')).toEqual(
-      Buffer.from(signature, 'base64url'),
+        expect(result).toMatchObject({
+          success: false,
+          error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+        });
+      },
     );
-    expect(
-      Buffer.from(alternateSignature, 'base64url').toString('base64url'),
-    ).toBe(signature);
-    const tampered = `${encoded}.${alternateSignature}`;
-    expect(await session.list({ cursor: tampered })).toMatchObject({
-      success: false,
-      error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
-    });
-    expect(await session.refresh()).toMatchObject({ success: true });
-    expect(await session.list({ cursor })).toMatchObject({
-      success: false,
-      error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+  });
+
+  describe('문서 삭제·ID 순서·필터 포함 여부 변경에 따른 cursor 만료', () => {
+    it.each([
+      { label: '문서를 삭제', replacement: null },
+      {
+        label: '마지막 문서 ID를 첫 번째로 정렬되는 ID로 변경',
+        replacement: 'id: aaa',
+      },
+    ])('$label하면 기존 cursor를 만료한다', async ({ replacement }) => {
+      for (let index = 0; index < 51; index++) {
+        const id = `doc-${String(index).padStart(2, '0')}`;
+        await file(
+          `${id}.yaml`,
+          `id: ${id}\nname: ${id}\ndomains: [업무]\ndefinition: 본문\n`,
+        );
+      }
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const first = await session.list();
+      if (!first.success || !first.nextCursor)
+        throw new Error('다음 cursor 없음');
+      const input = { cursor: first.nextCursor };
+      if (replacement === null) {
+        await rm(path.join(project, '.codocs/doc-50.yaml'));
+      } else {
+        await file(
+          'doc-50.yaml',
+          `${replacement}\nname: doc-50\ndomains: [업무]\ndefinition: 본문\n`,
+        );
+      }
+
+      const result = await session.list(input);
+
+      expect(result).toEqual({
+        success: false,
+        scanStatus: scanStatuses.complete,
+        error: {
+          code: workspaceQueryDiagnosticCodes.cursorExpired,
+          severity: diagnosticSeverities.error,
+          message: workspaceQueryDiagnosticMessages.cursorExpired,
+        },
+      });
     });
 
-    vi.resetModules();
-    const restarted = await import('./index.js');
-    const other = restarted.createWorkspaceQuerySession({ cwd: project });
-    expect(await other.list({ cursor })).toMatchObject({
-      success: false,
-      error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+    it.each([
+      {
+        label: '도메인',
+        domains: '기타',
+        kind: documentKinds.policy,
+        status: documentStatuses.confirmed,
+      },
+      {
+        label: '종류',
+        domains: '업무',
+        kind: documentKinds.decision,
+        status: documentStatuses.confirmed,
+      },
+      {
+        label: '상태',
+        domains: '업무',
+        kind: documentKinds.policy,
+        status: documentStatuses.proposed,
+      },
+    ])(
+      '문서의 $label을 변경해 기존 필터에서 제외하면 기존 cursor를 만료한다',
+      async ({ domains, kind, status }) => {
+        for (let index = 0; index < 51; index++) {
+          const id = `doc-${String(index).padStart(2, '0')}`;
+          await file(
+            `${id}.yaml`,
+            `id: ${id}\nname: ${id}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          );
+        }
+        const filters = {
+          domain: '업무',
+          kind: documentKinds.policy,
+          status: documentStatuses.confirmed,
+        };
+        const session = createWorkspaceQuerySession({ cwd: project });
+        const first = await session.list(filters);
+        if (!first.success || !first.nextCursor)
+          throw new Error('다음 cursor 없음');
+        const input = { cursor: first.nextCursor };
+        await file(
+          'doc-50.yaml',
+          `id: doc-50\nname: doc-50\ndomains: [${domains}]\nkind: ${kind}\nstatus: ${status}\ndefinition: 본문\n`,
+        );
+
+        const result = await session.list(input);
+
+        expect(result).toEqual({
+          success: false,
+          scanStatus: scanStatuses.complete,
+          error: {
+            code: workspaceQueryDiagnosticCodes.cursorExpired,
+            severity: diagnosticSeverities.error,
+            message: workspaceQueryDiagnosticMessages.cursorExpired,
+          },
+        });
+      },
+    );
+  });
+
+  describe('cursor 서명과 세션 수명', () => {
+    it('서명에 정규화되지 않은 base64url 문자를 넣으면 cursor를 거부한다', async () => {
+      for (let index = 0; index < 51; index++)
+        await file(
+          `doc-${index}.yaml`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+        );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const first = await session.list();
+      if (!first.success || !first.nextCursor)
+        throw new Error('다음 cursor 없음');
+      const [encoded, signature] = first.nextCursor.split('.');
+      if (!encoded || !signature) throw new Error('서명 cursor 형식 오류');
+      const alphabet =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+      const lastIndex = alphabet.indexOf(signature.at(-1) ?? '');
+      if (lastIndex < 0 || (lastIndex & 3) !== 0)
+        throw new Error('canonical 서명 형식 오류');
+      const alternateSignature = `${signature.slice(0, -1)}${alphabet[lastIndex | 1]}`;
+      expect(Buffer.from(alternateSignature, 'base64url')).toEqual(
+        Buffer.from(signature, 'base64url'),
+      );
+      const tampered = `${encoded}.${alternateSignature}`;
+
+      const result = await session.list({ cursor: tampered });
+
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+      });
+    });
+
+    it('명시적으로 새로 고침하면 이전 cursor를 만료한다', async () => {
+      for (let index = 0; index < 51; index++)
+        await file(
+          `doc-${index}.yaml`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+        );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const first = await session.list();
+      if (!first.success || !first.nextCursor)
+        throw new Error('다음 cursor 없음');
+      await session.refresh();
+
+      const result = await session.list({ cursor: first.nextCursor });
+
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+      });
+    });
+
+    it('새 세션에서 이전 cursor를 사용하면 만료 오류를 반환한다', async () => {
+      for (let index = 0; index < 51; index++)
+        await file(
+          `doc-${index}.yaml`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+        );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const first = await session.list();
+      if (!first.success || !first.nextCursor)
+        throw new Error('다음 cursor 없음');
+      vi.resetModules();
+      const restarted = await import('./index.js');
+      const other = restarted.createWorkspaceQuerySession({ cwd: project });
+
+      const result = await other.list({ cursor: first.nextCursor });
+
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+      });
     });
   });
 });

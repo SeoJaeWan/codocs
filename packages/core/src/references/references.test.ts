@@ -1,53 +1,144 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { describe, expect, it } from 'vitest';
 import {
-  extractReferences,
-  parseYaml,
   referenceDiagnosticCodes,
   referenceDiagnosticMessages,
-} from '../index.js';
+} from '../diagnostics/index.js';
+import { parseYaml } from '../parser/index.js';
 import { referenceSyntaxStatuses } from './domain-values.js';
+import { extractReferences } from './index.js';
 
-describe('본문의 참조 문법과 오류 복구', /** 문자열 자료형을 확인한 본문만 추출한다. */ () => {
-  it('공개 진단 상수를 조회하면 고정 코드와 한국어 문구를 반환한다', /** 공개 문자열 호환성은 구현 상수 참조와 별도로 검증한다. */ () => {
-    expect(referenceDiagnosticCodes.invalidReference).toBe('invalid_reference');
-    expect(referenceDiagnosticMessages.invalidReference).toBe(
-      '참조 구문이 올바르지 않습니다.',
-    );
+describe('extractReferences: 본문 문자열에서 참조 추출', () => {
+  it('정의에 참조가 하나 있으면 이름과 실제 원문 위치를 반환한다', () => {
+    const source = 'definition: "[[대상]]"\nname: 출처\ndomains: [업무]\n';
+    const parsed = {
+      success: true as const,
+      source,
+      data: { definition: '[[대상]]', name: '출처', domains: ['업무'] },
+      fields: [],
+      strings: [
+        {
+          fieldPath: ['definition'],
+          value: '[[대상]]',
+          sourceRanges: Array.from({ length: 6 }, (_, index) => ({
+            start: 13 + index,
+            end: 14 + index,
+          })),
+        },
+      ],
+      diagnostics: [],
+    };
+    const result = extractReferences(parsed);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.occurrences).toEqual([
+      expect.objectContaining({
+        syntax: referenceSyntaxStatuses.valid,
+        name: '대상',
+        text: '[[대상]]',
+        offsetRange: { start: 13, end: 19 },
+      }),
+    ]);
   });
-  it('문서 본문에 잘못된 원소와 다른 필드가 있으면 정상 본문 원소만 추출한다', /** 스키마 오류와 ID 누락은 정상 문자열을 버리지 않는다. */ () => {
-    const parsed = parseYaml(
-      'name: "[[제외]]"\ndefinition: "[[정의]]"\nexamples: [7, "[[예시]]", null, {definition: "[[제외]]"}]\nbody: "[[제외]]"\n',
-    );
+
+  it('이름과 도메인이 없는 문서의 정의를 확인하면 참조를 추출한다', () => {
+    const parsed = {
+      success: true as const,
+      source: 'definition: "[[대상]]"\n',
+      data: { definition: '[[대상]]' },
+      fields: [],
+      strings: [
+        {
+          fieldPath: ['definition'],
+          value: '[[대상]]',
+          sourceRanges: Array.from({ length: 6 }, (_, index) => ({
+            start: 13 + index,
+            end: 14 + index,
+          })),
+        },
+      ],
+      diagnostics: [],
+    };
+    const result = extractReferences(parsed);
+    expect(result.occurrences.map((item) => item.text)).toEqual(['[[대상]]']);
+  });
+
+  it('정의와 예문에 참조가 있으면 다른 필드는 제외하고 본문 순서로 반환한다', () => {
+    const parsed = {
+      success: true as const,
+      source:
+        'definition: "[[정의]]"\nexamples: [7, "[[예시]]"]\nname: "[[제외]]"\nbody: "[[제외]]"\n',
+      data: {
+        name: '[[제외]]',
+        definition: '[[정의]]',
+        examples: [7, '[[예시]]'],
+        body: '[[제외]]',
+      },
+      fields: [],
+      strings: [
+        {
+          fieldPath: ['definition'],
+          value: '[[정의]]',
+          sourceRanges: Array.from({ length: 6 }, (_, index) => ({
+            start: 13 + index,
+            end: 14 + index,
+          })),
+        },
+        {
+          fieldPath: ['examples', 1],
+          value: '[[예시]]',
+          sourceRanges: Array.from({ length: 6 }, (_, index) => ({
+            start: 36 + index,
+            end: 37 + index,
+          })),
+        },
+      ],
+      diagnostics: [],
+    };
+    const result = extractReferences(parsed);
     expect(
-      extractReferences(parsed).occurrences.map((item) => [
-        item.fieldPath,
-        item.text,
-      ]),
+      result.occurrences.map((item) => [item.fieldPath, item.text]),
     ).toEqual([
       [['definition'], '[[정의]]'],
       [['examples', 1], '[[예시]]'],
     ]);
   });
-  it('이름과 소속이 없어도 확인한 본문에서 참조를 추출한다', /** 전체 문서의 유효성과 본문 문자열의 추출 가능성을 구분한다. */ () => {
-    const result = extractReferences(parseYaml('definition: "[[대상]]"\n'));
-    expect(result.diagnostics).toEqual([]);
-    expect(result.occurrences.map((item) => item.text)).toEqual(['[[대상]]']);
-  });
+
   it.each([
-    'definition: 7\nexamples: "[[제외]]"\n',
-    'definition: false\ncustom: "[[제외]]"\n',
-    'type: other\nbody: "[[제외]]"\n',
-    'custom: "[[제외]]"\n',
-    'definition: ["[[제외]]"\n',
+    ['숫자 정의', 'definition: 7\n', { definition: 7 }],
+    ['문자열 예문', 'examples: "[[제외]]"\n', { examples: '[[제외]]' }],
+    ['사용자 속성', 'custom: "[[제외]]"\n', { custom: '[[제외]]' }],
   ])(
-    '본문 자료형이나 파싱에 실패한 %s이면 참조를 추측하지 않는다',
-    /** 잘못된 값을 문자열로 변환하지 않는다. */ (source) => {
-      expect(extractReferences(parseYaml(source))).toEqual({
+    '%s에서 참조처럼 보이는 값을 만나면 본문 참조로 추측하지 않는다',
+    (_condition, source, data) => {
+      const parsed = {
+        success: true as const,
+        source,
+        data,
+        fields: [],
+        strings: [],
+        diagnostics: [],
+      };
+      expect(extractReferences(parsed)).toEqual({
         occurrences: [],
         diagnostics: [],
       });
     },
   );
+
+  it('파싱에 실패한 입력을 전달하면 참조를 반환하지 않는다', () => {
+    const parsed = {
+      success: false as const,
+      source: 'definition: ["[[제외]]"\n',
+      diagnostics: [],
+    };
+    expect(extractReferences(parsed)).toEqual({
+      occurrences: [],
+      diagnostics: [],
+    });
+  });
+});
+
+describe('parseYaml과 extractReferences: YAML 표기별 참조 위치', () => {
   it('백슬래시 홀짝과 콜론 이스케이프를 쓰면 리터럴을 제외하고 정확한 이름을 유지한다', /** 공백·대소문자·ID와 무관한 이름을 보정하지 않는다. */ () => {
     const source = String.raw`definition: '\[[리터럴]] \\[[이름]] \\\[[리터럴]] \\\\[[도메인:이름\:콜론]] [[ 이름 😀 ]] [[이름]]'
 `;
@@ -189,5 +280,14 @@ describe('본문의 참조 문법과 오류 복구', /** 문자열 자료형을 
       [String.raw`a\\:b`, undefined],
       ['이:름', '도:메인'],
     ]);
+  });
+});
+
+describe('참조 구문 오류의 공개 코드와 문구', () => {
+  it('참조 구문 오류 상수를 조회하면 고정 코드와 한국어 문구를 반환한다', () => {
+    expect(referenceDiagnosticCodes.invalidReference).toBe('invalid_reference');
+    expect(referenceDiagnosticMessages.invalidReference).toBe(
+      '참조 구문이 올바르지 않습니다.',
+    );
   });
 });

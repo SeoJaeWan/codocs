@@ -1,404 +1,1049 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { describe, expect, it } from 'vitest';
-import { scanStatuses } from '../catalog/domain-values.js';
-import type { Catalog, CatalogObservation } from '../index.js';
 import {
-  buildCatalog,
-  parseYaml,
-  projectCatalogGet,
-  projectCatalogList,
+  catalogConfirmations,
+  referenceResolutionStatuses,
+  scanStatuses,
+  type Catalog,
+  type CatalogDocument,
+  type CatalogOccurrence,
+} from '../catalog/index.js';
+import {
+  catalogDiagnosticCodes,
+  diagnosticSeverities,
   queryDiagnosticCodes,
-} from '../index.js';
+  schemaDiagnosticCodes,
+} from '../diagnostics/index.js';
+import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import { documentKinds, documentStatuses } from '../validator/domain-values.js';
+import { projectCatalogGet, projectCatalogList } from './index.js';
 
-interface DocumentOptions {
-  definition?: string;
-  domains?: readonly string[];
-  kind?: string;
-  status?: string;
-}
-
-/** 테스트가 확인할 공개 문서 원문을 만든다. */
-function observation(
-  path: string,
-  id: string | undefined,
-  name: string | undefined,
-  options: DocumentOptions = {},
-): CatalogObservation {
-  const lines = [
-    ...(id === undefined ? [] : [`id: ${JSON.stringify(id)}`]),
-    ...(name === undefined ? [] : [`name: ${JSON.stringify(name)}`]),
-    `definition: ${JSON.stringify(options.definition ?? '설명')}`,
-    `domains: ${JSON.stringify(options.domains ?? ['도메인'])}`,
-    ...(options.kind === undefined
-      ? []
-      : [`kind: ${JSON.stringify(options.kind)}`]),
-    ...(options.status === undefined
-      ? []
-      : [`status: ${JSON.stringify(options.status)}`]),
-  ];
-  return { path, parsed: parseYaml(`${lines.join('\n')}\n`) };
-}
-
-/** 완전한 관측을 Catalog로 계산한다. */
-function complete(...observations: CatalogObservation[]): Catalog {
-  return buildCatalog({ status: scanStatuses.complete, observations });
-}
-
-/** 성공한 상세 결과를 좁힌다. */
-function successful(catalog: Catalog, ids: readonly string[]) {
-  const projection = projectCatalogGet(catalog, ids);
-  if (!projection.success) throw new Error('상세 조회가 성공해야 한다');
-  return projection.results;
-}
-
-describe('Catalog 목록 투영', /** 목록의 포함·정렬·충돌 계약을 검증한다. */ () => {
-  it.each([0, 1, 49, 50, 51, 100])(
-    '문서 %i개를 페이지 크기와 무관하게 모두 정렬한다',
-    /** 페이지 경계 주변에서도 core 전체 snapshot은 잘리지 않는다. */ (
-      size,
-    ) => {
-      const catalog = complete(
-        ...Array.from(
-          { length: size },
-          /** 역순 관측으로 목록 자체의 정렬을 확인한다. */ (_, index) =>
-            observation(
-              `${String(size - index).padStart(3, '0')}.yaml`,
-              `doc-${String(size - index).padStart(3, '0')}`,
-              `문서 ${index}`,
-            ),
-        ),
-      );
-      const result = projectCatalogList(catalog);
-      expect(result.totalCount).toBe(size);
-      expect(result.items).toHaveLength(size);
-      expect(result.items.map((item) => item.id)).toEqual(
-        [...result.items.map((item) => item.id)].sort(),
-      );
+const parsedBase = {
+  success: true as const,
+  source: '',
+  fields: [],
+  strings: [],
+  diagnostics: [],
+};
+const documentBase = {
+  domains: ['도메인'],
+  confirmation: catalogConfirmations.confirmed,
+  documentDiagnostics: [],
+  diagnostics: [],
+  occurrences: [],
+  references: [],
+  referencedBy: [],
+} satisfies Pick<
+  CatalogDocument,
+  | 'domains'
+  | 'confirmation'
+  | 'documentDiagnostics'
+  | 'diagnostics'
+  | 'occurrences'
+  | 'references'
+  | 'referencedBy'
+>;
+const catalogBase: Catalog = {
+  status: scanStatuses.complete,
+  failures: [],
+  documents: new Map(),
+  idPaths: new Map(),
+  namePaths: new Map(),
+  domainNamePaths: new Map(),
+};
+const alpha = {
+  ...documentBase,
+  path: 'a.yaml',
+  id: 'a',
+  name: 'A',
+  observation: {
+    path: 'a.yaml',
+    parsed: {
+      ...parsedBase,
+      source: 'id: a\nname: A\n',
+      data: { id: 'a', name: 'A', domains: ['도메인'], definition: '설명' },
     },
-  );
+  },
+} satisfies CatalogDocument;
+const occurrence = {
+  occurrence: {
+    syntax: referenceSyntaxStatuses.valid,
+    name: 'Target',
+    fieldPath: ['definition'],
+    text: '[[Target]]',
+    decodedRange: { start: 0, end: 10 },
+    offsetRange: { start: 12, end: 22 },
+    range: {
+      start: { line: 1, character: 0 },
+      end: { line: 1, character: 10 },
+    },
+  },
+  resolution: { status: referenceResolutionStatuses.missing, candidates: [] },
+} satisfies CatalogOccurrence;
 
-  it('domain·kind·status를 한 파일이 모두 만족할 때만 포함한다', /** 파일별 AND 조건을 검증한다. */ () => {
-    const catalog = complete(
-      observation('match.yaml', 'match', '일치', {
-        domains: ['판매', '공통'],
-        kind: 'policy',
-        status: 'confirmed',
-      }),
-      observation('domain-only.yaml', 'domain-only', '도메인만', {
-        domains: ['판매'],
-        kind: 'decision',
-        status: 'confirmed',
-      }),
-      observation('kind-only.yaml', 'kind-only', '종류만', {
-        domains: ['구매'],
-        kind: 'policy',
-        status: 'confirmed',
-      }),
+describe('projectCatalogList: Catalog 문서 목록 투영', () => {
+  describe('문서 표시와 ID 정렬', () => {
+    it('유일한 ID 문서를 조회하면 이름과 발견 경로를 표시한다', () => {
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[alpha.path, alpha]]),
+        idPaths: new Map([[alpha.id, new Set([alpha.path])]]),
+      };
+
+      const result = projectCatalogList(catalog);
+
+      expect(result).toEqual({
+        totalCount: 1,
+        items: [
+          expect.objectContaining({
+            id: alpha.id,
+            name: alpha.name,
+            source: { path: alpha.path },
+            conflict: false,
+          }),
+        ],
+      });
+    });
+
+    it.each([0, 1, 49, 50, 51, 100])(
+      '역순으로 등록한 문서 %i개를 조회하면 ID 오름차순으로 모두 반환한다',
+      (size) => {
+        const ids = Array.from({ length: size }, (_, index) =>
+          String(index + 1).padStart(3, '0'),
+        );
+        const documents = ids.map((id) => {
+          const path = id + '.yaml';
+          return {
+            ...alpha,
+            path,
+            id,
+            name: '문서 ' + id,
+            observation: {
+              path,
+              parsed: {
+                ...parsedBase,
+                data: { id, name: '문서 ' + id, domains: ['도메인'] },
+              },
+            },
+          } satisfies CatalogDocument;
+        });
+        const catalog: Catalog = {
+          ...catalogBase,
+          documents: new Map(
+            documents.map((document) => [document.path, document]),
+          ),
+          idPaths: new Map(
+            [...documents]
+              .reverse()
+              .map((document) => [document.id, new Set([document.path])]),
+          ),
+        };
+
+        const result = projectCatalogList(catalog);
+
+        expect(result.totalCount).toBe(size);
+        expect(result.items.map((item) => item.id)).toEqual(ids);
+      },
     );
-    expect(
-      projectCatalogList(catalog, {
+  });
+
+  describe('목록 필터와 사용할 수 없는 속성', () => {
+    it('한 문서가 도메인·종류·상태 조건을 모두 만족하면 그 문서를 포함한다', () => {
+      const document = {
+        ...alpha,
+        domains: ['판매', '공통'],
+        observation: {
+          path: alpha.path,
+          parsed: {
+            ...parsedBase,
+            data: {
+              id: alpha.id,
+              name: alpha.name,
+              domains: ['판매', '공통'],
+              kind: documentKinds.policy,
+              status: documentStatuses.confirmed,
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[document.path, document]]),
+        idPaths: new Map([[document.id, new Set([document.path])]]),
+      };
+      const filters = {
         domain: '판매',
         kind: documentKinds.policy,
         status: documentStatuses.confirmed,
-      }).items.map((item) => item.id),
-    ).toEqual(['match']);
-  });
+      };
 
-  it('잘못된 목록 속성은 표시와 해당 필터에서 제외한다', /** 오류 문서의 사용 가능한 목록 필드만 남긴다. */ () => {
-    const catalog = complete(
-      observation('bad.yaml', 'bad', '오류 문서', {
-        domains: ['판매'],
-        kind: 'unknown',
-      }),
-    );
-    const all = projectCatalogList(catalog).items[0];
-    expect(all).toMatchObject({ id: 'bad', hasErrors: true });
-    expect(all).not.toHaveProperty('kind');
-    expect(
-      projectCatalogList(catalog, { kind: documentKinds.policy }).items,
-    ).toEqual([]);
-  });
+      const result = projectCatalogList(catalog, filters);
 
-  it('중복 ID는 필터를 한 파일에서 판정하고 모든 경로만 정렬해 집계한다', /** 대표 문서 없는 충돌 항목을 검증한다. */ () => {
-    const catalog = complete(
-      observation('z.yaml', 'shared', '구매 문서', {
-        domains: ['구매'],
-        kind: 'decision',
-      }),
-      observation('a.yaml', 'shared', '판매 정책', {
-        domains: ['판매'],
-        kind: 'policy',
-      }),
-    );
-    const item = projectCatalogList(catalog, {
-      domain: '판매',
-      kind: documentKinds.policy,
-    }).items[0];
-    expect(item).toEqual({
-      id: 'shared',
-      paths: ['a.yaml', 'z.yaml'],
-      hasErrors: true,
-      conflict: true,
+      expect(result.items.map((item) => item.id)).toEqual([document.id]);
     });
-    expect(item).not.toHaveProperty('name');
-    expect(item).not.toHaveProperty('domains');
+
+    it.each([
+      {
+        domain: '구매',
+        kind: documentKinds.policy,
+        status: documentStatuses.confirmed,
+      },
+      {
+        domain: '판매',
+        kind: documentKinds.decision,
+        status: documentStatuses.confirmed,
+      },
+      {
+        domain: '판매',
+        kind: documentKinds.policy,
+        status: documentStatuses.proposed,
+      },
+    ])(
+      '한 필터만 불일치하는 %j 조건으로 조회하면 문서를 제외한다',
+      (filters) => {
+        const document = {
+          ...alpha,
+          domains: ['판매'],
+          observation: {
+            path: alpha.path,
+            parsed: {
+              ...parsedBase,
+              data: {
+                id: alpha.id,
+                name: alpha.name,
+                domains: ['판매'],
+                kind: documentKinds.policy,
+                status: documentStatuses.confirmed,
+              },
+            },
+          },
+        } satisfies CatalogDocument;
+        const catalog: Catalog = {
+          ...catalogBase,
+          documents: new Map([[document.path, document]]),
+          idPaths: new Map([[document.id, new Set([document.path])]]),
+        };
+
+        const result = projectCatalogList(catalog, filters);
+
+        expect(result.items).toEqual([]);
+      },
+    );
+
+    it('종류 필드에 오류가 있으면 다른 필드는 표시하고 종류 필터에서 제외한다', () => {
+      const issue = {
+        code: schemaDiagnosticCodes.invalidFieldValue,
+        severity: diagnosticSeverities.error,
+        message: '잘못된 종류',
+        fieldPath: ['kind'],
+      };
+      const document = {
+        ...alpha,
+        documentDiagnostics: [issue],
+        diagnostics: [issue],
+        observation: {
+          path: alpha.path,
+          parsed: {
+            ...parsedBase,
+            data: {
+              id: alpha.id,
+              name: alpha.name,
+              domains: ['판매'],
+              kind: 'unknown',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[document.path, document]]),
+        idPaths: new Map([[document.id, new Set([document.path])]]),
+      };
+
+      const result = projectCatalogList(catalog);
+      const filtered = projectCatalogList(catalog, {
+        kind: documentKinds.policy,
+      });
+
+      expect(result.items[0]).toMatchObject({
+        id: document.id,
+        hasErrors: true,
+      });
+      expect(result.items[0]).not.toHaveProperty('kind');
+      expect(filtered.items).toEqual([]);
+    });
+
+    it('같은 ID의 두 파일이 필터 조건을 나누어 만족하면 목록에서 제외한다', () => {
+      const sales = {
+        ...alpha,
+        domains: ['판매'],
+        observation: {
+          path: alpha.path,
+          parsed: {
+            ...parsedBase,
+            data: {
+              id: alpha.id,
+              name: alpha.name,
+              domains: ['판매'],
+              kind: documentKinds.decision,
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const policy = {
+        ...alpha,
+        path: 'policy.yaml',
+        domains: ['구매'],
+        observation: {
+          path: 'policy.yaml',
+          parsed: {
+            ...parsedBase,
+            data: {
+              id: alpha.id,
+              name: alpha.name,
+              domains: ['구매'],
+              kind: documentKinds.policy,
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map<string, CatalogDocument>([
+          [sales.path, sales],
+          [policy.path, policy],
+        ]),
+        idPaths: new Map([[alpha.id, new Set([sales.path, policy.path])]]),
+      };
+      const filters = { domain: '판매', kind: documentKinds.policy };
+
+      const result = projectCatalogList(catalog, filters);
+
+      expect(result).toEqual({ items: [], totalCount: 0 });
+    });
+
+    it('중복 ID의 한 경로만 필터에 맞으면 모든 충돌 경로를 반환한다', () => {
+      const matching = {
+        ...alpha,
+        path: 'z.yaml',
+        id: 'shared',
+        domains: ['판매'],
+        observation: {
+          path: 'z.yaml',
+          parsed: {
+            ...parsedBase,
+            data: {
+              id: 'shared',
+              name: '판매',
+              domains: ['판매'],
+              kind: documentKinds.policy,
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const other = {
+        ...alpha,
+        path: 'a.yaml',
+        id: 'shared',
+        domains: ['구매'],
+        observation: {
+          path: 'a.yaml',
+          parsed: {
+            ...parsedBase,
+            data: {
+              id: 'shared',
+              name: '구매',
+              domains: ['구매'],
+              kind: documentKinds.decision,
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map<string, CatalogDocument>([
+          [matching.path, matching],
+          [other.path, other],
+        ]),
+        idPaths: new Map([['shared', new Set(['z.yaml', 'a.yaml'])]]),
+      };
+
+      const result = projectCatalogList(catalog, {
+        domain: '판매',
+        kind: documentKinds.policy,
+      });
+
+      expect(result.items).toEqual([
+        {
+          id: 'shared',
+          paths: ['a.yaml', 'z.yaml'],
+          hasErrors: true,
+          conflict: true,
+        },
+      ]);
+    });
   });
 });
 
-describe('Catalog 상세 투영', /** 복수 ID와 문서·참조 분기를 검증한다. */ () => {
-  it('[A, B, A]를 첫 등장 순서로 중복 제거하고 정상·없음을 함께 반환한다', /** 항목별 독립 결과를 검증한다. */ () => {
-    const results = successful(complete(observation('a.yaml', 'a', 'A')), [
-      'a',
-      'b',
-      'a',
-    ]);
-    expect(results.map((result) => result.id)).toEqual(['a', 'b']);
-    expect(results[0]).toMatchObject({ found: true, conflict: false });
-    expect(results[1]).toEqual({
-      id: 'b',
-      found: false,
-      diagnostics: [
-        expect.objectContaining({ code: queryDiagnosticCodes.notFound }),
-      ],
-    });
-  });
+describe('projectCatalogGet: ID별 문서 상세 투영', () => {
+  describe('문서 조회와 요청 ID 처리', () => {
+    it('유일한 ID를 조회하면 문서와 경로를 반환한다', () => {
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[alpha.path, alpha]]),
+        idPaths: new Map([[alpha.id, new Set([alpha.path])]]),
+      };
+      const ids = [alpha.id];
 
-  it('빈 입력과 중복 제거 후 21개 입력은 전체 invalid_input이다', /** 유일한 get 크기 제한을 검증한다. */ () => {
-    expect(projectCatalogGet(complete(), [])).toMatchObject({
-      success: false,
-      error: { code: queryDiagnosticCodes.invalidInput },
-    });
-    const twenty = Array.from({ length: 20 }, (_, index) => `id-${index}`);
-    const deduplicated = projectCatalogGet(complete(), [...twenty, ...twenty]);
-    expect(deduplicated.success).toBe(true);
-    if (deduplicated.success) expect(deduplicated.results).toHaveLength(20);
-    expect(projectCatalogGet(complete(), [...twenty, 'id-20'])).toMatchObject({
-      success: false,
-      error: { code: queryDiagnosticCodes.invalidInput },
-    });
-  });
+      const result = projectCatalogGet(catalog, ids);
 
-  it('중복 ID와 정상 ID 중 충돌 결과만 내용·원문·revision을 생략한다', /** 충돌 union의 금지 필드를 검증한다. */ () => {
-    const catalog = complete(
-      observation('z.yaml', 'shared', 'Z'),
-      observation('a.yaml', 'shared', 'A'),
-      observation('normal.yaml', 'normal', '정상'),
-    );
-    const projection = projectCatalogGet(catalog, ['shared', 'normal'], {
-      revisions: new Map([
-        ['a.yaml', 'a-revision'],
-        ['normal.yaml', 'normal-revision'],
-        ['z.yaml', 'z-revision'],
-      ]),
-    });
-    if (!projection.success) throw new Error('상세 조회가 성공해야 한다');
-    const [conflict, normal] = projection.results;
-    expect(conflict).toMatchObject({
-      id: 'shared',
-      found: true,
-      conflict: true,
-      paths: ['a.yaml', 'z.yaml'],
-    });
-    expect(conflict).not.toHaveProperty('document');
-    expect(conflict).not.toHaveProperty('rawYaml');
-    expect(conflict).not.toHaveProperty('revision');
-    expect(normal).toMatchObject({
-      id: 'normal',
-      found: true,
-      conflict: false,
-      revision: 'normal-revision',
-    });
-    expect(normal).toHaveProperty('document');
-  });
-
-  it('JSON으로 표현할 수 없는 오류 문서는 전체 rawYaml과 진단·경로·revision을 반환한다', /** 손실 없는 원문 분기를 검증한다. */ () => {
-    const rawYaml =
-      'id: broken\nname: 오류 문서\ndefinition: 설명\ndomains: [도메인]\nvalue: .nan\n';
-    const catalog = complete({
-      path: 'broken.yaml',
-      parsed: parseYaml(rawYaml),
-    });
-    const projection = projectCatalogGet(catalog, ['broken'], {
-      revisions: new Map([['broken.yaml', 'raw-revision']]),
-    });
-    if (!projection.success) throw new Error('상세 조회가 성공해야 한다');
-    expect(projection.results[0]).toMatchObject({
-      id: 'broken',
-      found: true,
-      conflict: false,
-      rawYaml,
-      source: { path: 'broken.yaml' },
-      revision: 'raw-revision',
-    });
-    expect(projection.results[0]?.diagnostics).toContainEqual(
-      expect.objectContaining({ severity: 'error' }),
-    );
-    expect(projection.results[0]).not.toHaveProperty('document');
-  });
-
-  it('확정 직접 참조 ID만 중복 제거해 정렬하며 본문을 확장하지 않는다', /** 유효 직접 ID 목록만 검증한다. */ () => {
-    const catalog = complete(
-      observation('z.yaml', 'zeta', 'Zulu'),
-      observation('a.yaml', 'alpha', 'Alpha'),
-      observation('source.yaml', 'source', 'Source', {
-        definition: '[[Zulu]] [[Alpha]] [[Zulu]]',
-      }),
-    );
-    const [result] = successful(catalog, ['source']);
-    expect(result).toMatchObject({ references: ['alpha', 'zeta'] });
-    expect(result).not.toHaveProperty('referencedDocuments');
-  });
-
-  it('없는 참조는 path를 만들지 않고 원문 위치와 외부 진단을 보존한다', /** 부재 경로를 추측하지 않는지 검증한다. */ () => {
-    const [result] = successful(
-      complete(
-        observation('source.yaml', 'source', 'Source', {
-          definition: '앞 [[Missing]] 뒤',
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.results).toEqual([
+        expect.objectContaining({
+          id: ids[0],
+          found: true,
+          conflict: false,
+          source: { path: alpha.path },
+          document: alpha.observation.parsed.data,
         }),
-      ),
-      ['source'],
-    );
-    expect(result).toMatchObject({ references: [] });
-    const diagnostic = result?.diagnostics.find(
-      (item) => item.code === queryDiagnosticCodes.referenceNotFound,
-    );
-    expect(diagnostic?.path).toBe('source.yaml');
-    expect(diagnostic?.range?.start.line).toBeTypeOf('number');
-    expect(diagnostic?.range?.end.line).toBeTypeOf('number');
-    expect(diagnostic).not.toHaveProperty('relatedPaths');
+      ]);
+    });
+
+    it('같은 ID를 반복해서 조회하면 첫 등장 순서로 한 번씩 반환한다', () => {
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[alpha.path, alpha]]),
+        idPaths: new Map([[alpha.id, new Set([alpha.path])]]),
+      };
+      const ids = ['a', 'b', 'a'];
+
+      const result = projectCatalogGet(catalog, ids);
+
+      expect(result.success).toBe(true);
+      if (result.success)
+        expect(result.results.map((item) => item.id)).toEqual(['a', 'b']);
+    });
+
+    it('없는 ID를 조회하면 내용 없이 not_found 진단을 반환한다', () => {
+      const catalog: Catalog = { ...catalogBase };
+      const ids = ['missing'];
+
+      const result = projectCatalogGet(catalog, ids);
+
+      expect(result).toEqual({
+        success: true,
+        results: [
+          {
+            id: ids[0],
+            found: false,
+            diagnostics: [
+              expect.objectContaining({ code: queryDiagnosticCodes.notFound }),
+            ],
+          },
+        ],
+      });
+    });
+
+    it.each([
+      { name: '빈 목록', ids: [] },
+      {
+        name: '21개 고유 ID',
+        ids: Array.from({ length: 21 }, (_, i) => 'id-' + i),
+      },
+    ])('$name을 조회하면 invalid_input 오류를 반환한다', ({ ids }) => {
+      const catalog: Catalog = { ...catalogBase };
+
+      const result = projectCatalogGet(catalog, ids);
+
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: queryDiagnosticCodes.invalidInput },
+      });
+    });
+
+    it('20개 ID를 반복해서 조회하면 중복 제거 후 유효한 요청으로 처리한다', () => {
+      const catalog: Catalog = { ...catalogBase };
+      const ids = Array.from({ length: 20 }, (_, i) => 'id-' + i);
+
+      const result = projectCatalogGet(catalog, [...ids, ...ids]);
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.results).toHaveLength(ids.length);
+    });
   });
 
-  it('모호한 참조는 외부 ID에서 제외하고 모든 후보 경로를 정렬한다', /** 후보 경로 보존을 검증한다. */ () => {
-    const [result] = successful(
-      complete(
-        observation('z.yaml', 'z', 'Target'),
-        observation('a.yaml', 'a', 'Target'),
-        observation('source.yaml', 'source', 'Source', {
-          definition: '[[Target]]',
-        }),
-      ),
-      ['source'],
-    );
-    expect(result).toMatchObject({ references: [] });
-    expect(result?.diagnostics).toContainEqual(
-      expect.objectContaining({
-        code: queryDiagnosticCodes.referenceAmbiguous,
-        relatedPaths: ['a.yaml', 'z.yaml'],
-      }),
-    );
+  describe('중복 ID와 원문 보존', () => {
+    it('중복 ID를 조회하면 두 경로를 반환하고 대표 문서나 revision을 만들지 않는다', () => {
+      const other = {
+        ...alpha,
+        path: 'z.yaml',
+        observation: { ...alpha.observation, path: 'z.yaml' },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map<string, CatalogDocument>([
+          [alpha.path, alpha],
+          [other.path, other],
+        ]),
+        idPaths: new Map([[alpha.id, new Set([other.path, alpha.path])]]),
+      };
+      const ids = [alpha.id];
+      const options = {
+        revisions: new Map([
+          [alpha.path, 'a-revision'],
+          [other.path, 'z-revision'],
+        ]),
+      };
+
+      const result = projectCatalogGet(catalog, ids, options);
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.results[0]).toMatchObject({
+        id: ids[0],
+        found: true,
+        conflict: true,
+        paths: [alpha.path, other.path],
+        diagnostics: [
+          expect.objectContaining({ code: catalogDiagnosticCodes.duplicateId }),
+        ],
+      });
+      expect(result.results[0]).not.toHaveProperty('document');
+      expect(result.results[0]).not.toHaveProperty('rawYaml');
+      expect(result.results[0]).not.toHaveProperty('revision');
+    });
+
+    it('문서 데이터에 비유한 수가 있으면 원문과 진단을 반환한다', () => {
+      const issue = {
+        code: schemaDiagnosticCodes.invalidFieldValue,
+        severity: diagnosticSeverities.error,
+        message: 'JSON 값이 아닙니다.',
+        fieldPath: ['value'],
+      };
+      const document = {
+        ...alpha,
+        id: 'broken',
+        path: 'broken.yaml',
+        name: '오류 문서',
+        documentDiagnostics: [issue],
+        diagnostics: [issue],
+        observation: {
+          path: 'broken.yaml',
+          parsed: {
+            ...parsedBase,
+            source: 'id: broken\nvalue: .nan\n',
+            data: { id: 'broken', value: NaN },
+          },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[document.path, document]]),
+        idPaths: new Map([[document.id, new Set([document.path])]]),
+      };
+      const ids = [document.id];
+      const options = { revisions: new Map([[document.path, 'raw-revision']]) };
+
+      const result = projectCatalogGet(catalog, ids, options);
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.results[0]).toMatchObject({
+        id: ids[0],
+        rawYaml: document.observation.parsed.source,
+        source: { path: document.path },
+        revision: options.revisions.get(document.path),
+        diagnostics: [
+          expect.objectContaining({ severity: diagnosticSeverities.error }),
+        ],
+      });
+      expect(result.results[0]).not.toHaveProperty('document');
+    });
   });
 
-  it('단일 대상의 ID 누락과 중복은 내부 연결을 유지하되 외부 ID에서 제외한다', /** 경로 연결과 외부 ID를 구분한다. */ () => {
-    const missingCatalog = complete(
-      observation('target.yaml', undefined, 'Target'),
-      observation('source.yaml', 'source', 'Source', {
-        definition: '[[Target]]',
-      }),
-    );
-    expect(
-      missingCatalog.documents
-        .get('source.yaml')
-        ?.references.map((item) => item.path),
-    ).toEqual(['target.yaml']);
-    const [missing] = successful(missingCatalog, ['source']);
-    expect(missing).toMatchObject({ references: [] });
-    expect(missing?.diagnostics).toContainEqual(
-      expect.objectContaining({
-        code: 'reference_target_error',
-        relatedPaths: ['target.yaml'],
-        reason: 'missing_id',
-      }),
+  describe('확정 참조를 외부 ID로 표시', () => {
+    it('다른 문서를 직접 참조하면 대상 ID를 반환한다', () => {
+      const source = {
+        ...alpha,
+        path: 'source.yaml',
+        id: 'source',
+        name: 'Source',
+        observation: {
+          path: 'source.yaml',
+          parsed: {
+            ...parsedBase,
+            data: { id: 'source', definition: '[[A]]' },
+          },
+        },
+        references: [alpha],
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map<string, CatalogDocument>([
+          [source.path, source],
+          [alpha.path, alpha],
+        ]),
+        idPaths: new Map([
+          [source.id, new Set([source.path])],
+          [alpha.id, new Set([alpha.path])],
+        ]),
+      };
+
+      const result = projectCatalogGet(catalog, [source.id]);
+
+      expect(result.success).toBe(true);
+      if (result.success)
+        expect(result.results[0]).toMatchObject({ references: [alpha.id] });
+    });
+
+    it.each([
+      { label: '직접 참조', field: 'references' },
+      { label: '역참조', field: 'referencedBy' },
+    ] as const)(
+      '$label 경로 순서와 ID 순서가 다르면 ID 오름차순으로 반환한다',
+      ({ field }) => {
+        const zebra = {
+          ...alpha,
+          id: 'zebra',
+          path: 'first.yaml',
+          observation: {
+            path: 'first.yaml',
+            parsed: { ...parsedBase, data: { id: 'zebra', name: 'Zebra' } },
+          },
+        } satisfies CatalogDocument;
+        const beta = {
+          ...alpha,
+          id: 'beta',
+          path: 'last.yaml',
+          observation: {
+            path: 'last.yaml',
+            parsed: { ...parsedBase, data: { id: 'beta', name: 'Beta' } },
+          },
+        } satisfies CatalogDocument;
+        const source = {
+          ...alpha,
+          [field]: [zebra, beta],
+        } satisfies CatalogDocument;
+        const catalog: Catalog = {
+          ...catalogBase,
+          documents: new Map([
+            [source.path, source],
+            [zebra.path, zebra],
+            [beta.path, beta],
+          ]),
+          idPaths: new Map([
+            [source.id, new Set([source.path])],
+            [zebra.id, new Set([zebra.path])],
+            [beta.id, new Set([beta.path])],
+          ]),
+        };
+        const ids = [source.id];
+
+        const result = projectCatalogGet(catalog, ids);
+
+        expect(result.success).toBe(true);
+        if (!result.success) throw new Error('상세 조회 실패');
+        expect(result.results).toHaveLength(1);
+        expect(result.results[0]).toMatchObject({
+          [field]: [beta.id, zebra.id],
+        });
+      },
     );
 
-    const duplicateCatalog = complete(
-      observation('target.yaml', 'shared', 'Target'),
-      observation('other.yaml', 'shared', 'Other'),
-      observation('source.yaml', 'source', 'Source', {
-        definition: '[[Target]]',
-      }),
-    );
-    expect(
-      duplicateCatalog.documents
-        .get('source.yaml')
-        ?.references.map((item) => item.path),
-    ).toEqual(['target.yaml']);
-    const [duplicate] = successful(duplicateCatalog, ['source']);
-    expect(duplicate).toMatchObject({ references: [] });
-    expect(duplicate?.diagnostics).toContainEqual(
-      expect.objectContaining({
-        relatedPaths: ['target.yaml'],
-        reason: 'duplicate_id',
-      }),
-    );
+    it('같은 대상 경로가 반복되면 외부 참조 ID를 한 번만 반환한다', () => {
+      const source = {
+        ...alpha,
+        path: 'source.yaml',
+        id: 'source',
+        references: [alpha, alpha],
+        observation: {
+          path: 'source.yaml',
+          parsed: {
+            ...parsedBase,
+            data: { id: 'source', definition: '[[A]] [[A]]' },
+          },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map<string, CatalogDocument>([
+          [source.path, source],
+          [alpha.path, alpha],
+        ]),
+        idPaths: new Map([
+          [source.id, new Set([source.path])],
+          [alpha.id, new Set([alpha.path])],
+        ]),
+      };
+
+      const result = projectCatalogGet(catalog, [source.id]);
+
+      expect(result.success).toBe(true);
+      if (result.success)
+        expect(result.results[0]).toMatchObject({ references: [alpha.id] });
+    });
+
+    it('없는 참조를 조회하면 원래 위치와 대상 없음 진단을 반환한다', () => {
+      const source = {
+        ...alpha,
+        occurrences: [occurrence],
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[source.path, source]]),
+        idPaths: new Map([[source.id, new Set([source.path])]]),
+      };
+
+      const result = projectCatalogGet(catalog, [source.id]);
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.results[0]).toMatchObject({
+        references: [],
+        diagnostics: [
+          expect.objectContaining({
+            code: queryDiagnosticCodes.referenceNotFound,
+            path: source.path,
+            range: occurrence.occurrence.range,
+            offsetRange: occurrence.occurrence.offsetRange,
+          }),
+        ],
+      });
+      expect(result.results[0]?.diagnostics[0]).not.toHaveProperty(
+        'relatedPaths',
+      );
+    });
+
+    it('동명이인 참조를 조회하면 확정 ID 없이 모든 후보 경로를 반환한다', () => {
+      const a = { ...alpha, path: 'a.yaml' } satisfies CatalogDocument;
+      const z = { ...alpha, path: 'z.yaml' } satisfies CatalogDocument;
+      const source = {
+        ...alpha,
+        path: 'source.yaml',
+        id: 'source',
+        occurrences: [
+          {
+            ...occurrence,
+            resolution: {
+              status: referenceResolutionStatuses.ambiguous,
+              candidates: [
+                { ...z, errors: [] },
+                { ...a, errors: [] },
+              ],
+            },
+          },
+        ],
+        observation: {
+          path: 'source.yaml',
+          parsed: {
+            ...parsedBase,
+            data: { id: 'source', definition: '[[Target]]' },
+          },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[source.path, source]]),
+        idPaths: new Map([[source.id, new Set([source.path])]]),
+      };
+
+      const result = projectCatalogGet(catalog, [source.id]);
+
+      expect(result.success).toBe(true);
+      if (result.success)
+        expect(result.results[0]).toMatchObject({
+          references: [],
+          diagnostics: [
+            expect.objectContaining({
+              code: queryDiagnosticCodes.referenceAmbiguous,
+              relatedPaths: ['a.yaml', 'z.yaml'],
+            }),
+          ],
+        });
+    });
   });
 
-  it('역참조 출처의 ID가 없으면 외부 ID에서 제외하고 출처 경로와 이유를 반환한다', /** 역참조에도 같은 ID 규칙을 적용한다. */ () => {
-    const catalog = complete(
-      observation('target.yaml', 'target', 'Target'),
-      observation('source.yaml', undefined, 'Source', {
-        definition: '[[Target]]',
-      }),
-    );
-    expect(
-      catalog.documents
-        .get('target.yaml')
-        ?.referencedBy.map((item) => item.path),
-    ).toEqual(['source.yaml']);
-    const [target] = successful(catalog, ['target']);
-    expect(target).toMatchObject({ referencedBy: [] });
-    expect(target?.diagnostics).toContainEqual(
-      expect.objectContaining({
-        relatedPaths: ['source.yaml'],
-        reason: 'missing_id',
-      }),
-    );
+  describe('연결 문서의 ID를 외부 참조로 표시할 수 없는 경우', () => {
+    it('대상 문서에 ID가 없으면 외부 ID를 제외하고 대상 경로와 원인을 반환한다', () => {
+      const target = {
+        ...documentBase,
+        path: 'target.yaml',
+        name: 'Target',
+        observation: {
+          path: 'target.yaml',
+          parsed: {
+            ...parsedBase,
+            data: { name: 'Target', domains: ['도메인'] },
+          },
+        },
+      } satisfies CatalogDocument;
+      const source = {
+        ...alpha,
+        path: 'source.yaml',
+        id: 'source',
+        references: [target],
+        occurrences: [
+          {
+            ...occurrence,
+            resolution: {
+              status: referenceResolutionStatuses.resolved,
+              candidates: [{ ...target, errors: [] }],
+              target: { ...target, errors: [] },
+            },
+          },
+        ],
+        observation: {
+          path: 'source.yaml',
+          parsed: {
+            ...parsedBase,
+            data: { id: 'source', definition: '[[Target]]' },
+          },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map<string, CatalogDocument>([
+          [source.path, source],
+          [target.path, target],
+        ]),
+        idPaths: new Map([[source.id, new Set([source.path])]]),
+      };
+
+      const result = projectCatalogGet(catalog, [source.id]);
+
+      expect(result.success).toBe(true);
+      if (result.success)
+        expect(result.results[0]).toMatchObject({
+          references: [],
+          diagnostics: [
+            expect.objectContaining({
+              code: catalogDiagnosticCodes.referenceTargetError,
+              relatedPaths: [target.path],
+              reason: 'missing_id',
+            }),
+          ],
+        });
+    });
+
+    it('대상 ID가 다른 문서와 충돌하면 외부 ID를 제외하고 충돌 원인을 반환한다', () => {
+      const target = {
+        ...alpha,
+        path: 'target.yaml',
+        id: 'shared',
+        name: 'Target',
+      } satisfies CatalogDocument;
+      const other = {
+        ...alpha,
+        path: 'other.yaml',
+        id: 'shared',
+        name: 'Other',
+      } satisfies CatalogDocument;
+      const source = {
+        ...alpha,
+        path: 'source.yaml',
+        id: 'source',
+        references: [target],
+        occurrences: [
+          {
+            ...occurrence,
+            resolution: {
+              status: referenceResolutionStatuses.resolved,
+              candidates: [{ ...target, errors: [] }],
+              target: { ...target, errors: [] },
+            },
+          },
+        ],
+        observation: {
+          path: 'source.yaml',
+          parsed: {
+            ...parsedBase,
+            data: { id: 'source', definition: '[[Target]]' },
+          },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map<string, CatalogDocument>([
+          [source.path, source],
+          [target.path, target],
+          [other.path, other],
+        ]),
+        idPaths: new Map([
+          [source.id, new Set([source.path])],
+          ['shared', new Set([target.path, other.path])],
+        ]),
+      };
+
+      const result = projectCatalogGet(catalog, [source.id]);
+
+      expect(result.success).toBe(true);
+      if (result.success)
+        expect(result.results[0]).toMatchObject({
+          references: [],
+          diagnostics: [
+            expect.objectContaining({
+              relatedPaths: [target.path],
+              reason: 'duplicate_id',
+            }),
+          ],
+        });
+    });
+
+    it('역참조 출처에 ID가 없으면 외부 ID를 제외하고 출처 경로를 반환한다', () => {
+      const source = {
+        ...documentBase,
+        path: 'source.yaml',
+        observation: {
+          path: 'source.yaml',
+          parsed: {
+            ...parsedBase,
+            data: { name: 'Source', domains: ['도메인'] },
+          },
+        },
+      } satisfies CatalogDocument;
+      const target = {
+        ...alpha,
+        path: 'target.yaml',
+        id: 'target',
+        referencedBy: [source],
+        observation: {
+          path: 'target.yaml',
+          parsed: { ...parsedBase, data: { id: 'target', name: 'Target' } },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map<string, CatalogDocument>([
+          [target.path, target],
+          [source.path, source],
+        ]),
+        idPaths: new Map([[target.id, new Set([target.path])]]),
+      };
+
+      const result = projectCatalogGet(catalog, [target.id]);
+
+      expect(result.success).toBe(true);
+      if (result.success)
+        expect(result.results[0]).toMatchObject({
+          referencedBy: [],
+          diagnostics: [
+            expect.objectContaining({
+              relatedPaths: [source.path],
+              reason: 'missing_id',
+            }),
+          ],
+        });
+    });
   });
 
-  it('큰 본문과 20개 결과의 문서·참조 목록을 자르지 않는다', /** 응답 크기 절단이 없음을 검증한다. */ () => {
-    const body = '큰 본문'.repeat(100_000);
-    const targets = Array.from({ length: 19 }, (_, index) =>
-      observation(`target-${index}.yaml`, `target-${index}`, `Target ${index}`),
-    );
-    const references = targets
-      .map((_, index) => `[[Target ${index}]]`)
-      .join(' ');
-    const catalog = complete(
-      ...targets,
-      observation('large.yaml', 'large', 'Large', {
-        definition: `${body}${references}`,
-      }),
-    );
-    const ids = ['large', ...targets.map((_, index) => `target-${index}`)];
-    const projection = projectCatalogGet(catalog, ids);
-    if (!projection.success) throw new Error('20개 조회가 성공해야 한다');
-    expect(projection.results).toHaveLength(20);
-    const large = projection.results[0];
-    expect(large).toMatchObject({
-      references: Array.from(
+  describe('큰 응답과 입력 보존', () => {
+    it('서로 다른 문서 19개를 직접 참조하면 모든 대상 ID를 반환한다', () => {
+      const ids = Array.from(
         { length: 19 },
-        (_, index) => `target-${index}`,
-      ).sort(),
-    });
-    if (!large?.found || large.conflict)
-      throw new Error('큰 문서 결과가 있어야 한다');
-    expect(large.document?.definition).toBe(`${body}${references}`);
-  });
+        (_, index) => 'target-' + String(index).padStart(2, '0'),
+      );
+      const targets = ids.map((id) => {
+        const path = id + '.yaml';
+        return {
+          ...alpha,
+          id,
+          path,
+          observation: {
+            path,
+            parsed: { ...parsedBase, data: { id, name: id } },
+          },
+        } satisfies CatalogDocument;
+      });
+      const source = {
+        ...alpha,
+        id: 'source',
+        path: 'source.yaml',
+        references: targets,
+        observation: {
+          path: 'source.yaml',
+          parsed: { ...parsedBase, data: { id: 'source', name: 'Source' } },
+        },
+      } satisfies CatalogDocument;
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map<string, CatalogDocument>([
+          [source.path, source],
+          ...targets.map((target) => [target.path, target] as const),
+        ]),
+        idPaths: new Map([
+          [source.id, new Set([source.path])],
+          ...targets.map(
+            (target) => [target.id, new Set([target.path])] as const,
+          ),
+        ]),
+      };
 
-  it('결과를 새 값으로 만들고 Catalog와 호출자 입력을 바꾸지 않는다', /** 순수 투영과 복사를 검증한다. */ () => {
-    const catalog = complete(observation('a.yaml', 'a', 'A'));
-    const ids = ['a', 'a'] as const;
-    const beforeSource =
-      catalog.documents.get('a.yaml')?.observation.parsed.source;
-    const projection = projectCatalogGet(catalog, ids);
-    expect(ids).toEqual(['a', 'a']);
-    expect(catalog.documents.get('a.yaml')?.observation.parsed.source).toBe(
-      beforeSource,
-    );
-    if (!projection.success) throw new Error('상세 조회가 성공해야 한다');
-    const result = projection.results[0];
-    if (!result?.found || result.conflict || !result.document)
-      throw new Error('문서 결과가 있어야 한다');
-    const parsed = catalog.documents.get('a.yaml')?.observation.parsed;
-    expect(result.document).not.toBe(parsed?.success ? parsed.data : undefined);
+      const result = projectCatalogGet(catalog, [source.id]);
+
+      expect(result.success).toBe(true);
+      if (result.success)
+        expect(result.results[0]).toMatchObject({ references: ids });
+    });
+
+    it('20개 ID의 큰 본문을 조회하면 결과와 원문 내용을 자르지 않는다', () => {
+      const definition = '큰 본문'.repeat(100_000);
+      const ids = Array.from({ length: 20 }, (_, index) => 'id-' + index);
+      const documents = ids.map((id) => {
+        const path = id + '.yaml';
+        return {
+          ...alpha,
+          id,
+          path,
+          observation: {
+            path,
+            parsed: { ...parsedBase, data: { id, definition } },
+          },
+        } satisfies CatalogDocument;
+      });
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map(
+          documents.map((document) => [document.path, document]),
+        ),
+        idPaths: new Map(
+          documents.map((document) => [document.id, new Set([document.path])]),
+        ),
+      };
+
+      const result = projectCatalogGet(catalog, ids);
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.results).toHaveLength(ids.length);
+      expect(result.results[0]).toMatchObject({
+        document: { definition },
+      });
+    });
+
+    it('문서를 조회하면 입력 ID와 원본 Catalog 문서를 변경하지 않고 새 값을 반환한다', () => {
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[alpha.path, alpha]]),
+        idPaths: new Map([[alpha.id, new Set([alpha.path])]]),
+      };
+      const ids = [alpha.id, alpha.id];
+      const beforeIds = [...ids];
+      const beforeData = {
+        ...alpha.observation.parsed.data,
+        domains: [...alpha.observation.parsed.data.domains],
+      };
+
+      const result = projectCatalogGet(catalog, ids);
+
+      expect(ids).toEqual(beforeIds);
+      expect(alpha.observation.parsed.data).toEqual(beforeData);
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      const item = result.results[0];
+      if (!item?.found || item.conflict) return;
+      expect(item.document).toEqual(beforeData);
+      expect(item.document).not.toBe(alpha.observation.parsed.data);
+    });
   });
 });

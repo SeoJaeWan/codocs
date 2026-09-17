@@ -1,171 +1,559 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { describe, expect, it } from 'vitest';
 import {
-  buildCatalog,
+  catalogConfirmations,
   catalogFailureKinds,
+  scanStatuses,
+  type Catalog,
+  type CatalogDocument,
+} from '../catalog/index.js';
+import {
+  diagnosticSeverities,
+  schemaDiagnosticCodes,
+} from '../diagnostics/index.js';
+import {
   matchCode,
   matcherComparisonKinds,
   matcherEvidenceKinds,
-  parseYaml,
-  scanStatuses,
-  type Catalog,
-  type CatalogObservation,
-} from '../index.js';
+} from './index.js';
 
-/** 간단한 문서 관측을 만든다. */
-function observation(path: string, id: string, extra = ''): CatalogObservation {
-  return {
-    path,
-    parsed: parseYaml(
-      `id: ${id}\nname: ${path}\ndomains: [test]\ndefinition: 설명\n${extra}`,
-    ),
-  };
-}
+const documentBase = {
+  domains: ['test'],
+  confirmation: catalogConfirmations.confirmed,
+  documentDiagnostics: [],
+  diagnostics: [],
+  occurrences: [],
+  references: [],
+  referencedBy: [],
+} satisfies Pick<
+  CatalogDocument,
+  | 'domains'
+  | 'confirmation'
+  | 'documentDiagnostics'
+  | 'diagnostics'
+  | 'occurrences'
+  | 'references'
+  | 'referencedBy'
+>;
+const parsedBase = {
+  success: true as const,
+  fields: [],
+  strings: [],
+  diagnostics: [],
+};
+const catalogBase: Catalog = {
+  status: scanStatuses.complete,
+  failures: [],
+  documents: new Map(),
+  idPaths: new Map(),
+  namePaths: new Map(),
+  domainNamePaths: new Map(),
+};
+const returnZone = {
+  ...documentBase,
+  path: 'return-zone.yaml',
+  id: 'return-zone',
+  name: 'return-zone',
+  observation: {
+    path: 'return-zone.yaml',
+    parsed: {
+      ...parsedBase,
+      source:
+        '{"id": "return-zone", "name": "return-zone", "domains": ["test"], "definition": "설명"}',
+      data: {
+        id: 'return-zone',
+        name: 'return-zone',
+        domains: ['test'],
+        definition: '설명',
+      },
+    },
+  },
+} satisfies CatalogDocument;
+const zone = {
+  ...documentBase,
+  path: 'zone.yaml',
+  id: 'zone',
+  name: 'zone',
+  observation: {
+    path: 'zone.yaml',
+    parsed: {
+      ...parsedBase,
+      source:
+        '{"id": "zone", "name": "zone", "domains": ["test"], "definition": "설명"}',
+      data: { id: 'zone', name: 'zone', domains: ['test'], definition: '설명' },
+    },
+  },
+} satisfies CatalogDocument;
 
-/** 관측 배열로 완전한 카탈로그를 만든다. */
-function catalog(...items: CatalogObservation[]): Catalog {
-  return buildCatalog({ status: scanStatuses.complete, observations: items });
-}
-
-describe('코드 ID 매칭', /** 토큰·순위·오류 계약을 검증한다. */ () => {
-  it('camelCase의 연속 토큰과 UTF-16 범위를 유지한다', /** astral 문자 뒤의 UTF-16 위치를 확인한다. */ () => {
-    const result = matchCode(
-      catalog(observation('return.yaml', 'return-zone')),
-      '😀selectedReturnZones',
-    );
-    expect(result.candidates[0]?.evidence).toEqual([
-      expect.objectContaining({
-        token: 'ReturnZones',
-        range: { start: 10, end: 21 },
+describe('matchCode: 코드와 문서 ID 매칭', () => {
+  describe('현재 ID·이전 ID로 문서 후보 조회', () => {
+    it('코드가 현재 ID와 일치하면 문서와 일치 근거를 반환한다', () => {
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([[zone.path, zone]]),
+        },
+        code: 'zone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]).toMatchObject({
+        id: zone.id,
+        path: zone.path,
+        name: zone.name,
+        domains: zone.domains,
+      });
+      expect(result.candidates[0]?.evidence).toEqual([
+        {
+          kind: matcherEvidenceKinds.current,
+          comparison: matcherComparisonKinds.exact,
+          token: request.code,
+          sourceId: zone.id,
+          range: { start: 0, end: 4 },
+          consecutiveTokens: 1,
+        },
+      ]);
+    });
+    it('코드가 이전 ID와 일치하면 현재 문서와 이전 ID 메시지를 반환한다', () => {
+      const document = {
+        ...documentBase,
+        path: 'current-zone.yaml',
+        id: 'current-zone',
+        name: 'current-zone',
+        observation: {
+          path: 'current-zone.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "current-zone", "name": "current-zone", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "legacy-zone", "message": "새 ID를 사용하세요"}]}',
+            data: {
+              id: 'current-zone',
+              name: 'current-zone',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [
+                { id: 'legacy-zone', message: '새 ID를 사용하세요' },
+              ],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [document.path, document],
+          ]),
+        },
+        code: 'legacyZone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]?.id).toBe(document.id);
+      expect(result.candidates[0]?.evidence).toEqual([
+        expect.objectContaining({
+          kind: matcherEvidenceKinds.previous,
+          sourceId: document.observation.parsed.data.deprecatedAliases[0]?.id,
+          message:
+            document.observation.parsed.data.deprecatedAliases[0]?.message,
+        }),
+      ]);
+    });
+    it('일치하는 ID가 없으면 빈 후보 목록을 반환한다', () => {
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([[zone.path, zone]]),
+        },
+        code: 'unknown',
+      };
+      const result = matchCode(request);
+      expect(result.candidates).toEqual([]);
+    });
+    it('코드가 문서 이름에만 일치하면 후보를 반환하지 않는다', () => {
+      const document = {
+        ...documentBase,
+        path: 'unrelated-id.yaml',
+        id: 'unrelated-id',
+        name: 'zone',
+        observation: {
+          path: 'unrelated-id.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "unrelated-id", "name": "zone", "domains": ["test"], "definition": "설명"}',
+            data: {
+              id: 'unrelated-id',
+              name: 'zone',
+              domains: ['test'],
+              definition: '설명',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [document.path, document],
+          ]),
+        },
+        code: document.name,
+      };
+      const result = matchCode(request);
+      expect(result.candidates).toEqual([]);
+    });
+    it('복합 ID의 일부 토큰만 일치하면 후보를 반환하지 않는다', () => {
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [returnZone.path, returnZone],
+          ]),
+        },
+        code: 'return',
+      };
+      const result = matchCode(request);
+      expect(result.candidates).toEqual([]);
+    });
+    it('마지막 토큰이 복수형으로 일치하면 단수화 일치 근거를 반환한다', () => {
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [returnZone.path, returnZone],
+          ]),
+        },
+        code: 'returnZones',
+      };
+      const result = matchCode(request);
+      expect(result.candidates[0]?.id).toBe(returnZone.id);
+      expect(result.candidates[0]?.evidence[0]?.comparison).toBe(
+        matcherComparisonKinds.singular,
+      );
+    });
+  });
+  describe('식별자 표기별 연속 토큰과 UTF-16 위치', () => {
+    it('camelCase 코드 앞에 이모지가 있으면 일치 부분의 UTF-16 범위를 반환한다', () => {
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [returnZone.path, returnZone],
+          ]),
+        },
+        code: '😀selectedReturnZones',
+      };
+      const result = matchCode(request);
+      // 😀는 UTF-16 두 칸이며 selected는 여덟 칸이다. 끝 위치는 포함하지 않는다.
+      expect(result.candidates[0]?.evidence).toEqual([
+        expect.objectContaining({
+          token: 'ReturnZones',
+          range: { start: 10, end: 21 },
+          consecutiveTokens: 2,
+        }),
+      ]);
+    });
+    it('약어 뒤에 일반 단어가 이어지면 두 토큰으로 매칭한다', () => {
+      const document = {
+        ...documentBase,
+        path: 'http-server.yaml',
+        id: 'http-server',
+        name: 'http-server',
+        observation: {
+          path: 'http-server.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "http-server", "name": "http-server", "domains": ["test"], "definition": "설명"}',
+            data: {
+              id: 'http-server',
+              name: 'http-server',
+              domains: ['test'],
+              definition: '설명',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [document.path, document],
+          ]),
+        },
+        code: 'HTTPServer',
+      };
+      const result = matchCode(request);
+      expect(result.candidates[0]?.id).toBe(document.id);
+      expect(result.candidates[0]?.evidence[0]).toMatchObject({
+        token: request.code,
         consecutiveTokens: 2,
-      }),
-    ]);
+      });
+    });
+    it('영문과 숫자가 붙어 있으면 경계를 나누어 매칭한다', () => {
+      const document = {
+        ...documentBase,
+        path: 'zone-2-count.yaml',
+        id: 'zone-2-count',
+        name: 'zone-2-count',
+        observation: {
+          path: 'zone-2-count.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "zone-2-count", "name": "zone-2-count", "domains": ["test"], "definition": "설명"}',
+            data: {
+              id: 'zone-2-count',
+              name: 'zone-2-count',
+              domains: ['test'],
+              definition: '설명',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [document.path, document],
+          ]),
+        },
+        code: 'zone2Count',
+      };
+      const result = matchCode(request);
+      expect(result.candidates[0]?.id).toBe(document.id);
+      expect(result.candidates[0]?.evidence[0]).toMatchObject({
+        token: request.code,
+        consecutiveTokens: 3,
+      });
+    });
+    it.each([
+      { condition: '밑줄', code: 'return_zone' },
+      { condition: '하이픈', code: 'return-zone' },
+    ])(
+      '$condition로 연결한 코드를 조회하면 연속된 두 토큰으로 매칭한다',
+      ({ code }) => {
+        const request = {
+          catalog: {
+            ...catalogBase,
+            documents: new Map<string, CatalogDocument>([
+              [returnZone.path, returnZone],
+            ]),
+          },
+          code,
+        };
+        const result = matchCode(request);
+        expect(result.candidates[0]?.id).toBe(returnZone.id);
+        expect(result.candidates[0]?.evidence[0]).toMatchObject({
+          token: request.code,
+          consecutiveTokens: 2,
+        });
+      },
+    );
+    it.each([
+      { condition: '공백', code: 'return zone' },
+      { condition: '개행', code: 'return\nZone' },
+      { condition: '한글', code: 'return한글Zone' },
+      { condition: '마침표', code: 'return.zone' },
+    ])(
+      '$condition가 토큰 사이에 있으면 복합 ID를 제외하고 각 단어의 후보를 반환한다',
+      ({ code }) => {
+        const returnOnly = {
+          ...documentBase,
+          path: 'return.yaml',
+          id: 'return',
+          name: 'return',
+          observation: {
+            path: 'return.yaml',
+            parsed: {
+              ...parsedBase,
+              source:
+                '{"id": "return", "name": "return", "domains": ["test"], "definition": "설명"}',
+              data: {
+                id: 'return',
+                name: 'return',
+                domains: ['test'],
+                definition: '설명',
+              },
+            },
+          },
+        } satisfies CatalogDocument;
+        const request = {
+          catalog: {
+            ...catalogBase,
+            documents: new Map<string, CatalogDocument>([
+              [returnZone.path, returnZone],
+              [returnOnly.path, returnOnly],
+              [zone.path, zone],
+            ]),
+          },
+          code,
+        };
+        const result = matchCode(request);
+        expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+          returnOnly.id,
+          zone.id,
+        ]);
+      },
+    );
   });
-
-  it('약어·숫자·snake·kebab 경계를 토큰화한다', /** 약어와 숫자 경계에서 연속 토큰을 확인한다. */ () => {
-    const result = matchCode(
-      catalog(
-        observation('http.yaml', 'http-server'),
-        observation('count.yaml', 'zone-2-count'),
-      ),
-      'HTTPServer zone_2_count',
-    );
-    expect(result.candidates.map((candidate) => candidate.id)).toEqual([
-      'zone-2-count',
-      'http-server',
-    ]);
-    expect(result.candidates[0]?.evidence[0]?.consecutiveTokens).toBe(3);
-  });
-
-  it('공백·개행·비영어·구두점은 복합 묶음을 끊는다', /** 허용되지 않은 경계에서 독립 토큰만 반환하는지 확인한다. */ () => {
-    const terms = catalog(
-      observation('return.yaml', 'return-zone'),
-      observation('return-only.yaml', 'return'),
-      observation('zone.yaml', 'zone'),
-    );
-    expect(matchCode(terms, 'return zone').candidates.map((x) => x.id)).toEqual(
-      ['return', 'zone'],
-    );
-    expect(
-      matchCode(terms, 'return\nZone').candidates.map((x) => x.id),
-    ).toEqual(['return', 'zone']);
-    expect(
-      matchCode(terms, 'return한글Zone').candidates.map((x) => x.id),
-    ).toEqual(['return', 'zone']);
-    expect(matchCode(terms, 'return.zone').candidates.map((x) => x.id)).toEqual(
-      ['return', 'zone'],
-    );
-  });
-
-  it('현재 ID 간에는 연속 토큰 수가 많은 후보를 우선한다', /** 같은 현재 근거의 길이 순위를 독립적으로 확인한다. */ () => {
-    const result = matchCode(
-      catalog(
-        observation('zone.yaml', 'zone'),
-        observation('long.yaml', 'return-zone'),
-      ),
-      'returnZone',
-    );
-    expect(result.candidates.map((candidate) => candidate.id)).toEqual([
-      'return-zone',
-      'zone',
-    ]);
-    expect(
-      result.candidates.map((candidate) => candidate.evidence[0]?.kind),
-    ).toEqual([matcherEvidenceKinds.current, matcherEvidenceKinds.current]);
-  });
-
-  it('짧은 현재 ID를 긴 이전 ID보다 우선한다', /** 시기 순위가 길이 순위보다 앞서는지 확인한다. */ () => {
-    const result = matchCode(
-      catalog(
-        observation('current.yaml', 'zone'),
-        observation(
-          'previous.yaml',
-          'legacy-holder',
-          'deprecatedAliases:\n  - id: return-zone\n',
-        ),
-      ),
-      'returnZone',
-    );
-    expect(result.candidates.map((candidate) => candidate.id)).toEqual([
-      'zone',
-      'legacy-holder',
-    ]);
-    expect(
-      result.candidates.map((candidate) => candidate.evidence[0]?.kind),
-    ).toEqual([matcherEvidenceKinds.current, matcherEvidenceKinds.previous]);
-  });
-
-  it('이전 ID 간에는 연속 토큰 수가 많은 후보를 우선한다', /** 같은 이전 근거의 길이 순위를 독립적으로 확인한다. */ () => {
-    const result = matchCode(
-      catalog(
-        observation(
-          'short.yaml',
-          'short-holder',
-          'deprecatedAliases:\n  - id: zone\n',
-        ),
-        observation(
-          'long.yaml',
-          'long-holder',
-          'deprecatedAliases:\n  - id: return-zone\n',
-        ),
-      ),
-      'returnZone',
-    );
-    expect(result.candidates.map((candidate) => candidate.id)).toEqual([
-      'long-holder',
-      'short-holder',
-    ]);
-  });
-
-  it.each([
-    [
-      '현재 ID',
-      observation('singular.yaml', 'return-zone'),
-      observation('exact.yaml', 'return-zones'),
-    ],
-    [
-      '이전 ID',
-      observation(
-        'singular.yaml',
-        'singular-holder',
-        'deprecatedAliases:\n  - id: return-zone\n',
-      ),
-      observation(
-        'exact.yaml',
-        'exact-holder',
-        'deprecatedAliases:\n  - id: return-zones\n',
-      ),
-    ],
-  ])(
-    '%s의 토큰 수가 같으면 표기 일치를 단수화 일치보다 우선한다',
-    /** exact 순위가 현재·이전 근거에 같이 적용되는지 확인한다. */ (
-      _label,
-      singular,
-      exact,
-    ) => {
-      const result = matchCode(catalog(singular, exact), 'returnZones');
+  describe('현재·이전 ID와 일치 길이에 따른 후보 우선순위', () => {
+    it('현재 ID 후보가 여러 개면 연속 토큰 수가 많은 문서를 먼저 반환한다', () => {
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [zone.path, zone],
+            [returnZone.path, returnZone],
+          ]),
+        },
+        code: 'returnZone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+        returnZone.id,
+        zone.id,
+      ]);
+      expect(
+        result.candidates.map((candidate) => candidate.evidence[0]?.kind),
+      ).toEqual([matcherEvidenceKinds.current, matcherEvidenceKinds.current]);
+    });
+    it('짧은 현재 ID와 긴 이전 ID가 일치하면 현재 ID 문서를 먼저 반환한다', () => {
+      const previous = {
+        ...documentBase,
+        path: 'legacy-holder.yaml',
+        id: 'legacy-holder',
+        name: 'legacy-holder',
+        observation: {
+          path: 'legacy-holder.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "legacy-holder", "name": "legacy-holder", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "return-zone"}]}',
+            data: {
+              id: 'legacy-holder',
+              name: 'legacy-holder',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'return-zone' }],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [previous.path, previous],
+            [zone.path, zone],
+          ]),
+        },
+        code: 'returnZone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+        zone.id,
+        previous.id,
+      ]);
+      expect(
+        result.candidates.map((candidate) => candidate.evidence[0]?.kind),
+      ).toEqual([matcherEvidenceKinds.current, matcherEvidenceKinds.previous]);
+    });
+    it('이전 ID 후보가 여러 개면 연속 토큰 수가 많은 문서를 먼저 반환한다', () => {
+      const short = {
+        ...documentBase,
+        path: 'short-holder.yaml',
+        id: 'short-holder',
+        name: 'short-holder',
+        observation: {
+          path: 'short-holder.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "short-holder", "name": "short-holder", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "zone"}]}',
+            data: {
+              id: 'short-holder',
+              name: 'short-holder',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'zone' }],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const long = {
+        ...documentBase,
+        path: 'long-holder.yaml',
+        id: 'long-holder',
+        name: 'long-holder',
+        observation: {
+          path: 'long-holder.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "long-holder", "name": "long-holder", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "return-zone"}]}',
+            data: {
+              id: 'long-holder',
+              name: 'long-holder',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'return-zone' }],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [short.path, short],
+            [long.path, long],
+          ]),
+        },
+        code: 'returnZone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+        long.id,
+        short.id,
+      ]);
+    });
+    it('현재 ID의 토큰 수가 같으면 표기 일치를 단수화 일치보다 먼저 반환한다', () => {
+      const exact = {
+        ...documentBase,
+        path: 'return-zones.yaml',
+        id: 'return-zones',
+        name: 'return-zones',
+        observation: {
+          path: 'return-zones.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "return-zones", "name": "return-zones", "domains": ["test"], "definition": "설명"}',
+            data: {
+              id: 'return-zones',
+              name: 'return-zones',
+              domains: ['test'],
+              definition: '설명',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [returnZone.path, returnZone],
+            [exact.path, exact],
+          ]),
+        },
+        code: 'returnZones',
+      };
+      const result = matchCode(request);
       expect(result.candidates.map((candidate) => candidate.path)).toEqual([
-        'exact.yaml',
-        'singular.yaml',
+        exact.path,
+        returnZone.path,
       ]);
       expect(
         result.candidates.map((candidate) => candidate.evidence[0]?.comparison),
@@ -173,123 +561,401 @@ describe('코드 ID 매칭', /** 토큰·순위·오류 계약을 검증한다. 
         matcherComparisonKinds.exact,
         matcherComparisonKinds.singular,
       ]);
-    },
-  );
-
-  it('의미 순위가 같으면 원문 등장 순서로 결과를 고정한다', /** 위치는 결과 정렬에만 쓰고 Hover 본문 선택을 대신하지 않는다. */ () => {
-    const result = matchCode(
-      catalog(
-        observation('alpha.yaml', 'alpha-zone'),
-        observation('zebra.yaml', 'zebra-item'),
-      ),
-      'zebraItemAlphaZone',
-    );
-    expect(result.candidates.map((candidate) => candidate.id)).toEqual([
-      'zebra-item',
-      'alpha-zone',
-    ]);
-  });
-
-  it('위치까지 같은 이전 ID 충돌은 문서 ID와 경로로 정렬하고 모두 보존한다', /** 카탈로그 입력 순서가 동률 결과를 바꾸지 않는지 확인한다. */ () => {
-    const alpha = observation(
-      'z-path.yaml',
-      'alpha-doc',
-      'deprecatedAliases:\n  - id: return-zone\n',
-    );
-    const beta = observation(
-      'a-path.yaml',
-      'beta-doc',
-      'deprecatedAliases:\n  - id: return-zone\n',
-    );
-    for (const result of [
-      matchCode(catalog(alpha, beta), 'returnZone'),
-      matchCode(catalog(beta, alpha), 'returnZone'),
-    ])
-      expect(result.candidates.map((candidate) => candidate.id)).toEqual([
-        'alpha-doc',
-        'beta-doc',
-      ]);
-  });
-
-  it('중복된 현재 ID는 경로로 정렬하고 모든 문서를 보존한다', /** 현재/현재 충돌에서 대표 문서를 선택하지 않는다. */ () => {
-    const result = matchCode(
-      catalog(
-        observation('b.yaml', 'return-zone'),
-        observation('a.yaml', 'return-zone'),
-      ),
-      'returnZone',
-    );
-    expect(result.candidates.map((candidate) => candidate.path)).toEqual([
-      'a.yaml',
-      'b.yaml',
-    ]);
-  });
-
-  it('같은 문서·범위의 현재·이전 ID 근거를 모두 보존한다', /** 현재 근거가 이전 ID 안내를 숨길 수 있도록 근거를 합친다. */ () => {
-    const result = matchCode(
-      catalog(
-        observation(
-          'same.yaml',
-          'return-zone',
-          'deprecatedAliases:\n  - id: return-zone\n    message: 이전 ID\n',
-        ),
-      ),
-      'returnZone',
-    );
-    expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0]?.evidence.map((item) => item.kind)).toEqual([
-      matcherEvidenceKinds.current,
-      matcherEvidenceKinds.previous,
-    ]);
-  });
-
-  it('반복해 등장한 ID의 모든 원문 범위를 보존한다', /** Hover가 커서가 걸린 근거를 선택할 수 있게 한다. */ () => {
-    const result = matchCode(
-      catalog(observation('zone.yaml', 'zone')),
-      'zoneToZone',
-    );
-    expect(result.candidates[0]?.evidence.map((item) => item.range)).toEqual([
-      { start: 0, end: 4 },
-      { start: 6, end: 10 },
-    ]);
-  });
-
-  it('이름은 코드 매칭에 사용하지 않으며 단수화는 보조 근거다', /** 이름 필드 제외와 pluralize 비교 종류를 확인한다. */ () => {
-    const result = matchCode(
-      catalog(observation('return.yaml', 'return-zone')),
-      'returnZones',
-    );
-    expect(result.candidates[0]?.evidence[0]?.comparison).toBe(
-      matcherComparisonKinds.singular,
-    );
-    expect(
-      matchCode(catalog(observation('return.yaml', 'return-zone')), 'return')
-        .candidates,
-    ).toEqual([]);
-  });
-
-  it('문서별 오류와 부분 스캔을 유효한 후보와 함께 반환한다', /** 한 문서 오류와 부분 색인의 후보 보존을 확인한다. */ () => {
-    const result = matchCode(
-      buildCatalog({
-        status: scanStatuses.partial,
-        observations: [
-          {
-            path: 'bad.yaml',
-            parsed: parseYaml(
-              'id: bad\nname: bad.yaml\ndomains: [test]\ndefinition: 42\n',
-            ),
+    });
+    it('이전 ID의 토큰 수가 같으면 표기 일치를 단수화 일치보다 먼저 반환한다', () => {
+      const singular = {
+        ...documentBase,
+        path: 'singular-holder.yaml',
+        id: 'singular-holder',
+        name: 'singular-holder',
+        observation: {
+          path: 'singular-holder.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "singular-holder", "name": "singular-holder", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "return-zone"}]}',
+            data: {
+              id: 'singular-holder',
+              name: 'singular-holder',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'return-zone' }],
+            },
           },
-          observation('good.yaml', 'good'),
-        ],
-        failures: [{ kind: catalogFailureKinds.file, path: 'missing.yaml' }],
-      }),
-      'bad good',
+        },
+      } satisfies CatalogDocument;
+      const exact = {
+        ...documentBase,
+        path: 'exact-holder.yaml',
+        id: 'exact-holder',
+        name: 'exact-holder',
+        observation: {
+          path: 'exact-holder.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "exact-holder", "name": "exact-holder", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "return-zones"}]}',
+            data: {
+              id: 'exact-holder',
+              name: 'exact-holder',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'return-zones' }],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [singular.path, singular],
+            [exact.path, exact],
+          ]),
+        },
+        code: 'returnZones',
+      };
+      const result = matchCode(request);
+      expect(result.candidates.map((candidate) => candidate.path)).toEqual([
+        exact.path,
+        singular.path,
+      ]);
+      expect(
+        result.candidates.map((candidate) => candidate.evidence[0]?.comparison),
+      ).toEqual([
+        matcherComparisonKinds.exact,
+        matcherComparisonKinds.singular,
+      ]);
+    });
+    it('ID 종류·토큰 수·비교 방식이 같으면 코드에 나타난 순서로 반환한다', () => {
+      const alpha = {
+        ...documentBase,
+        path: 'alpha-zone.yaml',
+        id: 'alpha-zone',
+        name: 'alpha-zone',
+        observation: {
+          path: 'alpha-zone.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "alpha-zone", "name": "alpha-zone", "domains": ["test"], "definition": "설명"}',
+            data: {
+              id: 'alpha-zone',
+              name: 'alpha-zone',
+              domains: ['test'],
+              definition: '설명',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const zebra = {
+        ...documentBase,
+        path: 'zebra-item.yaml',
+        id: 'zebra-item',
+        name: 'zebra-item',
+        observation: {
+          path: 'zebra-item.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "zebra-item", "name": "zebra-item", "domains": ["test"], "definition": "설명"}',
+            data: {
+              id: 'zebra-item',
+              name: 'zebra-item',
+              domains: ['test'],
+              definition: '설명',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [alpha.path, alpha],
+            [zebra.path, zebra],
+          ]),
+        },
+        code: 'zebraItemAlphaZone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+        zebra.id,
+        alpha.id,
+      ]);
+    });
+  });
+  describe('ID 충돌과 반복 매칭의 후보·근거 보존', () => {
+    it.each(['정순', '역순'])(
+      '문서를 %s으로 전달해도 같은 이전 ID 후보를 현재 ID 순서로 모두 반환한다',
+      (order) => {
+        const alpha = {
+          ...documentBase,
+          path: 'z-path.yaml',
+          id: 'alpha-doc',
+          name: 'alpha-doc',
+          observation: {
+            path: 'z-path.yaml',
+            parsed: {
+              ...parsedBase,
+              source:
+                '{"id": "alpha-doc", "name": "alpha-doc", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "return-zone"}]}',
+              data: {
+                id: 'alpha-doc',
+                name: 'alpha-doc',
+                domains: ['test'],
+                definition: '설명',
+                deprecatedAliases: [{ id: 'return-zone' }],
+              },
+            },
+          },
+        } satisfies CatalogDocument;
+        const beta = {
+          ...documentBase,
+          path: 'a-path.yaml',
+          id: 'beta-doc',
+          name: 'beta-doc',
+          observation: {
+            path: 'a-path.yaml',
+            parsed: {
+              ...parsedBase,
+              source:
+                '{"id": "beta-doc", "name": "beta-doc", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "return-zone"}]}',
+              data: {
+                id: 'beta-doc',
+                name: 'beta-doc',
+                domains: ['test'],
+                definition: '설명',
+                deprecatedAliases: [{ id: 'return-zone' }],
+              },
+            },
+          },
+        } satisfies CatalogDocument;
+        const documents =
+          order === '정순'
+            ? new Map([
+                [alpha.path, alpha],
+                [beta.path, beta],
+              ])
+            : new Map([
+                [beta.path, beta],
+                [alpha.path, alpha],
+              ]);
+        const request = {
+          catalog: { ...catalogBase, documents },
+          code: 'returnZone',
+        };
+        const result = matchCode(request);
+        expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+          alpha.id,
+          beta.id,
+        ]);
+      },
     );
-    expect(result.partial).toBe(true);
-    expect(result.candidates.map((candidate) => candidate.id)).toEqual([
-      'bad',
-      'good',
-    ]);
-    expect(result.candidates[0]?.errors.length).toBeGreaterThan(0);
+    it('현재 ID가 중복되면 모든 문서를 경로순으로 반환한다', () => {
+      const second = {
+        ...documentBase,
+        path: 'b.yaml',
+        id: 'return-zone',
+        name: 'return-zone',
+        observation: {
+          path: 'b.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "return-zone", "name": "return-zone", "domains": ["test"], "definition": "설명"}',
+            data: {
+              id: 'return-zone',
+              name: 'return-zone',
+              domains: ['test'],
+              definition: '설명',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const first = {
+        ...documentBase,
+        path: 'a.yaml',
+        id: 'return-zone',
+        name: 'return-zone',
+        observation: {
+          path: 'a.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "return-zone", "name": "return-zone", "domains": ["test"], "definition": "설명"}',
+            data: {
+              id: 'return-zone',
+              name: 'return-zone',
+              domains: ['test'],
+              definition: '설명',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [second.path, second],
+            [first.path, first],
+          ]),
+        },
+        code: 'returnZone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates.map((candidate) => candidate.path)).toEqual([
+        first.path,
+        second.path,
+      ]);
+    });
+    it('같은 범위가 현재·이전 ID에 모두 일치하면 한 문서에 두 근거를 보존한다', () => {
+      const document = {
+        ...documentBase,
+        path: 'return-zone.yaml',
+        id: 'return-zone',
+        name: 'return-zone',
+        observation: {
+          path: 'return-zone.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "return-zone", "name": "return-zone", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "return-zone", "message": "이전 ID"}]}',
+            data: {
+              id: 'return-zone',
+              name: 'return-zone',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'return-zone', message: '이전 ID' }],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [document.path, document],
+          ]),
+        },
+        code: 'returnZone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]?.evidence.map((item) => item.kind)).toEqual([
+        matcherEvidenceKinds.current,
+        matcherEvidenceKinds.previous,
+      ]);
+    });
+    it('같은 ID가 코드에서 반복되면 각 일치 범위를 원문 순서로 반환한다', () => {
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([[zone.path, zone]]),
+        },
+        code: 'zoneToZone',
+      };
+      const result = matchCode(request);
+      // zone은 [0, 4), To 다음의 Zone은 [6, 10)에 있다.
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]?.evidence.map((item) => item.range)).toEqual([
+        { start: 0, end: 4 },
+        { start: 6, end: 10 },
+      ]);
+    });
+  });
+  describe('문서 오류와 불완전한 탐색 결과 전달', () => {
+    it('ID 이외의 필드에 오류가 있으면 일치 후보와 문서 오류를 함께 반환한다', () => {
+      const validDocument = {
+        ...documentBase,
+        path: 'bad.yaml',
+        id: 'bad',
+        name: 'bad',
+        observation: {
+          path: 'bad.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "bad", "name": "bad", "domains": ["test"], "definition": "설명"}',
+            data: {
+              id: 'bad',
+              name: 'bad',
+              domains: ['test'],
+              definition: '설명',
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const error = {
+        code: schemaDiagnosticCodes.invalidFieldType,
+        severity: diagnosticSeverities.error,
+        message: '문자열이어야 합니다.',
+        path: validDocument.path,
+        fieldPath: ['definition'],
+      };
+      const document = {
+        ...validDocument,
+        observation: {
+          ...validDocument.observation,
+          parsed: {
+            ...validDocument.observation.parsed,
+            source: 'id: bad\nname: bad\ndomains: [test]\ndefinition: 42\n',
+            data: { ...validDocument.observation.parsed.data, definition: 42 },
+          },
+        },
+        documentDiagnostics: [error],
+        diagnostics: [error],
+      };
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [document.path, document],
+            [zone.path, zone],
+          ]),
+        },
+        code: 'bad zone',
+      };
+      const result = matchCode(request);
+      expect(result.partial).toBe(false);
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+        document.id,
+        zone.id,
+      ]);
+      expect(result.candidates[0]?.errors).toEqual([error]);
+      expect(result.diagnostics).toEqual([error]);
+    });
+    it('부분 탐색에서 확인한 ID를 조회하면 후보와 부분 탐색 상태를 반환한다', () => {
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([[zone.path, zone]]),
+          status: scanStatuses.partial,
+        },
+        code: 'zone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+        zone.id,
+      ]);
+      expect(result.partial).toBe(true);
+      expect(result.status).toBe(request.catalog.status);
+    });
+    it('파일 읽기 실패가 있으면 일치 후보와 실패 경로를 함께 반환한다', () => {
+      const request = {
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([[zone.path, zone]]),
+          failures: [{ kind: catalogFailureKinds.file, path: 'missing.yaml' }],
+        },
+        code: 'zone',
+      };
+      const result = matchCode(request);
+      expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+        zone.id,
+      ]);
+      expect(result.failures).toEqual(request.catalog.failures);
+      expect(result.partial).toBe(true);
+    });
   });
 });

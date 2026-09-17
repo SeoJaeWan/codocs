@@ -1,886 +1,2287 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { describe, expect, it } from 'vitest';
+import { diagnosticSeverities } from '../diagnostics/domain-values.js';
+import {
+  catalogDiagnosticCodes,
+  catalogDiagnosticMessages,
+  yamlDiagnosticCodes,
+} from '../diagnostics/index.js';
+import type { YamlParseResult } from '../parser/index.js';
 import type {
-  Catalog,
   CatalogObservation,
   CatalogScan,
   RenameRequest,
-} from '../index.js';
+} from './index.js';
+import { buildCatalog, planRename, resolveReference } from './index.js';
 import {
-  buildCatalog,
-  catalogDiagnosticCodes,
-  catalogDiagnosticMessages,
-  parseYaml,
-  planRename,
-  resolveReference,
-} from '../index.js';
-import { catalogFailureKinds, scanStatuses } from './domain-values.js';
+  catalogConfirmations,
+  catalogFailureKinds,
+  referenceResolutionStatuses,
+  renameBlockingReasons,
+  renameImpactReasons,
+  renamePlanStatuses,
+  scanStatuses,
+} from './domain-values.js';
 
-/** 실제 YAML 문자열을 파싱한 중립 관측을 만든다. */
-function singleDomainDocument(
-  path: string,
-  name = '주문',
-  domain = '판매',
-  definition = '설명',
-  id: string | undefined = path.replace('.yaml', ''),
-): CatalogObservation {
-  return {
-    path,
-    parsed: parseYaml(
-      `${id === undefined ? '' : `id: ${id}\n`}name: ${JSON.stringify(name)}\ndomains: [${JSON.stringify(domain)}]\ndefinition: ${JSON.stringify(definition)}\n`,
-    ),
-  };
-}
-/** 복수 소속을 지정한 문서 관측을 만든다. */
-function multiDomainDocument(
-  path: string,
-  name: string,
-  domains: string[],
-  body = '설명',
-): CatalogObservation {
-  return {
-    path,
-    parsed: parseYaml(
-      `id: ${path.replace('.yaml', '')}\nname: ${JSON.stringify(name)}\ndomains: ${JSON.stringify(domains)}\ndefinition: ${JSON.stringify(body)}\n`,
-    ),
-  };
-}
-/** complete 관측으로 구축한다. */
-function complete(...observations: CatalogObservation[]): Catalog {
-  return buildCatalog({ status: scanStatuses.complete, observations });
-}
-/** 발견 경로별 문서가 존재함을 먼저 확인한다. */
-function document(catalog: Catalog, path: string) {
-  const result = catalog.documents.get(path);
-  if (!result) throw new Error(`문서 누락: ${path}`);
-  return result;
-}
-/** 참조 변경 계획을 이름 변경 필드와 구분한다. */
-function references(catalog: Catalog, request: RenameRequest) {
-  return planRename(catalog, request).changes.filter(
-    (c) => c.occurrenceIndex !== undefined,
-  );
-}
+/** 모든 성공 파싱 결과에 공통인 빈 속성이다. 각 테스트는 source·data·strings를 직접 지정한다. */
+const parsedBase = {
+  success: true,
+  fields: [],
+  strings: [],
+  diagnostics: [],
+} satisfies Pick<
+  Extract<YamlParseResult, { success: true }>,
+  'success' | 'fields' | 'strings' | 'diagnostics'
+>;
 
-describe('경로별 이름 색인', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-  it('출처 도메인과 같은 후보가 있어도 전체 동명 후보를 반환한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = buildCatalog({
-      status: scanStatuses.complete,
-      observations: [
-        {
-          path: 'a.yaml',
-          parsed: parseYaml(
-            'id: a\nname: 주문\ndomains: [판매]\ndefinition: 설명\n',
-          ),
+const orderDocument = {
+  path: 'a.yaml',
+  parsed: {
+    ...parsedBase,
+    source: '{"name":"주문","domains":["판매"],"definition":"설명","id":"a"}',
+    data: {
+      name: '주문',
+      domains: ['판매'],
+      definition: '설명',
+      id: 'a',
+    },
+    strings: [
+      {
+        fieldPath: ['name'],
+        value: '주문',
+        sourceRanges: Array.from({ length: 2 }, (_, index) => ({
+          start: 9 + index,
+          end: 10 + index,
+        })),
+      },
+    ],
+  },
+} satisfies CatalogObservation;
+
+const sourceRefersToOrder = {
+  path: 's.yaml',
+  parsed: {
+    ...parsedBase,
+    source:
+      '{"name":"출처","domains":["판매"],"definition":"[[주문]]","id":"s"}',
+    data: {
+      name: '출처',
+      domains: ['판매'],
+      definition: '[[주문]]',
+      id: 's',
+    },
+    strings: [
+      {
+        fieldPath: ['definition'],
+        value: '[[주문]]',
+        sourceRanges: Array.from({ length: 6 }, (_, index) => ({
+          start: 44 + index,
+          end: 45 + index,
+        })),
+      },
+    ],
+  },
+} satisfies CatalogObservation;
+
+const documentA = {
+  path: 'a.yaml',
+  parsed: {
+    ...parsedBase,
+    source: '{"name":"A","domains":["판매"],"definition":"설명","id":"a"}',
+    data: {
+      name: 'A',
+      domains: ['판매'],
+      definition: '설명',
+      id: 'a',
+    },
+  },
+} satisfies CatalogObservation;
+
+const purchaseOrder = {
+  path: 'b.yaml',
+  parsed: {
+    ...parsedBase,
+    source: '{"name":"주문","domains":["구매"],"definition":"설명","id":"b"}',
+    data: {
+      name: '주문',
+      domains: ['구매'],
+      definition: '설명',
+      id: 'b',
+    },
+  },
+} satisfies CatalogObservation;
+
+describe('buildCatalog: 문서 색인', () => {
+  describe('문서 경로·이름 색인과 참조 문서 간 연결', () => {
+    it('문서 하나를 색인하면 발견 경로와 이름으로 조회할 수 있다', () => {
+      const observation = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"주문","domains":["판매"],"definition":"설명","id":"a"}',
+          data: {
+            name: '주문',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'a',
+          },
         },
-        {
-          path: 'b.yaml',
-          parsed: parseYaml(
-            'id: b\nname: 주문\ndomains: [구매]\ndefinition: 설명\n',
-          ),
-        },
-        {
-          path: 'c.yaml',
-          parsed: parseYaml(
-            'id: c\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n',
-          ),
-        },
-      ],
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(catalog.documents.get(observation.path)?.name).toBe(
+        observation.parsed.data.name,
+      );
+      expect([
+        ...(catalog.namePaths.get(observation.parsed.data.name) ?? []),
+      ]).toEqual([observation.path]);
     });
-    expect(
-      catalog.documents.get('c.yaml')?.occurrences[0]?.resolution.status,
-    ).toBe('ambiguous');
-    expect(catalog.documents.get('c.yaml')?.references).toEqual([]);
-  });
-});
 
-describe('충돌과 확인 가능한 정보', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-  it('같은 도메인의 동명은 모든 경로를 오류로 진단한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      multiDomainDocument('b.yaml', '주문', ['판매']),
-    );
-    for (const path of ['a.yaml', 'b.yaml'])
-      expect(document(catalog, path).diagnostics).toContainEqual(
+    it('다른 문서를 한 번 참조하면 대상과 출처를 서로 연결한다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents
+          .get(sourceRefersToOrder.path)
+          ?.references.map((reference) => reference.path),
+      ).toEqual([orderDocument.path]);
+      expect(
+        catalog.documents
+          .get(orderDocument.path)
+          ?.referencedBy.map((reference) => reference.path),
+      ).toEqual([sourceRefersToOrder.path]);
+    });
+
+    it('서로 참조하는 두 문서를 색인하면 직접 연결만 반환한다', () => {
+      const observationA = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"A","domains":["판매"],"definition":"[[B]]","id":"a"}',
+          data: {
+            name: 'A',
+            domains: ['판매'],
+            definition: '[[B]]',
+            id: 'a',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[B]]',
+              sourceRanges: Array.from({ length: 5 }, (_, index) => ({
+                start: 43 + index,
+                end: 44 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const observationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"B","domains":["판매"],"definition":"[[A]] [[C]]","id":"b"}',
+          data: {
+            name: 'B',
+            domains: ['판매'],
+            definition: '[[A]] [[C]]',
+            id: 'b',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[A]] [[C]]',
+              sourceRanges: Array.from({ length: 11 }, (_, index) => ({
+                start: 43 + index,
+                end: 44 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const observationC = {
+        path: 'c.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"C","domains":["판매"],"definition":"설명","id":"c"}',
+          data: {
+            name: 'C',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'c',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observationA, observationB, observationC],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents
+          .get(observationA.path)
+          ?.references.map((reference) => reference.path),
+      ).toEqual([observationB.path]);
+      expect(
+        catalog.documents
+          .get(observationB.path)
+          ?.references.map((reference) => reference.path),
+      ).toEqual([observationA.path, observationC.path]);
+    });
+  });
+
+  describe('이름·도메인별 문서 구분과 중복 이름 검사', () => {
+    it('서로 다른 도메인에 같은 이름을 색인하면 이름 충돌 진단을 추가하지 않는다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, purchaseOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        [...catalog.documents.values()].flatMap(
+          (document) => document.diagnostics,
+        ),
+      ).toEqual([]);
+    });
+
+    it('한 문서에 같은 도메인이 반복되면 이름 후보에는 경로를 한 번 넣는다', () => {
+      const observation = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"주문","domains":["판매","구매","판매"],"definition":"설명","id":"a"}',
+          data: {
+            name: '주문',
+            domains: ['판매', '구매', '판매'],
+            definition: '설명',
+            id: 'a',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const reference = { name: observation.parsed.data.name };
+      expect(
+        resolveReference(catalog, reference).candidates.map(
+          (candidate) => candidate.path,
+        ),
+      ).toEqual([observation.path]);
+      const domainReference = {
+        name: observation.parsed.data.name,
+        domain: '판매',
+      };
+      expect(
+        resolveReference(catalog, domainReference).candidates.map(
+          (candidate) => candidate.path,
+        ),
+      ).toEqual([observation.path]);
+    });
+
+    it('ID와 실제 경로가 같아도 발견 경로가 다르면 두 문서를 따로 색인한다', () => {
+      const observationA = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"A","domains":["판매"],"definition":"설명","id":"shared"}',
+          data: {
+            name: 'A',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'shared',
+          },
+        },
+        realPath: '/same',
+      } satisfies CatalogObservation;
+      const observationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"B","domains":["판매"],"definition":"설명","id":"shared"}',
+          data: {
+            name: 'B',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'shared',
+          },
+        },
+        realPath: '/same',
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observationA, observationB],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect([...catalog.documents.keys()]).toEqual([
+        observationA.path,
+        observationB.path,
+      ]);
+      expect([...(catalog.idPaths.get('shared') ?? [])]).toEqual([
+        observationA.path,
+        observationB.path,
+      ]);
+    });
+
+    it('같은 도메인에 같은 이름의 문서가 둘이면 양쪽에 충돌 진단을 추가한다', () => {
+      const observationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"주문","domains":["판매"],"definition":"설명","id":"b"}',
+          data: {
+            name: '주문',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'b',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, observationB],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      for (const path of [orderDocument.path, observationB.path])
+        expect(catalog.documents.get(path)?.diagnostics).toContainEqual(
+          expect.objectContaining({
+            code: catalogDiagnosticCodes.duplicateName,
+            message: catalogDiagnosticMessages.duplicateName,
+            severity: diagnosticSeverities.error,
+            path,
+            relatedPaths: [orderDocument.path, observationB.path],
+            domain: '판매',
+          }),
+        );
+    });
+
+    it('ID가 같은 문서를 둘 색인하면 두 문서에 ID 충돌 진단을 추가한다', () => {
+      const observationA = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"A","domains":["판매"],"definition":"설명","id":"shared"}',
+          data: {
+            name: 'A',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'shared',
+          },
+        },
+      } satisfies CatalogObservation;
+      const observationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"B","domains":["판매"],"definition":"설명","id":"shared"}',
+          data: {
+            name: 'B',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'shared',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observationA, observationB],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      for (const path of [observationA.path, observationB.path])
+        expect(catalog.documents.get(path)?.documentDiagnostics).toContainEqual(
+          expect.objectContaining({
+            code: catalogDiagnosticCodes.duplicateId,
+            relatedPaths: [observationA.path, observationB.path],
+          }),
+        );
+    });
+  });
+
+  describe('반복 참조의 원문 순서 보존과 문서 연결 중복 제거', () => {
+    it('참조가 여러 번 나오면 추출기가 제공한 순서와 위치를 그대로 보존한다', () => {
+      const definition = '[[Z]] [[A]] [[Z]]';
+      const source = JSON.stringify({
+        name: '출처',
+        domains: ['판매'],
+        definition,
+        id: 's',
+      });
+      const observationB = {
+        path: 'z.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"Z","domains":["판매"],"definition":"설명","id":"z"}',
+          data: {
+            name: 'Z',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'z',
+          },
+        },
+      } satisfies CatalogObservation;
+      const observationC = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[Z]] [[A]] [[Z]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[Z]] [[A]] [[Z]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[Z]] [[A]] [[Z]]',
+              sourceRanges: Array.from({ length: 17 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [documentA, observationB, observationC],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents
+          .get(observationC.path)
+          ?.occurrences.map(({ occurrence }) => [
+            occurrence.text,
+            occurrence.offsetRange.start,
+          ]),
+      ).toEqual([
+        ['[[Z]]', source.indexOf('[[Z]]')],
+        ['[[A]]', source.indexOf('[[A]]')],
+        ['[[Z]]', source.lastIndexOf('[[Z]]')],
+      ]);
+    });
+
+    it('같은 대상을 반복해 참조하면 직접 연결을 경로별로 한 번 반환한다', () => {
+      const observationB = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[A]] [[A]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[A]] [[A]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[A]] [[A]]',
+              sourceRanges: Array.from({ length: 11 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [documentA, observationB],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents
+          .get(observationB.path)
+          ?.references.map((reference) => reference.path),
+      ).toEqual([documentA.path]);
+    });
+
+    it('한 문서가 같은 대상을 반복해 참조하면 역참조에는 출처를 한 번 반환한다', () => {
+      const observationB = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[A]] [[A]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[A]] [[A]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[A]] [[A]]',
+              sourceRanges: Array.from({ length: 11 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [documentA, observationB],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents
+          .get(documentA.path)
+          ?.referencedBy.map((reference) => reference.path),
+      ).toEqual([observationB.path]);
+    });
+  });
+
+  describe('연결할 수 없는 참조의 후보와 진단 반환', () => {
+    it('같은 이름의 후보가 여러 도메인에 있으면 모든 후보를 반환하고 대상을 확정하지 않는다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const source = catalog.documents.get(sourceRefersToOrder.path);
+      expect(source?.occurrences[0]?.resolution).toMatchObject({
+        status: referenceResolutionStatuses.ambiguous,
+        candidates: [
+          { path: orderDocument.path },
+          { path: purchaseOrder.path },
+        ],
+      });
+      expect(source?.occurrences[0]?.resolution.target).toBeUndefined();
+      expect(source?.references).toEqual([]);
+    });
+
+    it('참조 이름에 맞는 후보가 없으면 연결을 만들지 않는다', () => {
+      const observation = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[없음]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[없음]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[없음]]',
+              sourceRanges: Array.from({ length: 6 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents.get(observation.path)?.occurrences[0]?.resolution
+          .status,
+      ).toBe(referenceResolutionStatuses.missing);
+      expect(catalog.documents.get(observation.path)?.references).toEqual([]);
+    });
+
+    it('유효하지 않은 참조가 전달되면 후보를 조회하지 않고 연결하지 않는다', () => {
+      const observation = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[]]',
+              sourceRanges: Array.from({ length: 4 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents.get(observation.path)?.occurrences[0]?.resolution
+          .status,
+      ).toBe(referenceResolutionStatuses.invalid);
+      expect(catalog.documents.get(observation.path)?.references).toEqual([]);
+    });
+
+    it('다른 소속 도메인으로 자신을 참조하면 자기 참조로 판정하고 연결하지 않는다', () => {
+      const observation = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"A","domains":["판매","구매"],"definition":"[[구매:A]]","id":"a"}',
+          data: {
+            name: 'A',
+            domains: ['판매', '구매'],
+            definition: '[[구매:A]]',
+            id: 'a',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[구매:A]]',
+              sourceRanges: Array.from({ length: 8 }, (_, index) => ({
+                start: 48 + index,
+                end: 49 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents.get(observation.path)?.occurrences[0]?.resolution
+          .status,
+      ).toBe(referenceResolutionStatuses.self);
+      expect(catalog.documents.get(observation.path)?.references).toEqual([]);
+      expect(
+        catalog.documents
+          .get(observation.path)
+          ?.diagnostics.map((diagnostic) => diagnostic.code),
+      ).toContain(catalogDiagnosticCodes.selfReference);
+    });
+  });
+
+  describe('문서 오류가 있을 때 이름·참조 정보 보존', () => {
+    it('ID가 없는 문서를 색인해도 확인된 이름으로 다른 문서가 참조할 수 있다', () => {
+      const observationA = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source: '{"name":"주문","domains":["판매"],"definition":"설명"}',
+          data: { name: '주문', domains: ['판매'], definition: '설명' },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observationA, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(catalog.documents.get(observationA.path)?.id).toBeUndefined();
+      expect(
+        catalog.documents
+          .get(sourceRefersToOrder.path)
+          ?.references.map((reference) => reference.path),
+      ).toEqual([observationA.path]);
+    });
+
+    it('다른 필드에 오류가 있어도 확인된 이름으로 다른 문서가 참조할 수 있다', () => {
+      const observationA = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"주문","domains":["판매"],"definition":"설명","id":"a","examples":42}',
+          data: {
+            name: '주문',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'a',
+            examples: 42,
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observationA, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(catalog.documents.get(observationA.path)?.id).toBe('a');
+      expect(
+        catalog.documents
+          .get(sourceRefersToOrder.path)
+          ?.references.map((reference) => reference.path),
+      ).toEqual([observationA.path]);
+    });
+
+    it('오류가 있는 문서를 참조하면 참조 대상 오류를 경고한다', () => {
+      const observationA = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"주문","domains":["판매"],"definition":"설명","id":"a","examples":42}',
+          data: {
+            name: '주문',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'a',
+            examples: 42,
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observationA, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents.get(sourceRefersToOrder.path)?.diagnostics,
+      ).toContainEqual(
         expect.objectContaining({
-          code: catalogDiagnosticCodes.duplicateName,
-          message: catalogDiagnosticMessages.duplicateName,
-          path,
-          severity: 'error',
-          relatedPaths: ['a.yaml', 'b.yaml'],
-          domain: '판매',
+          code: catalogDiagnosticCodes.referenceTargetError,
+          severity: 'warning',
         }),
       );
-  });
-  it('다른 도메인의 동명은 중복 이름 오류 없이 공존한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      multiDomainDocument('b.yaml', '주문', ['구매']),
-    );
-    expect(
-      [...catalog.documents.values()].flatMap((d) => d.diagnostics),
-    ).toEqual([]);
-  });
-  it('다중 도메인 검색에서도 같은 경로는 후보 하나로 유지한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      multiDomainDocument('a.yaml', '주문', ['판매', '구매', '판매']),
-    );
-    expect(
-      resolveReference(catalog, { name: '주문' }).candidates.map((c) => c.path),
-    ).toEqual(['a.yaml']);
-    expect(
-      resolveReference(catalog, { name: '주문', domain: '구매' }).target?.path,
-    ).toBe('a.yaml');
-  });
-  it('ID와 realPath가 같아도 다른 발견 경로를 합치지 않는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const a = {
-        ...singleDomainDocument('a.yaml', 'A', '판매', '설명', 'shared'),
-        realPath: '/same',
-      },
-      b = {
-        ...singleDomainDocument('b.yaml', 'B', '판매', '설명', 'shared'),
-        realPath: '/same',
-      };
-    const catalog = complete(a, b);
-    expect([...(catalog.idPaths.get('shared') ?? [])]).toEqual([
-      'a.yaml',
-      'b.yaml',
-    ]);
-    expect(catalog.documents.size).toBe(2);
-    for (const path of ['a.yaml', 'b.yaml'])
-      expect(
-        document(catalog, path).diagnostics.some(
-          (d) => d.code === catalogDiagnosticCodes.duplicateId,
-        ),
-      ).toBe(true);
-  });
-  it('ID가 없고 다른 필드 오류가 있어도 정상 본문과 확인 가능한 이름을 유지한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const invalid = {
-      path: 'a.yaml',
-      parsed: parseYaml(
-        'name: 주문\ndomains: [판매]\ndefinition: "[[대상]]"\nexamples: 42\n',
-      ),
-    };
-    const catalog = complete(
-      invalid,
-      singleDomainDocument('b.yaml', '대상'),
-      singleDomainDocument('c.yaml', '출처', '판매', '[[주문]]'),
-    );
-    expect(document(catalog, 'a.yaml').id).toBeUndefined();
-    expect(document(catalog, 'a.yaml').references.map((r) => r.path)).toEqual([
-      'b.yaml',
-    ]);
-    expect(document(catalog, 'c.yaml').references.map((r) => r.path)).toEqual([
-      'a.yaml',
-    ]);
-    expect(
-      document(catalog, 'c.yaml').occurrences[0]?.resolution.target?.errors
-        .length,
-    ).toBeGreaterThan(0);
-    expect(
-      document(catalog, 'c.yaml').diagnostics.some(
-        (d) => d.code === catalogDiagnosticCodes.referenceTargetError,
-      ),
-    ).toBe(true);
-  });
-  it('ID 충돌 오류가 있어도 확정 경로 연결을 유지한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml', 'A', '판매', '설명', 'shared'),
-      singleDomainDocument('b.yaml', 'B', '판매', '설명', 'shared'),
-      singleDomainDocument('c.yaml', 'C', '판매', '[[A]]'),
-    );
-    expect(document(catalog, 'c.yaml').references.map((r) => r.path)).toEqual([
-      'a.yaml',
-    ]);
-  });
-  it('파싱 실패 원문에서 이름이나 참조를 추측하지 않는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete({
-      path: 'bad.yaml',
-      parsed: parseYaml('name: A\ndefinition: "[[B]]\n'),
     });
-    expect(document(catalog, 'bad.yaml').name).toBeUndefined();
-    expect(document(catalog, 'bad.yaml').occurrences).toEqual([]);
-    expect(catalog.namePaths.size).toBe(0);
-  });
-  it('이름과 도메인의 콜론을 문자열 연결 키로 합치지 않는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml', 'c', 'a:b'),
-      singleDomainDocument('b.yaml', 'b:c', 'a'),
-    );
-    expect(
-      resolveReference(catalog, { name: 'c', domain: 'a:b' }).target?.path,
-    ).toBe('a.yaml');
-    expect(
-      resolveReference(catalog, { name: 'b:c', domain: 'a' }).target?.path,
-    ).toBe('b.yaml');
-  });
-  it('trim과 대소문자 보정 및 ID 패턴 제한 없이 정확 비교한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml', ' 주문A! ', ' 판매 '),
-    );
-    expect(
-      resolveReference(catalog, { name: ' 주문A! ', domain: ' 판매 ' }).status,
-    ).toBe('resolved');
-    expect(resolveReference(catalog, { name: '주문A!' }).status).toBe(
-      'missing',
-    );
-    expect(resolveReference(catalog, { name: ' 주문a! ' }).status).toBe(
-      'missing',
-    );
-  });
-  it('공개 색인 진단 코드의 문자열 호환성을 유지한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    expect(catalogDiagnosticCodes).toEqual({
-      duplicateId: 'duplicate_id',
-      duplicateName: 'duplicate_name',
-      missingReference: 'missing_reference',
-      ambiguousReference: 'ambiguous_reference',
-      selfReference: 'self_reference',
-      unconfirmedReference: 'unconfirmed_reference',
-      referenceTargetError: 'reference_target_error',
-    });
-  });
-});
 
-describe('확정 직접 연결과 등장', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-  it('반복 위치는 모두 유지하고 목록과 역참조는 경로별 한 번 정렬한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('z.yaml', 'Z'),
-      singleDomainDocument('a.yaml', 'A'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[Z]] [[A]] [[Z]]'),
-    );
-    const source = document(catalog, 's.yaml');
-    expect(source.occurrences).toHaveLength(3);
-    expect(
-      source.occurrences.map((i) => i.occurrence.offsetRange.start),
-    ).toEqual(
-      [...source.occurrences.map((i) => i.occurrence.offsetRange.start)].sort(
-        (a, b) => a - b,
-      ),
-    );
-    expect(source.references.map((r) => r.path)).toEqual(['a.yaml', 'z.yaml']);
-    expect(document(catalog, 'z.yaml').referencedBy.map((r) => r.path)).toEqual(
-      ['s.yaml'],
-    );
-  });
-  it('모호함과 부재 및 무효 등장에 역참조를 만들지 않는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('b.yaml', '주문', '구매'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]] [[없음]] [[]]'),
-    );
-    expect(
-      document(catalog, 's.yaml').occurrences.map((o) => o.resolution.status),
-    ).toEqual(['ambiguous', 'missing', 'invalid']);
-    expect(document(catalog, 'a.yaml').referencedBy).toEqual([]);
-    expect(document(catalog, 'b.yaml').referencedBy).toEqual([]);
-  });
-  it('지정 도메인 참조는 해당 도메인의 정확 후보만 반환한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('b.yaml', '주문', '구매'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[구매:주문]]'),
-    );
-    expect(
-      document(catalog, 's.yaml').occurrences[0]?.resolution.target,
-    ).toMatchObject({
-      path: 'b.yaml',
-      name: '주문',
-      id: 'b',
-
-      domains: ['구매'],
-    });
-  });
-  it('다른 소속 도메인으로 쓴 같은 발견 문서의 자기 참조도 제외한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      multiDomainDocument('a.yaml', 'A', ['판매', '구매'], '[[구매:A]]'),
-    );
-    expect(document(catalog, 'a.yaml').occurrences[0]?.resolution.status).toBe(
-      'self',
-    );
-    expect(document(catalog, 'a.yaml').references).toEqual([]);
-    expect(
-      document(catalog, 'a.yaml').diagnostics.some(
-        (d) => d.code === catalogDiagnosticCodes.selfReference,
-      ),
-    ).toBe(true);
-  });
-  it('다른 문서의 순환은 전이 확장 없이 직접 연결로 유지한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml', 'A', '판매', '[[B]]'),
-      singleDomainDocument('b.yaml', 'B', '판매', '[[A]] [[C]]'),
-      singleDomainDocument('c.yaml', 'C'),
-    );
-    expect(document(catalog, 'a.yaml').references.map((r) => r.path)).toEqual([
-      'b.yaml',
-    ]);
-    expect(document(catalog, 'b.yaml').references.map((r) => r.path)).toEqual([
-      'a.yaml',
-      'c.yaml',
-    ]);
-  });
-  it('Unicode escape와 CRLF의 실제 YAML UTF16 위치를 의미 진단에도 보존한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const source =
-      'id: s\r\nname: S\r\ndomains: [판매]\r\ndefinition: "\\u005B\\u005B없음]] [[없음]]"\r\n';
-    const catalog = complete({ path: 's.yaml', parsed: parseYaml(source) }),
-      doc = document(catalog, 's.yaml');
-    expect(doc.occurrences).toHaveLength(2);
-    expect(
-      source.slice(
-        doc.occurrences[0]!.occurrence.offsetRange.start,
-        doc.occurrences[0]!.occurrence.offsetRange.end,
-      ),
-    ).toBe('\\u005B\\u005B없음]]');
-    expect(
-      doc.diagnostics
-        .filter((d) => d.code === catalogDiagnosticCodes.missingReference)
-        .map((d) => d.range),
-    ).toEqual(doc.occurrences.map((o) => o.occurrence.range));
-  });
-});
-
-describe('관측 갱신과 불확실성', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-  it('complete의 삭제와 이동은 이전 색인·역참조를 제거한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const old = complete(
-      singleDomainDocument('a.yaml', 'A'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
-    );
-    const moved = buildCatalog(
-      {
-        status: scanStatuses.complete,
-        observations: [
-          singleDomainDocument('b.yaml', 'A'),
-          singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
-        ],
-      },
-      old,
-    );
-    expect(moved.documents.has('a.yaml')).toBe(false);
-    expect(document(moved, 's.yaml').references.map((r) => r.path)).toEqual([
-      'b.yaml',
-    ]);
-    const deleted = buildCatalog(
-      {
-        status: scanStatuses.complete,
-        observations: [singleDomainDocument('s.yaml', 'S', '판매', '[[A]]')],
-      },
-      moved,
-    );
-    expect(document(deleted, 's.yaml').occurrences[0]?.resolution.status).toBe(
-      'missing',
-    );
-  });
-  it('ID·이름·도메인·본문 변경과 충돌 해소를 모두 다시 계산한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const old = complete(
-      singleDomainDocument('a.yaml', 'A', '판매', '[[S]]', 'same'),
-      singleDomainDocument('b.yaml', 'A', '판매', '설명', 'same'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
-    );
-    const next = buildCatalog(
-      {
-        status: scanStatuses.complete,
-        observations: [
-          singleDomainDocument('a.yaml', '새A', '구매', '설명', 'new'),
-          singleDomainDocument('b.yaml', 'B'),
-          singleDomainDocument('s.yaml', 'S', '판매', '[[구매:새A]]'),
-        ],
-      },
-      old,
-    );
-    expect(next.idPaths.has('same')).toBe(false);
-    expect(next.domainNamePaths.get('판매')?.has('A')).toBe(false);
-    expect([...next.documents.values()].flatMap((d) => d.diagnostics)).toEqual(
-      [],
-    );
-    expect(document(next, 's.yaml').references.map((r) => r.path)).toEqual([
-      'a.yaml',
-    ]);
-    expect(document(next, 's.yaml').referencedBy).toEqual([]);
-  });
-  it.each<{ failures: NonNullable<CatalogScan['failures']> }>([
-    { failures: [{ kind: catalogFailureKinds.file, path: 'a.yaml' }] },
-    { failures: [{ kind: catalogFailureKinds.folder, path: 'sub' }] },
-    { failures: [{ kind: catalogFailureKinds.unknown }] },
-  ])(
-    'partial 실패 범위 %j에서 이전 기록은 미확인으로 보존한다',
-    /** 각 실패 범위의 보존 상태와 불확실한 검색을 검증한다. */ ({
-      failures,
-    }) => {
-      const old = complete(
-        singleDomainDocument('a.yaml', 'A'),
-        singleDomainDocument('sub/b.yaml', 'B'),
-      );
-      const next = buildCatalog(
-        {
-          status: scanStatuses.partial,
-          observations: [
-            singleDomainDocument('s.yaml', 'S', '판매', '[[A]] [[없음]]'),
+    it('ID가 중복돼도 참조 이름에 일치하는 문서가 하나면 그 문서에 연결한다', () => {
+      const observationA = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"A","domains":["판매"],"definition":"설명","id":"shared"}',
+          data: {
+            name: 'A',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'shared',
+          },
+        },
+      } satisfies CatalogObservation;
+      const observationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"B","domains":["판매"],"definition":"설명","id":"shared"}',
+          data: {
+            name: 'B',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'shared',
+          },
+        },
+      } satisfies CatalogObservation;
+      const observationC = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[A]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[A]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[A]]',
+              sourceRanges: Array.from({ length: 5 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
           ],
-          failures,
         },
-        old,
-      );
-      expect(next.documents.size).toBe(3);
-      expect(document(next, 'a.yaml').confirmation).toBe('unconfirmed');
-      expect(document(next, 'sub/b.yaml').confirmation).toBe('unconfirmed');
-      expect(
-        document(next, 's.yaml').occurrences.map((o) => o.resolution.status),
-      ).toEqual(['unconfirmed', 'unconfirmed']);
-      expect(document(next, 'a.yaml').referencedBy).toEqual([]);
-      expect(next.failures).toEqual(failures);
-    },
-  );
-  it('partial에서 확인한 단일 후보도 미탐색 신규 후보 가능성 때문에 확정하지 않는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const next = buildCatalog({
-      status: scanStatuses.partial,
-      observations: [
-        singleDomainDocument('a.yaml', 'A'),
-        singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
-      ],
-      failures: [{ kind: catalogFailureKinds.folder, path: 'unknown' }],
-    });
-    expect(document(next, 'a.yaml').confirmation).toBe('confirmed');
-    expect(document(next, 's.yaml').occurrences[0]?.resolution).toMatchObject({
-      status: 'unconfirmed',
-      candidates: [{ path: 'a.yaml' }],
-    });
-    expect(document(next, 's.yaml').references).toEqual([]);
-  });
-  it('failed는 새 관측을 채택하지 않고 이전 색인과 실패 상태를 유지한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const old = complete(
-      singleDomainDocument('a.yaml', 'A'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
-    );
-    const next = buildCatalog(
-      {
-        status: scanStatuses.failed,
-        observations: [singleDomainDocument('a.yaml', '변경')],
-        failures: [{ kind: catalogFailureKinds.unknown }],
-      },
-      old,
-    );
-    expect(next.status).toBe('failed');
-    expect(document(next, 'a.yaml').name).toBe('A');
-    expect([...(next.namePaths.get('A') ?? [])]).toEqual(['a.yaml']);
-    expect(document(next, 's.yaml').references).toEqual([]);
-    expect(document(old, 's.yaml').references.map((r) => r.path)).toEqual([
-      'a.yaml',
-    ]);
-  });
-  it('complete 회복은 미확인 기록을 재확인하고 확정 연결을 다시 만든다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const old = complete(
-      singleDomainDocument('a.yaml', 'A'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
-    );
-    const failed = buildCatalog(
-      { status: scanStatuses.failed, observations: [] },
-      old,
-    );
-    const recovered = buildCatalog(
-      {
+      } satisfies CatalogObservation;
+      const scan = {
         status: scanStatuses.complete,
-        observations: [
-          singleDomainDocument('a.yaml', 'A'),
-          singleDomainDocument('s.yaml', 'S', '판매', '[[A]]'),
-        ],
-      },
-      failed,
-    );
-    expect(document(recovered, 'a.yaml').confirmation).toBe('confirmed');
-    expect(
-      document(recovered, 'a.yaml').referencedBy.map((r) => r.path),
-    ).toEqual(['s.yaml']);
-    expect(recovered.failures).toEqual([]);
-  });
-  it('계산이 이전 입력 관측과 원문을 변경하지 않는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const obs = singleDomainDocument('a.yaml', 'A'),
-      before = JSON.stringify(obs);
-    const old = complete(obs);
-    buildCatalog({ status: scanStatuses.partial, observations: [] }, old);
-    expect(JSON.stringify(obs)).toBe(before);
-    expect(document(old, 'a.yaml').confirmation).toBe('confirmed');
+        observations: [observationA, observationB, observationC],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(
+        catalog.documents
+          .get(observationA.path)
+          ?.documentDiagnostics.map((diagnostic) => diagnostic.code),
+      ).toContain(catalogDiagnosticCodes.duplicateId);
+      expect(
+        catalog.documents
+          .get(observationC.path)
+          ?.references.map((reference) => reference.path),
+      ).toEqual([observationA.path]);
+    });
+
+    it('파싱 실패 결과를 색인하면 이름과 참조를 추측하지 않는다', () => {
+      const observation = {
+        path: 'bad.yaml',
+        parsed: {
+          success: false,
+          source: 'name: "잘림',
+          diagnostics: [
+            {
+              code: yamlDiagnosticCodes.invalidYaml,
+              severity: diagnosticSeverities.error,
+              message: 'YAML 오류',
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      expect(catalog.documents.get(observation.path)?.name).toBeUndefined();
+      expect(catalog.documents.get(observation.path)?.occurrences).toEqual([]);
+      expect(catalog.namePaths.size).toBe(0);
+    });
   });
 });
 
-describe('순수 이름 변경 수정안', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-  it('발견 경로가 다른 같은 실경로 문서는 자기 참조로 합치지 않는다', /** 발견 경로 기준으로 자기 참조와 다른 문서를 구분한다. */ () => {
-    const catalog = complete(
-      {
-        ...singleDomainDocument('a.yaml', 'A', '판매', '[[B]]'),
-        realPath: '/same',
-      },
-      { ...singleDomainDocument('b.yaml', 'B'), realPath: '/same' },
-    );
-    expect(document(catalog, 'a.yaml').references.map((r) => r.path)).toEqual([
-      'b.yaml',
-    ]);
-  });
-  it('새 이름과 같던 다른 확정 참조도 도메인을 명시해 원래 대상을 유지한다', /** 이름 변경 후 새 모호함이 원래 다른 대상을 가로채지 않는다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml', 'A'),
-      singleDomainDocument('b.yaml', 'B', '구매'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[A]] [[B]]'),
-    );
-    const plan = planRename(catalog, { targetPath: 'a.yaml', newName: 'B' });
-    expect(plan.status).toBe('ready');
-    expect(
-      plan.changes
-        .filter((c) => c.path === 's.yaml')
-        .map((c) => [c.targetPath, c.newText]),
-    ).toEqual([
-      ['a.yaml', '[[판매:B]]'],
-      ['b.yaml', '[[구매:B]]'],
-    ]);
-  });
-  it('기존 명시 도메인을 다른 도메인 선택으로 덮어쓰지 않는다', /** 사용자의 선택도 기존 명시 도메인 보존 계약을 따른다. */ () => {
-    const catalog = complete(
-      multiDomainDocument('a.yaml', 'A', ['판매', '구매']),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[판매:A]]'),
-    );
-    const plan = planRename(catalog, {
-      targetPath: 'a.yaml',
-      newName: 'B',
-      selections: [
-        {
-          sourcePath: 's.yaml',
-          occurrenceIndex: 0,
-          targetPath: 'a.yaml',
-          domain: '구매',
+describe('buildCatalog: 관측 갱신', () => {
+  describe('전체 탐색 완료 시 이동·삭제·변경된 문서의 색인 갱신', () => {
+    it('완료 스캔에서 문서를 이동하면 이전 경로를 지우고 새 경로를 색인한다', () => {
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [documentA],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const nextObservation = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"A","domains":["판매"],"definition":"설명","id":"b"}',
+          data: {
+            name: 'A',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'b',
+          },
         },
-      ],
+      } satisfies CatalogObservation;
+      const nextScan = {
+        status: scanStatuses.complete,
+        observations: [nextObservation],
+      } satisfies CatalogScan;
+      const next = buildCatalog(nextScan, previous);
+      expect(next.documents.has(documentA.path)).toBe(false);
+      expect([
+        ...(next.namePaths.get(nextObservation.parsed.data.name) ?? []),
+      ]).toEqual([nextObservation.path]);
     });
-    expect(plan.impacts[0]?.reason).toBe('invalid_selection');
+
+    it('완료 스캔에서 문서를 삭제하면 이전 이름 후보에서 제외한다', () => {
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [documentA],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const nextScan = {
+        status: scanStatuses.complete,
+        observations: [],
+      } satisfies CatalogScan;
+      const next = buildCatalog(nextScan, previous);
+      expect(next.documents.has(documentA.path)).toBe(false);
+      expect(next.namePaths.has(documentA.parsed.data.name)).toBe(false);
+    });
+
+    it('완료 스캔에서 문서 이름이 바뀌면 이전 이름을 지우고 새 이름으로 찾는다', () => {
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [documentA],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const nextObservation = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"새A","domains":["판매"],"definition":"설명","id":"a"}',
+          data: {
+            name: '새A',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'a',
+          },
+        },
+      } satisfies CatalogObservation;
+      const nextScan = {
+        status: scanStatuses.complete,
+        observations: [nextObservation],
+      } satisfies CatalogScan;
+      const next = buildCatalog(nextScan, previous);
+      expect(next.namePaths.has(documentA.parsed.data.name)).toBe(false);
+      expect([
+        ...(next.namePaths.get(nextObservation.parsed.data.name) ?? []),
+      ]).toEqual([nextObservation.path]);
+    });
+
+    it('완료 스캔에서 소속 도메인이 바뀌면 이전 도메인에서는 찾지 않는다', () => {
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [documentA],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const nextObservation = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"A","domains":["구매"],"definition":"설명","id":"a"}',
+          data: {
+            name: 'A',
+            domains: ['구매'],
+            definition: '설명',
+            id: 'a',
+          },
+        },
+      } satisfies CatalogObservation;
+      const nextScan = {
+        status: scanStatuses.complete,
+        observations: [nextObservation],
+      } satisfies CatalogScan;
+      const next = buildCatalog(nextScan, previous);
+      expect(next.domainNamePaths.get('판매')).toBeUndefined();
+      expect([
+        ...(next.domainNamePaths
+          .get('구매')
+          ?.get(nextObservation.parsed.data.name) ?? []),
+      ]).toEqual([nextObservation.path]);
+    });
+
+    it('완료 스캔에서 참조 본문이 바뀌면 이전 연결을 지우고 새 대상으로 연결한다', () => {
+      const previousObservationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"B","domains":["판매"],"definition":"설명","id":"b"}',
+          data: {
+            name: 'B',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'b',
+          },
+        },
+      } satisfies CatalogObservation;
+      const previousObservationC = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[A]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[A]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[A]]',
+              sourceRanges: Array.from({ length: 5 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [documentA, previousObservationB, previousObservationC],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const nextObservationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"B","domains":["판매"],"definition":"설명","id":"b"}',
+          data: {
+            name: 'B',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'b',
+          },
+        },
+      } satisfies CatalogObservation;
+      const nextObservationC = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[B]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[B]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[B]]',
+              sourceRanges: Array.from({ length: 5 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const nextScan = {
+        status: scanStatuses.complete,
+        observations: [documentA, nextObservationB, nextObservationC],
+      } satisfies CatalogScan;
+      const next = buildCatalog(nextScan, previous);
+      expect(
+        next.documents
+          .get(nextObservationC.path)
+          ?.references.map((reference) => reference.path),
+      ).toEqual([nextObservationB.path]);
+      expect(next.documents.get(documentA.path)?.referencedBy).toEqual([]);
+    });
   });
-  it('일반 백슬래시와 마지막 백슬래시의 새 이름도 문법 round trip이 되면 허용한다', /** ID 패턴이나 별도 백슬래시 제한을 만들지 않는다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
+
+  describe('탐색·읽기 실패와 회복에 따른 문서 확인 상태 갱신', () => {
+    it.each([
+      {
+        label: '파일',
+        failure: { kind: catalogFailureKinds.file, path: 'a.yaml' },
+      },
+      {
+        label: '폴더',
+        failure: { kind: catalogFailureKinds.folder, path: 'sub' },
+      },
+      {
+        label: '범위를 모르는',
+        failure: { kind: catalogFailureKinds.unknown },
+      },
+    ])(
+      '$label 탐색에 실패한 부분 스캔이면 이전 문서를 미확인으로 보존한다',
+      ({ failure }) => {
+        const previousScan = {
+          status: scanStatuses.complete,
+          observations: [documentA],
+        } satisfies CatalogScan;
+        const previous = buildCatalog(previousScan);
+        const nextScan = {
+          status: scanStatuses.partial,
+          observations: [],
+          failures: [failure],
+        } satisfies CatalogScan;
+        const next = buildCatalog(nextScan, previous);
+        expect(next.documents.get(documentA.path)?.confirmation).toBe(
+          catalogConfirmations.unconfirmed,
+        );
+        expect(next.failures).toEqual([failure]);
+      },
     );
-    for (const name of ['새\\이름', '새이름\\']) {
-      const plan = planRename(catalog, { targetPath: 'a.yaml', newName: name });
-      expect(plan.status).toBe('ready');
-      expect(plan.changes.find((c) => c.path === 's.yaml')?.newText).toBe(
-        `[[${name}]]`,
+
+    it('전체 스캔에 실패하면 새 관측을 채택하지 않고 이전 이름을 미확인으로 보존한다', () => {
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [documentA],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const nextObservation = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"변경","domains":["판매"],"definition":"설명","id":"a"}',
+          data: {
+            name: '변경',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'a',
+          },
+        },
+      } satisfies CatalogObservation;
+      const nextScan = {
+        status: scanStatuses.failed,
+        observations: [nextObservation],
+        failures: [{ kind: catalogFailureKinds.unknown }],
+      } satisfies CatalogScan;
+      const next = buildCatalog(nextScan, previous);
+      expect(next.documents.get(nextObservation.path)?.name).toBe(
+        documentA.parsed.data.name,
       );
-    }
-  });
-  it('존재하지 않는 등장 및 리터럴에 대한 선택을 무시하지 않고 차단한다', /** 위치 없는 선택을 확정 수정안으로 처리하지 않는다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('s.yaml', 'S', '판매', '\\[[주문]]'),
-    );
-    const selection = {
-      sourcePath: 's.yaml',
-      occurrenceIndex: 0,
-      targetPath: 'a.yaml',
-    };
-    expect(
-      planRename(catalog, {
-        targetPath: 'a.yaml',
-        newName: '새주문',
-        selections: [selection],
-      }),
-    ).toMatchObject({
-      status: 'blocked',
-      blockingReason: 'invalid_selection',
-      invalidSelections: [selection],
-      changes: [],
+      expect(next.documents.get(nextObservation.path)?.confirmation).toBe(
+        catalogConfirmations.unconfirmed,
+      );
     });
-  });
-  it('같은 등장에 중복 선택이 있으면 첫 선택을 임의 채택하지 않는다', /** 서로 충돌하는 사용자 결정을 미해결 상태로 남긴다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('b.yaml', '주문', '구매'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
-    );
-    const selections = [
-      { sourcePath: 's.yaml', occurrenceIndex: 0, targetPath: 'a.yaml' },
-      { sourcePath: 's.yaml', occurrenceIndex: 0, targetPath: 'b.yaml' },
-    ];
-    expect(
-      planRename(catalog, {
-        targetPath: 'a.yaml',
-        newName: '새주문',
-        selections,
-      }),
-    ).toMatchObject({
-      status: 'blocked',
-      blockingReason: 'invalid_selection',
-      invalidSelections: selections,
-      changes: [],
+
+    it('미확인 상태에서 완료 스캔으로 회복하면 문서를 다시 확인한다', () => {
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [documentA],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const failedScan = {
+        status: scanStatuses.failed,
+        observations: [],
+      } satisfies CatalogScan;
+      const failed = buildCatalog(failedScan, previous);
+      const recoveredScan = {
+        status: scanStatuses.complete,
+        observations: [documentA],
+      } satisfies CatalogScan;
+      const recovered = buildCatalog(recoveredScan, failed);
+      expect(recovered.documents.get(documentA.path)?.confirmation).toBe(
+        catalogConfirmations.confirmed,
+      );
+      expect(recovered.failures).toEqual([]);
     });
-  });
-  it('미확인 실패 진단과 문서 오류는 별도 컬렉션에 유지한다', /** IO 계층의 고유 코드를 core 문서 코드로 바꾸지 않는다. */ () => {
-    const failure = {
-      kind: 'file' as const,
-      path: 'a.yaml',
-      diagnostics: [
-        {
-          code: 'read_failed',
-          severity: 'error' as const,
-          message: '읽기 실패',
+
+    it('같은 경로의 새 파싱이 실패하면 이전 이름을 최신 색인에 남기지 않는다', () => {
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [documentA],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const nextObservation = {
+        path: 'a.yaml',
+        parsed: {
+          success: false,
+          source: 'name: "잘림',
+          diagnostics: [
+            {
+              code: yamlDiagnosticCodes.invalidYaml,
+              severity: diagnosticSeverities.error,
+              message: 'YAML 오류',
+            },
+          ],
         },
-      ],
-    };
-    const old = complete(singleDomainDocument('a.yaml'));
-    const next = buildCatalog(
-      { status: scanStatuses.partial, observations: [], failures: [failure] },
-      old,
-    );
-    expect(next.failures[0]?.diagnostics).toEqual(failure.diagnostics);
-    expect(document(next, 'a.yaml').documentDiagnostics).toEqual([]);
-  });
-  it('같은 발견 경로의 새 파싱 실패는 이전 이름을 정상 최신 정보로 남기지 않는다', /** 확인한 내용 실패와 IO 미관측을 구분한다. */ () => {
-    const old = complete(singleDomainDocument('a.yaml', 'A'));
-    const next = buildCatalog(
-      {
+      } satisfies CatalogObservation;
+      const nextScan = {
         status: scanStatuses.partial,
-        observations: [{ path: 'a.yaml', parsed: parseYaml('name: "잘림') }],
+        observations: [nextObservation],
         failures: [{ kind: catalogFailureKinds.folder, path: 'sub' }],
-      },
-      old,
-    );
-    expect(document(next, 'a.yaml').confirmation).toBe('confirmed');
-    expect(document(next, 'a.yaml').name).toBeUndefined();
-    expect(next.namePaths.has('A')).toBe(false);
-    expect(document(next, 'a.yaml').documentDiagnostics[0]?.code).toBe(
-      'invalid_yaml',
-    );
-  });
-  it('확정 반복 참조를 실제 위치별 변경하고 원문을 보존한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const source = singleDomainDocument(
-      's.yaml',
-      'S',
-      '판매',
-      '[[주문]] [[주문]] \\[[주문]]',
-    );
-    const catalog = complete(singleDomainDocument('a.yaml'), source),
-      before = JSON.stringify(source);
-    const plan = planRename(catalog, {
-      targetPath: 'a.yaml',
-      newName: '새주문',
+      } satisfies CatalogScan;
+      const next = buildCatalog(nextScan, previous);
+      expect(next.documents.get(nextObservation.path)?.name).toBeUndefined();
+      expect(next.namePaths.has(documentA.parsed.data.name)).toBe(false);
     });
-    expect(plan.status).toBe('ready');
-    expect(plan.changes).toHaveLength(3);
-    expect(
-      plan.changes.filter((c) => c.path === 's.yaml').map((c) => c.newText),
-    ).toEqual(['[[새주문]]', '[[새주문]]']);
-    expect(plan.changes[0]).toMatchObject({
-      path: 'a.yaml',
-      fieldPath: ['name'],
-      oldText: '주문',
-      newText: '새주문',
+
+    it('부분 스캔을 계산하면 이전 입력과 이전 색인을 변경하지 않는다', () => {
+      const input = documentA;
+      const before = JSON.stringify(input);
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [input],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const scan = {
+        status: scanStatuses.partial,
+        observations: [],
+      } satisfies CatalogScan;
+      buildCatalog(scan, previous);
+      expect(JSON.stringify(input)).toBe(before);
+      expect(previous.documents.get('a.yaml')?.confirmation).toBe(
+        catalogConfirmations.confirmed,
+      );
     });
-    expect(JSON.stringify(source)).toBe(before);
-    expect(document(catalog, 'a.yaml').name).toBe('주문');
-  });
-  it('이미 지정한 도메인 표기는 유지한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[판매:주문]]'),
-    );
-    expect(
-      references(catalog, { targetPath: 'a.yaml', newName: '새주문' })[0]
-        ?.newText,
-    ).toBe('[[판매:새주문]]');
-  });
-  it('새 무도메인 표기가 모호해지면 단일 소속 도메인을 명시한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('b.yaml', '새주문', '구매'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
-    );
-    expect(
-      references(catalog, { targetPath: 'a.yaml', newName: '새주문' })[0]
-        ?.newText,
-    ).toBe('[[판매:새주문]]');
-  });
-  it('다중 도메인의 새 모호 표기는 미선택 도메인을 미해결로 남긴다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      multiDomainDocument('a.yaml', '주문', ['판매', '물류']),
-      singleDomainDocument('b.yaml', '새주문', '구매'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
-    );
-    const plan = planRename(catalog, {
-      targetPath: 'a.yaml',
-      newName: '새주문',
+
+    it('부분 스캔에 IO 실패 정보가 있으면 문서 진단과 구분해 보존한다', () => {
+      const failure = {
+        kind: catalogFailureKinds.file,
+        path: 'a.yaml',
+        diagnostics: [
+          {
+            code: 'read_failed',
+            severity: diagnosticSeverities.error,
+            message: '읽기 실패',
+          },
+        ],
+      };
+      const previousScan = {
+        status: scanStatuses.complete,
+        observations: [documentA],
+      } satisfies CatalogScan;
+      const previous = buildCatalog(previousScan);
+      const nextScan = {
+        status: scanStatuses.partial,
+        observations: [],
+        failures: [failure],
+      } satisfies CatalogScan;
+      const next = buildCatalog(nextScan, previous);
+      expect(next.failures[0]?.diagnostics).toEqual(failure.diagnostics);
+      expect(next.documents.get(documentA.path)?.documentDiagnostics).toEqual(
+        [],
+      );
     });
-    expect(plan.status).toBe('unresolved');
-    expect(plan.impacts[0]?.reason).toBe('domain_required');
-    expect(
-      references(catalog, {
-        targetPath: 'a.yaml',
+  });
+});
+
+describe('resolveReference: 참조 대상 조회', () => {
+  describe('이름과 도메인으로 참조 대상 조회', () => {
+    it('이름과 도메인이 일치하는 문서가 하나면 그 문서를 대상으로 반환한다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const reference = {
+        name: orderDocument.parsed.data.name,
+        domain: '판매',
+      };
+      expect(resolveReference(catalog, reference)).toMatchObject({
+        status: referenceResolutionStatuses.resolved,
+        target: { path: orderDocument.path },
+      });
+    });
+
+    it('도메인을 지정하면 같은 이름을 가진 다른 도메인의 문서를 제외한다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, purchaseOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const reference = {
+        name: purchaseOrder.parsed.data.name,
+        domain: '구매',
+      };
+      expect(
+        resolveReference(catalog, reference).candidates.map(
+          (candidate) => candidate.path,
+        ),
+      ).toEqual([purchaseOrder.path]);
+    });
+  });
+
+  describe('공백·대소문자·콜론을 포함한 참조 이름 비교', () => {
+    it('저장된 이름의 앞뒤 공백을 제거해 조회하면 후보를 찾지 않는다', () => {
+      const observation = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":" 주문A! ","domains":["판매"],"definition":"설명","id":"a"}',
+          data: {
+            name: ' 주문A! ',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'a',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const reference = { name: '주문A!', domain: '판매' };
+      expect(resolveReference(catalog, reference)).toMatchObject({
+        status: referenceResolutionStatuses.missing,
+        candidates: [],
+      });
+    });
+
+    it('저장된 이름과 대소문자가 다르면 후보를 찾지 않는다', () => {
+      const observation = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"주문A!","domains":["판매"],"definition":"설명","id":"a"}',
+          data: {
+            name: '주문A!',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'a',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const reference = { name: '주문a!', domain: '판매' };
+      expect(resolveReference(catalog, reference)).toMatchObject({
+        status: referenceResolutionStatuses.missing,
+        candidates: [],
+      });
+    });
+
+    it('도메인에 콜론이 있어도 정확히 일치하는 문서를 조회한다', () => {
+      const observation = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source: '{"name":"c","domains":["a:b"],"definition":"설명","id":"a"}',
+          data: {
+            name: 'c',
+            domains: ['a:b'],
+            definition: '설명',
+            id: 'a',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const reference = {
+        name: observation.parsed.data.name,
+        domain: 'a:b',
+      };
+      expect(resolveReference(catalog, reference).target?.path).toBe(
+        observation.path,
+      );
+    });
+
+    it('이름에 콜론이 있어도 정확히 일치하는 문서를 조회한다', () => {
+      const observation = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source: '{"name":"b:c","domains":["a"],"definition":"설명","id":"b"}',
+          data: {
+            name: 'b:c',
+            domains: ['a'],
+            definition: '설명',
+            id: 'b',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observation],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const reference = {
+        name: observation.parsed.data.name,
+        domain: 'a',
+      };
+      expect(resolveReference(catalog, reference).target?.path).toBe(
+        observation.path,
+      );
+    });
+  });
+
+  describe('복수 후보와 불완전한 탐색에서 참조 대상 확정 제한', () => {
+    it('같은 이름을 가진 문서가 둘이면 경로순 후보를 모두 반환하고 대상을 선택하지 않는다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [purchaseOrder, orderDocument],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const reference = { name: orderDocument.parsed.data.name };
+      const result = resolveReference(catalog, reference);
+      expect(result.status).toBe(referenceResolutionStatuses.ambiguous);
+      expect(result.candidates.map((candidate) => candidate.path)).toEqual([
+        orderDocument.path,
+        purchaseOrder.path,
+      ]);
+      expect(result.target).toBeUndefined();
+    });
+
+    it('부분 스캔에서 확인한 후보가 하나여도 전체 탐색을 마치지 못했으면 대상을 확정하지 않는다', () => {
+      const scan = {
+        status: scanStatuses.partial,
+        observations: [orderDocument],
+        failures: [{ kind: catalogFailureKinds.folder, path: 'sub' }],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const reference = { name: orderDocument.parsed.data.name };
+      expect(resolveReference(catalog, reference)).toMatchObject({
+        status: referenceResolutionStatuses.unconfirmed,
+        candidates: [{ path: orderDocument.path }],
+      });
+    });
+  });
+});
+
+describe('planRename: 이름 변경 계획', () => {
+  describe('문서 이름과 그 문서를 참조하는 표기의 수정안 생성', () => {
+    it('참조가 없는 문서의 이름을 변경하면 이름 필드 수정안을 반환한다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(plan.status).toBe(renamePlanStatuses.ready);
+      expect(plan.changes).toEqual([
+        expect.objectContaining({
+          path: orderDocument.path,
+          fieldPath: ['name'],
+          oldText: orderDocument.parsed.data.name,
+          newText: request.newName,
+        }),
+      ]);
+    });
+
+    it('참조된 문서의 이름을 변경하면 출처의 참조 표기도 변경한다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(plan.status).toBe(renamePlanStatuses.ready);
+      expect(
+        plan.changes.find((change) => change.path === sourceRefersToOrder.path),
+      ).toMatchObject({
+        oldText: '[[주문]]',
+        newText: '[[새주문]]',
+        targetPath: orderDocument.path,
+      });
+    });
+
+    it('반복된 참조의 이름을 변경하면 각 참조 위치에 수정안을 만든다', () => {
+      const definition = '[[주문]] [[주문]]';
+      const source = JSON.stringify({
+        name: '출처',
+        domains: ['판매'],
+        definition,
+        id: 's',
+      });
+      const observationB = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[주문]] [[주문]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[주문]] [[주문]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[주문]] [[주문]]',
+              sourceRanges: Array.from({ length: 13 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, observationB],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(
+        plan.changes
+          .filter((change) => change.path === observationB.path)
+          .map((change) => [change.offsetRange.start, change.newText]),
+      ).toEqual([
+        [source.indexOf('[[주문]]'), '[[새주문]]'],
+        [source.lastIndexOf('[[주문]]'), '[[새주문]]'],
+      ]);
+    });
+
+    it('도메인을 명시한 참조의 이름을 변경하면 기존 도메인을 유지한다', () => {
+      const observationB = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"[[판매:주문]]","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '[[판매:주문]]',
+            id: 's',
+          },
+          strings: [
+            {
+              fieldPath: ['definition'],
+              value: '[[판매:주문]]',
+              sourceRanges: Array.from({ length: 9 }, (_, index) => ({
+                start: 44 + index,
+                end: 45 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, observationB],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(
+        plan.changes.find((change) => change.path === observationB.path)
+          ?.newText,
+      ).toBe('[[판매:새주문]]');
+    });
+
+    it('새 이름이 다른 도메인의 문서와 같아지면 기존 대상의 도메인을 명시한다', () => {
+      const observationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"새주문","domains":["구매"],"definition":"설명","id":"b"}',
+          data: {
+            name: '새주문',
+            domains: ['구매'],
+            definition: '설명',
+            id: 'b',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, observationB, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: observationB.parsed.data.name,
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(
+        plan.changes.find((change) => change.path === sourceRefersToOrder.path)
+          ?.newText,
+      ).toBe('[[판매:새주문]]');
+    });
+
+    it('참조를 함께 변경하지 않으면 이름 필드만 수정하고 영향을 보고한다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+        updateReferences: false,
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(plan.changes.map((change) => change.path)).toEqual([
+        orderDocument.path,
+      ]);
+      expect(plan.impacts[0]?.reason).toBe(
+        renameImpactReasons.referencesDisabled,
+      );
+    });
+  });
+
+  describe('복수 후보의 대상·도메인 선택에 따른 참조 수정', () => {
+    it('모호한 참조에서 변경 대상을 선택하면 그 참조의 이름을 변경한다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
         newName: '새주문',
         selections: [
           {
-            sourcePath: 's.yaml',
+            sourcePath: sourceRefersToOrder.path,
             occurrenceIndex: 0,
-            targetPath: 'a.yaml',
+            targetPath: orderDocument.path,
+          },
+        ],
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(
+        plan.changes.find((change) => change.path === sourceRefersToOrder.path)
+          ?.newText,
+      ).toBe('[[새주문]]');
+    });
+
+    it('모호한 참조에서 다른 후보를 선택하면 변경 대상의 참조 수정안을 만들지 않는다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+        selections: [
+          {
+            sourcePath: sourceRefersToOrder.path,
+            occurrenceIndex: 0,
+            targetPath: purchaseOrder.path,
+          },
+        ],
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(
+        plan.changes.filter(
+          (change) => change.path === sourceRefersToOrder.path,
+        ),
+      ).toEqual([]);
+    });
+
+    it('다중 도메인 대상의 새 이름이 모호해지면 선택 전까지 영향을 미해결로 둔다', () => {
+      const observationA = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"주문","domains":["판매","물류"],"definition":"설명","id":"a"}',
+          data: {
+            name: '주문',
+            domains: ['판매', '물류'],
+            definition: '설명',
+            id: 'a',
+          },
+          strings: [
+            {
+              fieldPath: ['name'],
+              value: '주문',
+              sourceRanges: Array.from({ length: 2 }, (_, index) => ({
+                start: 9 + index,
+                end: 10 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const observationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"새주문","domains":["구매"],"definition":"설명","id":"b"}',
+          data: {
+            name: '새주문',
+            domains: ['구매'],
+            definition: '설명',
+            id: 'b',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observationA, observationB, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: observationA.path,
+        newName: observationB.parsed.data.name,
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(plan.status).toBe(renamePlanStatuses.unresolved);
+      expect(plan.impacts[0]?.reason).toBe(renameImpactReasons.domainRequired);
+    });
+
+    it('다중 도메인 대상에서 소속 도메인을 선택하면 그 도메인을 참조에 넣는다', () => {
+      const observationA = {
+        path: 'a.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"주문","domains":["판매","물류"],"definition":"설명","id":"a"}',
+          data: {
+            name: '주문',
+            domains: ['판매', '물류'],
+            definition: '설명',
+            id: 'a',
+          },
+          strings: [
+            {
+              fieldPath: ['name'],
+              value: '주문',
+              sourceRanges: Array.from({ length: 2 }, (_, index) => ({
+                start: 9 + index,
+                end: 10 + index,
+              })),
+            },
+          ],
+        },
+      } satisfies CatalogObservation;
+      const observationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"새주문","domains":["구매"],"definition":"설명","id":"b"}',
+          data: {
+            name: '새주문',
+            domains: ['구매'],
+            definition: '설명',
+            id: 'b',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [observationA, observationB, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: observationA.path,
+        newName: observationB.parsed.data.name,
+        selections: [
+          {
+            sourcePath: sourceRefersToOrder.path,
+            occurrenceIndex: 0,
+            targetPath: observationA.path,
             domain: '물류',
           },
         ],
-      })[0]?.newText,
-    ).toBe('[[물류:새주문]]');
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(
+        plan.changes.find((change) => change.path === sourceRefersToOrder.path)
+          ?.newText,
+      ).toBe('[[물류:새주문]]');
+    });
   });
-  it('사용자가 선택한 모호 후보를 유지한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('b.yaml', '주문', '구매'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
-    );
-    expect(
-      references(catalog, {
+
+  describe('이름 변경의 충돌 검사와 참조 선택·표기 오류 처리', () => {
+    it('같은 도메인에 새 이름이 충돌하면 변경 계획을 차단한다', () => {
+      const observationB = {
+        path: 'b.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"새주문","domains":["판매"],"definition":"설명","id":"b"}',
+          data: {
+            name: '새주문',
+            domains: ['판매'],
+            definition: '설명',
+            id: 'b',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, observationB],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: observationB.parsed.data.name,
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(plan).toMatchObject({
+        status: renamePlanStatuses.blocked,
+        blockingReason: renameBlockingReasons.nameConflict,
+        changes: [],
+      });
+      expect(plan.conflicts[0]).toMatchObject({
+        domain: '판매',
+        candidates: [{ path: observationB.path }],
+      });
+    });
+
+    it('부분 색인에서 이름을 변경하면 충돌 부재를 확정할 수 없어 차단한다', () => {
+      const scan = {
+        status: scanStatuses.partial,
+        observations: [orderDocument],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+      } satisfies RenameRequest;
+      expect(planRename(catalog, request)).toMatchObject({
+        status: renamePlanStatuses.blocked,
+        blockingReason: renameBlockingReasons.unconfirmed,
+        changes: [],
+      });
+    });
+
+    it('존재하지 않는 참조 위치를 선택하면 계획을 차단한다', () => {
+      const observationB = {
+        path: 's.yaml',
+        parsed: {
+          ...parsedBase,
+          source:
+            '{"name":"출처","domains":["판매"],"definition":"설명","id":"s"}',
+          data: {
+            name: '출처',
+            domains: ['판매'],
+            definition: '설명',
+            id: 's',
+          },
+        },
+      } satisfies CatalogObservation;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, observationB],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const selection = {
+        sourcePath: observationB.path,
+        occurrenceIndex: 0,
+        targetPath: orderDocument.path,
+      };
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+        selections: [selection],
+      } satisfies RenameRequest;
+      expect(planRename(catalog, request)).toMatchObject({
+        status: renamePlanStatuses.blocked,
+        blockingReason: renameBlockingReasons.invalidSelection,
+        invalidSelections: [selection],
+      });
+    });
+
+    it('한 참조 위치에 서로 다른 후보를 중복 선택하면 계획을 차단한다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const selections = [
+        {
+          sourcePath: sourceRefersToOrder.path,
+          occurrenceIndex: 0,
+          targetPath: orderDocument.path,
+        },
+        {
+          sourcePath: sourceRefersToOrder.path,
+          occurrenceIndex: 0,
+          targetPath: purchaseOrder.path,
+        },
+      ];
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+        selections,
+      } satisfies RenameRequest;
+      expect(planRename(catalog, request)).toMatchObject({
+        status: renamePlanStatuses.blocked,
+        blockingReason: renameBlockingReasons.invalidSelection,
+        invalidSelections: selections,
+      });
+    });
+
+    it('새 이름을 참조로 표현할 수 없으면 참조 변경 영향을 미해결로 남긴다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새[주문',
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(plan.impacts[0]?.reason).toBe(renameImpactReasons.unrepresentable);
+    });
+  });
+
+  describe('이름 변경 계획 계산 시 기존 관측과 색인 보존', () => {
+    it('이름 변경 계획을 계산하면 원래 관측과 색인을 변경하지 않는다', () => {
+      const input = orderDocument;
+      const source = sourceRefersToOrder;
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [input, source],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const before = JSON.stringify([input, source]);
+      const request = {
         targetPath: 'a.yaml',
         newName: '새주문',
-        selections: [
-          { sourcePath: 's.yaml', occurrenceIndex: 0, targetPath: 'a.yaml' },
-        ],
-      })[0]?.newText,
-    ).toBe('[[새주문]]');
+      } satisfies RenameRequest;
+      planRename(catalog, request);
+      expect(JSON.stringify([input, source])).toBe(before);
+      expect(catalog.documents.get('a.yaml')?.name).toBe('주문');
+    });
   });
-  it('사용자가 다른 후보를 선택하면 그 후보를 존중한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('b.yaml', '주문', '구매'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
-    );
-    const plan = planRename(catalog, {
-      targetPath: 'a.yaml',
+});
+
+describe('planRename: 참조 선택과 영향', () => {
+  it('명시된 도메인과 다른 도메인을 선택하면 잘못된 선택으로 보고한다', () => {
+    const observationA = {
+      path: 'a.yaml',
+      parsed: {
+        ...parsedBase,
+        source:
+          '{"name":"A","domains":["판매","구매"],"definition":"설명","id":"a"}',
+        data: {
+          name: 'A',
+          domains: ['판매', '구매'],
+          definition: '설명',
+          id: 'a',
+        },
+        strings: [
+          {
+            fieldPath: ['name'],
+            value: 'A',
+            sourceRanges: Array.from({ length: 1 }, (_, index) => ({
+              start: 9 + index,
+              end: 10 + index,
+            })),
+          },
+        ],
+      },
+    } satisfies CatalogObservation;
+    const observationB = {
+      path: 's.yaml',
+      parsed: {
+        ...parsedBase,
+        source:
+          '{"name":"출처","domains":["판매"],"definition":"[[판매:A]]","id":"s"}',
+        data: {
+          name: '출처',
+          domains: ['판매'],
+          definition: '[[판매:A]]',
+          id: 's',
+        },
+        strings: [
+          {
+            fieldPath: ['definition'],
+            value: '[[판매:A]]',
+            sourceRanges: Array.from({ length: 8 }, (_, index) => ({
+              start: 44 + index,
+              end: 45 + index,
+            })),
+          },
+        ],
+      },
+    } satisfies CatalogObservation;
+    const scan = {
+      status: scanStatuses.complete,
+      observations: [observationA, observationB],
+    } satisfies CatalogScan;
+    const catalog = buildCatalog(scan);
+    const request = {
+      targetPath: observationA.path,
+      newName: 'B',
+      selections: [
+        {
+          sourcePath: observationB.path,
+          occurrenceIndex: 0,
+          targetPath: observationA.path,
+          domain: '구매',
+        },
+      ],
+    } satisfies RenameRequest;
+    const plan = planRename(catalog, request);
+    expect(plan.impacts[0]?.reason).toBe(renameImpactReasons.invalidSelection);
+  });
+
+  it('참조 후보에 없는 경로를 선택하면 잘못된 선택으로 보고한다', () => {
+    const scan = {
+      status: scanStatuses.complete,
+      observations: [orderDocument, sourceRefersToOrder],
+    } satisfies CatalogScan;
+    const catalog = buildCatalog(scan);
+    const request = {
+      targetPath: orderDocument.path,
       newName: '새주문',
       selections: [
-        { sourcePath: 's.yaml', occurrenceIndex: 0, targetPath: 'b.yaml' },
+        {
+          sourcePath: sourceRefersToOrder.path,
+          occurrenceIndex: 0,
+          targetPath: 'none',
+        },
       ],
-    });
-    expect(plan.status).toBe('ready');
-    expect(plan.changes.filter((c) => c.path === 's.yaml')).toEqual([]);
+    } satisfies RenameRequest;
+    const plan = planRename(catalog, request);
+    expect(plan.impacts[0]?.reason).toBe(renameImpactReasons.invalidSelection);
   });
-  it('미선택 모호 참조가 다른 후보 하나로 바뀌는 영향도 보고한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('b.yaml', '주문', '구매'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
-    );
-    const plan = planRename(catalog, {
-      targetPath: 'a.yaml',
+
+  it('대상에 없는 도메인을 선택하면 잘못된 선택으로 보고한다', () => {
+    const scan = {
+      status: scanStatuses.complete,
+      observations: [orderDocument, sourceRefersToOrder],
+    } satisfies CatalogScan;
+    const catalog = buildCatalog(scan);
+    const request = {
+      targetPath: orderDocument.path,
       newName: '새주문',
-    });
-    expect(plan.status).toBe('unresolved');
+      selections: [
+        {
+          sourcePath: sourceRefersToOrder.path,
+          occurrenceIndex: 0,
+          targetPath: orderDocument.path,
+          domain: '구매',
+        },
+      ],
+    } satisfies RenameRequest;
+    const plan = planRename(catalog, request);
+    expect(plan.impacts[0]?.reason).toBe(renameImpactReasons.invalidSelection);
+  });
+
+  it('모호한 참조를 선택하지 않고 후보 구성을 바꾸면 해결 결과 변화를 보고한다', () => {
+    const scan = {
+      status: scanStatuses.complete,
+      observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
+    } satisfies CatalogScan;
+    const catalog = buildCatalog(scan);
+    const request = {
+      targetPath: orderDocument.path,
+      newName: '새주문',
+    } satisfies RenameRequest;
+    const plan = planRename(catalog, request);
+    expect(plan.status).toBe(renamePlanStatuses.unresolved);
     expect(plan.impacts[0]).toMatchObject({
-      reason: 'changed_resolution',
-      before: { status: 'ambiguous' },
-      after: { status: 'resolved', target: { path: 'b.yaml' } },
-    });
-  });
-  it('서로 다른 소속 수의 문서도 같은 도메인의 새 이름 충돌을 차단한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      multiDomainDocument('b.yaml', '새주문', ['판매']),
-    );
-    const plan = planRename(catalog, {
-      targetPath: 'a.yaml',
-      newName: '새주문',
-    });
-    expect(plan.status).toBe('blocked');
-    expect(plan.changes).toEqual([]);
-    expect(plan.conflicts[0]).toMatchObject({
-      domain: '판매',
-      candidates: [{ path: 'b.yaml' }],
-    });
-  });
-  it('참조 동시 변경을 끄면 이름 필드만 계획하고 미해결 영향을 반환한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
-    );
-    const plan = planRename(catalog, {
-      targetPath: 'a.yaml',
-      newName: '새주문',
-      updateReferences: false,
-    });
-    expect(plan.changes).toHaveLength(1);
-    expect(plan.impacts[0]?.reason).toBe('references_disabled');
-  });
-  it('존재하지 않는 후보 및 소속하지 않는 도메인 선택은 미해결이다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
-    );
-    for (const selection of [
-      { sourcePath: 's.yaml', occurrenceIndex: 0, targetPath: 'none' },
-      {
-        sourcePath: 's.yaml',
-        occurrenceIndex: 0,
-        targetPath: 'a.yaml',
-        domain: '구매',
+      reason: renameImpactReasons.changedResolution,
+      before: { status: referenceResolutionStatuses.ambiguous },
+      after: {
+        status: referenceResolutionStatuses.resolved,
+        target: { path: purchaseOrder.path },
       },
-    ])
-      expect(
-        planRename(catalog, {
-          targetPath: 'a.yaml',
-          newName: '새주문',
-          selections: [selection],
-        }).impacts[0]?.reason,
-      ).toBe('invalid_selection');
+    });
   });
-  it('콜론이 포함된 새 이름은 참조 구성에서 escape한다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
+});
+
+describe('buildCatalog: 참조 진단의 원문 위치', () => {
+  it('Unicode 이스케이프와 CRLF가 있는 참조를 색인하면 전달된 원문 위치에 진단을 붙인다', () => {
+    const source =
+      'id: s\r\nname: S\r\ndomains: [판매]\r\ndefinition: "\\u005B\\u005B없음]] [[없음]]"\r\n';
+    const escaped = source.indexOf('\\u005B');
+    const plain = source.indexOf('[[없음]]');
+    const observation = {
+      path: 's.yaml',
+      parsed: {
+        ...parsedBase,
+        source,
+        data: {
+          id: 's',
+          name: 'S',
+          domains: ['판매'],
+          definition: '[[없음]] [[없음]]',
+        },
+        strings: [
+          {
+            fieldPath: ['definition'],
+            value: '[[없음]] [[없음]]',
+            sourceRanges: [
+              { start: escaped, end: escaped + 6 },
+              { start: escaped + 6, end: escaped + 12 },
+              ...Array.from({ length: 5 }, (_, index) => ({
+                start: escaped + 12 + index,
+                end: escaped + 13 + index,
+              })),
+              ...Array.from({ length: 6 }, (_, index) => ({
+                start: plain + index,
+                end: plain + index + 1,
+              })),
+            ],
+          },
+        ],
+      },
+    } satisfies CatalogObservation;
+    const scan = {
+      status: scanStatuses.complete,
+      observations: [observation],
+    } satisfies CatalogScan;
+    const catalog = buildCatalog(scan);
+    expect(
+      catalog.documents
+        .get(observation.path)
+        ?.diagnostics.filter(
+          (diagnostic) =>
+            diagnostic.code === catalogDiagnosticCodes.missingReference,
+        )
+        .map((diagnostic) => diagnostic.range),
+    ).toEqual([
+      { start: { line: 3, character: 13 }, end: { line: 3, character: 29 } },
+      { start: { line: 3, character: 30 }, end: { line: 3, character: 36 } },
+    ]);
+  });
+});
+
+describe('planRename: 원문 위치와 참조 표기', () => {
+  it('Unicode 이스케이프로 작성된 이름을 변경하면 이스케이프를 포함한 원문 범위를 수정한다', () => {
+    const source =
+      'id: a\nname: "\\uC8FC문"\ndomains: [판매]\ndefinition: 설명\n';
+    const nameStart = source.indexOf('\\uC8FC');
+    const observation = {
+      path: 'a.yaml',
+      parsed: {
+        ...parsedBase,
+        source,
+        data: {
+          id: 'a',
+          name: '주문',
+          domains: ['판매'],
+          definition: '설명',
+        },
+        strings: [
+          {
+            fieldPath: ['name'],
+            value: '주문',
+            sourceRanges: [
+              { start: nameStart, end: nameStart + 6 },
+              { start: nameStart + 6, end: nameStart + 7 },
+            ],
+          },
+        ],
+      },
+    } satisfies CatalogObservation;
+    const scan = {
+      status: scanStatuses.complete,
+      observations: [observation],
+    } satisfies CatalogScan;
+    const catalog = buildCatalog(scan);
+    const request = {
+      targetPath: observation.path,
+      newName: '새주문',
+    } satisfies RenameRequest;
+    const plan = planRename(catalog, request);
+    const nameChange = plan.changes.find(
+      (change) => change.path === observation.path,
     );
     expect(
-      references(catalog, { targetPath: 'a.yaml', newName: '새:주문' })[0]
+      nameChange &&
+        source.slice(nameChange.offsetRange.start, nameChange.offsetRange.end),
+    ).toBe('\\uC8FC문');
+  });
+
+  it('접힌 본문의 참조 이름을 변경하면 각 원문 참조 위치에 수정안을 만든다', () => {
+    const source =
+      'id: s\nname: S\ndomains: [판매]\ndefinition: >-\n  [[주문]]\n  [[주문]]\n';
+    const first = source.indexOf('[[주문]]');
+    const second = source.lastIndexOf('[[주문]]');
+    const observationB = {
+      path: 's.yaml',
+      parsed: {
+        ...parsedBase,
+        source,
+        data: {
+          id: 's',
+          name: 'S',
+          domains: ['판매'],
+          definition: '[[주문]] [[주문]]',
+        },
+        strings: [
+          {
+            fieldPath: ['definition'],
+            value: '[[주문]] [[주문]]',
+            sourceRanges: [
+              ...Array.from({ length: 6 }, (_, index) => ({
+                start: first + index,
+                end: first + index + 1,
+              })),
+              { start: first + 6, end: second },
+              ...Array.from({ length: 6 }, (_, index) => ({
+                start: second + index,
+                end: second + index + 1,
+              })),
+            ],
+          },
+        ],
+      },
+    } satisfies CatalogObservation;
+    const scan = {
+      status: scanStatuses.complete,
+      observations: [orderDocument, observationB],
+    } satisfies CatalogScan;
+    const catalog = buildCatalog(scan);
+    const request = {
+      targetPath: orderDocument.path,
+      newName: '새주문',
+    } satisfies RenameRequest;
+    const plan = planRename(catalog, request);
+    expect(
+      plan.changes
+        .filter((change) => change.path === observationB.path)
+        .map((change) => [change.offsetRange.start, change.newText]),
+    ).toEqual([
+      [first, '[[새주문]]'],
+      [second, '[[새주문]]'],
+    ]);
+  });
+});
+
+describe('planRename: 새 이름의 참조 표기', () => {
+  it.each([
+    { condition: '이름 중간에 백슬래시가 있는', newName: '새\\이름' },
+    { condition: '이름 끝에 백슬래시가 있는', newName: '새이름\\' },
+  ])(
+    '$condition 이름으로 변경하면 백슬래시를 포함한 참조 수정안을 만든다',
+    ({ newName }) => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName,
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(plan.status).toBe(renamePlanStatuses.ready);
+      expect(
+        plan.changes.find((change) => change.path === sourceRefersToOrder.path)
+          ?.newText,
+      ).toBe(`[[${newName}]]`);
+    },
+  );
+
+  it('새 이름에 콜론이 있으면 참조 수정안에서 콜론을 이스케이프한다', () => {
+    const scan = {
+      status: scanStatuses.complete,
+      observations: [orderDocument, sourceRefersToOrder],
+    } satisfies CatalogScan;
+    const catalog = buildCatalog(scan);
+    const request = {
+      targetPath: orderDocument.path,
+      newName: '새:주문',
+    } satisfies RenameRequest;
+    const plan = planRename(catalog, request);
+    expect(plan.status).toBe(renamePlanStatuses.ready);
+    expect(
+      plan.changes.find((change) => change.path === sourceRefersToOrder.path)
         ?.newText,
     ).toBe('[[새\\:주문]]');
-  });
-  it('새 이름을 문법으로 표현할 수 없으면 추측하지 않고 미해결이다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = complete(
-      singleDomainDocument('a.yaml'),
-      singleDomainDocument('s.yaml', 'S', '판매', '[[주문]]'),
-    );
-    expect(
-      planRename(catalog, { targetPath: 'a.yaml', newName: '새[주문' })
-        .impacts[0]?.reason,
-    ).toBe('unrepresentable');
-  });
-  it('미확인 색인에서는 새 이름 충돌의 부재를 확정하지 않는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const catalog = buildCatalog({
-      status: scanStatuses.partial,
-      observations: [singleDomainDocument('a.yaml')],
-    });
-    expect(
-      planRename(catalog, { targetPath: 'a.yaml', newName: '새주문' }),
-    ).toMatchObject({
-      status: 'blocked',
-      blockingReason: 'unconfirmed',
-      changes: [],
-    });
-  });
-  it('Unicode escape 이름과 folded 본문의 수정안은 실제 원문 위치를 갖는다', /** 조건별 공개 상태와 관찰 결과를 검증한다. */ () => {
-    const a = {
-      path: 'a.yaml',
-      parsed: parseYaml(
-        'id: a\nname: "\\uC8FC문"\ndomains: [판매]\ndefinition: 설명\n',
-      ),
-    };
-    const s = {
-      path: 's.yaml',
-      parsed: parseYaml(
-        'id: s\nname: S\ndomains: [판매]\ndefinition: >-\n  [[주문]]\n  [[주문]]\n',
-      ),
-    };
-    const plan = planRename(complete(a, s), {
-      targetPath: 'a.yaml',
-      newName: '새주문',
-    });
-    expect(plan.changes).toHaveLength(3);
-    const name = plan.changes.find((c) => c.path === 'a.yaml')!;
-    expect(
-      a.parsed.source?.slice(name.offsetRange.start, name.offsetRange.end),
-    ).toBe('\\uC8FC문');
-    for (const change of plan.changes.filter((c) => c.path === 's.yaml'))
-      expect(
-        s.parsed.source?.slice(
-          change.offsetRange.start,
-          change.offsetRange.end,
-        ),
-      ).toBe('[[주문]]');
   });
 });

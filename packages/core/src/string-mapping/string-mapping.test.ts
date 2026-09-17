@@ -1,13 +1,76 @@
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { describe, expect, it } from 'vitest';
 import {
-  extractReferences,
   getStringMapping,
   getStringRange,
   parseYaml,
-} from '../index.js';
+} from '../parser/index.js';
 import { referenceSyntaxStatuses } from '../references/domain-values.js';
+import { extractReferences } from '../references/index.js';
 
-describe('해석 문자열의 실제 YAML 원문 매핑', /** 해석 offset을 원문에 단순 가산하지 않고 실제 토큰 구간을 확인한다. */ () => {
+describe('getStringMapping: 확인된 문자열의 원문 위치 조회', () => {
+  it('문자열 필드의 매핑을 조회하면 해석값과 코드 단위별 원문 범위를 반환한다', () => {
+    const parsed = {
+      success: true as const,
+      source: 'definition: "abc"\n',
+      data: { definition: 'abc' },
+      fields: [],
+      strings: [
+        {
+          fieldPath: ['definition'],
+          value: 'abc',
+          sourceRanges: [
+            { start: 13, end: 14 },
+            { start: 14, end: 15 },
+            { start: 15, end: 16 },
+          ],
+        },
+      ],
+      diagnostics: [],
+    };
+    expect(getStringMapping(parsed, ['definition'])).toEqual(parsed.strings[0]);
+  });
+
+  it('매핑되지 않은 필드를 조회하면 위치를 반환하지 않는다', () => {
+    const parsed = {
+      success: true as const,
+      source: 'definition: 7\n',
+      data: { definition: 7 },
+      fields: [],
+      strings: [],
+      diagnostics: [],
+    };
+    expect(getStringMapping(parsed, ['definition'])).toBeUndefined();
+  });
+});
+
+describe('getStringRange: 해석 문자열 범위의 원문 위치 조회', () => {
+  it('해석 문자열의 일부를 조회하면 대응하는 원문 범위를 반환한다', () => {
+    const parsed = {
+      success: true as const,
+      source: 'definition: "abc"\n',
+      data: { definition: 'abc' },
+      fields: [],
+      strings: [
+        {
+          fieldPath: ['definition'],
+          value: 'abc',
+          sourceRanges: [
+            { start: 13, end: 14 },
+            { start: 14, end: 15 },
+            { start: 15, end: 16 },
+          ],
+        },
+      ],
+      diagnostics: [],
+    };
+    expect(
+      getStringRange(parsed, ['definition'], { start: 1, end: 3 }),
+    ).toEqual({ start: 14, end: 16 });
+  });
+});
+
+describe('parseYaml과 getStringMapping: YAML 표기별 문자열 위치 연결', () => {
   it.each([
     [
       'plain',
@@ -128,19 +191,40 @@ describe('해석 문자열의 실제 YAML 원문 매핑', /** 해석 offset을 �
       ).toEqual(['[[첫째]]', '[[둘째]]', '[[셋째]]']);
     },
   );
-  it('실패·비문자열·잘못된 해석 범위를 조회하면 확인하지 않은 위치를 제공하지 않는다', /** 기존 값 범위를 문자열 위치로 대체하지 않는다. */ () => {
-    const parsed = parseYaml('definition: 7\nname: "abc"\n');
+  it('파싱에 실패한 원문을 조회하면 문자열 매핑을 반환하지 않는다', () => {
+    const parsed = {
+      success: false as const,
+      source: 'definition: "끝',
+      diagnostics: [],
+    };
     expect(getStringMapping(parsed, ['definition'])).toBeUndefined();
-    expect(
-      getStringMapping(parseYaml('definition: "끝'), ['definition']),
-    ).toBeUndefined();
-    for (const range of [
-      { start: -1, end: 1 },
-      { start: 0, end: 4 },
-      { start: 2, end: 1 },
-      { start: 0.5, end: 1 },
-    ])
-      expect(getStringRange(parsed, ['name'], range)).toBeUndefined();
+  });
+
+  it.each([
+    ['음수 시작점', { start: -1, end: 1 }],
+    ['문자열 길이를 넘는 끝점', { start: 0, end: 4 }],
+    ['역순 범위', { start: 2, end: 1 }],
+    ['소수 시작점', { start: 0.5, end: 1 }],
+  ])('%s을 조회하면 원문 위치를 반환하지 않는다', (_condition, range) => {
+    const parsed = {
+      success: true as const,
+      source: 'name: "abc"\n',
+      data: { name: 'abc' },
+      fields: [],
+      strings: [
+        {
+          fieldPath: ['name'],
+          value: 'abc',
+          sourceRanges: [
+            { start: 7, end: 8 },
+            { start: 8, end: 9 },
+            { start: 9, end: 10 },
+          ],
+        },
+      ],
+      diagnostics: [],
+    };
+    expect(getStringRange(parsed, ['name'], range)).toBeUndefined();
   });
   it.each([
     ['plain LF', 'definition: 앞  \n  \n  [[이름]]  \n  뒤\n'],

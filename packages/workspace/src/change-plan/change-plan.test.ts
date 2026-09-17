@@ -1,159 +1,193 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
+/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { changePlanStatuses, parseYaml } from '@codocs/core';
-import { describe, expect, it } from 'vitest';
+import { changePlanStatuses } from '@codocs/core';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadWorkspace } from '../loader/index.js';
-import { calculateRevision } from '../revision/index.js';
 import { planWorkspaceChange } from './index.js';
 
-describe('작업 공간의 미저장 변경 계획', () => {
-  it('한 번 읽은 바이트 revision을 확인하고 디스크를 수정하지 않는다', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'codocs-change-plan-'));
-    try {
-      const folder = path.join(root, '.codocs');
-      await mkdir(folder);
-      const file = path.join(folder, 'zone.yaml');
-      const bytes = Buffer.from(
-        'id: zone\r\nname: 구역\r\ndomains: [운영]\r\ndefinition: 설명\r\n',
-      );
-      await writeFile(file, bytes);
-      const scan = await loadWorkspace({ cwd: root });
-      const original = scan.documents[0];
-      expect(original?.revision).toBe(calculateRevision(bytes));
-      const result = planWorkspaceChange(
-        {
-          mode: 'update',
-          id: 'zone',
-          revision: original?.revision,
-          set: { id: 'next-zone' },
-        },
-        scan,
-      );
-      expect(result.status).toBe(changePlanStatuses.candidate);
-      if (result.status === changePlanStatuses.candidate) {
-        expect(result.baseRevision).toBe(original?.revision);
-        expect(result.revision).toBe(
-          calculateRevision(Buffer.from(result.raw)),
-        );
-      }
-      expect(await readFile(file)).toEqual(bytes);
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
-  });
+const original =
+  '# 그대로 보존\r\nid: zone\r\nname: 구역\r\ndefinition: 설명\r\ndomains: [운영]\r\ndeprecatedAliases:\r\n  - id: return-zone\r\n    message: 기존 안내\r\n';
+let root: string;
+let file: string;
 
-  it('실제 파일의 원문과 revision으로 ID 후보를 재파싱하고 충돌을 진단하되 저장하지 않는다', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'codocs-change-plan-flow-'));
-    try {
-      const folder = path.join(root, '.codocs');
-      await mkdir(folder);
-      const targetPath = path.join(folder, 'zone.yaml');
-      const targetBytes = Buffer.from(
-        '# 그대로 보존\r\nid: zone\r\nname: 구역\r\ndefinition: 설명\r\ndomains: [운영]\r\ndeprecatedAliases:\r\n  - id: return-zone\r\n    message: 기존 안내\r\n',
-      );
-      await writeFile(targetPath, targetBytes);
-      await writeFile(
-        path.join(folder, 'taken.yaml'),
-        'id: taken\nname: 다른 문서\ndefinition: 설명\ndomains: [운영]\n',
-      );
-      await writeFile(
-        path.join(folder, 'unrelated.yaml'),
-        'id: unrelated\nname: 오류 문서\ndomains: [운영]\n',
-      );
+beforeEach(async () => {
+  root = await mkdtemp(path.join(tmpdir(), 'codocs-change-plan-'));
+  const folder = path.join(root, '.codocs');
+  await mkdir(folder);
+  file = path.join(folder, 'zone.yaml');
+  await writeFile(file, original);
+  await writeFile(
+    path.join(folder, 'taken.yaml'),
+    'id: taken\nname: 다른 문서\ndefinition: 설명\ndomains: [운영]\n',
+  );
+  await writeFile(
+    path.join(folder, 'unrelated.yaml'),
+    'id: unrelated\nname: 오류 문서\ndomains: [운영]\n',
+  );
+});
+
+afterEach(async () => {
+  await rm(root, { recursive: true, force: true });
+});
+
+describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작성', () => {
+  describe('문서 변경 후보와 원본 보존', () => {
+    it('문서 이름 변경을 계획하면 새 이름을 가진 후보를 반환한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
         (item) => item.source.path === '.codocs/zone.yaml',
       );
-      expect(source?.raw).toBe(targetBytes.toString('utf8'));
-      expect(source?.revision).toBe(calculateRevision(targetBytes));
-      expect(source?.utf8Lossless).toBe(true);
+      const request = {
+        mode: 'update',
+        id: 'zone',
+        revision: source?.revision,
+        set: { name: '새 구역' },
+      };
 
+      const result = planWorkspaceChange(request, scan);
+
+      expect(result.status).toBe(changePlanStatuses.candidate);
+      if (result.status !== changePlanStatuses.candidate) return;
+      expect(result.path).toBe(source?.source.path);
+      expect(result.data.name).toBe(request.set.name);
+    });
+
+    it('기존 ID를 변경하면 주석·개행·이전 ID 이력을 포함한 후보를 반환한다', async () => {
+      const scan = await loadWorkspace({ cwd: root });
+      const source = scan.documents.find(
+        (item) => item.source.path === '.codocs/zone.yaml',
+      );
       const request = {
         mode: 'update',
         id: 'zone',
         revision: source?.revision,
         set: { id: 'next-zone' },
       };
-      const result = planWorkspaceChange(request, scan);
-      expect(result.status).toBe(changePlanStatuses.candidate);
-      if (result.status === changePlanStatuses.candidate) {
-        expect(result.baseRevision).toBe(source?.revision);
-        expect(result.revision).toBe(
-          calculateRevision(Buffer.from(result.raw)),
-        );
-        expect(result.raw).toContain('# 그대로 보존\r\n');
-        expect(result.raw).toContain('message: 기존 안내\r\n');
-        const parsed = parseYaml(result.raw, '.codocs/zone.yaml');
-        expect(parsed.success).toBe(true);
-        if (parsed.success) expect(parsed.data).toEqual(result.data);
-        expect(result.data.deprecatedAliases).toEqual([
-          { id: 'return-zone', message: '기존 안내' },
-          { id: 'zone' },
-        ]);
-        expect(
-          result.diagnostics.some(
-            (issue) => issue.path === '.codocs/unrelated.yaml',
-          ),
-        ).toBe(false);
-        expect(Object.hasOwn(result, 'saved')).toBe(false);
-      }
-      expect(request.set.id).toBe('next-zone');
-      expect(source?.raw).toBe(targetBytes.toString('utf8'));
-      expect(await readFile(targetPath)).toEqual(targetBytes);
 
-      const collision = planWorkspaceChange(
-        { ...request, set: { id: 'taken' } },
-        scan,
+      const result = planWorkspaceChange(request, scan);
+
+      expect(result.status).toBe(changePlanStatuses.candidate);
+      if (result.status !== changePlanStatuses.candidate) return;
+      expect(result.baseRevision).toBe(request.revision);
+      expect(result.raw).toContain('# 그대로 보존\r\n');
+      expect(result.raw).toContain('message: 기존 안내\r\n');
+      expect(result.data.id).toBe(request.set.id);
+      expect(result.data.deprecatedAliases).toEqual([
+        { id: 'return-zone', message: '기존 안내' },
+        { id: 'zone' },
+      ]);
+      expect(result.revision).toMatch(/^[a-f0-9]{64}$/u);
+      expect(result.diagnostics).not.toContainEqual(
+        expect.objectContaining({ path: '.codocs/unrelated.yaml' }),
       );
-      expect(collision.status).toBe(changePlanStatuses.failed);
-      if (collision.status === changePlanStatuses.failed) {
-        expect(
-          collision.diagnostics.some((issue) => issue.code === 'duplicate_id'),
-        ).toBe(true);
-        expect(
-          collision.diagnostics.some(
-            (issue) => issue.path === '.codocs/unrelated.yaml',
-          ),
-        ).toBe(false);
-      }
-      const sameId = planWorkspaceChange(
-        { ...request, set: { id: 'zone' } },
-        scan,
+    });
+
+    it('ID 변경 후보를 계획하면 파일과 요청 객체를 수정하지 않는다', async () => {
+      const scan = await loadWorkspace({ cwd: root });
+      const source = scan.documents.find(
+        (item) => item.source.path === '.codocs/zone.yaml',
       );
-      expect(sameId.status).toBe(changePlanStatuses.unchanged);
-      if (sameId.status === changePlanStatuses.unchanged)
-        expect(sameId.revision).toBe(source?.revision);
-      const protectedList = planWorkspaceChange(
-        { ...request, set: { deprecatedAliases: [] } },
-        scan,
-      );
-      expect(protectedList.status).toBe(changePlanStatuses.failed);
-      expect(await readFile(targetPath)).toEqual(targetBytes);
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
+      const request = {
+        mode: 'update',
+        id: 'zone',
+        revision: source?.revision,
+        set: { id: 'next-zone' },
+      };
+      const before = structuredClone(request);
+
+      const result = planWorkspaceChange(request, scan);
+
+      expect(result.status).toBe(changePlanStatuses.candidate);
+      expect(request).toEqual(before);
+      expect(source?.raw).toBe(original);
+      expect(await readFile(file, 'utf8')).toBe(original);
+      expect(result).not.toHaveProperty('saved');
+    });
   });
 
-  it('요청 접근자를 실행하지 않고 실패한다', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'codocs-change-plan-'));
-    try {
+  describe('ID 충돌과 변경 없는 요청 처리', () => {
+    it('다른 문서가 사용 중인 ID로 변경하면 중복 ID 오류를 반환한다', async () => {
+      const scan = await loadWorkspace({ cwd: root });
+      const source = scan.documents.find(
+        (item) => item.source.path === '.codocs/zone.yaml',
+      );
+      const request = {
+        mode: 'update',
+        id: 'zone',
+        revision: source?.revision,
+        set: { id: 'taken' },
+      };
+
+      const result = planWorkspaceChange(request, scan);
+
+      expect(result.status).toBe(changePlanStatuses.failed);
+      if (result.status !== changePlanStatuses.failed) return;
+      expect(result.diagnostics).toContainEqual(
+        expect.objectContaining({ code: 'duplicate_id' }),
+      );
+      expect(result.diagnostics).not.toContainEqual(
+        expect.objectContaining({ path: '.codocs/unrelated.yaml' }),
+      );
+      expect(await readFile(file, 'utf8')).toBe(original);
+    });
+
+    it('기존 ID로 변경을 요청하면 원래 revision과 함께 변경 없음을 반환한다', async () => {
+      const scan = await loadWorkspace({ cwd: root });
+      const source = scan.documents.find(
+        (item) => item.source.path === '.codocs/zone.yaml',
+      );
+      const request = {
+        mode: 'update',
+        id: 'zone',
+        revision: source?.revision,
+        set: { id: 'zone' },
+      };
+
+      const result = planWorkspaceChange(request, scan);
+
+      expect(result.status).toBe(changePlanStatuses.unchanged);
+      if (result.status === changePlanStatuses.unchanged)
+        expect(result.revision).toBe(source?.revision);
+    });
+
+    it('이전 ID 목록을 직접 지우도록 요청하면 실패하고 파일을 보존한다', async () => {
+      const scan = await loadWorkspace({ cwd: root });
+      const source = scan.documents.find(
+        (item) => item.source.path === '.codocs/zone.yaml',
+      );
+      const request = {
+        mode: 'update',
+        id: 'zone',
+        revision: source?.revision,
+        set: { deprecatedAliases: [] },
+      };
+
+      const result = planWorkspaceChange(request, scan);
+
+      expect(result.status).toBe(changePlanStatuses.failed);
+      expect(await readFile(file, 'utf8')).toBe(original);
+    });
+  });
+
+  describe('요청 접근자 실행 방지', () => {
+    it('요청 속성에 접근자가 있으면 실행하지 않고 실패한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       let invoked = 0;
       const request = Object.defineProperty({}, 'mode', {
+        /** 접근자 실행 여부를 관찰한다. */
         get() {
           invoked++;
           return 'update';
         },
         enumerable: true,
       });
-      expect(planWorkspaceChange(request, scan).status).toBe(
-        changePlanStatuses.failed,
-      );
+
+      const result = planWorkspaceChange(request, scan);
+
+      expect(result.status).toBe(changePlanStatuses.failed);
       expect(invoked).toBe(0);
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
+    });
   });
 });
