@@ -1,7 +1,9 @@
-id: workspace-change-plan
+id: plan-workspace-change
 name: '작업 공간 변경 계획'
 domains:
   - '작업 공간'
+deprecatedAliases:
+  - id: workspace-change-plan
 definition: |
   작업 공간에서 읽은 자료를 [[문서 변경 계획]]에 연결하고, 검증된 후보의 바이트 버전을 계산하는 책임이다.
   생성·수정 요청과 스캔 결과를 바탕으로 후보 계산에 필요한 관측을 준비한다.
