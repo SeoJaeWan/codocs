@@ -10,7 +10,7 @@ definition: |
   ## 패키지 연결
 
   vscode는 language-server를 실행하고 language-server와 mcp는 workspace를 통해 프로젝트 파일에 접근한다.
-  workspace는 읽은 데이터를 core의 순수 계산에 연결한다. language-server와 mcp도 core의 공개 계산을 사용할 수 있다.
+  workspace는 [[문서 탐색]]의 관측을 [[작업 공간 색인 구성]]과 [[작업 공간 변경 계획]]으로 core의 순수 계산에 연결한다. language-server와 mcp도 core의 공개 계산을 사용할 수 있다.
   다른 패키지의 내부 구현 접근을 제한하는 기준은 [[코드 컨벤션]]에서 확인한다.
 
   - [[Core]]: 파싱·검증·색인·참조·매칭 계산의 담당 문서를 찾는다.
