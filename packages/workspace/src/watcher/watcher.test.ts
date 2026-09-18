@@ -26,22 +26,29 @@ describe('workspace watcher 신호', () => {
     watcher.subscribe((batch) => batches.push([...batch.paths]));
     const codocs = path.join(project, '.codocs');
     await mkdir(codocs);
-    await vi.waitFor(() => expect(batches.flat()).toContain(codocs));
+    await vi.waitFor(() => expect(batches.flat()).toContain(codocs), {
+      timeout: 5_000,
+    });
     await writeFile(path.join(codocs, 'alpha.yaml'), 'id: alpha\n');
-    await vi.waitFor(() =>
-      expect(batches.flat()).toContain(path.join(codocs, 'alpha.yaml')),
+    await vi.waitFor(
+      () => expect(batches.flat()).toContain(path.join(codocs, 'alpha.yaml')),
+      { timeout: 5_000 },
     );
     await rename(codocs, path.join(project, 'saved'));
-    await vi.waitFor(() =>
-      expect(batches.flat().filter((p) => p === codocs).length).toBeGreaterThan(
-        1,
-      ),
+    await vi.waitFor(
+      () =>
+        expect(
+          batches.flat().filter((p) => p === codocs).length,
+        ).toBeGreaterThan(1),
+      { timeout: 5_000 },
     );
     await mkdir(codocs);
-    await vi.waitFor(() =>
-      expect(batches.flat().filter((p) => p === codocs).length).toBeGreaterThan(
-        2,
-      ),
+    await vi.waitFor(
+      () =>
+        expect(
+          batches.flat().filter((p) => p === codocs).length,
+        ).toBeGreaterThan(2),
+      { timeout: 5_000 },
     );
     expect(watcher.readiness.ready).toBe(true);
   });

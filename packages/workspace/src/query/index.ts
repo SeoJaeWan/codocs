@@ -35,6 +35,7 @@ import {
   type WorkspaceScanDiagnostic,
   type WorkspaceScanResult,
 } from '../loader/index.js';
+import { workspaceTargetKinds } from '../paths/domain-values.js';
 import {
   createWorkspaceWatcher,
   type WorkspaceWatcher,
@@ -78,6 +79,7 @@ export interface WorkspaceListSuccess {
   totalCount: number;
   returnedCount: number;
   nextCursor: string | null;
+  diagnostics?: readonly WorkspaceQueryDiagnostic[];
 }
 
 /** 부분 scan에서 색인 밖 ID는 부재로 확정하지 않는다. */
@@ -97,6 +99,7 @@ export interface WorkspaceGetSuccess {
   success: true;
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
   results: readonly WorkspaceGetResult[];
+  diagnostics?: readonly WorkspaceQueryDiagnostic[];
 }
 
 /** scan 또는 요청 조건 때문에 전체 요청을 수행하지 못한 결과다. */
@@ -117,6 +120,12 @@ export type WorkspaceRefreshResult =
   | {
       success: true;
       scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
+      fileCount: number;
+      itemCount: number;
+      errorCount: number;
+      warningCount: number;
+      countsComplete: boolean;
+      diagnostics: readonly WorkspaceScanDiagnostic[];
     }
   | WorkspaceQueryFailure;
 
@@ -334,6 +343,7 @@ export class WorkspaceQuerySession {
   #catalog: Catalog | undefined;
   #scan: WorkspaceScanResult | undefined;
   #revisions = new Map<string, string>();
+  #completed: { catalog: Catalog; revisions: Map<string, string> } | undefined;
   #generation = 0;
   #refreshPromise: Promise<WorkspaceScanResult> | undefined;
   #explicitRefreshPromise: Promise<WorkspaceRefreshResult> | undefined;
@@ -375,6 +385,8 @@ export class WorkspaceQuerySession {
       this.#catalog = next;
       this.#revisions = revisions;
       this.#generation++;
+      if (scan.status === scanStatuses.complete && next)
+        this.#completed = { catalog: next, revisions };
     }
     this.#scan = scan;
     return scan;
@@ -461,19 +473,31 @@ export class WorkspaceQuerySession {
     return this.#scan?.status;
   }
 
+  /** 감시만 실패했을 때 제한 조회에 쓸 마지막 완료 snapshot의 존재 여부다. */
+  get limitedReadAvailable(): boolean {
+    return this.#scan?.status !== scanStatuses.failed && !!this.#completed;
+  }
+
   /** 감시 실패를 마지막 색인의 최신 성공으로 숨기지 않는다. */
-  #watchFailure(): WorkspaceQueryFailure | undefined {
+  #watchFailure(): WorkspaceQueryDiagnostic | undefined {
     const readiness = this.#watcher?.readiness;
     if (readiness?.state !== workspaceLifecycleStates.failed) return undefined;
     return {
+      code: workspaceDiagnosticCodes.readFailed,
+      severity: diagnosticSeverities.warning,
+      message:
+        `${readiness.cause ?? workspaceDiagnosticMessages.readFailed} ${readiness.guidance ?? ''}`.trim(),
+    };
+  }
+
+  /** 보유 완료 snapshot이 없으면 감시 진단을 요청 실패로 반환한다. */
+  #watchFailureResult(
+    diagnostic: WorkspaceQueryDiagnostic,
+  ): WorkspaceQueryFailure {
+    return {
       success: false,
       scanStatus: scanStatuses.failed,
-      error: {
-        code: workspaceDiagnosticCodes.readFailed,
-        severity: diagnosticSeverities.error,
-        message:
-          `${readiness.cause ?? workspaceDiagnosticMessages.readFailed} ${readiness.guidance ?? ''}`.trim(),
-      },
+      error: { ...diagnostic, severity: diagnosticSeverities.error },
     };
   }
 
@@ -481,22 +505,24 @@ export class WorkspaceQuerySession {
   async list(input: WorkspaceListInput = {}): Promise<WorkspaceListResult> {
     const scan = await this.#current();
     const watchFailure = this.#watchFailure();
-    if (watchFailure) return watchFailure;
     if (scan.status === scanStatuses.failed) return scanFailure(scan);
-    const catalog = this.#catalog;
+    if (watchFailure && !this.#completed)
+      return this.#watchFailureResult(watchFailure);
+    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
     if (!catalog) return scanFailure(scan);
+    const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
 
     const decoded =
       input.cursor === undefined ? undefined : decodeCursor(input.cursor);
     if (input.cursor !== undefined && !decoded)
-      return cursorExpired(scan.status);
+      return cursorExpired(scanStatus);
     const supplied = normalizeFilters(input);
     if (
       decoded &&
       hasSuppliedFilters(input) &&
       JSON.stringify(supplied) !== JSON.stringify(decoded.filters)
     )
-      return invalidInput(scan.status);
+      return invalidInput(scanStatus);
     const filters = decoded?.filters ?? supplied;
     const projection = projectCatalogList(catalog, filters);
     const currentFingerprint = fingerprint(projection.items);
@@ -506,9 +532,15 @@ export class WorkspaceQuerySession {
         decoded.fingerprint !== currentFingerprint ||
         decoded.position > projection.totalCount)
     )
-      return cursorExpired(scan.status);
+      return cursorExpired(scanStatus);
     const position = decoded?.position ?? 0;
-    const items = projection.items.slice(position, position + pageSize);
+    const items = projection.items
+      .slice(position, position + pageSize)
+      .map((item) =>
+        watchFailure && !item.conflict
+          ? { ...item, confirmation: catalogConfirmations.unconfirmed }
+          : item,
+      );
     const nextPosition = position + items.length;
     const nextCursor =
       nextPosition < projection.totalCount
@@ -522,11 +554,12 @@ export class WorkspaceQuerySession {
         : null;
     return {
       success: true,
-      scanStatus: scan.status,
+      scanStatus,
       items,
       totalCount: projection.totalCount,
       returnedCount: items.length,
       nextCursor,
+      ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
     };
   }
 
@@ -534,24 +567,26 @@ export class WorkspaceQuerySession {
   async get(ids: readonly string[]): Promise<WorkspaceGetResponse> {
     const scan = await this.#current();
     const watchFailure = this.#watchFailure();
-    if (watchFailure) return watchFailure;
     if (scan.status === scanStatuses.failed) return scanFailure(scan);
-    const catalog = this.#catalog;
+    if (watchFailure && !this.#completed)
+      return this.#watchFailureResult(watchFailure);
+    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
     if (!catalog) return scanFailure(scan);
+    const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
     const projection = projectCatalogGet(catalog, ids, {
-      revisions: this.#revisions,
+      revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
     });
     if (!projection.success)
       return {
         success: false,
-        scanStatus: scan.status,
+        scanStatus,
         error: projection.error,
       };
     const results = projection.results.map(
       /** partial의 부재와 이전 기록을 확정 결과와 구분한다. */ (
         result,
       ): WorkspaceGetResult => {
-        if (scan.status === scanStatuses.partial && !result.found)
+        if (scanStatus === scanStatuses.partial && !result.found)
           return {
             id: result.id,
             found: false,
@@ -564,10 +599,19 @@ export class WorkspaceQuerySession {
               },
             ],
           };
-        return withConfirmationDiagnostic(result);
+        return withConfirmationDiagnostic(
+          watchFailure && result.found && !result.conflict
+            ? { ...result, confirmation: catalogConfirmations.unconfirmed }
+            : result,
+        );
       },
     );
-    return { success: true, scanStatus: scan.status, results };
+    return {
+      success: true,
+      scanStatus,
+      results,
+      ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
+    };
   }
 
   /** 명시 refresh는 결과 변화와 무관하게 기존 커서 generation을 만료한다. */
@@ -578,10 +622,29 @@ export class WorkspaceQuerySession {
       if (this.#watcher) await this.#watcher.refresh();
       const scan = await this.#synchronize();
       const watchFailure = this.#watchFailure();
-      if (watchFailure) return watchFailure;
+      if (watchFailure) return this.#watchFailureResult(watchFailure);
       return scan.status === scanStatuses.failed
         ? scanFailure(scan)
-        : { success: true, scanStatus: scan.status };
+        : {
+            success: true,
+            scanStatus: scan.status,
+            fileCount:
+              scan.documents.length +
+              scan.failures.filter(
+                (failure) => failure.kind === workspaceTargetKinds.file,
+              ).length,
+            itemCount: projectCatalogList(this.#catalog!, {}).totalCount,
+            errorCount: scan.diagnostics.filter(
+              (diagnostic) =>
+                diagnostic.severity === diagnosticSeverities.error,
+            ).length,
+            warningCount: scan.diagnostics.filter(
+              (diagnostic) =>
+                diagnostic.severity === diagnosticSeverities.warning,
+            ).length,
+            countsComplete: scan.status === scanStatuses.complete,
+            diagnostics: scan.diagnostics,
+          };
     })();
     this.#explicitRefreshPromise = operation;
     const clear = (): void => {

@@ -20,13 +20,23 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  createWorkspaceQuerySession,
+  createWorkspaceQuerySession as createSession,
   workspaceQueryDiagnosticCodes,
   workspaceQueryDiagnosticMessages,
 } from './index.js';
+import type { WorkspaceQuerySession } from './index.js';
+import { WorkspaceWatcher, watcherRecoveryGuidance } from '../watcher/index.js';
 
 let project: string;
+const sessions: WorkspaceQuerySession[] = [];
 const execFileAsync = promisify(execFile);
+
+/** 각 사례가 연 감시 세션을 종료할 수 있게 추적한다. */
+function createWorkspaceQuerySession(input: unknown): WorkspaceQuerySession {
+  const session = createSession(input);
+  sessions.push(session);
+  return session;
+}
 
 beforeEach(
   /** 각 사례가 독립적인 실제 프로젝트에서 시작한다. */ async () => {
@@ -39,6 +49,7 @@ beforeEach(
 
 afterEach(
   /** 해당 사례가 만든 fixture만 정리한다. */ async () => {
+    await Promise.all(sessions.splice(0).map((session) => session.close()));
     await rm(project, { recursive: true, force: true });
   },
 );
@@ -51,6 +62,144 @@ async function file(name: string, raw: string): Promise<string> {
 }
 
 describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검증한다. */ () => {
+  it('refresh 집계는 같은 탐색의 파일·비필터 목록·진단을 반영한다', async () => {
+    await file(
+      'alpha.yaml',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    await file(
+      'duplicate.yaml',
+      'id: alpha\nname: duplicate\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    await file('broken.yaml', 'id: [\n');
+    await file('unidentified.yaml', 'name: missing id\n');
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const result = await session.refresh();
+    const list = await session.list();
+
+    expect(result).toMatchObject({
+      success: true,
+      scanStatus: 'complete',
+      fileCount: 4,
+      itemCount: 1,
+      countsComplete: true,
+    });
+    if (!result.success || !list.success) throw new Error('refresh 실패');
+    expect(result.itemCount).toBe(list.totalCount);
+    expect(result.errorCount).toBe(
+      result.diagnostics.filter(
+        (d) => d.severity === diagnosticSeverities.error,
+      ).length,
+    );
+    expect(result.warningCount).toBe(
+      result.diagnostics.filter(
+        (d) => d.severity === diagnosticSeverities.warning,
+      ).length,
+    );
+    expect(result.errorCount).toBeGreaterThan(0);
+    await session.close();
+  });
+
+  it('partial refresh는 집계가 불완전함을 명시한다', async () => {
+    const target = await file(
+      'alpha.yaml',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    await session.list();
+    await rm(target);
+    await symlink('missing-target.yaml', target);
+
+    const result = await session.refresh();
+
+    expect(result).toMatchObject({
+      success: true,
+      scanStatus: 'partial',
+      countsComplete: false,
+      itemCount: 1,
+    });
+    if (!result.success) throw new Error('partial refresh 실패');
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+    await session.close();
+  });
+
+  it('감시 실패는 마지막 완료 snapshot만 미확인 조회로 제공한다', async () => {
+    await file(
+      'alpha.yaml',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    await session.list();
+    const spy = vi
+      .spyOn(WorkspaceWatcher.prototype, 'readiness', 'get')
+      .mockReturnValue({
+        state: 'failed',
+        ready: false,
+        cause: 'watcher error',
+        guidance: watcherRecoveryGuidance,
+      });
+    try {
+      expect(session.limitedReadAvailable).toBe(true);
+      const list = await session.list();
+      const get = await session.get(['alpha', 'outside']);
+      expect(list).toMatchObject({
+        success: true,
+        scanStatus: 'partial',
+        items: [{ id: 'alpha', confirmation: 'unconfirmed' }],
+      });
+      if (list.success)
+        expect(list.diagnostics?.[0]?.message).toContain('codocs_refresh');
+      expect(get).toMatchObject({
+        success: true,
+        scanStatus: 'partial',
+        results: [
+          { id: 'alpha', found: true, confirmation: 'unconfirmed' },
+          { id: 'outside', found: false, confirmation: 'unconfirmed' },
+        ],
+      });
+      if (get.success)
+        expect(get.results[1]?.diagnostics).not.toContainEqual(
+          expect.objectContaining({ code: queryDiagnosticCodes.notFound }),
+        );
+    } finally {
+      spy.mockRestore();
+      await session.close();
+    }
+  });
+
+  it('완료 snapshot 없이 감시가 실패하면 조회 실패를 반환한다', async () => {
+    const target = await file(
+      'alpha.yaml',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    await rm(target);
+    await symlink('missing-target.yaml', target);
+    const session = createWorkspaceQuerySession({ cwd: project });
+    expect(await session.list()).toMatchObject({
+      success: true,
+      scanStatus: 'partial',
+    });
+    const spy = vi
+      .spyOn(WorkspaceWatcher.prototype, 'readiness', 'get')
+      .mockReturnValue({
+        state: 'failed',
+        ready: false,
+        cause: 'watcher error',
+        guidance: watcherRecoveryGuidance,
+      });
+    try {
+      expect(session.limitedReadAvailable).toBe(false);
+      expect(await session.list()).toMatchObject({
+        success: false,
+        scanStatus: 'failed',
+        error: { severity: diagnosticSeverities.error },
+      });
+      expect(await session.get(['alpha'])).toMatchObject({ success: false });
+    } finally {
+      spy.mockRestore();
+      await session.close();
+    }
+  });
   it('동시 refresh가 같은 결과와 한 세대를 공유하고 조회가 보유한 결과를 재사용한다', async () => {
     await file(
       'alpha.yaml',
@@ -571,6 +720,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         success: false,
         error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
       });
+      await other.close();
     });
   });
 });

@@ -155,7 +155,7 @@ function getInput(input: unknown): CodocsGetInput | undefined {
 }
 
 /** scan을 시작하지 못한 입력 오류를 고정 공통 진단으로 반환한다. */
-function invalidInput(): CodocsListResponse & CodocsGetResponse {
+function invalidInput(): WorkspaceQueryFailure {
   return {
     success: false,
     scanStatus: scanStatuses.failed,
@@ -185,10 +185,14 @@ function accessState(session: WorkspaceQuerySession): CodocsAccessState {
   const readiness = session.readiness;
   const scanStatus = session.scanStatus;
   const canRead =
+    (readiness.state === workspaceLifecycleStates.ready &&
+      (scanStatus === scanStatuses.complete ||
+        scanStatus === scanStatuses.partial)) ||
+    (readiness.state === workspaceLifecycleStates.failed &&
+      session.limitedReadAvailable);
+  const canChange =
     readiness.state === workspaceLifecycleStates.ready &&
-    (scanStatus === scanStatuses.complete ||
-      scanStatus === scanStatuses.partial);
-  const canChange = canRead && scanStatus === scanStatuses.complete;
+    scanStatus === scanStatuses.complete;
   return {
     ...readiness,
     scanStatus,

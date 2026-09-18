@@ -1,5 +1,9 @@
 /* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- 감시 이벤트 콜백은 선언 함수가 아니다. */
 import chokidar, { type FSWatcher } from 'chokidar';
+import {
+  watch as watchDirectory,
+  type FSWatcher as DirectoryWatcher,
+} from 'node:fs';
 import path from 'node:path';
 import {
   workspaceLifecycleStates,
@@ -21,6 +25,7 @@ export class WorkspaceWatcher {
   readonly #root: string;
   readonly #listeners = new Set<(batch: WorkspaceChangeBatch) => void>();
   #rootWatcher: FSWatcher | undefined;
+  #entryWatcher: DirectoryWatcher | undefined;
   #contentWatcher: FSWatcher | undefined;
   #targetWatcher: FSWatcher | undefined;
   readonly #targetParents = new Set<string>();
@@ -34,6 +39,7 @@ export class WorkspaceWatcher {
   #recoveryUsed = false;
   #closed = false;
   #starting: Promise<void> | undefined;
+  #reopening = false;
 
   /** 선택한 실제 프로젝트 경로를 감시 대상으로 고정한다. */
   constructor(projectRoot: string) {
@@ -77,6 +83,8 @@ export class WorkspaceWatcher {
       depth: 1,
       ignoreInitial: true,
       persistent: true,
+      usePolling: true,
+      interval: 100,
     });
     const contentWatcher = chokidar.watch(codocsPath, {
       ignoreInitial: true,
@@ -94,11 +102,17 @@ export class WorkspaceWatcher {
     this.#rootWatcher = rootWatcher;
     this.#contentWatcher = contentWatcher;
     this.#targetWatcher = targetWatcher;
+    this.#entryWatcher = watchDirectory(this.#root, (_event, filename) => {
+      if (filename?.toString() !== codocsDirectoryName) return;
+      this.#signal(codocsPath);
+      void this.#reopenContent().catch(() => undefined);
+    });
     const failure = (error: unknown): void => {
       if (this.#state.state === workspaceLifecycleStates.ready)
         void this.#recover(error).catch(() => undefined);
     };
     rootWatcher.on('error', failure);
+    this.#entryWatcher.on('error', failure);
     contentWatcher.on('error', failure);
     targetWatcher?.on('error', failure);
     rootWatcher.on('all', (event, changed) => {
@@ -182,21 +196,26 @@ export class WorkspaceWatcher {
   /** .codocs 교체 후 새 트리를 다시 감시한다. */
   async #reopenContent(): Promise<void> {
     const current = this.#contentWatcher;
-    if (!current || this.#closed) return;
-    await current.close();
-    if (this.#closed) return;
-    const next = chokidar.watch(path.join(this.#root, codocsDirectoryName), {
-      ignoreInitial: true,
-      followSymlinks: true,
-      awaitWriteFinish: false,
-    });
-    next.on('all', (_event, changed) => this.#signal(changed));
-    next.on('error', (error) => {
-      void this.#recover(error).catch(() => undefined);
-    });
-    this.#contentWatcher = next;
-    await new Promise<void>((resolve) => next.once('ready', resolve));
-    this.#signal(path.join(this.#root, codocsDirectoryName));
+    if (!current || this.#closed || this.#reopening) return;
+    this.#reopening = true;
+    try {
+      await current.close();
+      if (this.#closed) return;
+      const next = chokidar.watch(path.join(this.#root, codocsDirectoryName), {
+        ignoreInitial: true,
+        followSymlinks: true,
+        awaitWriteFinish: false,
+      });
+      next.on('all', (_event, changed) => this.#signal(changed));
+      next.on('error', (error) => {
+        void this.#recover(error).catch(() => undefined);
+      });
+      this.#contentWatcher = next;
+      await new Promise<void>((resolve) => next.once('ready', resolve));
+      this.#signal(path.join(this.#root, codocsDirectoryName));
+    } finally {
+      this.#reopening = false;
+    }
   }
 
   /** 처음 한 번 감시를 시작한다. */
@@ -235,6 +254,7 @@ export class WorkspaceWatcher {
       cause,
     };
     try {
+      this.#entryWatcher?.close();
       await Promise.all([
         this.#rootWatcher?.close(),
         this.#contentWatcher?.close(),
@@ -259,6 +279,7 @@ export class WorkspaceWatcher {
     this.#recoveryUsed = false;
     this.#state = { state: workspaceLifecycleStates.recovering, ready: false };
     try {
+      this.#entryWatcher?.close();
       await Promise.all([
         this.#rootWatcher?.close(),
         this.#contentWatcher?.close(),
@@ -283,6 +304,7 @@ export class WorkspaceWatcher {
     if (this.#timer) clearTimeout(this.#timer);
     this.#pending.clear();
     this.#listeners.clear();
+    this.#entryWatcher?.close();
     await Promise.all([
       this.#rootWatcher?.close(),
       this.#contentWatcher?.close(),

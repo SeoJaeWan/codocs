@@ -18,6 +18,7 @@ const backend = vi.hoisted(
       refresh: vi.fn(),
       readiness,
       scanStatus,
+      limitedReadAvailable: false,
     };
   },
 );
@@ -44,6 +45,7 @@ beforeEach(
     vi.clearAllMocks();
     backend.readiness = { state: 'ready', ready: true };
     backend.scanStatus = 'complete';
+    backend.limitedReadAvailable = false;
   },
 );
 
@@ -498,6 +500,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         cause: 'watcher error',
         guidance: 'codocs_refresh를 실행하세요.',
       };
+      backend.limitedReadAvailable = false;
       const handlers = createCodocsQueryHandlers();
 
       expect(handlers.access).toMatchObject({
@@ -511,6 +514,40 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       });
     });
 
+    it('감시 실패 후 완료 snapshot이 있으면 list/get만 허용한다', async () => {
+      backend.readiness = {
+        state: 'failed',
+        ready: false,
+        cause: 'watcher error',
+        guidance: 'codocs_refresh를 실행하세요.',
+      };
+      backend.limitedReadAvailable = true;
+      backend.list.mockResolvedValue({
+        success: true,
+        scanStatus: 'partial',
+        items: [],
+        totalCount: 0,
+        returnedCount: 0,
+        nextCursor: null,
+      });
+      backend.get.mockResolvedValue({
+        success: true,
+        scanStatus: 'partial',
+        results: [],
+      });
+      const handlers = createCodocsQueryHandlers();
+
+      expect(handlers.access).toMatchObject({
+        canRead: true,
+        canWrite: false,
+        canValidate: false,
+      });
+      expect(await handlers.codocsList()).toMatchObject({ success: true });
+      expect(await handlers.codocsGet({ ids: ['alpha'] })).toMatchObject({
+        success: true,
+      });
+    });
+
     it('동시 codocs_refresh 호출은 같은 workspace 작업과 결과를 공유한다', async () => {
       const response = {
         success: true,
@@ -519,6 +556,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         itemCount: 2,
         errorCount: 1,
         warningCount: 1,
+        countsComplete: false,
         diagnostics: [],
       };
       const operation = Promise.resolve(response);
