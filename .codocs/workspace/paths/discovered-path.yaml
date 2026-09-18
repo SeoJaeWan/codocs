@@ -15,5 +15,5 @@ definition: |
 
   ## 코드와 검증 위치
 
-  발견 경로와 실제 경로의 확인는 [담당 구현](../../../packages/workspace/src/paths/index.ts)에서 확인한다.
+  발견 경로와 실제 경로의 확인은 [담당 구현](../../../packages/workspace/src/paths/index.ts)에서 확인한다.
   관련 계약의 사례는 [인접 테스트](../../../packages/workspace/src/paths/paths.test.ts)에서 확인한다.

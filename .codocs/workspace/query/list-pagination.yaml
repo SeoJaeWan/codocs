@@ -25,5 +25,5 @@ definition: |
 
   ## 코드와 검증 위치
 
-  페이지와 커서의 판단는 [담당 구현](../../../packages/workspace/src/query/index.ts)에서 확인한다.
+  페이지와 커서의 판단은 [담당 구현](../../../packages/workspace/src/query/index.ts)에서 확인한다.
   관련 계약의 사례는 [인접 테스트](../../../packages/workspace/src/query/query.test.ts)에서 확인한다.
