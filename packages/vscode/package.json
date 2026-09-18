@@ -15,8 +15,7 @@
     "build": "node ../../tools/build/build.mjs build"
   },
   "files": [
-    "dist",
-    "README.md"
+    "dist"
   ],
   "main": "./dist/index.cjs"
 }

@@ -17,7 +17,6 @@
     "@codocs/core": "workspace:*"
   },
   "files": [
-    "dist",
-    "README.md"
+    "dist"
   ]
 }

@@ -14,8 +14,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "files": [
-    "dist",
-    "README.md"
+    "dist"
   ],
   "devDependencies": {
     "@types/pluralize": "0.0.33"
