@@ -14,7 +14,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@codocs/core": "workspace:*"
+    "@codocs/core": "workspace:*",
+    "chokidar": "5.0.0"
   },
   "files": [
     "dist"

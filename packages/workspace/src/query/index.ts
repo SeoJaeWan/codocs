@@ -1,3 +1,4 @@
+/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- refresh 내부 콜백은 공개 선언 함수가 아니다. */
 import {
   catalogConfirmations,
   catalogDiagnosticCodes,
@@ -34,6 +35,15 @@ import {
   type WorkspaceScanDiagnostic,
   type WorkspaceScanResult,
 } from '../loader/index.js';
+import { workspaceTargetKinds } from '../paths/domain-values.js';
+import {
+  createWorkspaceWatcher,
+  type WorkspaceWatcher,
+} from '../watcher/index.js';
+import {
+  workspaceLifecycleStates,
+  type WorkspaceReadiness,
+} from '../lifecycle/index.js';
 
 const pageSize = 50;
 const cursorVersion = 1;
@@ -69,6 +79,7 @@ export interface WorkspaceListSuccess {
   totalCount: number;
   returnedCount: number;
   nextCursor: string | null;
+  diagnostics?: readonly WorkspaceQueryDiagnostic[];
 }
 
 /** 부분 scan에서 색인 밖 ID는 부재로 확정하지 않는다. */
@@ -88,6 +99,7 @@ export interface WorkspaceGetSuccess {
   success: true;
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
   results: readonly WorkspaceGetResult[];
+  diagnostics?: readonly WorkspaceQueryDiagnostic[];
 }
 
 /** scan 또는 요청 조건 때문에 전체 요청을 수행하지 못한 결과다. */
@@ -108,6 +120,12 @@ export type WorkspaceRefreshResult =
   | {
       success: true;
       scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
+      fileCount: number;
+      itemCount: number;
+      errorCount: number;
+      warningCount: number;
+      countsComplete: boolean;
+      diagnostics: readonly WorkspaceScanDiagnostic[];
     }
   | WorkspaceQueryFailure;
 
@@ -323,58 +341,188 @@ function withConfirmationDiagnostic(
 export class WorkspaceQuerySession {
   readonly #input: unknown;
   #catalog: Catalog | undefined;
+  #scan: WorkspaceScanResult | undefined;
   #revisions = new Map<string, string>();
+  #completed: { catalog: Catalog; revisions: Map<string, string> } | undefined;
   #generation = 0;
-  #queue: Promise<void> = Promise.resolve();
+  #refreshPromise: Promise<WorkspaceScanResult> | undefined;
+  #explicitRefreshPromise: Promise<WorkspaceRefreshResult> | undefined;
+  #watcher: WorkspaceWatcher | undefined;
+  #dirty = false;
+  #closed = false;
 
   /** 프로젝트 선택의 own data 값만 고정하고 IO는 각 요청 시 수행한다. */
   constructor(input: unknown = {}) {
     this.#input = sessionInput(input);
   }
 
-  /** scan을 늦은 완료 순서와 무관하게 직렬 적용한다. */
-  async #synchronize(invalidateCursors: boolean): Promise<WorkspaceScanResult> {
-    let resolved!: WorkspaceScanResult;
-    const operation = this.#queue.then(
-      /** 앞 요청이 끝난 뒤 한 scan의 상태를 원자적으로 교체한다. */ async () => {
-        const scan = await loadWorkspace(this.#input);
-        const next = buildWorkspaceCatalog(scan, this.#catalog);
-        if (scan.status === scanStatuses.complete)
-          this.#revisions = scanRevisions(scan);
-        else if (scan.status === scanStatuses.partial) {
-          const revisions = new Map(this.#revisions);
-          for (const [path, revision] of scanRevisions(scan))
-            revisions.set(path, revision);
-          this.#revisions = revisions;
-        }
-        this.#catalog = next;
-        if (invalidateCursors) this.#generation++;
-        resolved = scan;
-      },
+  /** 하나의 스캔에서 문서·참조·진단·revision을 함께 게시한다. */
+  async #scanOnce(): Promise<WorkspaceScanResult> {
+    const scan = await loadWorkspace(this.#input);
+    const next =
+      scan.status === scanStatuses.failed
+        ? undefined
+        : buildWorkspaceCatalog(scan, this.#catalog);
+    const revisions =
+      scan.status === scanStatuses.complete
+        ? new Map<string, string>()
+        : new Map(this.#revisions);
+    if (scan.status !== scanStatuses.failed)
+      for (const [sourcePath, revision] of scanRevisions(scan))
+        revisions.set(sourcePath, revision);
+    if (scan.root && !this.#watcher && !this.#closed) {
+      const watcher = await createWorkspaceWatcher(scan.root.projectRoot);
+      this.#watcher = watcher;
+      watcher.subscribe(() => {
+        if (this.#refreshPromise) this.#dirty = true;
+        else void this.#synchronize().catch(() => undefined);
+      });
+    }
+    await this.#watcher?.trackTargets(
+      scan.documents.map((document) => document.source.realPath),
     );
-    this.#queue = operation.catch(() => undefined);
-    await operation;
-    return resolved;
+    if (scan.status !== scanStatuses.failed) {
+      this.#catalog = next;
+      this.#revisions = revisions;
+      this.#generation++;
+      if (scan.status === scanStatuses.complete && next)
+        this.#completed = { catalog: next, revisions };
+    }
+    this.#scan = scan;
+    return scan;
+  }
+
+  /** 병행 호출은 하나의 작업을 공유하고 스캔 도중 온 알림도 반영한다. */
+  #synchronize(): Promise<WorkspaceScanResult> {
+    if (this.#refreshPromise) return this.#refreshPromise;
+    /** 변경 알림을 스캔 완료 시점까지 다시 반영한다. */
+    const operation = (async (): Promise<WorkspaceScanResult> => {
+      let scan: WorkspaceScanResult;
+      do {
+        this.#dirty = false;
+        try {
+          scan = await this.#scanOnce();
+        } catch (error: unknown) {
+          scan = {
+            status: scanStatuses.failed,
+            documents: [],
+            failures: [],
+            skippedCycles: [],
+            diagnostics: [
+              {
+                code: workspaceDiagnosticCodes.readFailed,
+                severity: diagnosticSeverities.error,
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : workspaceDiagnosticMessages.readFailed,
+              },
+            ],
+          };
+          this.#scan = scan;
+        }
+      } while (this.#dirty && !this.#closed);
+      return scan;
+    })();
+    this.#refreshPromise = operation;
+    const clear = (): void => {
+      if (this.#refreshPromise === operation) this.#refreshPromise = undefined;
+    };
+    void operation.then(clear, clear).catch(() => undefined);
+    return operation;
+  }
+
+  /** 최초 조회만 스캔 완료를 기다리고 이후에는 보유한 단일 snapshot을 읽는다. */
+  async #current(): Promise<WorkspaceScanResult> {
+    if (!this.#scan) return this.#synchronize();
+    return this.#scan;
+  }
+
+  /** 감시 연결 및 현재 scan의 준비 상태다. */
+  get readiness(): WorkspaceReadiness {
+    if (this.#closed)
+      return { state: workspaceLifecycleStates.closed, ready: false };
+    if (this.#watcher?.readiness.state === workspaceLifecycleStates.failed)
+      return this.#watcher.readiness;
+    if (this.#scan?.status === scanStatuses.failed)
+      return {
+        state: workspaceLifecycleStates.failed,
+        ready: false,
+        ...(this.#scan.diagnostics[0]?.message
+          ? { cause: this.#scan.diagnostics[0].message }
+          : {}),
+      };
+    if (this.#refreshPromise)
+      return { state: workspaceLifecycleStates.refreshing, ready: false };
+    if (this.#watcher) return this.#watcher.readiness;
+    return {
+      state: this.#refreshPromise
+        ? workspaceLifecycleStates.refreshing
+        : workspaceLifecycleStates.starting,
+      ready: false,
+    };
+  }
+
+  /** 반영된 complete 또는 partial refresh의 세대다. */
+  get generation(): number {
+    return this.#generation;
+  }
+
+  /** 마지막으로 게시한 탐색 상태다. */
+  get scanStatus(): ScanStatus | undefined {
+    return this.#scan?.status;
+  }
+
+  /** 감시만 실패했을 때 제한 조회에 쓸 마지막 완료 snapshot의 존재 여부다. */
+  get limitedReadAvailable(): boolean {
+    return this.#scan?.status !== scanStatuses.failed && !!this.#completed;
+  }
+
+  /** 감시 실패를 마지막 색인의 최신 성공으로 숨기지 않는다. */
+  #watchFailure(): WorkspaceQueryDiagnostic | undefined {
+    const readiness = this.#watcher?.readiness;
+    if (readiness?.state !== workspaceLifecycleStates.failed) return undefined;
+    return {
+      code: workspaceDiagnosticCodes.readFailed,
+      severity: diagnosticSeverities.warning,
+      message:
+        `${readiness.cause ?? workspaceDiagnosticMessages.readFailed} ${readiness.guidance ?? ''}`.trim(),
+    };
+  }
+
+  /** 보유 완료 snapshot이 없으면 감시 진단을 요청 실패로 반환한다. */
+  #watchFailureResult(
+    diagnostic: WorkspaceQueryDiagnostic,
+  ): WorkspaceQueryFailure {
+    return {
+      success: false,
+      scanStatus: scanStatuses.failed,
+      error: { ...diagnostic, severity: diagnosticSeverities.error },
+    };
   }
 
   /** 최신 실제 scan에서 필터 snapshot을 50개씩 반환한다. */
   async list(input: WorkspaceListInput = {}): Promise<WorkspaceListResult> {
-    const scan = await this.#synchronize(false);
+    const scan = await this.#current();
+    const watchFailure = this.#watchFailure();
     if (scan.status === scanStatuses.failed) return scanFailure(scan);
-    const catalog = this.#catalog;
+    if (watchFailure && !this.#completed)
+      return this.#watchFailureResult(watchFailure);
+    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
     if (!catalog) return scanFailure(scan);
+    const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
 
     const decoded =
       input.cursor === undefined ? undefined : decodeCursor(input.cursor);
     if (input.cursor !== undefined && !decoded)
-      return cursorExpired(scan.status);
+      return cursorExpired(scanStatus);
     const supplied = normalizeFilters(input);
     if (
       decoded &&
       hasSuppliedFilters(input) &&
       JSON.stringify(supplied) !== JSON.stringify(decoded.filters)
     )
-      return invalidInput(scan.status);
+      return invalidInput(scanStatus);
     const filters = decoded?.filters ?? supplied;
     const projection = projectCatalogList(catalog, filters);
     const currentFingerprint = fingerprint(projection.items);
@@ -384,9 +532,15 @@ export class WorkspaceQuerySession {
         decoded.fingerprint !== currentFingerprint ||
         decoded.position > projection.totalCount)
     )
-      return cursorExpired(scan.status);
+      return cursorExpired(scanStatus);
     const position = decoded?.position ?? 0;
-    const items = projection.items.slice(position, position + pageSize);
+    const items = projection.items
+      .slice(position, position + pageSize)
+      .map((item) =>
+        watchFailure && !item.conflict
+          ? { ...item, confirmation: catalogConfirmations.unconfirmed }
+          : item,
+      );
     const nextPosition = position + items.length;
     const nextCursor =
       nextPosition < projection.totalCount
@@ -400,34 +554,39 @@ export class WorkspaceQuerySession {
         : null;
     return {
       success: true,
-      scanStatus: scan.status,
+      scanStatus,
       items,
       totalCount: projection.totalCount,
       returnedCount: items.length,
       nextCursor,
+      ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
     };
   }
 
   /** 최신 실제 scan에서 1~20개 ID를 독립 결과로 반환한다. */
   async get(ids: readonly string[]): Promise<WorkspaceGetResponse> {
-    const scan = await this.#synchronize(false);
+    const scan = await this.#current();
+    const watchFailure = this.#watchFailure();
     if (scan.status === scanStatuses.failed) return scanFailure(scan);
-    const catalog = this.#catalog;
+    if (watchFailure && !this.#completed)
+      return this.#watchFailureResult(watchFailure);
+    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
     if (!catalog) return scanFailure(scan);
+    const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
     const projection = projectCatalogGet(catalog, ids, {
-      revisions: this.#revisions,
+      revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
     });
     if (!projection.success)
       return {
         success: false,
-        scanStatus: scan.status,
+        scanStatus,
         error: projection.error,
       };
     const results = projection.results.map(
       /** partial의 부재와 이전 기록을 확정 결과와 구분한다. */ (
         result,
       ): WorkspaceGetResult => {
-        if (scan.status === scanStatuses.partial && !result.found)
+        if (scanStatus === scanStatuses.partial && !result.found)
           return {
             id: result.id,
             found: false,
@@ -440,18 +599,66 @@ export class WorkspaceQuerySession {
               },
             ],
           };
-        return withConfirmationDiagnostic(result);
+        return withConfirmationDiagnostic(
+          watchFailure && result.found && !result.conflict
+            ? { ...result, confirmation: catalogConfirmations.unconfirmed }
+            : result,
+        );
       },
     );
-    return { success: true, scanStatus: scan.status, results };
+    return {
+      success: true,
+      scanStatus,
+      results,
+      ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
+    };
   }
 
   /** 명시 refresh는 결과 변화와 무관하게 기존 커서 generation을 만료한다. */
-  async refresh(): Promise<WorkspaceRefreshResult> {
-    const scan = await this.#synchronize(true);
-    return scan.status === scanStatuses.failed
-      ? scanFailure(scan)
-      : { success: true, scanStatus: scan.status };
+  refresh(): Promise<WorkspaceRefreshResult> {
+    if (this.#explicitRefreshPromise) return this.#explicitRefreshPromise;
+    /** 수동 재연결과 전체 스캔의 결과를 함께 반환한다. */
+    const operation = (async (): Promise<WorkspaceRefreshResult> => {
+      if (this.#watcher) await this.#watcher.refresh();
+      const scan = await this.#synchronize();
+      const watchFailure = this.#watchFailure();
+      if (watchFailure) return this.#watchFailureResult(watchFailure);
+      return scan.status === scanStatuses.failed
+        ? scanFailure(scan)
+        : {
+            success: true,
+            scanStatus: scan.status,
+            fileCount:
+              scan.documents.length +
+              scan.failures.filter(
+                (failure) => failure.kind === workspaceTargetKinds.file,
+              ).length,
+            itemCount: projectCatalogList(this.#catalog!, {}).totalCount,
+            errorCount: scan.diagnostics.filter(
+              (diagnostic) =>
+                diagnostic.severity === diagnosticSeverities.error,
+            ).length,
+            warningCount: scan.diagnostics.filter(
+              (diagnostic) =>
+                diagnostic.severity === diagnosticSeverities.warning,
+            ).length,
+            countsComplete: scan.status === scanStatuses.complete,
+            diagnostics: scan.diagnostics,
+          };
+    })();
+    this.#explicitRefreshPromise = operation;
+    const clear = (): void => {
+      if (this.#explicitRefreshPromise === operation)
+        this.#explicitRefreshPromise = undefined;
+    };
+    void operation.then(clear, clear).catch(() => undefined);
+    return operation;
+  }
+
+  /** 연결된 파일 감시를 명시적으로 종료한다. */
+  async close(): Promise<void> {
+    this.#closed = true;
+    await this.#watcher?.close();
   }
 }
 

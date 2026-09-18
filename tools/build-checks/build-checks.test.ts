@@ -1,7 +1,6 @@
 /* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -10,7 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bundleIde } from '../build/build.mjs';
@@ -38,10 +37,7 @@ import {
 import { resolvePnpm } from '../check/runtime.mjs';
 
 const root = process.cwd();
-mkdirSync(path.join(root, '.workbench/fixtures'), { recursive: true });
-const fixture = mkdtempSync(
-  path.join(root, '.workbench/fixtures/빌드 소비자 with spaces-'),
-);
+const fixture = mkdtempSync(path.join(tmpdir(), 'codocs build consumer-'));
 afterAll(
   /** 실행별 소비자와 설치 store를 정리한다. */ () => {
     rmSync(fixture, { recursive: true, force: true, maxRetries: 3 });
@@ -139,62 +135,57 @@ function outputFiles(directory: string): string[] {
 }
 
 beforeAll(
-  /** 이전 출력 없는 빌드와 소스 없는 별도 소비자를 준비한다. */ () => {
+  /** 이전 출력 없는 빌드와 monorepo 밖의 tarball 소비자를 준비한다. */ () => {
     // build 명령 자체가 모든 dist를 지우며, 이전 산출물로 성공하지 않는다.
     run(['tools/build/build.mjs', 'build'], root);
-    const resolvedFixture = path.resolve(fixture);
-    if (
-      !resolvedFixture.startsWith(
-        path.resolve(root, '.workbench/fixtures') + path.sep,
-      )
-    )
-      throw new Error('Fixture path escapes workspace');
-    rmSync(resolvedFixture, { recursive: true, force: true });
     mkdirSync(consumer, { recursive: true });
-    const coreManifest: unknown = JSON.parse(
-      readFileSync(path.join(root, 'packages/core/package.json'), 'utf8'),
-    );
-    if (
-      typeof coreManifest !== 'object' ||
-      coreManifest === null ||
-      !('dependencies' in coreManifest)
-    )
-      throw new Error('Core dependencies missing');
+    const pnpm = resolvePnpm();
+    for (const folder of folders) {
+      run(
+        [
+          pnpm,
+          '--dir',
+          path.join(root, 'packages', folder),
+          'pack',
+          '--out',
+          path.join(fixture, folder + '.tgz'),
+        ],
+        root,
+      );
+    }
     writeFileSync(
       path.join(consumer, 'package.json'),
       JSON.stringify({
         type: 'module',
-        dependencies: coreManifest.dependencies,
+        dependencies: Object.fromEntries(
+          names.map((name) => [`@codocs/${name}`, `file:../${name}.tgz`]),
+        ),
       }),
     );
-    const coreRequire = createRequire(
-      path.join(root, 'packages/core/package.json'),
+    // workspace:* references in packed manifests resolve to the same local tarballs.
+    writeFileSync(
+      path.join(consumer, 'pnpm-workspace.yaml'),
+      "packages: ['.']\noverrides:\n" +
+        names
+          .map((name) => `  '@codocs/${name}': 'file:../${name}.tgz'`)
+          .join('\n') +
+        '\n',
     );
-    for (const dependency of ['pluralize', 'yaml', 'zod']) {
-      const directory = path.dirname(
-        coreRequire.resolve(dependency + '/package.json'),
-      );
-      cpSync(directory, path.join(consumer, 'node_modules', dependency), {
-        recursive: true,
-      });
-    }
-    for (let index = 0; index < folders.length; index++) {
-      const folder = folders[index];
-      const name = names[index];
-      if (!folder || !name) throw new Error('Invalid package mapping');
-      const source = path.join(root, 'packages', folder);
-      const destination = path.join(consumer, 'node_modules/@codocs', name);
-      mkdirSync(destination, { recursive: true });
-      cpSync(
-        path.join(source, 'package.json'),
-        path.join(destination, 'package.json'),
-      );
-      cpSync(path.join(source, 'dist'), path.join(destination, 'dist'), {
-        recursive: true,
-      });
-    }
+    const installed = spawnSync(
+      process.execPath,
+      [
+        pnpm,
+        'install',
+        '--store-dir',
+        path.join(fixture, 'pnpm-store'),
+        '--cache-dir',
+        path.join(fixture, 'pnpm-cache'),
+      ],
+      { cwd: consumer, encoding: 'utf8' },
+    );
+    expect(installed.status, installed.stdout + installed.stderr).toBe(0);
   },
-  60_000,
+  120_000,
 );
 
 describe('빌드된 패키지의 외부 소비자 계약', () => {
@@ -280,61 +271,31 @@ describe('빌드된 패키지의 외부 소비자 계약', () => {
   });
 
   describe('tarball 소비와 내부 경로 차단', () => {
-    it('이름 참조 tarball 소비자가 symlink 없이 공개 JS·d.ts와 내부 subpath 거부를 실행한다', /** 기존 링크 fixture 실패와 독립적으로 실제 pack 배포를 추출해 소비한다. */ () => {
-      const directory = mkdtempSync(path.join(fixture, 'name packed '));
-      const packed = path.join(directory, 'consumer');
-      const pnpm = resolvePnpm();
-      mkdirSync(packed);
-      writeFileSync(
-        path.join(packed, 'package.json'),
-        JSON.stringify({ type: 'module' }),
-      );
+    it('이름 참조 tarball 소비자가 공개 JS·d.ts와 내부 subpath 거부를 실행한다', /** 설치된 tarball의 공개 출력만 사용하는 소비자를 검증한다. */ () => {
       for (const folder of ['core', 'workspace']) {
-        const archive = path.join(directory, folder + '.tgz');
-        run(
-          [
-            pnpm,
-            '--dir',
-            path.join(root, 'packages', folder),
-            'pack',
-            '--out',
-            archive,
-          ],
-          root,
-        );
+        const archive = path.join(fixture, folder + '.tgz');
         const files = execFileSync('tar', ['-tzf', archive], {
           encoding: 'utf8',
         });
         expect(files).toContain('package/dist/index.js');
         expect(files).toContain('package/dist/index.d.ts');
         expect(files).not.toContain('package/src/');
-        const destination = path.join(packed, 'node_modules/@codocs', folder);
-        mkdirSync(destination, { recursive: true });
-        execFileSync('tar', [
-          '-xzf',
-          archive,
-          '-C',
-          destination,
-          '--strip-components=1',
-        ]);
+        const destination = path.join(consumer, 'node_modules/@codocs', folder);
         expect(existsSync(path.join(destination, 'src'))).toBe(false);
       }
-      for (const dependency of ['pluralize', 'yaml', 'zod'])
-        cpSync(
-          path.join(consumer, 'node_modules', dependency),
-          path.join(packed, 'node_modules', dependency),
-          { recursive: true },
-        );
-      writeFileSync(path.join(packed, 'name-references.mjs'), nameReferenceJs);
-      writeFileSync(path.join(packed, 'name-references.ts'), nameReferenceTs);
       writeFileSync(
-        path.join(packed, 'name-references.json'),
+        path.join(consumer, 'name-references.mjs'),
+        nameReferenceJs,
+      );
+      writeFileSync(path.join(consumer, 'name-references.ts'), nameReferenceTs);
+      writeFileSync(
+        path.join(consumer, 'name-references.json'),
         JSON.stringify(nameReferenceConfig),
       );
-      expect(run(['name-references.mjs'], packed)).toContain(
+      expect(run(['name-references.mjs'])).toContain(
         'Name reference JS contract verified',
       );
-      expect(run([tsc, '-p', 'name-references.json'], packed)).toBe('');
+      expect(run([tsc, '-p', 'name-references.json'])).toBe('');
     });
 
     it('workspace tarball만 설치한 JS·TS 소비자가 실제 문서를 로딩하고 내부 subpath를 거부한다', /** 소스 없는 배포 소비자의 실제 IO와 구분된 반환 타입 및 exports 경계를 검증한다. */ () => {
@@ -666,15 +627,28 @@ for (const issue of diagnostics) {
     });
 
     it('Node subprocess가 ESM 공개 진입점을 가져오면 파서·검증기를 실행한다', () => {
+      const workspaceManifest = JSON.parse(
+        readFileSync(
+          path.join(consumer, 'node_modules/@codocs/workspace/package.json'),
+          'utf8',
+        ),
+      ) as { dependencies?: Record<string, string> };
+      expect(typeof workspaceManifest.dependencies?.chokidar).toBe('string');
       const script = `
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
 for (const name of ${JSON.stringify(names)}) {
   const value = await import('@codocs/' + name);
   if (typeof value !== 'object') throw new Error('Invalid module: ' + name);
 }
+const installed = fileURLToPath(new URL('./node_modules/', import.meta.url));
+const coreRequire = createRequire(import.meta.resolve('@codocs/core'));
+const workspaceRequire = createRequire(import.meta.resolve('@codocs/workspace'));
+if (!workspaceRequire.resolve('chokidar').startsWith(installed)) throw new Error('Workspace watcher dependency must be installed');
 const { parseYaml, getValueRange, yamlDiagnosticCodes, validateDocument } = await import('@codocs/core');
 const validated = validateDocument({ data: {id: 'order', name: '주문', definition: '정의', domains: ['영역'], custom: {nested: [null, 1, true]}} });
 if (!validated.success || validated.data.custom.nested[1] !== 1 || validated.warnings.length !== 1) throw new Error('Validator dependency failed');
-if (!import.meta.resolve('zod').startsWith(new URL('./node_modules/zod/', import.meta.url).href)) throw new Error('Zod dependency must be local');
+if (!coreRequire.resolve('zod').startsWith(installed)) throw new Error('Zod dependency must be installed');
 const parsed = parseYaml('name: "한글 😀"\\n');
 const range = getValueRange(parsed, ['name']);
 if (!parsed.success || parsed.data.name !== '한글 😀' || !range || parsed.source.slice(range.start, range.end) !== '"한글 😀"') throw new Error('Parser API failed');
@@ -682,7 +656,7 @@ const invalid = parseYaml('name: [');
 if (invalid.success || !invalid.diagnostics.some(issue => issue.code === yamlDiagnosticCodes.invalidYaml)) throw new Error('Invalid YAML diagnostic failed');
 const unsupported = parseYaml('name: first\\nname: second');
 if (unsupported.success || !unsupported.diagnostics.some(issue => issue.code === yamlDiagnosticCodes.unsupportedYamlFeature)) throw new Error('Unsupported YAML diagnostic failed');
-if (!import.meta.resolve('yaml').startsWith(new URL('./node_modules/yaml/', import.meta.url).href)) throw new Error('Yaml dependency must be local');
+if (!coreRequire.resolve('yaml').startsWith(installed)) throw new Error('Yaml dependency must be installed');
 console.log('JS packages loaded');`;
       writeFileSync(path.join(consumer, 'consume.mjs'), script);
       expect(run(['consume.mjs'])).toContain('JS packages loaded');

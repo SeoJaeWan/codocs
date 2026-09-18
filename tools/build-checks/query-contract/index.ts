@@ -31,7 +31,9 @@ try {
   assert.ok(import.meta.resolve('@codocs/mcp').startsWith(new URL('./node_modules/', import.meta.url).href));
   for (const subpath of ['src/index.js', 'dist/index.js', 'dist/query/index.js']) await assert.rejects(import('@codocs/mcp/' + subpath), {code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'});
   console.log('MCP query JS contract verified');
-} finally { await rm(project, {recursive: true, force: true}); }`;
+} finally { await rm(project, {recursive: true, force: true}); }
+// The public query handlers keep a file watcher alive after this contract finishes.
+process.exit(0);`;
 
 /** Node 전역 타입 없는 strict d.ts 소비자 설정이다. */
 export const queryContractConfig = {

@@ -4,11 +4,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCodocsQueryHandlers } from './index.js';
 
 const backend = vi.hoisted(
-  /** 각 handler 호출과 전달 인수를 독립적으로 기록한다. */ () => ({
-    list: vi.fn(),
-    get: vi.fn(),
-    refresh: vi.fn(),
-  }),
+  /** 각 handler 호출과 전달 인수를 독립적으로 기록한다. */ () => {
+    const readiness: {
+      state: string;
+      ready: boolean;
+      cause?: string;
+      guidance?: string;
+    } = { state: 'ready', ready: true };
+    const scanStatus: string | undefined = 'complete';
+    return {
+      list: vi.fn(),
+      get: vi.fn(),
+      refresh: vi.fn(),
+      readiness,
+      scanStatus,
+      limitedReadAvailable: false,
+    };
+  },
 );
 
 vi.mock(
@@ -16,12 +28,24 @@ vi.mock(
   /** 실제 IO 대신 workspace 공개 결과 경계를 제어한다. */ () => ({
     /** 같은 조회 backend를 반환한다. */
     createWorkspaceQuerySession: () => backend,
+    workspaceDiagnosticCodes: { readFailed: 'workspace_read_failed' },
+    workspaceLifecycleStates: {
+      starting: 'starting',
+      ready: 'ready',
+      refreshing: 'refreshing',
+      recovering: 'recovering',
+      failed: 'failed',
+      closed: 'closed',
+    },
   }),
 );
 
 beforeEach(
   /** 각 사례의 호출과 응답 계획을 초기화한다. */ () => {
     vi.clearAllMocks();
+    backend.readiness = { state: 'ready', ready: true };
+    backend.scanStatus = 'complete';
+    backend.limitedReadAvailable = false;
   },
 );
 
@@ -309,6 +333,56 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(backend.list).toHaveBeenCalledWith(input);
     });
 
+    it('partial 목록에서 미확인 문서에 진단을 더하고 기존 항목을 보존한다', async () => {
+      const response = {
+        success: true,
+        scanStatus: 'partial',
+        items: [
+          {
+            id: 'old',
+            name: '이전 문서',
+            source: { path: '.codocs/old.yaml' },
+            confirmation: 'unconfirmed',
+            hasErrors: false,
+            conflict: false,
+          },
+          {
+            id: 'new',
+            name: '확인 문서',
+            source: { path: '.codocs/new.yaml' },
+            confirmation: 'confirmed',
+            hasErrors: false,
+            conflict: false,
+          },
+        ],
+        totalCount: 2,
+        returnedCount: 2,
+        nextCursor: null,
+      };
+      backend.list.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers();
+
+      const result = await handlers.codocsList();
+
+      expect(result).toMatchObject({
+        success: true,
+        scanStatus: 'partial',
+        totalCount: 2,
+        items: [
+          {
+            id: 'old',
+            confirmation: 'unconfirmed',
+            diagnostics: [
+              { code: 'unconfirmed_reference', severity: 'warning' },
+            ],
+          },
+          { id: 'new', confirmation: 'confirmed' },
+        ],
+      });
+      if (result.success)
+        expect(result.items[1]).not.toHaveProperty('diagnostics');
+    });
+
     it('cursor를 전달하면 backend에 cursor를 보내고 다음 페이지를 반환한다', async () => {
       const response = {
         success: true,
@@ -372,6 +446,139 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
 
       expect(result).toBe(response);
       expect(backend.refresh).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('준비 상태와 복구 요청', () => {
+    it('완료 색인만 write와 validate를 허용하고 partial은 조회만 허용한다', () => {
+      const handlers = createCodocsQueryHandlers();
+
+      expect(handlers.access).toMatchObject({
+        state: 'ready',
+        scanStatus: 'complete',
+        canRead: true,
+        canWrite: true,
+        canValidate: true,
+        canGuide: true,
+        canRefresh: true,
+      });
+
+      backend.scanStatus = 'partial';
+      expect(handlers.access).toMatchObject({
+        scanStatus: 'partial',
+        canRead: true,
+        canWrite: false,
+        canValidate: false,
+      });
+    });
+
+    it.each(['refreshing', 'recovering'])(
+      '%s 중 조회를 차단하고 refresh는 유지한다',
+      async (state) => {
+        backend.readiness = { state, ready: false };
+        const handlers = createCodocsQueryHandlers();
+        const list = await handlers.codocsList();
+        const get = await handlers.codocsGet({ ids: ['alpha'] });
+
+        expect(list).toMatchObject({ success: false, scanStatus: 'failed' });
+        expect(get).toMatchObject({ success: false, scanStatus: 'failed' });
+        expect(backend.list).not.toHaveBeenCalled();
+        expect(backend.get).not.toHaveBeenCalled();
+        expect(handlers.access).toMatchObject({
+          canRead: false,
+          canWrite: false,
+          canValidate: false,
+          canRefresh: true,
+        });
+      },
+    );
+
+    it('실패 상태의 원인과 수동 refresh 안내를 전달하고 변경 gate를 닫는다', () => {
+      backend.readiness = {
+        state: 'failed',
+        ready: false,
+        cause: 'watcher error',
+        guidance: 'codocs_refresh를 실행하세요.',
+      };
+      backend.limitedReadAvailable = false;
+      const handlers = createCodocsQueryHandlers();
+
+      expect(handlers.access).toMatchObject({
+        cause: 'watcher error',
+        guidance: 'codocs_refresh를 실행하세요.',
+        canRead: false,
+        canWrite: false,
+        canValidate: false,
+        canGuide: true,
+        canRefresh: true,
+      });
+    });
+
+    it('감시 실패 후 완료 snapshot이 있으면 list/get만 허용한다', async () => {
+      backend.readiness = {
+        state: 'failed',
+        ready: false,
+        cause: 'watcher error',
+        guidance: 'codocs_refresh를 실행하세요.',
+      };
+      backend.limitedReadAvailable = true;
+      backend.list.mockResolvedValue({
+        success: true,
+        scanStatus: 'partial',
+        items: [],
+        totalCount: 0,
+        returnedCount: 0,
+        nextCursor: null,
+      });
+      backend.get.mockResolvedValue({
+        success: true,
+        scanStatus: 'partial',
+        results: [],
+      });
+      const handlers = createCodocsQueryHandlers();
+
+      expect(handlers.access).toMatchObject({
+        canRead: true,
+        canWrite: false,
+        canValidate: false,
+      });
+      expect(await handlers.codocsList()).toMatchObject({ success: true });
+      expect(await handlers.codocsGet({ ids: ['alpha'] })).toMatchObject({
+        success: true,
+      });
+    });
+
+    it('동시 codocs_refresh 호출은 같은 workspace 작업과 결과를 공유한다', async () => {
+      const response = {
+        success: true,
+        scanStatus: 'partial',
+        fileCount: 3,
+        itemCount: 2,
+        errorCount: 1,
+        warningCount: 1,
+        countsComplete: false,
+        diagnostics: [],
+      };
+      const operation = Promise.resolve(response);
+      backend.refresh.mockReturnValue(operation);
+      const handlers = createCodocsQueryHandlers();
+
+      const first = handlers.codocsRefresh();
+      const second = handlers.refresh({});
+
+      expect(first).toBe(operation);
+      expect(second).toBe(operation);
+      expect(await first).toBe(response);
+      expect(backend.refresh).toHaveBeenCalledOnce();
+    });
+
+    it('refresh에 알 수 없는 입력을 주면 backend를 호출하지 않는다', async () => {
+      const handlers = createCodocsQueryHandlers();
+
+      expect(await handlers.codocsRefresh({ force: true })).toEqual(
+        invalidInput(),
+      );
+      expect(backend.refresh).not.toHaveBeenCalled();
     });
   });
 
