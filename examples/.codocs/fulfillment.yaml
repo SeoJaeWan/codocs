@@ -1,0 +1,6 @@
+# 가상 프로젝트 예시이며 실제 업무 사실이 아니다.
+id: sample-fulfillment
+name: 가상 주문 처리
+definition: 가상 프로젝트에서 [[가상 주문]]를 확인한 뒤 가상 배송 상태를 기록한다.
+domains:
+  - sample-sales
