@@ -51,6 +51,26 @@ async function file(name: string, raw: string): Promise<string> {
 }
 
 describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검증한다. */ () => {
+  it('동시 refresh가 같은 결과와 한 세대를 공유하고 조회가 보유한 결과를 재사용한다', async () => {
+    await file(
+      'alpha.yaml',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    await session.list();
+    const before = session.generation;
+    expect(await session.get(['alpha'])).toMatchObject({ success: true });
+    expect(session.generation).toBe(before);
+    const first = session.refresh();
+    const second = session.refresh();
+    expect(first).toBe(second);
+    expect(await first).toMatchObject({
+      success: true,
+      scanStatus: 'complete',
+    });
+    expect(session.generation).toBe(before + 1);
+    await session.close();
+  });
   describe('문서 목록과 상세 조회', () => {
     it('문서 하나가 있는 프로젝트를 목록 조회하면 한 항목과 완료 상태를 반환한다', async () => {
       const raw =
@@ -140,6 +160,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       await rm(target);
       await symlink('missing-target.yaml', target);
 
+      await session.refresh();
       const result = await session.get(['alpha']);
 
       expect(result).toMatchObject({
@@ -167,6 +188,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       await rm(target);
       await symlink('missing-target.yaml', target);
 
+      await session.refresh();
       const result = await session.get(['outside']);
 
       expect(result).toMatchObject({
@@ -194,6 +216,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       await rm(target);
       await symlink('missing-target.yaml', target);
 
+      await session.refresh();
       const result = await session.list();
 
       expect(result).toMatchObject({
@@ -216,6 +239,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     await rename(codocs, saved);
     await symlink('missing-codocs', codocs);
 
+    await session.refresh();
     const list = await session.list();
     const get = await session.get(['alpha']);
     expect(list).toMatchObject({ success: false, scanStatus: 'failed' });
@@ -274,9 +298,13 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         'id: doc-50\nname: doc-50\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 새 본문\n',
       );
 
+      await session.refresh();
       const result = await session.list({ cursor: first.nextCursor });
 
-      expect(result).toMatchObject({ success: true, returnedCount: 1 });
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+      });
     });
 
     it('cursor와 최초 목록의 도메인과 다른 필터를 전달하면 입력 오류를 반환한다', async () => {
@@ -316,6 +344,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         'id: doc-50\nname: 표시 이름 변경\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
       );
 
+      await session.refresh();
       const result = await session.list({ cursor: first.nextCursor });
 
       expect(result).toMatchObject({
@@ -356,6 +385,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
             'id: doc-50\nname: duplicate\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
           );
 
+        await session.refresh();
         const result = await session.list({ cursor: first.nextCursor });
 
         expect(result).toMatchObject({
@@ -395,6 +425,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         );
       }
 
+      await session.refresh();
       const result = await session.list(input);
 
       expect(result).toEqual({
@@ -452,6 +483,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
           `id: doc-50\nname: doc-50\ndomains: [${domains}]\nkind: ${kind}\nstatus: ${status}\ndefinition: 본문\n`,
         );
 
+        await session.refresh();
         const result = await session.list(input);
 
         expect(result).toEqual({
