@@ -17,11 +17,16 @@ import {
 } from '../diagnostics/index.js';
 import { resolveWorkspacePath } from '../index.js';
 import type { ProjectRoot } from '../project-root/index.js';
+import { detectFileSystemTestCapabilities } from '../test-support/file-system.js';
 
 let fixture: string;
 let project: string;
 let outside: string;
 let selectedRoot: ProjectRoot;
+const {
+  symlink: symlinkSupported,
+  permissionDenial: permissionDenialSupported,
+} = await detectFileSystemTestCapabilities();
 beforeEach(
   /** 테스트마다 고유한 실제 파일 fixture를 생성한다. */ async () => {
     fixture = await mkdtemp(path.join(tmpdir(), 'codocs-path-'));
@@ -53,14 +58,14 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
 
       expect(result).toMatchObject({
         success: true,
-        path: input,
+        path: path.normalize(input),
         kind: 'file',
         access: { read: true, write: true },
         scope: { kind: 'workspace' },
       });
     });
 
-    it('외부 파일 링크를 요청하면 그 파일의 읽기와 쓰기 범위를 허용한다', /** 외부 파일 링크를 요청하면 그 파일의 읽기와 쓰기 범위를 허용한다. */ async () => {
+    it.skipIf(!symlinkSupported)('외부 파일 링크를 요청하면 그 파일의 읽기와 쓰기 범위를 허용한다', /** 외부 파일 링크를 요청하면 그 파일의 읽기와 쓰기 범위를 허용한다. */ async () => {
       await symlink(
         path.join(outside, 'target.yaml'),
         path.join(project, '.codocs', 'file.yaml'),
@@ -75,7 +80,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         scope: { kind: 'linkedFile' },
       });
     });
-    it('외부 폴더 링크의 하위 파일을 요청하면 읽기와 쓰기 범위를 허용한다', /** 외부 폴더 링크의 하위 파일을 요청하면 읽기와 쓰기 범위를 허용한다. */ async () => {
+    it.skipIf(!symlinkSupported)('외부 폴더 링크의 하위 파일을 요청하면 읽기와 쓰기 범위를 허용한다', /** 외부 폴더 링크의 하위 파일을 요청하면 읽기와 쓰기 범위를 허용한다. */ async () => {
       await symlink(outside, path.join(project, '.codocs', 'folder'));
       expect(
         await resolveWorkspacePath(selectedRoot, '.codocs/folder/target.yaml'),
@@ -88,7 +93,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
   });
 
   describe('연결 범위 밖 직접 접근 차단', () => {
-    it('연결된 파일의 실제 외부 경로를 직접 요청하면 거부한다', /** 연결된 파일의 실제 외부 경로를 직접 요청하면 거부한다. */ async () => {
+    it.skipIf(!symlinkSupported)('연결된 파일의 실제 외부 경로를 직접 요청하면 거부한다', /** 연결된 파일의 실제 외부 경로를 직접 요청하면 거부한다. */ async () => {
       await symlink(
         path.join(outside, 'target.yaml'),
         path.join(project, '.codocs', 'file.yaml'),
@@ -116,7 +121,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         status: 'denied',
       });
     });
-    it('폴더 링크에서 ..로 연결 루트를 벗어나면 거부한다', /** 폴더 링크에서 ..로 연결 루트를 벗어나면 거부한다. */ async () => {
+    it.skipIf(!symlinkSupported)('폴더 링크에서 ..로 연결 루트를 벗어나면 거부한다', /** 폴더 링크에서 ..로 연결 루트를 벗어나면 거부한다. */ async () => {
       await symlink(outside, path.join(project, '.codocs', 'folder'));
       expect(
         await resolveWorkspacePath(selectedRoot, '.codocs/folder/../file.yaml'),
@@ -125,7 +130,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         status: 'denied',
       });
     });
-    it('파일 링크에서 ..로 부모나 형제에 접근하면 거부한다', /** 파일 링크에서 ..로 부모나 형제에 접근하면 거부한다. */ async () => {
+    it.skipIf(!symlinkSupported)('파일 링크에서 ..로 부모나 형제에 접근하면 거부한다', /** 파일 링크에서 ..로 부모나 형제에 접근하면 거부한다. */ async () => {
       await symlink(
         path.join(outside, 'target.yaml'),
         path.join(project, '.codocs', 'file.yaml'),
@@ -174,7 +179,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         path: path.join('.codocs', 'target.yaml'),
       });
     });
-    it('연결 폴더 하위에서 ..로 연결 루트까지만 돌아오면 허용한다', /** 연결 폴더 하위에서 ..로 연결 루트까지만 돌아오면 허용한다. */ async () => {
+    it.skipIf(!symlinkSupported)('연결 폴더 하위에서 ..로 연결 루트까지만 돌아오면 허용한다', /** 연결 폴더 하위에서 ..로 연결 루트까지만 돌아오면 허용한다. */ async () => {
       await mkdir(path.join(outside, 'nested'));
       await symlink(outside, path.join(project, '.codocs', 'folder'), 'dir');
       expect(
@@ -188,7 +193,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         realPath: await realpath(path.join(outside, 'target.yaml')),
       });
     });
-    it('연결 폴더 하위에서 ..를 반복해 연결 루트 밖으로 요청하면 거부한다', /** 연결 폴더 하위에서 ..를 반복해 연결 루트 밖으로 요청하면 거부한다. */ async () => {
+    it.skipIf(!symlinkSupported)('연결 폴더 하위에서 ..를 반복해 연결 루트 밖으로 요청하면 거부한다', /** 연결 폴더 하위에서 ..를 반복해 연결 루트 밖으로 요청하면 거부한다. */ async () => {
       await mkdir(path.join(outside, 'nested'));
       await symlink(outside, path.join(project, '.codocs', 'folder'), 'dir');
       const result = await resolveWorkspacePath(
@@ -208,7 +213,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
       });
       expect(result).not.toHaveProperty('realPath');
     });
-    it('논리 절대 경로의 폴더 링크 뒤에 ..가 있으면 정규화 전에 거부한다', /** 논리 절대 경로의 폴더 링크 뒤에 ..가 있으면 정규화 전에 거부한다. */ async () => {
+    it.skipIf(!symlinkSupported)('논리 절대 경로의 폴더 링크 뒤에 ..가 있으면 정규화 전에 거부한다', /** 논리 절대 경로의 폴더 링크 뒤에 ..가 있으면 정규화 전에 거부한다. */ async () => {
       await symlink(outside, path.join(project, '.codocs', 'folder'), 'dir');
       expect(
         await resolveWorkspacePath(
@@ -248,7 +253,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
   });
 
   describe('중첩 연결과 경로 별칭 유지', () => {
-    it('.codocs 자체가 외부 폴더 링크이면 하위 파일을 허용하고 연결 루트 밖 이동은 거부한다', /** .codocs 자체가 외부 폴더 링크이면 하위 파일을 허용하고 연결 루트 밖 이동은 거부한다. */ async () => {
+    it.skipIf(!symlinkSupported)('.codocs 자체가 외부 폴더 링크이면 하위 파일을 허용하고 연결 루트 밖 이동은 거부한다', /** .codocs 자체가 외부 폴더 링크이면 하위 파일을 허용하고 연결 루트 밖 이동은 거부한다. */ async () => {
       await rm(path.join(project, '.codocs'), { recursive: true });
       await symlink(outside, path.join(project, '.codocs'), 'dir');
       expect(
@@ -270,7 +275,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         status: 'denied',
       });
     });
-    it('외부 폴더 안에 별도 외부 파일 링크가 있으면 해당 파일만 새 연결 범위로 허용한다', /** 외부 폴더 안에 별도 외부 파일 링크가 있으면 해당 파일만 새 연결 범위로 허용한다. */ async () => {
+    it.skipIf(!symlinkSupported)('외부 폴더 안에 별도 외부 파일 링크가 있으면 해당 파일만 새 연결 범위로 허용한다', /** 외부 폴더 안에 별도 외부 파일 링크가 있으면 해당 파일만 새 연결 범위로 허용한다. */ async () => {
       const shared = path.join(fixture, 'shared.yaml');
       await writeFile(shared, '공유');
       await symlink(shared, path.join(outside, 'nested.yaml'), 'file');
@@ -292,7 +297,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         ),
       ).toMatchObject({ success: false, status: 'denied' });
     });
-    it('파일 링크가 다른 파일 링크를 가리키면 최종 확인한 실제 파일을 반환한다', /** 파일 링크가 다른 파일 링크를 가리키면 최종 확인한 실제 파일을 반환한다. */ async () => {
+    it.skipIf(!symlinkSupported)('파일 링크가 다른 파일 링크를 가리키면 최종 확인한 실제 파일을 반환한다', /** 파일 링크가 다른 파일 링크를 가리키면 최종 확인한 실제 파일을 반환한다. */ async () => {
       await symlink('target.yaml', path.join(outside, 'chain.yaml'), 'file');
       await symlink(
         path.join(outside, 'chain.yaml'),
@@ -307,7 +312,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         scope: { kind: 'linkedFile' },
       });
     });
-    it('두 폴더 링크가 같은 외부 폴더에 도달하면 서로 다른 논리 경로를 보존한다', /** 두 폴더 링크가 같은 외부 폴더에 도달하면 서로 다른 논리 경로를 보존한다. */ async () => {
+    it.skipIf(!symlinkSupported)('두 폴더 링크가 같은 외부 폴더에 도달하면 서로 다른 논리 경로를 보존한다', /** 두 폴더 링크가 같은 외부 폴더에 도달하면 서로 다른 논리 경로를 보존한다. */ async () => {
       await symlink(outside, path.join(project, '.codocs', '공통A'), 'dir');
       await symlink(outside, path.join(project, '.codocs', '공통B'), 'dir');
       const first = await resolveWorkspacePath(
@@ -330,7 +335,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         throw new Error('두 연결을 확인해야 한다');
       expect(first.realPath).toBe(second.realPath);
     });
-    it('한글과 Unicode 표기가 다른 링크 이름을 요청하면 두 논리 경로를 별도로 유지한다', /** 한글과 Unicode 표기가 다른 링크 이름을 요청하면 두 논리 경로를 별도로 유지한다. */ async () => {
+    it.skipIf(!symlinkSupported)('한글과 Unicode 표기가 다른 링크 이름을 요청하면 두 논리 경로를 별도로 유지한다', /** 한글과 Unicode 표기가 다른 링크 이름을 요청하면 두 논리 경로를 별도로 유지한다. */ async () => {
       const names = ['Mixed-가.yaml', 'Mixed-가.yaml'];
       await mkdir(path.join(project, '.codocs', 'first'));
       await mkdir(path.join(project, '.codocs', 'second'));
@@ -378,7 +383,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         ],
       });
     });
-    it('.codocs 자체가 깨진 링크이면 부재 대신 대상 확인 실패를 반환한다', /** .codocs 자체가 깨진 링크이면 부재 대신 대상 확인 실패를 반환한다. */ async () => {
+    it.skipIf(!symlinkSupported)('.codocs 자체가 깨진 링크이면 부재 대신 대상 확인 실패를 반환한다', /** .codocs 자체가 깨진 링크이면 부재 대신 대상 확인 실패를 반환한다. */ async () => {
       await rm(path.join(project, '.codocs'), { recursive: true });
       await symlink(
         path.join(fixture, 'missing'),
@@ -399,7 +404,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         },
       );
     });
-    it('하위 파일 링크가 깨지면 원문·실경로·좌표 없이 실패 경로와 실제 ENOENT를 반환한다', /** 하위 파일 링크가 깨지면 원문·실경로·좌표 없이 실패 경로와 실제 ENOENT를 반환한다. */ async () => {
+    it.skipIf(!symlinkSupported)('하위 파일 링크가 깨지면 원문·실경로·좌표 없이 실패 경로와 실제 ENOENT를 반환한다', /** 하위 파일 링크가 깨지면 원문·실경로·좌표 없이 실패 경로와 실제 ENOENT를 반환한다. */ async () => {
       await symlink(
         path.join(outside, 'missing.yaml'),
         path.join(project, '.codocs', 'broken.yaml'),
@@ -469,7 +474,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         });
       },
     );
-    it('파일 링크 두 개가 서로를 가리키면 실제 ELOOP를 실패 진단으로 반환한다', /** 파일 링크 두 개가 서로를 가리키면 실제 ELOOP를 실패 진단으로 반환한다. */ async () => {
+    it.skipIf(!symlinkSupported)('파일 링크 두 개가 서로를 가리키면 실제 ELOOP를 실패 진단으로 반환한다', /** 파일 링크 두 개가 서로를 가리키면 실제 ELOOP를 실패 진단으로 반환한다. */ async () => {
       await symlink('b.yaml', path.join(project, '.codocs', 'a.yaml'), 'file');
       await symlink('a.yaml', path.join(project, '.codocs', 'b.yaml'), 'file');
       expect(
@@ -515,7 +520,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         });
       },
     );
-    it('하위 폴더 탐색 권한이 없으면 실제 EACCES와 실패 경로만 반환한다', /** 권한이 없는 실제 임시 폴더에서 파일 조회 실패를 확인하고 권한을 복구한다. */ async () => {
+    it.skipIf(!permissionDenialSupported)('하위 폴더 탐색 권한이 없으면 실제 EACCES와 실패 경로만 반환한다', /** 권한이 없는 실제 임시 폴더에서 파일 조회 실패를 확인하고 권한을 복구한다. */ async () => {
       const folder = path.join(project, '.codocs', 'restricted');
       await mkdir(folder);
       await writeFile(path.join(folder, 'file.yaml'), '원문');
@@ -542,7 +547,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         await chmod(folder, 0o700);
       }
     });
-    it('연결 파일에 OS 쓰기 권한이 없어도 정책 범위는 읽기와 쓰기를 허용한다', /** 실제 쓰기는 하지 않고 연결 범위 정책과 OS 파일 권한이 별개임을 확인한다. */ async () => {
+    it.skipIf(!symlinkSupported)('연결 파일에 OS 쓰기 권한이 없어도 정책 범위는 읽기와 쓰기를 허용한다', /** 실제 쓰기는 하지 않고 연결 범위 정책과 OS 파일 권한이 별개임을 확인한다. */ async () => {
       const target = path.join(outside, 'target.yaml');
       await chmod(target, 0o400);
       await symlink(

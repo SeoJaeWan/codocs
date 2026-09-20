@@ -26,6 +26,10 @@ import {
 } from './index.js';
 import type { WorkspaceQuerySession } from './index.js';
 import { WorkspaceWatcher, watcherRecoveryGuidance } from '../watcher/index.js';
+import { detectFileSystemTestCapabilities } from '../test-support/file-system.js';
+
+const { symlink: symlinkSupported } =
+  await detectFileSystemTestCapabilities();
 
 let project: string;
 const sessions: WorkspaceQuerySession[] = [];
@@ -100,7 +104,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     await session.close();
   });
 
-  it('partial refresh는 집계가 불완전함을 명시한다', async () => {
+  it.skipIf(!symlinkSupported)('partial refresh는 집계가 불완전함을 명시한다', async () => {
     const target = await file(
       'alpha.yaml',
       'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
@@ -167,7 +171,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     }
   });
 
-  it('완료 snapshot 없이 감시가 실패하면 조회 실패를 반환한다', async () => {
+  it.skipIf(!symlinkSupported)('완료 snapshot 없이 감시가 실패하면 조회 실패를 반환한다', async () => {
     const target = await file(
       'alpha.yaml',
       'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
@@ -367,7 +371,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   });
 
   describe('부분 스캔 후 이전 조회 결과 보존', () => {
-    it('문서 경로가 깨진 링크로 바뀌면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
+    it.skipIf(!symlinkSupported)('문서 경로가 깨진 링크로 바뀌면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
       const raw =
         "id: alpha\nname: 알파\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: '이전 본문'\n";
       const target = await file('alpha.yaml', raw);
@@ -401,7 +405,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
-    it('부분 스캔에서 색인 밖 ID를 조회하면 부재로 확정하지 않는다', async () => {
+    it.skipIf(!symlinkSupported)('부분 스캔에서 색인 밖 ID를 조회하면 부재로 확정하지 않는다', async () => {
       const target = await file(
         'alpha.yaml',
         'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
@@ -425,7 +429,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         );
     });
 
-    it('부분 스캔에서 목록을 조회하면 이전 항목을 포함한 개수를 반환한다', async () => {
+    it.skipIf(!symlinkSupported)('부분 스캔에서 목록을 조회하면 이전 항목을 포함한 개수를 반환한다', async () => {
       const target = await file(
         'alpha.yaml',
         'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
@@ -450,7 +454,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     });
   });
 
-  it('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 깨진 .codocs로 실제 failed 전환을 만든다. */ async () => {
+  it.skipIf(!symlinkSupported)('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 깨진 .codocs로 실제 failed 전환을 만든다. */ async () => {
     await file(
       'alpha.yaml',
       'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',

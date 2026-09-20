@@ -100,3 +100,12 @@ The cross-platform/full-regression result remains provisional. Windows cannot ex
 5. Investigate and remeasure the retained 5,000- and 10,000-document propagation misses before claiming behavior beyond the verified 1,000-document target.
 
 No push, merge, pull request, coordinator-checkout edit, or source/harness edit was performed by INT-001.
+
+## Post-integration follow-up
+
+The follow-up source pass keeps the existing bounded loader batching and records the larger comparison-scale misses as follow-up work. It does not introduce an incremental refresh design or change the refresh boundary.
+
+- `packages/workspace/src/loader/index.ts` now uses a named Korean-JSDoc helper for the batch-resolution callback. `pnpm lint` and `pnpm typecheck` pass.
+- OS-sensitive tests probe the current file-system capabilities before registering symlink and permission-denial cases. Windows runs the portable path assertions and marks unsupported symlink/permission cases skipped; a host that supports those capabilities runs the same cases. Path expectations use `path` normalization instead of POSIX literals.
+- The Windows full run now completes with 19 test files passing, 550 tests passing, and 40 capability-gated tests skipped. The skipped cases are the existing symlink and POSIX permission contracts; they remain available for a capable OS run.
+- The previously observed 5,000- and 10,000-document propagation timeouts remain recorded in `RESULTS.md`. Improving refresh/index rebuild time is deferred to a later change and is outside this follow-up.

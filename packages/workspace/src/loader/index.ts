@@ -35,6 +35,15 @@ import {
   resolveProjectRoot,
   type ProjectRoot,
 } from '../project-root/index.js';
+
+/** 디렉터리 항목의 작업공간 경로 해석 결과를 반환한다. */
+function resolveDirectoryEntry(
+  root: ProjectRoot,
+  directoryPath: string,
+  entry: string,
+): Promise<WorkspacePathResult> {
+  return resolveWorkspacePath(root, path.join(directoryPath, entry));
+}
 import { decodeWorkspaceBytes } from '../revision/index.js';
 import { workspaceDocumentStatuses } from './domain-values.js';
 export * from './domain-values.js';
@@ -320,10 +329,7 @@ export async function loadWorkspace(
             entries
               .slice(offset, offset + directoryEntryBatchSize)
               .map((entry) =>
-                resolveWorkspacePath(
-                  root,
-                  path.join(target.logicalPath, entry),
-                ),
+                resolveDirectoryEntry(root, target.logicalPath, entry),
               ),
           );
           const files: ResolvedPath[] = [];
