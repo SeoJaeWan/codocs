@@ -101,3 +101,5 @@ pnpm performance:cod14 -- --documents 100,1000,5000,10000 --startup-runs 1 --war
 |    10,000 | 14,060.644 ms | 0.018 / 0.086 / 0.140 ms |              0/3; timeout | propagation miss |
 
 All startup, valid get, and 21-ID invalid-request observations were exact. The command exited with status 1 because the retained propagation timeouts make the overall correctness field fail; the raw JSON and Markdown report were still written to `full-scale-20260920`.
+
+The 1,000-document scale was rerun on the current branch with the same 1/20/100/3 repetition settings and a 10,000 ms propagation observation limit. All three external writes completed, but propagation p95 was 1,058.783 ms, so the 500 ms target miss is a real slow completion rather than an unobserved correctness result. The earlier `optimized-1000` artifact reports 411.654 ms from a previous worktree state; that value is retained as historical evidence and is not reproduced by the current branch.
