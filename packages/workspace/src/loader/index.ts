@@ -39,6 +39,9 @@ import { decodeWorkspaceBytes } from '../revision/index.js';
 import { workspaceDocumentStatuses } from './domain-values.js';
 export * from './domain-values.js';
 
+/** 파일이 많은 폴더에서도 파일 시스템 요청을 직렬화하지 않되 과도한 동시 요청은 피한다. */
+const directoryEntryBatchSize = 64;
+
 /** 읽은 문서의 발견 경로와 확인한 실제 파일이다. 경로 표기는 임의 변환하지 않는다. */
 export interface WorkspaceDocumentSource {
   path: string;
@@ -308,17 +311,33 @@ export async function loadWorkspace(
           return;
         }
         entries.sort();
-        for (const entry of entries) {
-          const child = await resolveWorkspacePath(
-            root,
-            path.join(target.logicalPath, entry),
+        for (
+          let offset = 0;
+          offset < entries.length;
+          offset += directoryEntryBatchSize
+        ) {
+          const children = await Promise.all(
+            entries
+              .slice(offset, offset + directoryEntryBatchSize)
+              .map((entry) =>
+                resolveWorkspacePath(
+                  root,
+                  path.join(target.logicalPath, entry),
+                ),
+              ),
           );
-          if (!child.success) {
-            failures.push(pathFailure(child));
-            diagnostics.push(...child.diagnostics);
-            continue;
+          const files: ResolvedPath[] = [];
+          for (const child of children) {
+            if (!child.success) {
+              failures.push(pathFailure(child));
+              diagnostics.push(...child.diagnostics);
+              continue;
+            }
+            if (child.kind === workspaceTargetKinds.directory)
+              await visit(child);
+            else files.push(child);
           }
-          await visit(child);
+          await Promise.all(files.map((child) => visit(child)));
         }
       } finally {
         ancestors.pop();
@@ -345,6 +364,9 @@ export async function loadWorkspace(
   }
 
   await visit(initial);
+  documents.sort((left, right) =>
+    left.source.path.localeCompare(right.source.path),
+  );
   const rootReadFailed = failures.some(
     /** 스캔 시작 폴더 자체의 실패는 하위 누락과 다르게 전체 실패다. */
     (failure) => failure.logicalPath === initial.logicalPath,
