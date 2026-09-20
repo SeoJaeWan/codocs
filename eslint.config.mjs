@@ -92,4 +92,11 @@ export default defineConfig(
       ],
     },
   },
+  {
+    files: ['**/*.{js,mjs,cjs}'],
+    plugins: { codocs },
+    rules: {
+      'codocs/korean-jsdoc': 'error',
+    },
+  },
 );

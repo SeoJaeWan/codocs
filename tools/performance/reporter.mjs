@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-/** Computes a percentile with linear interpolation over sorted values. */
+/** 정렬한 값에 선형 보간을 적용해 percentile을 계산한다. */
 function percentile(values, fraction) {
   if (values.length === 0) return null;
   const sorted = [...values].sort((left, right) => left - right);
@@ -13,7 +13,7 @@ function percentile(values, fraction) {
   return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
 }
 
-/** Summarizes only correct successful latency observations. */
+/** 정확히 성공한 지연 관측값만 요약한다. */
 export function summarize(observations, successClassification = 'success') {
   const successful = observations.filter(
     (observation) =>
@@ -42,12 +42,12 @@ export function summarize(observations, successClassification = 'success') {
   };
 }
 
-/** Formats a nullable measurement for Markdown. */
+/** nullable 측정값을 Markdown 형식으로 변환한다. */
 function format(value) {
   return value === null || value === undefined ? 'n/a' : value.toFixed(3);
 }
 
-/** Renders the human-readable report from the raw JSON structure. */
+/** 원시 JSON 구조에서 사람이 읽는 보고서를 렌더링한다. */
 export function renderMarkdown(report) {
   const lines = [
     '# COD-14 Performance Report',
@@ -108,7 +108,7 @@ export function renderMarkdown(report) {
   return `${lines.join('\n')}\n`;
 }
 
-/** Writes raw JSON and Markdown reports and records serialization overhead. */
+/** 원시 JSON·Markdown 보고서를 쓰고 직렬화 비용을 기록한다. */
 export async function writeReports(report, outputDirectory) {
   await mkdir(outputDirectory, { recursive: true });
   const jsonStartedAt = performance.now();

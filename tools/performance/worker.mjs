@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-/** Parses the worker's internal command-line arguments. */
+/** worker 내부 명령줄 인자를 파싱한다. */
 function parseArguments(values) {
   const parsed = {};
   for (let index = 0; index < values.length; index += 2) {
@@ -16,7 +16,7 @@ function parseArguments(values) {
   return parsed;
 }
 
-/** Returns a numeric worker setting or throws for malformed input. */
+/** 숫자 worker 설정을 반환하고 잘못된 입력이면 오류를 던진다. */
 function numberSetting(settings, key) {
   const value = Number(settings[key]);
   if (!Number.isFinite(value) || value < 0)
@@ -24,7 +24,7 @@ function numberSetting(settings, key) {
   return value;
 }
 
-/** Summarizes a public get response for retained failure evidence. */
+/** 보존할 실패 근거를 위해 공개 get 응답을 요약한다. */
 function responseSummary(response) {
   if (!response || typeof response !== 'object')
     return { type: typeof response };
@@ -42,39 +42,45 @@ function responseSummary(response) {
       ? response.results.length
       : undefined,
     results: Array.isArray(response.results)
-      ? response.results.map((result) => ({
-          id: result?.id,
-          found: result?.found,
-          conflict: result?.conflict,
-          revision: result?.revision,
-          definition: result?.document?.definition,
-        }))
+      ? response.results.map(
+          /** 공개 응답 결과에서 실패 근거로 남길 필드를 추출한다. */
+          (result) => ({
+            id: result?.id,
+            found: result?.found,
+            conflict: result?.conflict,
+            revision: result?.revision,
+            definition: result?.document?.definition,
+          }),
+        )
       : undefined,
   };
 }
 
-/** Checks that a public get response exactly matches the requested documents. */
+/** 공개 get 응답이 요청한 문서와 정확히 일치하는지 확인한다. */
 function exactResponse(response, documents) {
   if (!response?.success || response.results?.length !== documents.length)
     return false;
-  return documents.every((document, index) => {
-    const result = response.results[index];
-    return (
-      result?.id === document.id &&
-      result.found === true &&
-      result.conflict === false &&
-      result.document?.id === document.id &&
-      result.document?.name === document.name &&
-      result.document?.definition === document.definition &&
-      JSON.stringify(result.document?.domains) ===
-        JSON.stringify(document.domains) &&
-      result.document?.kind === document.kind &&
-      result.document?.status === document.status
-    );
-  });
+  return documents.every(
+    /** 요청 문서 하나와 공개 응답 결과 하나를 비교한다. */
+    (document, index) => {
+      const result = response.results[index];
+      return (
+        result?.id === document.id &&
+        result.found === true &&
+        result.conflict === false &&
+        result.document?.id === document.id &&
+        result.document?.name === document.name &&
+        result.document?.definition === document.definition &&
+        JSON.stringify(result.document?.domains) ===
+          JSON.stringify(document.domains) &&
+        result.document?.kind === document.kind &&
+        result.document?.status === document.status
+      );
+    },
+  );
 }
 
-/** Identifies the public transient returned while watcher synchronization runs. */
+/** watcher 동기화 중 반환되는 공개 임시 상태인지 판별한다. */
 function isRebuilding(response) {
   return (
     response?.success === false &&
@@ -84,12 +90,15 @@ function isRebuilding(response) {
   );
 }
 
-/** Waits without adding the delay to an individual public get call's timing. */
+/** 개별 공개 get 호출 시간에 지연을 포함하지 않고 대기한다. */
 function delay(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  return new Promise(
+    /** 지정한 시간 뒤 대기를 완료한다. */
+    (resolve) => setTimeout(resolve, milliseconds),
+  );
 }
 
-/** Creates the YAML for a propagation observation's complete external write. */
+/** 반영 관측의 외부 전체 쓰기에 사용할 YAML을 만든다. */
 function changedYaml(document, definition) {
   return [
     `id: ${JSON.stringify(document.id)}`,
@@ -103,7 +112,7 @@ function changedYaml(document, definition) {
   ].join('\n');
 }
 
-/** Runs one independent startup, query, and propagation measurement process. */
+/** 독립된 초기화·조회·반영 측정 프로세스 하나를 실행한다. */
 async function main() {
   const settings = parseArguments(process.argv.slice(2));
   const fixture = path.resolve(settings.fixture);
@@ -311,12 +320,15 @@ async function main() {
 
 try {
   const output = `${JSON.stringify(await main())}\n`;
-  await new Promise((resolve, reject) => {
-    process.stdout.write(output, (error) => {
-      if (error) reject(error);
-      else resolve();
-    });
-  });
+  await new Promise(
+    /** 표준 출력 쓰기가 끝나거나 실패하면 Promise를 완료한다. */
+    (resolve, reject) => {
+      process.stdout.write(output, (error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    },
+  );
   process.exit(0);
 } catch (error) {
   process.stderr.write(

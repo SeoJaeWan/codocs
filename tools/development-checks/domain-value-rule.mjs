@@ -217,7 +217,7 @@ export default {
         fix:
           matches.length !== 1
             ? undefined
-            : (fixer) => {
+            : /** 원본 도메인 상수 참조로 문자열을 교체한다. */ (fixer) => {
                 if (local) {
                   const typeOnly = local.declarations?.some(
                     (declaration) =>

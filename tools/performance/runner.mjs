@@ -22,7 +22,7 @@ const defaults = {
   'fixture-root': '.workbench/fixtures/task-002',
 };
 
-/** Prints command usage. */
+/** 명령 사용법을 출력한다. */
 function usage() {
   return [
     'Usage: pnpm performance:cod14 -- [options]',
@@ -39,7 +39,7 @@ function usage() {
   ].join('\n');
 }
 
-/** Parses the public command-line settings. */
+/** 공개 명령줄 설정을 파싱한다. */
 function parseArguments(values) {
   if (values.includes('--help')) {
     process.stdout.write(`${usage()}\n`);
@@ -66,6 +66,7 @@ function parseArguments(values) {
     throw new Error(
       `--documents must contain only ${supportedDocumentCounts.join(', ')}`,
     );
+  /** 설정 이름의 정수값을 최소값과 함께 검증한다. */
   const integer = (name, minimum) => {
     const value = Number(settings[name]);
     if (!Number.isSafeInteger(value) || value < minimum)
@@ -85,7 +86,7 @@ function parseArguments(values) {
   };
 }
 
-/** Runs a worker in an independent Node process and parses its result. */
+/** 독립 Node 프로세스에서 worker를 실행하고 결과를 파싱한다. */
 async function runWorker(configuration, fixtureDirectory) {
   const startupStartedAtMs = performance.timeOrigin + performance.now();
   const arguments_ = [
@@ -105,44 +106,52 @@ async function runWorker(configuration, fixtureDirectory) {
     '--startup-started-at-ms',
     String(startupStartedAtMs),
   ];
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, arguments_, {
-      cwd: repository,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk;
-    });
-    child.once('error', reject);
-    child.once('close', (code) => {
-      if (code !== 0)
-        reject(new Error(`Performance worker exited ${code}: ${stderr}`));
-      else {
-        try {
-          resolve(JSON.parse(stdout));
-        } catch (error) {
-          reject(
-            new Error(
-              `Performance worker returned invalid JSON: ${error.message}\n${stdout}\n${stderr}`,
-            ),
-          );
-        }
-      }
-    });
-  });
+  return new Promise(
+    /** 독립 worker 프로세스의 표준 출력과 종료 결과를 수집한다. */
+    (resolve, reject) => {
+      const child = spawn(process.execPath, arguments_, {
+        cwd: repository,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.setEncoding('utf8');
+      child.stderr.setEncoding('utf8');
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk;
+      });
+      child.once('error', reject);
+      child.once(
+        'close',
+        /** worker 종료 코드를 해석하고 결과 JSON을 반환한다. */
+        (code) => {
+          if (code !== 0)
+            reject(new Error(`Performance worker exited ${code}: ${stderr}`));
+          else {
+            try {
+              resolve(JSON.parse(stdout));
+            } catch (error) {
+              reject(
+                new Error(
+                  `Performance worker returned invalid JSON: ${error.message}\n${stdout}\n${stderr}`,
+                ),
+              );
+            }
+          }
+        },
+      );
+    },
+  );
 }
 
-/** Returns retained non-success observations with their scale and category. */
+/** 보존된 비성공 관측값을 규모와 범주와 함께 반환한다. */
 function failuresFor(scale) {
   const failures = [];
+  /** 한 측정 범주의 비성공 관측을 실패 목록에 추가한다. */
   const collect = (category, observations, expectedClassification) => {
     for (const observation of observations)
       if (
@@ -171,7 +180,7 @@ function failuresFor(scale) {
   return failures;
 }
 
-/** Builds one scale section from independent worker runs. */
+/** 독립 worker 실행 결과에서 문서 규모 하나의 섹션을 만든다. */
 async function runScale(configuration, documentCount) {
   const processRuns = [];
   let fixture;
@@ -197,17 +206,22 @@ async function runScale(configuration, documentCount) {
     fixture = generated;
     processRuns.push(await runWorker(configuration, fixtureDirectory));
   }
-  const startupObservations = processRuns.map((run, index) => ({
-    processRun: index + 1,
-    processId: run.processId,
-    ...run.startup,
-  }));
+  const startupObservations = processRuns.map(
+    /** 프로세스별 초기화 관측에 실행 번호를 붙인다. */
+    (run, index) => ({
+      processRun: index + 1,
+      processId: run.processId,
+      ...run.startup,
+    }),
+  );
   const valid = {};
   for (const count of [1, 10, 20]) {
-    const observations = processRuns.flatMap((run, index) =>
-      run.queries
-        .filter((observation) => observation.requestedCount === count)
-        .map((observation) => ({ processRun: index + 1, ...observation })),
+    const observations = processRuns.flatMap(
+      /** 프로세스 하나의 유효 조회 관측에 실행 번호를 붙인다. */
+      (run, index) =>
+        run.queries
+          .filter((observation) => observation.requestedCount === count)
+          .map((observation) => ({ processRun: index + 1, ...observation })),
     );
     valid[String(count)] = {
       requestedCount: count,
@@ -215,17 +229,21 @@ async function runScale(configuration, documentCount) {
       summary: summarize(observations),
     };
   }
-  const invalidObservations = processRuns.flatMap((run, index) =>
-    run.invalidRequests.map((observation) => ({
-      processRun: index + 1,
-      ...observation,
-    })),
+  const invalidObservations = processRuns.flatMap(
+    /** 프로세스 하나의 invalid 조회 관측에 실행 번호를 붙인다. */
+    (run, index) =>
+      run.invalidRequests.map((observation) => ({
+        processRun: index + 1,
+        ...observation,
+      })),
   );
-  const propagationObservations = processRuns.flatMap((run, index) =>
-    run.propagation.map((observation) => ({
-      processRun: index + 1,
-      ...observation,
-    })),
+  const propagationObservations = processRuns.flatMap(
+    /** 프로세스 하나의 외부 변경 관측에 실행 번호를 붙인다. */
+    (run, index) =>
+      run.propagation.map((observation) => ({
+        processRun: index + 1,
+        ...observation,
+      })),
   );
   return {
     documentCount,
@@ -267,16 +285,19 @@ async function runScale(configuration, documentCount) {
             observation.latencyMs <= 500,
         ),
     },
-    processMetrics: processRuns.map((run, index) => ({
-      processRun: index + 1,
-      processId: run.processId,
-      memory: run.memory,
-      eventLoop: run.eventLoop,
-    })),
+    processMetrics: processRuns.map(
+      /** 프로세스별 메모리와 이벤트 루프 측정값에 실행 번호를 붙인다. */
+      (run, index) => ({
+        processRun: index + 1,
+        processId: run.processId,
+        memory: run.memory,
+        eventLoop: run.eventLoop,
+      }),
+    ),
   };
 }
 
-/** Runs all configured scale measurements and emits both report formats. */
+/** 설정한 모든 문서 규모를 측정하고 두 보고서 형식을 출력한다. */
 async function main() {
   const configuration = parseArguments(process.argv.slice(2));
   const scales = [];

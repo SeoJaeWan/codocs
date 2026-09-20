@@ -9,17 +9,17 @@ const kinds = ['policy', 'procedure', 'decision', 'discussion'];
 const statuses = ['proposed', 'confirmed', 'deprecated'];
 const domainCount = 7;
 
-/** Returns the SHA-256 digest of a UTF-8 value. */
+/** UTF-8 값의 SHA-256 digest를 반환한다. */
 export function sha256(value) {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
-/** Produces a deterministic hexadecimal token for one fixture position. */
+/** fixture 위치 하나에 대한 결정적 16진수 토큰을 만든다. */
 function token(seed, index) {
   return sha256(`${seed}\0${index}`);
 }
 
-/** Returns a stable fixture document and its serialized YAML. */
+/** 고정된 fixture 문서와 직렬화한 YAML을 반환한다. */
 export function fixtureDocument(seed, index) {
   const key = token(seed, index);
   const ordinal = String(index + 1).padStart(5, '0');
@@ -54,7 +54,7 @@ export function fixtureDocument(seed, index) {
   return { document, yaml };
 }
 
-/** Creates a deterministic fixture, manifest, and expected-value file. */
+/** 결정적 fixture와 manifest·기대값 파일을 생성한다. */
 export async function generateFixture({ directory, documentCount, seed }) {
   if (!supportedDocumentCounts.includes(documentCount))
     throw new Error(
