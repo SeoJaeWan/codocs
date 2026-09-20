@@ -261,6 +261,80 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         ],
       });
     });
+
+    it.each([1, 10, 20])(
+      '%i개 ID를 상세 조회하면 실제 파일의 모든 결과를 요청 순서로 반환한다',
+      async (size) => {
+        const ids = Array.from(
+          { length: size },
+          (_, index) => `doc-${String(index).padStart(2, '0')}`,
+        );
+        await Promise.all(
+          ids.map((id) =>
+            file(
+              `${id}.yaml`,
+              `id: ${id}\nname: ${id}\ndomains: [업무]\ndefinition: ${id} 본문\n`,
+            ),
+          ),
+        );
+        const session = createWorkspaceQuerySession({ cwd: project });
+
+        const result = await session.get(ids);
+
+        expect(result).toMatchObject({
+          success: true,
+          scanStatus: scanStatuses.complete,
+        });
+        if (result.success)
+          expect(result.results.map((item) => item.id)).toEqual(ids);
+      },
+    );
+
+    it('21개 고유 ID를 상세 조회하면 일부 결과 없이 전체 요청 입력 오류를 반환한다', async () => {
+      const ids = Array.from(
+        { length: 21 },
+        (_, index) => `doc-${String(index).padStart(2, '0')}`,
+      );
+      await Promise.all(
+        ids.map((id) =>
+          file(
+            `${id}.yaml`,
+            `id: ${id}\nname: ${id}\ndomains: [업무]\ndefinition: ${id} 본문\n`,
+          ),
+        ),
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+
+      const result = await session.get(ids);
+
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: queryDiagnosticCodes.invalidInput },
+      });
+      expect(result).not.toHaveProperty('results');
+    });
+
+    it('실제 파일의 이름 참조를 상세 조회하면 직접 참조와 역참조 ID를 반환한다', async () => {
+      await file(
+        'source.yaml',
+        "id: source\nname: 출발\ndomains: [업무]\ndefinition: '[[대상]]'\n",
+      );
+      await file(
+        'target.yaml',
+        'id: target\nname: 대상\ndomains: [업무]\ndefinition: 대상 본문\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+
+      const result = await session.get(['source', 'target']);
+
+      expect(result).toMatchObject({
+        success: true,
+        results: [
+          { id: 'source', found: true, references: ['target'] },
+          { id: 'target', found: true, referencedBy: ['source'] },
+        ],
+      });
+    });
   });
 
   it('오류 문서의 원문과 byte revision을 함께 조회하고 별도 프로세스에서도 같은 revision을 계산한다', /** 실제 파일의 잘못된 UTF-8을 재인코딩하지 않는다. */ async () => {
@@ -447,12 +521,24 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         'id: doc-50\nname: doc-50\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 새 본문\n',
       );
 
-      await session.refresh();
+      await vi.waitFor(
+        async () => {
+          const synchronized = await session.get(['doc-50']);
+          expect(synchronized).toMatchObject({
+            success: true,
+            results: [{ document: { definition: '새 본문' } }],
+          });
+        },
+        { timeout: 5_000, interval: 25 },
+      );
       const result = await session.list({ cursor: first.nextCursor });
 
       expect(result).toMatchObject({
-        success: false,
-        error: { code: workspaceQueryDiagnosticCodes.cursorExpired },
+        success: true,
+        totalCount: 51,
+        returnedCount: 1,
+        nextCursor: null,
+        items: [{ id: 'doc-50' }],
       });
     });
 
@@ -493,7 +579,24 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         'id: doc-50\nname: 표시 이름 변경\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
       );
 
-      await session.refresh();
+      await vi.waitFor(
+        async () => {
+          const synchronizedFirst = await session.list();
+          if (!synchronizedFirst.success || !synchronizedFirst.nextCursor)
+            throw new Error('동기화 확인 cursor 없음');
+          const synchronized = await session.list({
+            cursor: synchronizedFirst.nextCursor,
+          });
+          if (!synchronized.success) throw new Error('목록 동기화 실패');
+          expect(synchronized.items).toContainEqual(
+            expect.objectContaining({
+              id: 'doc-50',
+              name: '표시 이름 변경',
+            }),
+          );
+        },
+        { timeout: 5_000, interval: 25 },
+      );
       const result = await session.list({ cursor: first.nextCursor });
 
       expect(result).toMatchObject({
@@ -534,7 +637,30 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
             'id: doc-50\nname: duplicate\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
           );
 
-        await session.refresh();
+        await vi.waitFor(
+          async () => {
+            const synchronizedFirst = await session.list();
+            if (!synchronizedFirst.success || !synchronizedFirst.nextCursor)
+              throw new Error('동기화 확인 cursor 없음');
+            const synchronized = await session.list({
+              cursor: synchronizedFirst.nextCursor,
+            });
+            if (!synchronized.success) throw new Error('목록 동기화 실패');
+            if (changed === 'new')
+              expect(synchronized.items).toContainEqual(
+                expect.objectContaining({ id: 'new' }),
+              );
+            if (changed === 'error')
+              expect(synchronized.items).toContainEqual(
+                expect.objectContaining({ id: 'doc-50', hasErrors: true }),
+              );
+            if (changed === 'conflict')
+              expect(synchronized.items).toContainEqual(
+                expect.objectContaining({ id: 'doc-50', conflict: true }),
+              );
+          },
+          { timeout: 5_000, interval: 25 },
+        );
         const result = await session.list({ cursor: first.nextCursor });
 
         expect(result).toMatchObject({
@@ -574,7 +700,22 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         );
       }
 
-      await session.refresh();
+      await vi.waitFor(
+        async () => {
+          const synchronized = await session.list();
+          expect(synchronized).toMatchObject({
+            success: true,
+            totalCount: replacement === null ? 50 : 51,
+          });
+          if (synchronized.success)
+            expect(synchronized.items.map((item) => item.id)).toEqual(
+              replacement === null
+                ? expect.not.arrayContaining(['doc-50'])
+                : expect.arrayContaining(['aaa']),
+            );
+        },
+        { timeout: 5_000, interval: 25 },
+      );
       const result = await session.list(input);
 
       expect(result).toEqual({
@@ -632,7 +773,16 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
           `id: doc-50\nname: doc-50\ndomains: [${domains}]\nkind: ${kind}\nstatus: ${status}\ndefinition: 본문\n`,
         );
 
-        await session.refresh();
+        await vi.waitFor(
+          async () => {
+            const synchronized = await session.list(filters);
+            expect(synchronized).toMatchObject({
+              success: true,
+              totalCount: 50,
+            });
+          },
+          { timeout: 5_000, interval: 25 },
+        );
         const result = await session.list(input);
 
         expect(result).toEqual({
