@@ -4,6 +4,7 @@ import {
   watch as watchDirectory,
   type FSWatcher as DirectoryWatcher,
 } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   workspaceLifecycleStates,
@@ -15,6 +16,8 @@ import { codocsDirectoryName } from '../project-root/index.js';
 export interface WorkspaceChangeBatch {
   paths: readonly string[];
 }
+
+type ContentIdentity = { dev: number; ino: number } | null;
 
 /** 변화 감지 실패 후 사용자가 직접 호출할 복구 방법이다. */
 export const watcherRecoveryGuidance =
@@ -39,7 +42,10 @@ export class WorkspaceWatcher {
   #recoveryUsed = false;
   #closed = false;
   #starting: Promise<void> | undefined;
+  #openingContent = false;
+  #reopenRequested = false;
   #reopening = false;
+  #contentIdentity: ContentIdentity | undefined;
 
   /** 선택한 실제 프로젝트 경로를 감시 대상으로 고정한다. */
   constructor(projectRoot: string) {
@@ -79,6 +85,9 @@ export class WorkspaceWatcher {
   /** 두 watcher를 시작해 프로젝트의 .codocs 교체와 내부 변경을 함께 감지한다. */
   async #open(): Promise<void> {
     const codocsPath = path.join(this.#root, codocsDirectoryName);
+    this.#contentIdentity = await this.#readContentIdentity(codocsPath);
+    this.#openingContent = true;
+    this.#reopenRequested = false;
     const rootWatcher = chokidar.watch(this.#root, {
       depth: 1,
       ignoreInitial: true,
@@ -104,7 +113,6 @@ export class WorkspaceWatcher {
     this.#targetWatcher = targetWatcher;
     this.#entryWatcher = watchDirectory(this.#root, (_event, filename) => {
       if (filename?.toString() !== codocsDirectoryName) return;
-      this.#signal(codocsPath);
       void this.#reopenContent().catch(() => undefined);
     });
     const failure = (error: unknown): void => {
@@ -117,12 +125,21 @@ export class WorkspaceWatcher {
     targetWatcher?.on('error', failure);
     rootWatcher.on('all', (event, changed) => {
       if (path.resolve(changed) === codocsPath) {
-        this.#signal(changed);
         if (event === 'addDir' || event === 'unlinkDir')
           void this.#reopenContent().catch(failure);
+        else this.#signal(changed);
       }
     });
-    contentWatcher.on('all', (_event, changed) => this.#signal(changed));
+    contentWatcher.on('all', (event, changed) => {
+      if (
+        path.resolve(changed) === codocsPath &&
+        (event === 'addDir' || event === 'unlinkDir')
+      ) {
+        void this.#reopenContent().catch(failure);
+        return;
+      }
+      this.#signal(changed);
+    });
     targetWatcher?.on('all', (_event, changed) => this.#signalTarget(changed));
     /** 시작 중 오류를 무한한 ready 대기로 남기지 않는다. */
     const ready = (watcher: FSWatcher): Promise<void> =>
@@ -130,11 +147,29 @@ export class WorkspaceWatcher {
         watcher.once('ready', resolve);
         watcher.once('error', reject);
       });
-    await Promise.all([
-      ready(rootWatcher),
-      ready(contentWatcher),
-      ...(targetWatcher ? [ready(targetWatcher)] : []),
-    ]);
+    try {
+      await Promise.all([
+        ready(rootWatcher),
+        ready(contentWatcher),
+        ...(targetWatcher ? [ready(targetWatcher)] : []),
+      ]);
+    } finally {
+      this.#openingContent = false;
+    }
+    const reopenRequested = this.#reopenRequested;
+    this.#reopenRequested = false;
+    if (reopenRequested) await this.#reopenContent();
+    else this.#contentIdentity = await this.#readContentIdentity(codocsPath);
+  }
+
+  /** 현재 .codocs 디렉터리의 파일 시스템 식별자를 읽는다. */
+  async #readContentIdentity(codocsPath: string): Promise<ContentIdentity> {
+    try {
+      const result = await stat(codocsPath);
+      return { dev: result.dev, ino: result.ino };
+    } catch {
+      return null;
+    }
   }
 
   /** 연결 대상이나 그 조상 변화만 query에 전달한다. */
@@ -196,12 +231,28 @@ export class WorkspaceWatcher {
   /** .codocs 교체 후 새 트리를 다시 감시한다. */
   async #reopenContent(): Promise<void> {
     const current = this.#contentWatcher;
-    if (!current || this.#closed || this.#reopening) return;
+    if (!current || this.#closed) return;
+    if (this.#openingContent) {
+      this.#reopenRequested = true;
+      return;
+    }
+    if (this.#reopening) return;
     this.#reopening = true;
+    const codocsPath = path.join(this.#root, codocsDirectoryName);
     try {
+      const identity = await this.#readContentIdentity(codocsPath);
+      if (
+        this.#contentIdentity !== undefined &&
+        ((this.#contentIdentity === null && identity === null) ||
+          (this.#contentIdentity !== null &&
+            identity !== null &&
+            this.#contentIdentity.dev === identity.dev &&
+            this.#contentIdentity.ino === identity.ino))
+      )
+        return;
       await current.close();
       if (this.#closed) return;
-      const next = chokidar.watch(path.join(this.#root, codocsDirectoryName), {
+      const next = chokidar.watch(codocsPath, {
         ignoreInitial: true,
         followSymlinks: true,
         awaitWriteFinish: false,
@@ -212,7 +263,8 @@ export class WorkspaceWatcher {
       });
       this.#contentWatcher = next;
       await new Promise<void>((resolve) => next.once('ready', resolve));
-      this.#signal(path.join(this.#root, codocsDirectoryName));
+      this.#contentIdentity = await this.#readContentIdentity(codocsPath);
+      this.#signal(codocsPath);
     } finally {
       this.#reopening = false;
     }
