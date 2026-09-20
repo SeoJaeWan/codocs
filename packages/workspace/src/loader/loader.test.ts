@@ -20,6 +20,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { workspaceDiagnosticCodes } from '../diagnostics/index.js';
 import { resolveWorkspacePath } from '../paths/index.js';
+import { detectFileSystemTestCapabilities } from '../test-support/file-system.js';
 import { loadWorkspace } from './index.js';
 import { workspaceDocumentStatuses } from './domain-values.js';
 
@@ -27,6 +28,10 @@ let fixture: string;
 let project: string;
 let codocs: string;
 let outside: string;
+const {
+  symlink: symlinkSupported,
+  permissionDenial: permissionDenialSupported,
+} = await detectFileSystemTestCapabilities();
 const raw =
   'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\n';
 beforeEach(
@@ -89,7 +94,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     }
     expect(result.failures).toEqual([]);
   });
-  it('다른 Unicode와 대소문자 이름으로 같은 파일을 연결하면 두 발견 경로를 유지한다', /** 경로를 임의로 정규화하여 문서를 병합하지 않는다. */ async () => {
+  it.skipIf(!symlinkSupported)('다른 Unicode와 대소문자 이름으로 같은 파일을 연결하면 두 발견 경로를 유지한다', /** 경로를 임의로 정규화하여 문서를 병합하지 않는다. */ async () => {
     const target = path.join(outside, 'target.yaml');
     await writeFile(target, raw);
     const names = ['first/Mixed-가.yaml', 'second/mixed-가.yml'];
@@ -187,7 +192,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       documents: [],
     });
   });
-  it('외부 파일과 폴더 링크를 읽으면 논리 경로와 읽기 쓰기 범위를 제공한다', /** 외부 연결 범위는 부모 전체로 확장하지 않는다. */ async () => {
+  it.skipIf(!symlinkSupported)('외부 파일과 폴더 링크를 읽으면 논리 경로와 읽기 쓰기 범위를 제공한다', /** 외부 연결 범위는 부모 전체로 확장하지 않는다. */ async () => {
     const file = path.join(outside, '외부 파일.yaml');
     await writeFile(file, raw);
     await symlink(file, path.join(codocs, 'file.yml'), 'file');
@@ -219,7 +224,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       ),
     ).toMatchObject({ success: false, status: 'denied' });
   });
-  it('.codocs 자체가 외부 폴더 링크이면 그 하위 문서를 읽는다', /** 명시적으로 연결된 스캔 루트를 처리한다. */ async () => {
+  it.skipIf(!symlinkSupported)('.codocs 자체가 외부 폴더 링크이면 그 하위 문서를 읽는다', /** 명시적으로 연결된 스캔 루트를 처리한다. */ async () => {
     await rm(codocs, { recursive: true });
     await writeFile(path.join(outside, 'term.yaml'), raw);
     await symlink(outside, codocs, 'dir');
@@ -229,7 +234,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       documents: [{ status: 'valid', scope: { kind: 'linkedDirectory' } }],
     });
   });
-  it('자기와 부모 폴더로 돌아오는 연결이 있으면 연결만 건너뛰고 정상 문서를 읽는다', /** 확인된 순환은 탐색 누락과 별도로 기록한다. */ async () => {
+  it.skipIf(!symlinkSupported)('자기와 부모 폴더로 돌아오는 연결이 있으면 연결만 건너뛰고 정상 문서를 읽는다', /** 확인된 순환은 탐색 누락과 별도로 기록한다. */ async () => {
     await document('nested/ok.yaml', raw);
     await symlink(codocs, path.join(codocs, 'self'), 'dir');
     await symlink(codocs, path.join(codocs, 'nested', 'parent'), 'dir');
@@ -246,7 +251,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
         },
       ]);
   });
-  it('여러 연결을 거쳐 조상으로 돌아오면 순환 연결만 중단한다', /** 별도 정상 문서는 계속 처리한다. */ async () => {
+  it.skipIf(!symlinkSupported)('여러 연결을 거쳐 조상으로 돌아오면 순환 연결만 중단한다', /** 별도 정상 문서는 계속 처리한다. */ async () => {
     const second = path.join(fixture, 'second');
     await mkdir(second);
     await writeFile(path.join(second, 'ok.yaml'), raw);
@@ -263,7 +268,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     });
     expect(result.documents).toHaveLength(2);
   });
-  it('다른 두 가지가 같은 폴더에 도달하면 양쪽 논리 경로를 각각 읽는다', /** 전역 중복 제거로 중복 ID를 숨기지 않는다. */ async () => {
+  it.skipIf(!symlinkSupported)('다른 두 가지가 같은 폴더에 도달하면 양쪽 논리 경로를 각각 읽는다', /** 전역 중복 제거로 중복 ID를 숨기지 않는다. */ async () => {
     await writeFile(path.join(outside, 'same.yaml'), raw);
     await symlink(outside, path.join(codocs, 'SharedA'), 'dir');
     await symlink(outside, path.join(codocs, 'sharedB'), 'dir');
@@ -287,7 +292,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       expect(item.data.id).toBe('shared-term');
     }
   });
-  it('같은 파일의 링크 별칭과 hardlink를 읽으면 모든 발견 경로를 보존한다', /** 파일 실제 경로가 같아도 대표 별칭을 고르지 않는다. */ async () => {
+  it.skipIf(!symlinkSupported)('같은 파일의 링크 별칭과 hardlink를 읽으면 모든 발견 경로를 보존한다', /** 파일 실제 경로가 같아도 대표 별칭을 고르지 않는다. */ async () => {
     await document('original.yaml', raw);
     await symlink('original.yaml', path.join(codocs, 'alias.yml'), 'file');
     await link(
@@ -380,7 +385,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       ],
     });
   });
-  it('깨진 링크가 있으면 실패 경로만 보관하고 정상 문서를 계속 읽어 부분 완료다', /** 얻지 못한 원문과 실제 경로를 만들지 않는다. */ async () => {
+  it.skipIf(!symlinkSupported)('깨진 링크가 있으면 실패 경로만 보관하고 정상 문서를 계속 읽어 부분 완료다', /** 얻지 못한 원문과 실제 경로를 만들지 않는다. */ async () => {
     await document('ok.yaml', raw);
     await symlink(
       path.join(outside, 'missing.yaml'),
@@ -402,7 +407,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     expect(result.failures[0]).not.toHaveProperty('realPath');
     expect(result.failures[0]).not.toHaveProperty('id');
   });
-  it('하위 파일을 실제로 읽을 수 없으면 확인한 실제 경로와 IO 실패를 보관한다', /** chmod 권한 실패를 실제 readFile로 확인한다. */ async () => {
+  it.skipIf(!permissionDenialSupported)('하위 파일을 실제로 읽을 수 없으면 확인한 실제 경로와 IO 실패를 보관한다', /** chmod 권한 실패를 실제 readFile로 확인한다. */ async () => {
     await document('restricted.yaml', raw);
     await document('ok.yaml', raw);
     const target = path.join(codocs, 'restricted.yaml');
@@ -428,7 +433,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       await chmod(target, 0o600);
     }
   });
-  it('하위 폴더 열거를 실제로 실패하면 누락 범위와 정상 파일을 함께 반환한다', /** execute만 있는 폴더에서 readdir 실패를 확인한다. */ async () => {
+  it.skipIf(!permissionDenialSupported)('하위 폴더 열거를 실제로 실패하면 누락 범위와 정상 파일을 함께 반환한다', /** execute만 있는 폴더에서 readdir 실패를 확인한다. */ async () => {
     await document('restricted/hidden.yaml', raw);
     await document('ok.yaml', raw);
     const folder = path.join(codocs, 'restricted');
@@ -453,7 +458,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     }
   });
   describe('스캔 시작 경로 실패', () => {
-    it.each(['project', '.codocs'])(
+    it.skipIf(!permissionDenialSupported).each(['project', '.codocs'])(
       '%s 디렉터리의 탐색 권한이 없으면 전체 실패를 반환한다',
       async (kind) => {
         const target = kind === 'project' ? project : codocs;
@@ -498,7 +503,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       });
     });
   });
-  it('깨진 .codocs 링크이면 정상 부재로 숨기지 않고 전체 실패다', /** 존재하는 연결의 대상 실패를 기록한다. */ async () => {
+  it.skipIf(!symlinkSupported)('깨진 .codocs 링크이면 정상 부재로 숨기지 않고 전체 실패다', /** 존재하는 연결의 대상 실패를 기록한다. */ async () => {
     await rm(codocs, { recursive: true });
     await symlink(path.join(outside, 'missing'), codocs, 'dir');
     expect(await loadWorkspace({ cwd: project })).toMatchObject({

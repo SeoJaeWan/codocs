@@ -11,6 +11,8 @@ const original =
   '# 그대로 보존\r\nid: zone\r\nname: 구역\r\ndefinition: 설명\r\ndomains: [운영]\r\ndeprecatedAliases:\r\n  - id: return-zone\r\n    message: 기존 안내\r\n';
 let root: string;
 let file: string;
+const zonePath = path.join('.codocs', 'zone.yaml');
+const unrelatedPath = path.join('.codocs', 'unrelated.yaml');
 
 beforeEach(async () => {
   root = await mkdtemp(path.join(tmpdir(), 'codocs-change-plan-'));
@@ -37,7 +39,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
     it('문서 이름 변경을 계획하면 새 이름을 가진 후보를 반환한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
-        (item) => item.source.path === '.codocs/zone.yaml',
+        (item) => item.source.path === zonePath,
       );
       const request = {
         mode: 'update',
@@ -57,7 +59,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
     it('기존 ID를 변경하면 주석·개행·이전 ID 이력을 포함한 후보를 반환한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
-        (item) => item.source.path === '.codocs/zone.yaml',
+        (item) => item.source.path === zonePath,
       );
       const request = {
         mode: 'update',
@@ -80,14 +82,14 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
       ]);
       expect(result.revision).toMatch(/^[a-f0-9]{64}$/u);
       expect(result.diagnostics).not.toContainEqual(
-        expect.objectContaining({ path: '.codocs/unrelated.yaml' }),
+        expect.objectContaining({ path: unrelatedPath }),
       );
     });
 
     it('ID 변경 후보를 계획하면 파일과 요청 객체를 수정하지 않는다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
-        (item) => item.source.path === '.codocs/zone.yaml',
+        (item) => item.source.path === zonePath,
       );
       const request = {
         mode: 'update',
@@ -111,7 +113,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
     it('다른 문서가 사용 중인 ID로 변경하면 중복 ID 오류를 반환한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
-        (item) => item.source.path === '.codocs/zone.yaml',
+        (item) => item.source.path === zonePath,
       );
       const request = {
         mode: 'update',
@@ -128,7 +130,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
         expect.objectContaining({ code: 'duplicate_id' }),
       );
       expect(result.diagnostics).not.toContainEqual(
-        expect.objectContaining({ path: '.codocs/unrelated.yaml' }),
+        expect.objectContaining({ path: unrelatedPath }),
       );
       expect(await readFile(file, 'utf8')).toBe(original);
     });
@@ -136,7 +138,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
     it('기존 ID로 변경을 요청하면 원래 revision과 함께 변경 없음을 반환한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
-        (item) => item.source.path === '.codocs/zone.yaml',
+        (item) => item.source.path === zonePath,
       );
       const request = {
         mode: 'update',
@@ -155,7 +157,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
     it('이전 ID 목록을 직접 지우도록 요청하면 실패하고 파일을 보존한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
-        (item) => item.source.path === '.codocs/zone.yaml',
+        (item) => item.source.path === zonePath,
       );
       const request = {
         mode: 'update',

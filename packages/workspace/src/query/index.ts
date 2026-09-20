@@ -358,6 +358,9 @@ export class WorkspaceQuerySession {
 
   /** 하나의 스캔에서 문서·참조·진단·revision을 함께 게시한다. */
   async #scanOnce(): Promise<WorkspaceScanResult> {
+    const previousListFingerprint = this.#catalog
+      ? fingerprint(projectCatalogList(this.#catalog, {}).items)
+      : undefined;
     const scan = await loadWorkspace(this.#input);
     const next =
       scan.status === scanStatuses.failed
@@ -384,7 +387,13 @@ export class WorkspaceQuerySession {
     if (scan.status !== scanStatuses.failed) {
       this.#catalog = next;
       this.#revisions = revisions;
-      this.#generation++;
+      if (
+        previousListFingerprint !== undefined &&
+        next &&
+        previousListFingerprint !==
+          fingerprint(projectCatalogList(next, {}).items)
+      )
+        this.#generation++;
       if (scan.status === scanStatuses.complete && next)
         this.#completed = { catalog: next, revisions };
     }
@@ -620,9 +629,12 @@ export class WorkspaceQuerySession {
     /** 수동 재연결과 전체 스캔의 결과를 함께 반환한다. */
     const operation = (async (): Promise<WorkspaceRefreshResult> => {
       if (this.#watcher) await this.#watcher.refresh();
+      const generation = this.#generation;
       const scan = await this.#synchronize();
       const watchFailure = this.#watchFailure();
       if (watchFailure) return this.#watchFailureResult(watchFailure);
+      if (scan.status !== scanStatuses.failed)
+        this.#generation = Math.max(this.#generation, generation + 1);
       return scan.status === scanStatuses.failed
         ? scanFailure(scan)
         : {
