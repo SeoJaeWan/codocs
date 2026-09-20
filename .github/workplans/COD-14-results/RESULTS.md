@@ -84,3 +84,20 @@ Raw JSON and generated Markdown are retained beside this file in `baseline-1000`
 ## Follow-up verification
 
 The follow-up keeps the existing bounded loader batching. It adds a named Korean-JSDoc helper for the batch callback and makes the regression suite capability-aware: symlink and POSIX permission cases are registered only when the host can exercise them, while path assertions use the host separator. On Windows, `pnpm lint`, `pnpm typecheck`, and the full Vitest run pass with 550 passed and 40 capability-gated skips across 19 files. The 5,000- and 10,000-document propagation timeouts remain recorded as deferred refresh/indexing work; this pass does not claim a new cross-scale performance result.
+
+## Full-scale comparison rerun
+
+On 2026-09-20, all four fixture sizes were measured in one run with one independent startup process, 20 warmup calls, 100 samples for each valid get size, and 3 external-write propagation observations. This is a scale comparison, not the 1,000-document acceptance run: the reduced repetition counts do not replace the planned 10-startup/1,000-query/100-propagation verification.
+
+```text
+pnpm performance:cod14 -- --documents 100,1000,5000,10000 --startup-runs 1 --warmup-runs 20 --query-runs 100 --propagation-runs 3 --output .github/workplans/COD-14-results/full-scale-20260920 --fixture-root .workbench/fixtures/cod14-full-scale-20260920
+```
+
+| Documents |       Startup |          Get 1/10/20 p95 |               Propagation | Classification   |
+| --------: | ------------: | -----------------------: | ------------------------: | ---------------- |
+|       100 |    357.722 ms | 0.032 / 0.038 / 0.071 ms | 3/3 exact; p95 190.542 ms | comparison pass  |
+|     1,000 |  1,606.560 ms | 0.016 / 0.111 / 0.104 ms |              0/3; timeout | propagation miss |
+|     5,000 |  7,064.438 ms | 0.016 / 0.083 / 0.122 ms |              0/3; timeout | propagation miss |
+|    10,000 | 14,060.644 ms | 0.018 / 0.086 / 0.140 ms |              0/3; timeout | propagation miss |
+
+All startup, valid get, and 21-ID invalid-request observations were exact. The command exited with status 1 because the retained propagation timeouts make the overall correctness field fail; the raw JSON and Markdown report were still written to `full-scale-20260920`.
