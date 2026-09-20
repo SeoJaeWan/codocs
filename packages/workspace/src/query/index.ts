@@ -6,6 +6,7 @@ import {
   diagnosticSeverities,
   isDocumentKind,
   isDocumentStatus,
+  matchCode,
   projectCatalogGet,
   projectCatalogList,
   queryDiagnosticCodes,
@@ -16,6 +17,9 @@ import {
   type CatalogListFilters,
   type CatalogListItem,
   type CatalogQueryDiagnostic,
+  type CodeMatchCandidate,
+  type CodeMatchEvidence,
+  type CodeMatchResult,
   type Diagnostic,
   type ScanStatus,
 } from '@codocs/core';
@@ -114,6 +118,24 @@ export type WorkspaceListResult = WorkspaceListSuccess | WorkspaceQueryFailure;
 
 /** 상세 조회 결과다. */
 export type WorkspaceGetResponse = WorkspaceGetSuccess | WorkspaceQueryFailure;
+
+/** 현재 catalog snapshot으로 전체 문서 텍스트를 매칭한 결과다. */
+export interface WorkspaceMatchSuccess {
+  success: true;
+  scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
+  catalogVersion: number;
+  refreshing: boolean;
+  candidates: readonly CodeMatchCandidate[];
+  evidence: readonly CodeMatchEvidence[];
+  diagnostics: CodeMatchResult['diagnostics'];
+  partial: boolean;
+  status: CodeMatchResult['status'];
+  failures: CodeMatchResult['failures'];
+}
+
+/** 전체 텍스트 매칭 결과 또는 catalog를 확인할 수 없는 실패다. */
+export type WorkspaceMatchResult =
+  WorkspaceMatchSuccess | WorkspaceQueryFailure;
 
 /** 명시 refresh의 scan 결과다. */
 export type WorkspaceRefreshResult =
@@ -343,8 +365,11 @@ export class WorkspaceQuerySession {
   #catalog: Catalog | undefined;
   #scan: WorkspaceScanResult | undefined;
   #revisions = new Map<string, string>();
-  #completed: { catalog: Catalog; revisions: Map<string, string> } | undefined;
+  #completed:
+    | { catalog: Catalog; revisions: Map<string, string>; version: number }
+    | undefined;
   #generation = 0;
+  #catalogVersion = 0;
   #refreshPromise: Promise<WorkspaceScanResult> | undefined;
   #explicitRefreshPromise: Promise<WorkspaceRefreshResult> | undefined;
   #watcher: WorkspaceWatcher | undefined;
@@ -387,6 +412,7 @@ export class WorkspaceQuerySession {
     if (scan.status !== scanStatuses.failed) {
       this.#catalog = next;
       this.#revisions = revisions;
+      this.#catalogVersion++;
       if (
         previousListFingerprint !== undefined &&
         next &&
@@ -395,7 +421,11 @@ export class WorkspaceQuerySession {
       )
         this.#generation++;
       if (scan.status === scanStatuses.complete && next)
-        this.#completed = { catalog: next, revisions };
+        this.#completed = {
+          catalog: next,
+          revisions,
+          version: this.#catalogVersion,
+        };
     }
     this.#scan = scan;
     return scan;
@@ -475,6 +505,11 @@ export class WorkspaceQuerySession {
   /** 반영된 complete 또는 partial refresh의 세대다. */
   get generation(): number {
     return this.#generation;
+  }
+
+  /** 매칭에 사용하는 catalog snapshot이 게시될 때마다 바뀌는 버전이다. */
+  get catalogVersion(): number {
+    return this.#catalogVersion;
   }
 
   /** 마지막으로 게시한 탐색 상태다. */
@@ -620,6 +655,40 @@ export class WorkspaceQuerySession {
       scanStatus,
       results,
       ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
+    };
+  }
+
+  /** 열린 문서의 전체 원문을 현재 프로젝트 catalog snapshot으로 매칭한다. */
+  async match(text: string): Promise<WorkspaceMatchResult> {
+    const scan = await this.#current();
+    const watchFailure = this.#watchFailure();
+    if (scan.status === scanStatuses.failed) return scanFailure(scan);
+    if (watchFailure && !this.#completed)
+      return this.#watchFailureResult(watchFailure);
+    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
+    if (!catalog) return scanFailure(scan);
+    const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
+    const result = matchCode(catalog, text);
+    const candidates = watchFailure
+      ? result.candidates.map((candidate) => ({
+          ...candidate,
+          confirmation: catalogConfirmations.unconfirmed,
+        }))
+      : result.candidates;
+    return {
+      ...result,
+      success: true,
+      scanStatus,
+      catalogVersion: watchFailure
+        ? this.#completed!.version
+        : this.#catalogVersion,
+      refreshing: !!this.#refreshPromise,
+      candidates,
+      partial: result.partial || !!watchFailure,
+      status: scanStatus,
+      ...(watchFailure
+        ? { diagnostics: [...result.diagnostics, watchFailure] }
+        : {}),
     };
   }
 
