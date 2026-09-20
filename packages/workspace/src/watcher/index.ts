@@ -42,6 +42,8 @@ export class WorkspaceWatcher {
   #recoveryUsed = false;
   #closed = false;
   #starting: Promise<void> | undefined;
+  #openingContent = false;
+  #reopenRequested = false;
   #reopening = false;
   #contentIdentity: ContentIdentity | undefined;
 
@@ -83,7 +85,9 @@ export class WorkspaceWatcher {
   /** 두 watcher를 시작해 프로젝트의 .codocs 교체와 내부 변경을 함께 감지한다. */
   async #open(): Promise<void> {
     const codocsPath = path.join(this.#root, codocsDirectoryName);
-    this.#contentIdentity = undefined;
+    this.#contentIdentity = await this.#readContentIdentity(codocsPath);
+    this.#openingContent = true;
+    this.#reopenRequested = false;
     const rootWatcher = chokidar.watch(this.#root, {
       depth: 1,
       ignoreInitial: true,
@@ -143,12 +147,19 @@ export class WorkspaceWatcher {
         watcher.once('ready', resolve);
         watcher.once('error', reject);
       });
-    await Promise.all([
-      ready(rootWatcher),
-      ready(contentWatcher),
-      ...(targetWatcher ? [ready(targetWatcher)] : []),
-    ]);
-    this.#contentIdentity = await this.#readContentIdentity(codocsPath);
+    try {
+      await Promise.all([
+        ready(rootWatcher),
+        ready(contentWatcher),
+        ...(targetWatcher ? [ready(targetWatcher)] : []),
+      ]);
+    } finally {
+      this.#openingContent = false;
+    }
+    const reopenRequested = this.#reopenRequested;
+    this.#reopenRequested = false;
+    if (reopenRequested) await this.#reopenContent();
+    else this.#contentIdentity = await this.#readContentIdentity(codocsPath);
   }
 
   /** 현재 .codocs 디렉터리의 파일 시스템 식별자를 읽는다. */
@@ -220,7 +231,12 @@ export class WorkspaceWatcher {
   /** .codocs 교체 후 새 트리를 다시 감시한다. */
   async #reopenContent(): Promise<void> {
     const current = this.#contentWatcher;
-    if (!current || this.#closed || this.#reopening) return;
+    if (!current || this.#closed) return;
+    if (this.#openingContent) {
+      this.#reopenRequested = true;
+      return;
+    }
+    if (this.#reopening) return;
     this.#reopening = true;
     const codocsPath = path.join(this.#root, codocsDirectoryName);
     try {

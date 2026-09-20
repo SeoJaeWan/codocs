@@ -1,6 +1,6 @@
 /* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- Vitest 목업 콜백은 공개 선언 함수가 아니다. */
 import type { EventEmitter } from 'node:events';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,7 +10,21 @@ import { workspaceLifecycleStates } from '../lifecycle/index.js';
 const fake = vi.hoisted(() => ({
   watchers: [] as (EventEmitter & { close: ReturnType<typeof vi.fn> })[],
   failNext: false,
+  manualReady: false,
+  contentIdentity: undefined as { dev: number; ino: number } | undefined,
+  statCalls: 0,
 }));
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    stat: async (...args: Parameters<typeof actual.stat>) => {
+      fake.statCalls += 1;
+      return fake.contentIdentity ?? actual.stat(...args);
+    },
+  };
+});
 
 vi.mock('chokidar', async () => {
   const events = await import('node:events');
@@ -24,9 +38,10 @@ vi.mock('chokidar', async () => {
         fake.watchers.push(watcher);
         const fail = fake.failNext;
         fake.failNext = false;
-        queueMicrotask(() =>
-          watcher.emit(fail ? 'error' : 'ready', new Error('watch failed')),
-        );
+        if (!fake.manualReady)
+          queueMicrotask(() =>
+            watcher.emit(fail ? 'error' : 'ready', new Error('watch failed')),
+          );
         return watcher;
       },
     },
@@ -45,6 +60,9 @@ let watcher: WorkspaceWatcher | undefined;
 beforeEach(async () => {
   fake.watchers.length = 0;
   fake.failNext = false;
+  fake.manualReady = false;
+  fake.contentIdentity = undefined;
+  fake.statCalls = 0;
   project = await mkdtemp(path.join(tmpdir(), 'codocs-watcher-recovery-'));
 });
 
@@ -59,6 +77,45 @@ afterEach(async () => {
 });
 
 describe('WorkspaceWatcher 신호 병합과 구독 수명', () => {
+  it('초기 연결 중 .codocs 알림이 오면 준비 중인 내용 감시자를 닫지 않는다', async () => {
+    const codocs = path.join(project, '.codocs');
+    await mkdir(codocs);
+    fake.manualReady = true;
+    fake.contentIdentity = { dev: 1, ino: 1 };
+    const starting = createWorkspaceWatcher(project);
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(2));
+    const contentWatcher = fake.watchers[1]!;
+
+    fake.watchers[0]!.emit('all', 'addDir', codocs);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    for (const connection of fake.watchers) connection.emit('ready');
+    watcher = await starting;
+
+    expect(watcher.readiness).toEqual({
+      state: workspaceLifecycleStates.ready,
+      ready: true,
+    });
+    expect(fake.watchers).toHaveLength(2);
+    expect(contentWatcher.close).not.toHaveBeenCalled();
+  });
+
+  it('같은 .codocs 디렉터리 알림이 겹치면 내용 감시자를 다시 열지 않는다', async () => {
+    const codocs = path.join(project, '.codocs');
+    await mkdir(codocs);
+    fake.contentIdentity = { dev: 1, ino: 1 };
+    watcher = await createWorkspaceWatcher(project);
+    const contentWatcher = fake.watchers[1]!;
+    const initialStatCalls = fake.statCalls;
+
+    fake.watchers[0]!.emit('all', 'addDir', codocs);
+    contentWatcher.emit('all', 'addDir', codocs);
+    await vi.waitFor(() => expect(fake.statCalls).toBe(initialStatCalls + 1));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(fake.watchers).toHaveLength(2);
+    expect(contentWatcher.close).not.toHaveBeenCalled();
+  });
+
   it('같은 경로의 변경 알림이 한 배치에 모이면 경로를 한 번만 전달한다', async () => {
     watcher = await createWorkspaceWatcher(project);
     const listener = vi.fn();
