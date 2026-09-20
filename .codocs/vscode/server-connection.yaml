@@ -1,0 +1,14 @@
+id: server-connection
+name: '언어 서버 연결'
+domains:
+  - 'VS Code'
+definition: |
+  VS Code 확장이 별도 Node 언어 서버를 실행하고 LSP/Node IPC로 연결하는 계약이다.
+  확장은 호스트와 실행 생명주기를 담당하며 core·workspace 함수를 직접 호출하지 않는다.
+
+  ## 책임 경계
+
+  클라이언트 연결은 vscode-languageclient, 서버 요청 처리는 language-server의 vscode-languageserver가 담당한다.
+  코드의 최신 내용은 [[문서 동기화]], 호버·자동완성·진단의 표현 경계는 [[IDE 지원]]에서 정의한다.
+  실행·연결 실패는 연결 상태로 안내하며 정상적인 빈 조회나 문서 부재로 해석하지 않는다.
+  패키지 번들의 로드 성공과 실제 확장 실행·LSP 연결 성공은 별도로 확인한다.
