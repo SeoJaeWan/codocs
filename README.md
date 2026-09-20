@@ -29,6 +29,12 @@ pnpm build
 
 ## 개발하기
 
+`pnpm install`은 `prepare` 스크립트로 Husky의 커밋 전 검사 훅을 설치한다. 기존 체크아웃에서는 `pnpm prepare`로 설치할 수 있다. 훅 명령은 `.husky/pre-commit`, 파일별 검사 설정은 `package.json`의 `lint-staged`에서 관리한다.
+
+커밋할 때 lint-staged가 스테이징된 코드 파일에 `eslint --fix`와 `prettier --write`를 순서대로 실행하고, 문서·데이터·스타일 파일에는 Prettier를 적용한다. 자동 수정 후 검사를 통과하면 수정 결과도 커밋에 포함한다. 자동 수정할 수 없는 ESLint 오류나 파싱 오류가 남으면 커밋을 중단하고 파일·원인을 안내한다. ESLint 경고만 남으면 커밋을 허용한다.
+
+부분 스테이징 파일의 미스테이징 변경은 검사 중 임시로 숨겼다가 복원한다. 검사 실패 시 lint-staged는 기본적으로 자동 수정도 되돌린다. 오류를 직접 수정하고 다시 스테이징한 뒤 커밋한다. `pnpm check:staged`로 같은 자동 수정을 수동 실행할 수 있다. 기존 파일 전체의 오류까지 고치는 것은 아니므로 전체 검증에는 계속 `pnpm check`를 사용한다. 로컬 훅은 `--no-verify`로 우회할 수 있다.
+
 ```sh
 pnpm test              # 기능 테스트 watch
 pnpm test:run          # 기능 테스트 단일 실행

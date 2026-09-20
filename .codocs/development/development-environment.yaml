@@ -14,6 +14,10 @@ definition: |
   pnpm test는 기능 watch, pnpm test:run은 기능 단일 실행이다.
   pnpm check:development는 개발 규칙·설치 계약, pnpm check:build는 빌드·패키지 소비를 검사한다.
   pnpm check는 준비와 전체 검사를 순차 실행하고 실패하면 중단한다.
+  pnpm install의 prepare 단계에서 Husky 커밋 훅을 설치한다.
+  커밋 전 lint-staged가 스테이징된 코드에 ESLint 자동 수정과 Prettier를 적용하고, 문서·데이터·스타일에는 Prettier를 적용한다.
+  성공한 자동 수정은 커밋에 포함하며, 남은 ESLint 오류나 파싱 오류는 커밋을 중단한다. 경고만으로는 중단하지 않는다.
+  커밋 훅은 전체 타입·기능·빌드 검사를 대체하지 않는다.
   지정된 Node·pnpm 외에 전용 환경변수나 미리 채운 store를 요구하지 않는다.
   현재 저장소의 추가 검증 명령과 실행 방법은 루트 README에서 확인한다.
 
