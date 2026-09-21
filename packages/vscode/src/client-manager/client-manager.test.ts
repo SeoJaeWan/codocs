@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method, codocs/korean-jsdoc, jsdoc/require-jsdoc -- mock 메서드 자체의 호출 여부를 검증한다. */
 import { describe, expect, it, vi } from 'vitest';
 import {
   RollingRestartBudget,

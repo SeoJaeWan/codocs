@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- Vitest 목업 콜백은 공개 선언 함수가 아니다. */
 import type { EventEmitter } from 'node:events';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

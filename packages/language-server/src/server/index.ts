@@ -1,10 +1,8 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- LSP SDK 등록 콜백은 공개 선언 함수가 아니다. */
 import {
   createConnection,
   ProposedFeatures,
   TextDocumentSyncKind,
   type Connection,
-  type InitializeResult,
 } from 'vscode-languageserver/node.js';
 import {
   documentMatchRequestMethod,
@@ -40,7 +38,10 @@ export function bindLanguageServer(
   logger: ServerLogger = stderrLogger,
 ): LanguageServerRuntime {
   let supportsWorkspaceFolderChanges = false;
-  connection.onInitialize(async (params): Promise<InitializeResult> => {
+  /** LSP 초기화 요청을 세션에 적용하고 서버 capability를 반환한다. */
+  const initialize: Parameters<Connection['onInitialize']>[0] = async (
+    params,
+  ) => {
     supportsWorkspaceFolderChanges =
       params.capabilities.workspace?.workspaceFolders === true;
     await session.initialize(params);
@@ -59,30 +60,49 @@ export function bindLanguageServer(
       },
       serverInfo: { name: 'codocs-language-server' },
     };
-  });
-  connection.onDidOpenTextDocument((params) => {
+  };
+  connection.onInitialize(initialize);
+  /** 열린 문서를 세션에 저장하고 무시된 요청을 기록한다. */
+  const didOpenTextDocument: Parameters<
+    Connection['onDidOpenTextDocument']
+  >[0] = (params) => {
     const update = session.openDocument(params);
     if (!update.accepted)
       logger.error(
         `didOpen ignored: ${params.textDocument.uri} (${update.reason})`,
       );
-  });
-  connection.onDidChangeTextDocument((params) => {
+  };
+  connection.onDidOpenTextDocument(didOpenTextDocument);
+  /** 변경된 문서를 세션에 반영하고 무시된 요청을 기록한다. */
+  const didChangeTextDocument: Parameters<
+    Connection['onDidChangeTextDocument']
+  >[0] = (params) => {
     const update = session.changeDocument(params);
     if (!update.accepted)
       logger.error(
         `didChange ignored: ${params.textDocument.uri} (${update.reason})`,
       );
-  });
-  connection.onDidCloseTextDocument((params) => {
+  };
+  connection.onDidChangeTextDocument(didChangeTextDocument);
+  /** 닫힌 문서를 세션에서 제거한다. */
+  const didCloseTextDocument: Parameters<
+    Connection['onDidCloseTextDocument']
+  >[0] = (params) => {
     session.closeDocument(params.textDocument.uri);
-  });
-  connection.onInitialized(() => {
+  };
+  connection.onDidCloseTextDocument(didCloseTextDocument);
+  /** 초기화 완료 뒤 workspace folder 변경 알림을 등록한다. */
+  const initialized: Parameters<Connection['onInitialized']>[0] = () => {
     if (!supportsWorkspaceFolderChanges) return;
-    connection.workspace.onDidChangeWorkspaceFolders(async (event) => {
+    /** workspace folder 변경을 세션에 반영한다. */
+    const changeWorkspaceFolders: Parameters<
+      typeof connection.workspace.onDidChangeWorkspaceFolders
+    >[0] = async (event) => {
       await session.changeWorkspaceFolders(event.added, event.removed);
-    });
-  });
+    };
+    connection.workspace.onDidChangeWorkspaceFolders(changeWorkspaceFolders);
+  };
+  connection.onInitialized(initialized);
   connection.onRequest(
     documentMatchRequestMethod,
     async (request: DocumentMatchRequest): Promise<DocumentMatchResponse> =>
@@ -93,15 +113,21 @@ export function bindLanguageServer(
     async (request: WorkspaceRefreshRequest | undefined) =>
       session.refreshWorkspaces(request),
   );
-  connection.onShutdown(async () => {
+  /** 종료 요청을 받으면 세션을 닫는다. */
+  const shutdown = async (): Promise<void> => {
     await session.close();
-  });
-  connection.onExit(() => {
+  };
+  connection.onShutdown(shutdown);
+  /** 프로세스 종료 시 세션 정리를 시도하고 실패를 기록한다. */
+  const exit = (): void => {
     void session.close().catch((error: unknown) => {
       logger.error(error instanceof Error ? error.message : String(error));
     });
-  });
-  return { session, listen: () => connection.listen() };
+  };
+  connection.onExit(exit);
+  /** LSP transport listener를 시작한다. */
+  const listen = (): void => connection.listen();
+  return { session, listen };
 }
 
 /** argv에서 선택한 stdio 또는 Node IPC 전송으로 실제 서버를 시작한다. */

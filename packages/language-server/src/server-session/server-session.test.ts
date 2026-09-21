@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- 테스트 콜백은 공개 선언 함수가 아니다. */
 import {
   catalogConfirmations,
   diagnosticSeverities,

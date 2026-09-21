@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { ESLint } from 'eslint';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';

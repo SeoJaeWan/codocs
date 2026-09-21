@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- 프로토콜 시험 콜백은 공개 선언 함수가 아니다. */
 import { build } from 'esbuild';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';

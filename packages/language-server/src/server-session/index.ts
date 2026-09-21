@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc -- 세션 내부 매핑 콜백은 공개 선언 함수가 아니다. */
 import type {
   CodeMatchCandidate,
   CodeMatchEvidence,
@@ -227,14 +226,18 @@ export class LanguageServerSession {
     const selected = request.workspaceUri
       ? [this.#workspaces.get(normalizeWorkspaceUri(request.workspaceUri))]
       : [...this.#workspaces.values()];
+    /** 선택된 workspace 하나를 갱신하고 현재 상태를 반환한다. */
+    const refreshWorkspace = async (
+      workspace: WorkspaceBinding,
+    ): Promise<WorkspaceRefreshResponse> => ({
+      workspaceUri: workspace.uri,
+      result: await workspace.session.refresh(),
+      workspaceState: workspace.session.readiness,
+    });
     return Promise.all(
       selected
         .filter((workspace): workspace is WorkspaceBinding => !!workspace)
-        .map(async (workspace) => ({
-          workspaceUri: workspace.uri,
-          result: await workspace.session.refresh(),
-          workspaceState: workspace.session.readiness,
-        })),
+        .map(refreshWorkspace),
     );
   }
 
@@ -368,18 +371,20 @@ function mapMatchResult(
   workspace: WorkspaceBinding,
   result: Extract<WorkspaceMatchResult, { success: true }>,
 ): DocumentMatchSuccess {
+  /** 후보 하나에 LSP 좌표로 변환한 근거 목록을 연결한다. */
+  const mapCandidate = (candidate: CodeMatchCandidate): LspMatchCandidate => ({
+    ...candidate,
+    evidence: candidate.evidence.map((evidence) =>
+      mapEvidence(document, evidence),
+    ),
+  });
   return {
     ...result,
     uri: document.uri,
     version: document.version,
     workspaceUri: workspace.uri,
     workspaceState: workspace.session.readiness,
-    candidates: result.candidates.map((candidate) => ({
-      ...candidate,
-      evidence: candidate.evidence.map((evidence) =>
-        mapEvidence(document, evidence),
-      ),
-    })),
+    candidates: result.candidates.map(mapCandidate),
     evidence: result.evidence.map((evidence) =>
       mapEvidence(document, evidence),
     ),

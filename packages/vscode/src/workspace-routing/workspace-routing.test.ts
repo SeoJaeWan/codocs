@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc -- 테스트 콜백이다. */
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { isOwnedByWorkspaceRoot, nearestWorkspaceRoot } from './index.js';
