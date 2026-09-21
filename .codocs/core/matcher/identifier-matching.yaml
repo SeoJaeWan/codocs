@@ -23,8 +23,9 @@ definition: |
   원본 위치를 보존하며 camelCase·PascalCase·snake_case·kebab-case를 분리하고 비교할 때 대소문자를 정리한다.
   연속 대문자 뒤 소문자가 나오면 마지막 대문자 앞을 경계로 삼는다. HTTPServer → HTTP/Server, HTTPSServer → HTTPS/Server, getURLValue → get/URL/Value다. 약어의 뜻을 추론하지 않는다.
   문자·숫자 경계도 나누되 숫자를 유지한다. zone2Count → zone/2/Count다. zone-2-count는 전체 매칭되지만 zone-count는 중간 숫자를 건너뛸 수 없다. zone과 count는 각각의 위치에서 매칭할 수 있다.
-  밑줄·하이픈·일반 공백·탭은 복합 용어의 단어 구분자로 허용한다. return__zone·return--zone처럼 반복되어도 매칭하며 원본 범위에 구분자를 포함한다. 등록 ID 자체의 형식 검증을 완화하는 규칙은 아니다.
-  비영어 문자와 점·슬래시 같은 구두점, LF/CRLF 줄바꿈은 복합 매칭을 끊는다. return한글Zone이나 return.zone을 return-zone으로 연결하지 않지만 양옆의 return과 zone은 각각 매칭할 수 있다.
+  밑줄·하이픈은 하나의 식별자 안에서 복합 용어의 단어 구분자로 허용한다. return__zone·return--zone처럼 반복되어도 매칭하며 원본 범위에 구분자를 포함한다. 등록 ID 자체의 형식 검증을 완화하는 규칙은 아니다.
+  일반 공백·탭·LF/CRLF 줄바꿈은 식별자 묶음과 복합 매칭을 끊는다. userName·user_name·user-name은 user-name과 매칭하지만 user name이나 탭으로 구분한 user와 name은 복합 매칭하지 않는다. user와 name이 각각 등록되어 있으면 각 위치에서 개별 매칭한다.
+  비영어 문자와 점·슬래시 같은 구두점도 복합 매칭을 끊는다. return한글Zone이나 return.zone을 return-zone으로 연결하지 않지만 양옆의 return과 zone은 각각 매칭할 수 있다. 주석·문자열에서도 문맥을 추론해 경계 양옆의 단어를 합치지 않는다.
   연속 토큰 묶음에서만 찾는다. returnOldZone의 Old나 return2Zone의 2를 건너뛰지 않는다. 접두·접미 토큰은 허용하므로 reservationReturnZoneId 안에서 등록된 reservation과 return-zone을 각각 찾을 수 있다.
 
   ## 표기와 단수화 비교
@@ -53,6 +54,7 @@ definition: |
 
   문서 전체에 오류가 있어도 확인 가능한 유효한 현재·이전 ID는 매칭한다. 형식이 잘못된 이전 ID는 해당 항목만 제외하고 다른 유효한 값은 유지한다.
   message가 잘못돼도 유효한 이전 ID는 매칭한다. 현재 ID가 누락되거나 잘못돼도 유효한 이전 ID로 찾을 수 있으며, 확인 불가능한 현재 ID는 추측하지 않는다.
+  매칭 결과에서 현재 ID를 나타내는 필드는 유효한 현재 ID가 확인된 경우에만 제공한다. 현재 ID가 누락되거나 형식이 잘못되면 해당 필드를 생략하고 이전 ID로 대신 채우지 않는다. 이 경우에도 매칭된 이전 ID는 개별 근거에 유지하며 문서 경로·후보·진단을 보존한다.
   진단은 매칭 결과와 함께 보존한다. 직접 편집한 현재/이전 ID 중복 등 오류·경고 판정은 [[문서 검증]]에서 확인한다.
   문서를 일부 읽지 못하면 읽은 결과를 제공하되 불완전 상태를 유지한다. 후보가 하나라는 이유만으로 전체 프로젝트에서 유일하다고 확정하지 않는다.
 
