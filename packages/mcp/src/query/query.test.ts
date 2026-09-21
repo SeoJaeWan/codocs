@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codocs/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCodocsQueryHandlers } from './index.js';

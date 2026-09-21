@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- VS Code 이벤트 adapter 콜백은 SDK 타입으로 설명한다. */
 import * as vscode from 'vscode';
 import {
   CloseAction,
@@ -18,9 +17,9 @@ import {
   type FolderClientBoundary,
   type WorkspaceFolderBoundary,
   type WorkspaceHostBoundary,
-} from './client-manager.js';
-import { bundledServerPath } from './package-paths.js';
-import { isOwnedByWorkspaceRoot } from './workspace-routing.js';
+} from '../client-manager/index.js';
+import { bundledServerPath } from '../package-assembly/index.js';
+import { isOwnedByWorkspaceRoot } from '../workspace-routing/index.js';
 
 const refreshMethod = 'codocs/refresh';
 
@@ -36,9 +35,10 @@ export class VscodeExtensionRuntime {
     this.#context = context;
     this.#output = vscode.window.createOutputChannel('Codocs');
     const host = this.#workspaceHost();
-    this.#manager = new WorkspaceClientManager(host, (folder) =>
-      this.#createFolderClient(folder),
-    );
+    /** manager가 요청한 folder를 실제 VS Code client로 만든다. */
+    const createFolderClient = (folder: WorkspaceFolderBoundary) =>
+      this.#createFolderClient(folder);
+    this.#manager = new WorkspaceClientManager(host, createFolderClient);
   }
 
   /** 명령과 workspace 연결을 활성화한다. */
@@ -59,23 +59,38 @@ export class VscodeExtensionRuntime {
     this.#output.dispose();
   }
 
+  /** VS Code workspace API를 테스트 가능한 host 경계로 감싼다. */
   #workspaceHost(): WorkspaceHostBoundary {
+    /** 현재 VS Code workspace folder 목록을 경계 타입으로 반환한다. */
+    const folders = (): WorkspaceFolderBoundary[] =>
+      (vscode.workspace.workspaceFolders ?? []).map(toFolderBoundary);
+    /** VS Code folder 변경을 manager 경계 이벤트로 변환한다. */
+    const onDidChangeFolders = (
+      listener: Parameters<WorkspaceHostBoundary['onDidChangeFolders']>[0],
+    ): DisposableBoundary => {
+      /** VS Code folder 변경 이벤트를 manager listener에 전달한다. */
+      const handleFolderChange = (
+        event: vscode.WorkspaceFoldersChangeEvent,
+      ) => {
+        listener({
+          added: event.added.map(toFolderBoundary),
+          removed: event.removed.map(toFolderBoundary),
+        });
+      };
+      return vscode.workspace.onDidChangeWorkspaceFolders(handleFolderChange);
+    };
+    /** VS Code output channel에 host 경계 오류를 기록한다. */
+    const reportFailure = (message: string, error: unknown): void => {
+      this.#output.appendLine(`${message} ${errorMessage(error)}`);
+    };
     return {
-      folders: () =>
-        (vscode.workspace.workspaceFolders ?? []).map(toFolderBoundary),
-      onDidChangeFolders: (listener): DisposableBoundary =>
-        vscode.workspace.onDidChangeWorkspaceFolders((event) => {
-          listener({
-            added: event.added.map(toFolderBoundary),
-            removed: event.removed.map(toFolderBoundary),
-          });
-        }),
-      reportFailure: (message, error) => {
-        this.#output.appendLine(`${message} ${errorMessage(error)}`);
-      },
+      folders,
+      onDidChangeFolders,
+      reportFailure,
     };
   }
 
+  /** 직렬화한 folder 경계를 실제 VS Code folder client로 연결한다. */
   #createFolderClient(folder: WorkspaceFolderBoundary): FolderClientBoundary {
     const vscodeFolder = workspaceFolder(folder.uri);
     if (!vscodeFolder)
@@ -98,6 +113,7 @@ class VscodeFolderClient implements FolderClientBoundary {
   #client: LanguageClient | undefined;
   #stopping = false;
 
+  /** 실제 workspace folder와 서버 경로를 관리하는 client를 만든다. */
   constructor(
     folder: vscode.WorkspaceFolder,
     serverPath: string,
@@ -108,6 +124,7 @@ class VscodeFolderClient implements FolderClientBoundary {
     this.#output = output;
   }
 
+  /** folder용 watcher와 language client를 시작한다. */
   async start(): Promise<void> {
     if (this.#client) return;
     this.#stopping = false;
@@ -128,6 +145,7 @@ class VscodeFolderClient implements FolderClientBoundary {
       documentSelector: [{ scheme: 'file' }],
       middleware: this.#documentMiddleware(),
       errorHandler: this.#errorHandler(),
+      /** 시작 실패를 제한된 횟수만 자동 재시작한다. */
       initializationFailedHandler: (error) => {
         const restart = this.#budget.recordFailure();
         if (!restart) this.#reportStopped(error);
@@ -143,7 +161,15 @@ class VscodeFolderClient implements FolderClientBoundary {
       clientOptions,
     );
     this.#client = client;
+    /** knowledge 파일 변경 뒤 해당 작업 공간의 catalog를 갱신한다. */
     const refresh = () => this.#refresh();
+    /** 실행 상태가 되면 연결 사실을 output channel에 기록한다. */
+    const reportRunning = (event: { newState: State }): void => {
+      if (event.newState === State.Running)
+        this.#output.appendLine(
+          `Codocs language server가 연결되었습니다: ${this.#folder.name}`,
+        );
+    };
     this.#disposables.push(
       directoryWatcher,
       contentsWatcher,
@@ -153,16 +179,12 @@ class VscodeFolderClient implements FolderClientBoundary {
       contentsWatcher.onDidCreate(refresh),
       contentsWatcher.onDidChange(refresh),
       contentsWatcher.onDidDelete(refresh),
-      client.onDidChangeState((event) => {
-        if (event.newState === State.Running)
-          this.#output.appendLine(
-            `Codocs language server가 연결되었습니다: ${this.#folder.name}`,
-          );
-      }),
+      client.onDidChangeState(reportRunning),
     );
     await client.start();
   }
 
+  /** 시작 중인 client를 정리하고 현재 열린 문서를 다시 동기화한다. */
   async restart(): Promise<void> {
     if (this.#client?.state === State.Starting)
       await this.#waitForStartTransition(this.#client);
@@ -171,6 +193,7 @@ class VscodeFolderClient implements FolderClientBoundary {
     await this.start();
   }
 
+  /** watcher·listener·language client와 서버 프로세스를 종료한다. */
   async stop(): Promise<void> {
     this.#stopping = true;
     for (const disposable of this.#disposables.splice(0)) disposable.dispose();
@@ -179,8 +202,10 @@ class VscodeFolderClient implements FolderClientBoundary {
     if (client) await client.dispose();
   }
 
+  /** 현재 folder가 소유한 문서만 language client에 전달한다. */
   #documentMiddleware(): Middleware {
     const synchronized = new Set<string>();
+    /** 현재 language client folder가 문서를 소유하는지 확인한다. */
     const owns = (document: vscode.TextDocument): boolean => {
       if (document.uri.scheme !== 'file') return false;
       return isOwnedByWorkspaceRoot(
@@ -196,15 +221,18 @@ class VscodeFolderClient implements FolderClientBoundary {
       );
     };
     return {
+      /** 소유한 문서의 열림 이벤트를 LSP client에 전달한다. */
       didOpen: async (document, next) => {
         if (!owns(document)) return;
         synchronized.add(document.uri.toString());
         await next(document);
       },
+      /** 이미 동기화한 문서의 변경 이벤트를 LSP client에 전달한다. */
       didChange: async (event, next) => {
         if (!synchronized.has(event.document.uri.toString())) return;
         await next(event);
       },
+      /** 닫힌 문서를 동기화 집합에서 제거하고 LSP client에 전달한다. */
       didClose: async (document, next) => {
         if (!synchronized.delete(document.uri.toString())) return;
         await next(document);
@@ -212,65 +240,85 @@ class VscodeFolderClient implements FolderClientBoundary {
     };
   }
 
+  /** client가 Starting 상태에서 벗어날 때까지 기다린다. */
   async #waitForStartTransition(client: LanguageClient): Promise<void> {
     if (client.state !== State.Starting) return;
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
+    /** language client 상태 변화를 기다리고 제한 시간을 적용한다. */
+    const waitForTransition = (
+      resolve: () => void,
+      reject: (reason?: unknown) => void,
+    ): void => {
+      /** 시작 전환이 지연되면 대기를 실패시킨다. */
+      const rejectAfterTimeout = (): void => {
         listener.dispose();
         reject(
           new Error(
             `Codocs language client 시작 전환이 완료되지 않았습니다: ${this.#folder.name}`,
           ),
         );
-      }, 5_000);
-      const listener = client.onDidChangeState((event) => {
+      };
+      const timer = setTimeout(rejectAfterTimeout, 5_000);
+      /** Starting 상태가 끝나면 대기 중인 작업을 재개한다. */
+      const handleStateChange = (event: { newState: State }): void => {
         if (event.newState === State.Starting) return;
         clearTimeout(timer);
         listener.dispose();
         resolve();
-      });
-    });
+      };
+      const listener = client.onDidChangeState(handleStateChange);
+    };
+    await new Promise<void>(waitForTransition);
   }
 
+  /** 예기치 않은 연결 오류의 재시작·중단 정책을 반환한다. */
   #errorHandler(): ErrorHandler {
     return {
+      /** 오류 횟수에 따라 연결을 계속하거나 종료한다. */
       error: (_error, _message, count) => ({
         action: (count ?? 0) < 3 ? ErrorAction.Continue : ErrorAction.Shutdown,
       }),
+      /** 종료 원인에 따라 자동 재시작 또는 사용자 안내를 선택한다. */
       closed: () => {
         if (this.#stopping) return { action: CloseAction.DoNotRestart };
         if (this.#budget.recordFailure())
           return { action: CloseAction.Restart };
-        this.#showStoppedMessage().catch((error: unknown) => {
+        /** 중단 안내 표시 실패를 output channel에 기록한다. */
+        const reportStoppedMessageFailure = (error: unknown): void => {
           this.#output.appendLine(
             `Codocs language server 중지 안내를 표시하지 못했습니다: ${errorMessage(error)}`,
           );
-        });
+        };
+        this.#showStoppedMessage().catch(reportStoppedMessageFailure);
         return { action: CloseAction.DoNotRestart, handled: true };
       },
     };
   }
 
+  /** 현재 작업 공간의 catalog 갱신 요청을 서버에 보낸다. */
   #refresh(): void {
     const client = this.#client;
     if (!client?.isRunning()) return;
+    /** catalog 갱신 요청 실패를 output channel에 기록한다. */
+    const reportRefreshFailure = (error: unknown): void => {
+      this.#output.appendLine(
+        `Codocs knowledge 갱신에 실패했습니다: ${errorMessage(error)}`,
+      );
+    };
     client
       .sendRequest(refreshMethod, {
         workspaceUri: this.#folder.uri.toString(),
       })
-      .catch((error: unknown) => {
-        this.#output.appendLine(
-          `Codocs knowledge 갱신에 실패했습니다: ${errorMessage(error)}`,
-        );
-      });
+      .catch(reportRefreshFailure);
   }
 
+  /** 반복 시작 실패 뒤 중단 상태와 수동 복구 방법을 기록한다. */
   #reportStopped(error: unknown): void {
     this.#output.appendLine(
       `Codocs language server가 반복해서 시작하지 못해 중지되었습니다 (${this.#folder.name}): ${errorMessage(error)}. “Codocs: Restart Language Servers” 명령을 실행하세요.`,
     );
   }
 
+  /** 중단 안내를 표시하고 사용자가 선택하면 수동 재시작한다. */
   async #showStoppedMessage(): Promise<void> {
     const restart = 'Restart Codocs';
     const selection = await vscode.window.showErrorMessage(

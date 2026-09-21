@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc -- 실제 VS Code 프로세스 검증 진입점이다. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import {
@@ -37,6 +36,7 @@ const vsixPath =
 if (vsixArgumentIndex >= 0 && !vsixPath)
   throw new Error('--vsix requires an archive path');
 
+/** 실행에 필요한 파일이 존재하는지 확인한다. */
 async function requireFile(target, description) {
   try {
     await access(target);
@@ -45,6 +45,7 @@ async function requireFile(target, description) {
   }
 }
 
+/** Extension Host fixture용 knowledge 파일을 만든다. */
 async function writeKnowledge(root, id) {
   const directory = path.join(root, '.codocs');
   await mkdir(directory, { recursive: true });
@@ -55,8 +56,10 @@ async function writeKnowledge(root, id) {
   );
 }
 
+/** VS Code CLI 프로세스를 실행하고 종료 결과를 수집한다. */
 function runCode(arguments_, environment, executable = codeExecutable) {
-  return new Promise((resolve, reject) => {
+  /** 자식 프로세스의 출력과 종료 상태를 Promise 결과로 만든다. */
+  const execute = (resolve, reject) => {
     const child = spawn(executable, arguments_, {
       cwd: repositoryRoot,
       env: environment,
@@ -84,7 +87,8 @@ function runCode(arguments_, environment, executable = codeExecutable) {
       clearTimeout(timer);
       resolve({ code, signal, stdout, stderr });
     });
-  });
+  };
+  return new Promise(execute);
 }
 
 const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'cod15-host-'));

@@ -1,11 +1,10 @@
-/* eslint-disable codocs/korean-jsdoc -- Vitest 콜백은 공개 선언 함수가 아니다. */
 import { describe, expect, it } from 'vitest';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
   documentUpdateRejections,
   SynchronizedDocuments,
   utf16OffsetsToRange,
-} from './document-sync.js';
+} from './index.js';
 
 describe('SynchronizedDocuments: 전체 원문과 단조 버전 동기화', () => {
   it('임의 언어의 문법 오류 원문을 열면 그대로 저장한다', () => {

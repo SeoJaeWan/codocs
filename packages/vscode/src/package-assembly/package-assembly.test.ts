@@ -1,13 +1,12 @@
-/* eslint-disable codocs/korean-jsdoc -- package metadata 검증 콜백이다. */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { bundledServerPath } from './package-paths.js';
+import { bundledServerPath } from './index.js';
 
-const packageRoot = path.resolve(import.meta.dirname, '..');
+const packageRoot = path.resolve(import.meta.dirname, '../..');
 
-describe('VS Code extension package assembly', () => {
-  it('Extension Host activation과 main 및 수동 재시작 명령을 선언한다', () => {
+describe('VS Code 확장 패키지 조립', () => {
+  it('Extension Host를 활성화하면 main·수동 재시작 명령을 manifest에 선언한다', () => {
     const manifest: unknown = JSON.parse(
       readFileSync(path.join(packageRoot, 'package.json'), 'utf8'),
     );

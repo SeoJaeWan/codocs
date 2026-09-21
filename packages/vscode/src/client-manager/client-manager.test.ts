@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method, codocs/korean-jsdoc, jsdoc/require-jsdoc -- mock 메서드 자체의 호출 여부를 검증한다. */
 import { describe, expect, it, vi } from 'vitest';
 import {
   RollingRestartBudget,
@@ -6,7 +5,7 @@ import {
   type FolderClientBoundary,
   type WorkspaceFolderBoundary,
   type WorkspaceHostBoundary,
-} from './client-manager.js';
+} from './index.js';
 
 const first = { name: 'first', uri: 'file:///workspace/first' };
 const second = { name: 'second', uri: 'file:///workspace/second' };

@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- refresh 내부 콜백은 공개 선언 함수가 아니다. */
 import {
   catalogConfirmations,
   catalogDiagnosticCodes,
@@ -435,7 +434,7 @@ export class WorkspaceQuerySession {
   #synchronize(): Promise<WorkspaceScanResult> {
     if (this.#refreshPromise) return this.#refreshPromise;
     /** 변경 알림을 스캔 완료 시점까지 다시 반영한다. */
-    const operation = (async (): Promise<WorkspaceScanResult> => {
+    const scanOperation = async (): Promise<WorkspaceScanResult> => {
       let scan: WorkspaceScanResult;
       do {
         this.#dirty = false;
@@ -462,8 +461,10 @@ export class WorkspaceQuerySession {
         }
       } while (this.#dirty && !this.#closed);
       return scan;
-    })();
+    };
+    const operation = scanOperation();
     this.#refreshPromise = operation;
+    /** 스캔 완료 뒤 현재 operation 참조를 정리한다. */
     const clear = (): void => {
       if (this.#refreshPromise === operation) this.#refreshPromise = undefined;
     };
@@ -696,7 +697,7 @@ export class WorkspaceQuerySession {
   refresh(): Promise<WorkspaceRefreshResult> {
     if (this.#explicitRefreshPromise) return this.#explicitRefreshPromise;
     /** 수동 재연결과 전체 스캔의 결과를 함께 반환한다. */
-    const operation = (async (): Promise<WorkspaceRefreshResult> => {
+    const refreshOperation = async (): Promise<WorkspaceRefreshResult> => {
       if (this.#watcher) await this.#watcher.refresh();
       const generation = this.#generation;
       const scan = await this.#synchronize();
@@ -726,8 +727,10 @@ export class WorkspaceQuerySession {
             countsComplete: scan.status === scanStatuses.complete,
             diagnostics: scan.diagnostics,
           };
-    })();
+    };
+    const operation = refreshOperation();
     this.#explicitRefreshPromise = operation;
+    /** refresh 완료 뒤 현재 operation 참조를 정리한다. */
     const clear = (): void => {
       if (this.#explicitRefreshPromise === operation)
         this.#explicitRefreshPromise = undefined;

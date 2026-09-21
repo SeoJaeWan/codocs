@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc -- 세션 내부 매핑 콜백은 공개 선언 함수가 아니다. */
 import type {
   CodeMatchCandidate,
   CodeMatchEvidence,
@@ -20,20 +19,23 @@ import type {
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
-import { SynchronizedDocuments, utf16OffsetsToRange } from './document-sync.js';
+import {
+  SynchronizedDocuments,
+  utf16OffsetsToRange,
+} from '../document-sync/index.js';
+export {
+  documentMatchErrorCodes,
+  type DocumentMatchErrorCode,
+} from './domain-values.js';
+import {
+  documentMatchErrorCodes,
+  type DocumentMatchErrorCode,
+} from './domain-values.js';
 
 /** 문서 매칭 요청의 메서드 이름이다. */
 export const documentMatchRequestMethod = 'codocs/match';
 /** 작업 공간 색인 수동 갱신 요청의 메서드 이름이다. */
 export const workspaceRefreshRequestMethod = 'codocs/refresh';
-
-/** 서버 계층의 매칭 실패 코드다. @domainValues */
-export const documentMatchErrorCodes = {
-  documentNotOpen: 'document_not_open',
-  staleDocumentVersion: 'stale_document_version',
-  workspaceNotFound: 'workspace_not_found',
-  workspaceQueryFailed: 'workspace_query_failed',
-} as const;
 
 /** 최신 열린 문서를 매칭하는 요청이다. */
 export interface DocumentMatchRequest {
@@ -69,7 +71,7 @@ export type DocumentMatchSuccess = Omit<
 /** 문서·작업 공간·색인의 현재 상태로 수행할 수 없는 매칭 응답이다. */
 export interface DocumentMatchFailure {
   success: false;
-  code: (typeof documentMatchErrorCodes)[keyof typeof documentMatchErrorCodes];
+  code: DocumentMatchErrorCode;
   uri: string;
   requestedVersion?: number;
   currentVersion?: number;
@@ -224,14 +226,18 @@ export class LanguageServerSession {
     const selected = request.workspaceUri
       ? [this.#workspaces.get(normalizeWorkspaceUri(request.workspaceUri))]
       : [...this.#workspaces.values()];
+    /** 선택된 workspace 하나를 갱신하고 현재 상태를 반환한다. */
+    const refreshWorkspace = async (
+      workspace: WorkspaceBinding,
+    ): Promise<WorkspaceRefreshResponse> => ({
+      workspaceUri: workspace.uri,
+      result: await workspace.session.refresh(),
+      workspaceState: workspace.session.readiness,
+    });
     return Promise.all(
       selected
         .filter((workspace): workspace is WorkspaceBinding => !!workspace)
-        .map(async (workspace) => ({
-          workspaceUri: workspace.uri,
-          result: await workspace.session.refresh(),
-          workspaceState: workspace.session.readiness,
-        })),
+        .map(refreshWorkspace),
     );
   }
 
@@ -365,18 +371,20 @@ function mapMatchResult(
   workspace: WorkspaceBinding,
   result: Extract<WorkspaceMatchResult, { success: true }>,
 ): DocumentMatchSuccess {
+  /** 후보 하나에 LSP 좌표로 변환한 근거 목록을 연결한다. */
+  const mapCandidate = (candidate: CodeMatchCandidate): LspMatchCandidate => ({
+    ...candidate,
+    evidence: candidate.evidence.map((evidence) =>
+      mapEvidence(document, evidence),
+    ),
+  });
   return {
     ...result,
     uri: document.uri,
     version: document.version,
     workspaceUri: workspace.uri,
     workspaceState: workspace.session.readiness,
-    candidates: result.candidates.map((candidate) => ({
-      ...candidate,
-      evidence: candidate.evidence.map((evidence) =>
-        mapEvidence(document, evidence),
-      ),
-    })),
+    candidates: result.candidates.map(mapCandidate),
     evidence: result.evidence.map((evidence) =>
       mapEvidence(document, evidence),
     ),

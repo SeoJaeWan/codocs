@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- 프로토콜 시험 콜백은 공개 선언 함수가 아니다. */
 import { build } from 'esbuild';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -8,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   documentMatchRequestMethod,
   workspaceRefreshRequestMethod,
-} from './server-session.js';
+} from '../server-session/index.js';
 
 interface JsonRpcResponse {
   id: number;
@@ -136,7 +135,7 @@ describe('language server stdio 프로세스', () => {
       'utf8',
     );
     await build({
-      entryPoints: [fileURLToPath(new URL('./index.ts', import.meta.url))],
+      entryPoints: [fileURLToPath(new URL('../index.ts', import.meta.url))],
       outfile: output,
       bundle: true,
       platform: 'node',
@@ -248,7 +247,7 @@ describe('language server stdio 프로세스', () => {
       ),
     ]);
     await build({
-      entryPoints: [fileURLToPath(new URL('./index.ts', import.meta.url))],
+      entryPoints: [fileURLToPath(new URL('../index.ts', import.meta.url))],
       outfile: output,
       bundle: true,
       platform: 'node',

@@ -1,5 +1,5 @@
 import type * as vscode from 'vscode';
-import { VscodeExtensionRuntime } from './vscode-client.js';
+import { VscodeExtensionRuntime } from './vscode-client/index.js';
 
 let runtime: VscodeExtensionRuntime | undefined;
 
