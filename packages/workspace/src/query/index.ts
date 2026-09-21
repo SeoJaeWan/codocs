@@ -8,6 +8,7 @@ import {
   matchCode,
   projectCatalogGet,
   projectCatalogList,
+  projectCatalogPaths,
   queryDiagnosticCodes,
   queryDiagnosticMessages,
   scanStatuses,
@@ -15,6 +16,10 @@ import {
   type CatalogGetResult,
   type CatalogListFilters,
   type CatalogListItem,
+  type CatalogPathDocumentResult,
+  type CatalogPathLink,
+  type CatalogPathMissingResult,
+  type CatalogPathResult,
   type CatalogQueryDiagnostic,
   type CodeMatchCandidate,
   type CodeMatchEvidence,
@@ -28,6 +33,8 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
@@ -55,19 +62,25 @@ const processCursorSecret = randomBytes(32);
 /** 목록 커서가 현재 process 또는 snapshot에서 더 이상 유효하지 않을 때 사용하는 코드다. @domainValues */
 export const workspaceQueryDiagnosticCodes = {
   cursorExpired: 'cursor_expired',
+  /** 요청한 코드 매칭 catalog와 현재 상세 조회 catalog가 다를 때 사용하는 코드다. */
+  catalogVersionMismatch: 'catalog_version_mismatch',
 } as const;
 
 /** 커서 오류의 고정 문구다. */
 export const workspaceQueryDiagnosticMessages = {
   cursorExpired:
     '목록 커서가 만료되었습니다. 커서 없이 첫 페이지를 다시 조회하세요.',
+  catalogVersionMismatch:
+    '코드 매칭에 사용한 문서 색인이 변경되었습니다. 최신 코드 매칭 결과로 다시 조회하세요.',
 } as const;
 
 /** 조회에서 core·workspace와 커서 계층이 반환할 수 있는 공통 진단이다. */
 export type WorkspaceQueryDiagnostic =
   | CatalogQueryDiagnostic
   | WorkspaceScanDiagnostic
-  | Diagnostic<(typeof workspaceQueryDiagnosticCodes)['cursorExpired']>;
+  | Diagnostic<
+      (typeof workspaceQueryDiagnosticCodes)[keyof typeof workspaceQueryDiagnosticCodes]
+    >;
 
 /** 목록 입력은 고정 페이지와 선택 필터 또는 이전 페이지 커서만 제공한다. */
 export interface WorkspaceListInput extends CatalogListFilters {
@@ -117,6 +130,51 @@ export type WorkspaceListResult = WorkspaceListSuccess | WorkspaceQueryFailure;
 
 /** 상세 조회 결과다. */
 export type WorkspaceGetResponse = WorkspaceGetSuccess | WorkspaceQueryFailure;
+
+/** 같은 catalog 버전에서 경로별 내용과 관계를 조회한 결과다. */
+export interface WorkspacePathGetSuccess {
+  success: true;
+  scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
+  catalogVersion: number;
+  results: readonly WorkspacePathGetItem[];
+  diagnostics?: readonly WorkspaceQueryDiagnostic[];
+}
+
+/** 코드 매칭 뒤 catalog가 바뀌어 경로 결과를 적용할 수 없는 실패다. */
+export interface WorkspaceCatalogVersionMismatch {
+  success: false;
+  scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
+  catalogVersion: number;
+  expectedCatalogVersion: number;
+  error: Diagnostic<
+    (typeof workspaceQueryDiagnosticCodes)['catalogVersionMismatch']
+  >;
+}
+
+/** 경로 상세 조회의 성공·일반 실패·catalog 버전 불일치 결과다. */
+export type WorkspacePathGetResponse =
+  | WorkspacePathGetSuccess
+  | WorkspaceCatalogVersionMismatch
+  | WorkspaceQueryFailure;
+
+/** 편집기가 열 수 있는 file URI를 확인된 문서 경로에 연결한다. */
+export type WorkspacePathGetLink = CatalogPathLink & { uri: string };
+
+/** Core 경로 문서에 발견 경로의 file URI와 URI가 있는 관계를 추가한다. */
+export type WorkspacePathDocumentResult =
+  CatalogPathDocumentResult extends infer Result
+    ? Result extends CatalogPathDocumentResult
+      ? Omit<Result, 'source' | 'references' | 'referencedBy'> & {
+          source: Result['source'] & { uri: string };
+          references?: readonly WorkspacePathGetLink[];
+          referencedBy?: readonly WorkspacePathGetLink[];
+        }
+      : never
+    : never;
+
+/** 확인되지 않은 경로와 URI까지 확인한 문서 결과를 구분한다. */
+export type WorkspacePathGetItem =
+  CatalogPathMissingResult | WorkspacePathDocumentResult;
 
 /** 현재 catalog snapshot으로 전체 문서 텍스트를 매칭한 결과다. */
 export interface WorkspaceMatchSuccess {
@@ -355,6 +413,54 @@ function withConfirmationDiagnostic(
         path: result.source.path,
       },
     ],
+  };
+}
+
+/** 미확인 경로 문서에 최신성 비보장 진단을 추가한다. */
+function withPathConfirmationDiagnostic(
+  result: CatalogPathResult,
+): CatalogPathResult {
+  if (!result.found || result.confirmation === catalogConfirmations.confirmed)
+    return result;
+  return {
+    ...result,
+    diagnostics: [
+      ...result.diagnostics,
+      {
+        code: catalogDiagnosticCodes.unconfirmedReference,
+        severity: diagnosticSeverities.warning,
+        message: catalogDiagnosticMessages.unconfirmedReference,
+        path: result.path,
+      },
+    ],
+  };
+}
+
+/** 프로젝트 발견 경로를 열 수 있는 file URI로 변환한다. */
+function workspacePathUri(projectRoot: string, documentPath: string): string {
+  return pathToFileURL(path.resolve(projectRoot, documentPath)).href;
+}
+
+/** Core 경로 결과에 확인한 프로젝트 기준의 이동 URI를 추가한다. */
+function withWorkspaceUris(
+  projectRoot: string,
+  result: CatalogPathResult,
+): WorkspacePathGetItem {
+  if (!result.found) return result;
+  const { references, referencedBy, ...base } = result;
+  /** 같은 관측의 관계 경로에 이동 URI를 추가한다. */
+  const link = (item: CatalogPathLink): WorkspacePathGetLink => ({
+    ...item,
+    uri: workspacePathUri(projectRoot, item.path),
+  });
+  return {
+    ...base,
+    source: {
+      ...result.source,
+      uri: workspacePathUri(projectRoot, result.source.path),
+    },
+    ...(references ? { references: references.map(link) } : {}),
+    ...(referencedBy ? { referencedBy: referencedBy.map(link) } : {}),
   };
 }
 
@@ -654,6 +760,72 @@ export class WorkspaceQuerySession {
     return {
       success: true,
       scanStatus,
+      results,
+      ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
+    };
+  }
+
+  /** 코드 매칭 경로를 그때의 catalog 버전에서 내용·관계와 함께 반환한다. */
+  async getByPaths(
+    paths: readonly string[],
+    expectedCatalogVersion: number,
+  ): Promise<WorkspacePathGetResponse> {
+    const scan = await this.#current();
+    const watchFailure = this.#watchFailure();
+    if (scan.status === scanStatuses.failed) return scanFailure(scan);
+    if (watchFailure && !this.#completed)
+      return this.#watchFailureResult(watchFailure);
+    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
+    if (!catalog) return scanFailure(scan);
+    const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
+    const catalogVersion = watchFailure
+      ? this.#completed!.version
+      : this.#catalogVersion;
+    const projection = projectCatalogPaths(catalog, paths, {
+      revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
+    });
+    if (!projection.success)
+      return {
+        success: false,
+        scanStatus,
+        error: projection.error,
+      };
+    if (
+      !Number.isSafeInteger(expectedCatalogVersion) ||
+      expectedCatalogVersion < 0
+    )
+      return invalidInput(scanStatus);
+    if (expectedCatalogVersion !== catalogVersion)
+      return {
+        success: false,
+        scanStatus,
+        catalogVersion,
+        expectedCatalogVersion,
+        error: {
+          code: workspaceQueryDiagnosticCodes.catalogVersionMismatch,
+          severity: diagnosticSeverities.error,
+          message: workspaceQueryDiagnosticMessages.catalogVersionMismatch,
+        },
+      };
+    const results = projection.results.map(
+      /** 확인한 문서에만 현재 프로젝트의 URI와 감시 상태를 결합한다. */ (
+        result,
+      ): WorkspacePathGetItem => {
+        if (!result.found) return result;
+        return withWorkspaceUris(
+          scan.root.projectRoot,
+          withPathConfirmationDiagnostic(
+            watchFailure
+              ? { ...result, confirmation: catalogConfirmations.unconfirmed }
+              : result,
+          ),
+        );
+      },
+    );
+    return {
+      success: true,
+      scanStatus,
+      catalogVersion,
       results,
       ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
     };

@@ -16,6 +16,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -978,5 +979,198 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
       await other.close();
     });
+  });
+});
+
+describe('경로와 catalog 버전 기반 문서 조회', () => {
+  it('이전 ID로 찾은 현재 ID 누락 문서를 경로로 조회하면 내용과 진단을 유지한다', async () => {
+    const documentPath = await file(
+      'missing-id.yaml',
+      'name: 이전 이름\ndomains: [업무]\ndefinition: 본문\ndeprecatedAliases: [{ id: old-name }]\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const matched = await session.match('oldName');
+    if (!matched.success) throw new Error('코드 매칭 실패');
+    const candidate = matched.candidates[0];
+    if (!candidate) throw new Error('이전 ID 후보 없음');
+
+    const result = await session.getByPaths(
+      [candidate.path],
+      matched.catalogVersion,
+    );
+
+    expect(result).toMatchObject({
+      success: true,
+      catalogVersion: matched.catalogVersion,
+      results: [
+        {
+          path: path.relative(project, documentPath),
+          found: true,
+          document: { name: '이전 이름', definition: '본문' },
+          diagnostics: [
+            {
+              code: 'missing_required_field',
+              path: path.relative(project, documentPath),
+              fieldPath: ['id'],
+            },
+          ],
+        },
+      ],
+    });
+    if (!result.success) throw new Error('경로 조회 실패');
+    expect(result.results[0]).not.toHaveProperty('id');
+  });
+
+  it('직접 참조와 역참조를 경로 링크로 구분한다', async () => {
+    await file(
+      'source.yaml',
+      "id: source\nname: 출발\ndomains: [업무]\ndefinition: '[[대상]]'\n",
+    );
+    await file(
+      'target.yaml',
+      'id: target\nname: 대상\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const matched = await session.match('source target');
+    if (!matched.success) throw new Error('코드 매칭 실패');
+
+    const result = await session.getByPaths(
+      ['.codocs/source.yaml', '.codocs/target.yaml'],
+      matched.catalogVersion,
+    );
+
+    expect(result).toMatchObject({
+      success: true,
+      results: [
+        { references: [{ path: '.codocs/target.yaml', id: 'target' }] },
+        { referencedBy: [{ path: '.codocs/source.yaml', id: 'source' }] },
+      ],
+    });
+    if (!result.success) throw new Error('경로 조회 실패');
+    expect(result.results[0]).not.toHaveProperty('referencedBy');
+    expect(result.results[1]).not.toHaveProperty('references');
+  });
+
+  it('본문 변경으로 catalog가 갱신되면 이전 버전의 경로 조회를 거부한다', async () => {
+    await file(
+      'stable.yaml',
+      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 이전 본문\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const first = await session.match('stable');
+    if (!first.success) throw new Error('초기 매칭 실패');
+    await file(
+      'stable.yaml',
+      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 새 본문\n',
+    );
+    await vi.waitFor(
+      async () => {
+        const changed = await session.match('stable');
+        if (!changed.success) throw new Error('변경 매칭 실패');
+        expect(changed.catalogVersion).toBeGreaterThan(first.catalogVersion);
+      },
+      { timeout: 5_000, interval: 25 },
+    );
+
+    const result = await session.getByPaths(
+      ['.codocs/stable.yaml'],
+      first.catalogVersion,
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: workspaceQueryDiagnosticCodes.catalogVersionMismatch },
+      expectedCatalogVersion: first.catalogVersion,
+    });
+    if (result.success || !('catalogVersion' in result))
+      throw new Error('catalog 버전 불일치가 아님');
+    expect(result.catalogVersion).toBeGreaterThan(first.catalogVersion);
+  });
+
+  it.skipIf(!symlinkSupported)(
+    '부분 관측에서 확인하지 못한 경로는 부재로 확정하지 않는다',
+    async () => {
+      const target = await file(
+        'alpha.yaml',
+        'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const initial = await session.match('alpha');
+      if (!initial.success) throw new Error('초기 매칭 실패');
+      await rm(target);
+      await symlink('missing-target.yaml', target);
+      const refreshed = await session.refresh();
+      if (!refreshed.success) throw new Error('부분 갱신 실패');
+
+      const result = await session.getByPaths(
+        ['.codocs/outside.yaml'],
+        session.catalogVersion,
+      );
+
+      expect(result).toMatchObject({
+        success: true,
+        scanStatus: scanStatuses.partial,
+        results: [
+          {
+            path: '.codocs/outside.yaml',
+            found: false,
+            confirmation: 'unconfirmed',
+          },
+        ],
+      });
+      if (result.success)
+        expect(result.results[0]?.diagnostics).not.toContainEqual(
+          expect.objectContaining({ code: queryDiagnosticCodes.notFound }),
+        );
+    },
+  );
+
+  it('한글과 공백이 있는 CRLF 문서의 ID 오류 위치와 revision을 그대로 반환한다', async () => {
+    await mkdir(path.join(project, '.codocs', '하위 폴더'));
+    const raw =
+      'id: Invalid_Id\r\nname: 오류 문서\r\ndomains: [업무]\r\ndefinition: 😀본문\r\ndeprecatedAliases: [{ id: old-name }]\r\n';
+    await file('하위 폴더/오류 문서.yaml', raw);
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const matched = await session.match('oldName');
+    if (!matched.success) throw new Error('코드 매칭 실패');
+    const candidate = matched.candidates[0];
+    if (!candidate) throw new Error('형식 오류 ID 후보 없음');
+
+    const result = await session.getByPaths(
+      [candidate.path],
+      matched.catalogVersion,
+    );
+
+    expect(result).toMatchObject({
+      success: true,
+      results: [
+        {
+          path: '.codocs/하위 폴더/오류 문서.yaml',
+          revision: createHash('sha256').update(raw, 'utf8').digest('hex'),
+          source: {
+            path: '.codocs/하위 폴더/오류 문서.yaml',
+            uri: pathToFileURL(
+              path.join(project, '.codocs', '하위 폴더', '오류 문서.yaml'),
+            ).href,
+          },
+          diagnostics: [
+            expect.objectContaining({
+              fieldPath: ['id'],
+              range: {
+                start: { line: 0, character: 4 },
+                end: { line: 0, character: 14 },
+              },
+            }),
+          ],
+        },
+      ],
+    });
+    if (!result.success) throw new Error('경로 조회 실패');
+    const source = result.results[0]?.found
+      ? result.results[0].source
+      : undefined;
+    expect(source?.offsetRange?.start).toBe(0);
+    expect(source?.range?.start).toEqual({ line: 0, character: 0 });
+    expect(result.results[0]).not.toHaveProperty('id');
   });
 });

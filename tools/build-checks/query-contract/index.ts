@@ -4,6 +4,7 @@ import {mkdir, writeFile, rm} from 'node:fs/promises';
 import path from 'node:path';
 import {createCodocsQueryHandlers} from '@codocs/mcp';
 import {queryDiagnosticCodes} from '@codocs/core';
+import {createWorkspaceQuerySession} from '@codocs/workspace';
 const project = path.join(process.cwd(), 'mcp project');
 await mkdir(path.join(project, '.codocs'), {recursive: true});
 try {
@@ -26,6 +27,16 @@ try {
   assert.equal(typeof get.results[0].revision, 'string');
   assert.equal(get.results[1].found, false);
   assert.equal(get.results[1].diagnostics[0].code, queryDiagnosticCodes.notFound);
+  const session = createWorkspaceQuerySession({cwd: project});
+  const matched = await session.match('b');
+  assert.equal(matched.success, true);
+  const byPaths = await session.getByPaths(['.codocs/b.yaml'], matched.catalogVersion);
+  assert.equal(byPaths.success, true);
+  assert.equal(byPaths.results[0].path, '.codocs/b.yaml');
+  assert.equal(byPaths.results[0].references[0].path, '.codocs/a.yaml');
+  assert.equal(byPaths.results[0].references[0].id, 'a');
+  assert.equal(typeof byPaths.results[0].references[0].uri, 'string');
+  await session.close();
   const invalid = await handlers.codocsGet({ids: [], extra: true});
   assert.deepEqual(invalid, {success: false, scanStatus: 'failed', error: {code: queryDiagnosticCodes.invalidInput, severity: 'error', message: '조회 입력이 올바르지 않습니다.'}});
   assert.ok(import.meta.resolve('@codocs/mcp').startsWith(new URL('./node_modules/', import.meta.url).href));
@@ -54,8 +65,10 @@ export const queryContractConfig = {
 
 /** strict NodeNext가 scanStatus와 ID별 결과 union을 완전하게 좁히는지 검사한다. */
 export const queryContractTs = String.raw`import {createCodocsQueryHandlers} from '@codocs/mcp';
-import {queryDiagnosticCodes} from '@codocs/core';
-import {workspaceQueryDiagnosticCodes} from '@codocs/workspace';
+import {projectCatalogPaths, queryDiagnosticCodes} from '@codocs/core';
+import {createWorkspaceQuerySession, workspaceQueryDiagnosticCodes} from '@codocs/workspace';
+import type {Catalog, CatalogPathProjection} from '@codocs/core';
+import type {WorkspacePathGetResponse} from '@codocs/workspace';
 import type {CodocsGetInput, CodocsGetResponse, CodocsListInput, CodocsListResponse} from '@codocs/mcp';
 const handlers = createCodocsQueryHandlers({cwd: '.'});
 const listInput: CodocsListInput = {domain: '업무', kind: 'policy', status: 'confirmed'};
@@ -100,6 +113,19 @@ if (get.success) {
   // @ts-expect-error 실패 상세에는 부분 results가 없다.
   console.log(get.results);
 }
+declare const catalog: Catalog;
+const pathProjection: CatalogPathProjection = projectCatalogPaths(catalog, ['.codocs/a.yaml']);
+if (pathProjection.success && pathProjection.results[0]?.found) {
+  const item = pathProjection.results[0];
+  console.log(item.path, item.id, item.document, item.rawYaml, item.references, item.referencedBy, item.diagnostics);
+}
+const pathSession = createWorkspaceQuerySession({cwd: '.'});
+const pathGet: WorkspacePathGetResponse = await pathSession.getByPaths(['.codocs/a.yaml'], 1);
+if (!pathGet.success && 'expectedCatalogVersion' in pathGet) {
+  const mismatchCode: 'catalog_version_mismatch' = pathGet.error.code;
+  console.log(mismatchCode, pathGet.expectedCatalogVersion, pathGet.catalogVersion);
+}
+await pathSession.close();
 const invalidCode: 'invalid_input' = queryDiagnosticCodes.invalidInput;
 const cursorCode: 'cursor_expired' = workspaceQueryDiagnosticCodes.cursorExpired;
 console.log(invalidCode, cursorCode);
