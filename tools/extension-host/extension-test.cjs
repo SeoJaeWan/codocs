@@ -1,11 +1,27 @@
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const { access, mkdir, readFile, writeFile } = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
+const { monitorEventLoopDelay, performance } = require('node:perf_hooks');
 const vscode = require('vscode');
 
 const extensionIdentifier = 'codocs.codocs';
 const restartCommand = 'codocs.restartLanguageServers';
+const openSourceCommand = 'codocs.openSource';
+const progress = [];
+
+/** 실행 단계와 시각을 실패 후 읽을 수 있는 evidence에 기록한다. */
+async function checkpoint(phase, detail = {}) {
+  const progressPath = process.env.COD16_PROGRESS_PATH;
+  if (!progressPath) return;
+  progress.push({ phase, at: new Date().toISOString(), ...detail });
+  await writeFile(
+    progressPath,
+    `${JSON.stringify(progress, null, 2)}\n`,
+    'utf8',
+  );
+}
 
 /** 실행 중인 language server 프로세스의 PID를 찾는다. */
 function serverProcesses(serverPath) {
@@ -70,27 +86,92 @@ async function killAndWaitForRestart(serverPath, pid, expectedCount) {
   return waitFor('language server automatic restart', checkRestart);
 }
 
-/** Extension Host 시나리오를 실행하고 증거 파일을 기록한다. */
-async function run() {
-  const fixtureRoot = process.env.COD15_FIXTURE_ROOT;
-  const extensionRoot = process.env.COD15_EXTENSION_ROOT;
-  const evidencePath = process.env.COD15_EVIDENCE_PATH;
-  assert.ok(fixtureRoot, 'COD15_FIXTURE_ROOT is required');
-  assert.ok(extensionRoot, 'COD15_EXTENSION_ROOT is required');
-  assert.ok(evidencePath, 'COD15_EVIDENCE_PATH is required');
+/** Hover 배열의 Markdown 원문을 한 문자열로 합친다. */
+function hoverMarkdown(hovers) {
+  return hovers
+    .flatMap((hover) =>
+      Array.isArray(hover.contents) ? hover.contents : [hover.contents],
+    )
+    .map((content) =>
+      typeof content === 'string' ? content : (content.value ?? ''),
+    )
+    .join('\n');
+}
 
+/** 실제 VS Code Hover provider 명령을 실행한다. */
+async function executeHover(document, position, timeoutMilliseconds = 10_000) {
+  let timer;
+  /** Hover 요청 제한 시간이 지나면 명시적인 fixture 실패를 반환한다. */
+  const timeout = (resolve, reject) => {
+    void resolve;
+    /** 제한 시간을 넘긴 Hover 요청을 거부한다. */
+    const failAfterTimeout = () =>
+      reject(new Error('executeHoverProvider timed out'));
+    timer = setTimeout(failAfterTimeout, timeoutMilliseconds);
+  };
+  try {
+    return await Promise.race([
+      vscode.commands.executeCommand(
+        'vscode.executeHoverProvider',
+        document.uri,
+        position,
+      ),
+      new Promise(timeout),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Hover 반환값을 단계 evidence에 직렬화할 수 있는 형태로 만든다. */
+function hoverSnapshot(hovers) {
+  if (hovers === undefined || hovers === null) return hovers;
+  const snapshot = [];
+  for (const hover of hovers) {
+    const contents = [];
+    for (const content of hover.contents)
+      contents.push({ value: content.value, isTrusted: content.isTrusted });
+    snapshot.push({ range: hover.range, contents });
+  }
+  return snapshot;
+}
+
+/** Markdown command URI에서 첫 원문 열기 인자를 복원한다. */
+function commandArgument(markdown) {
+  const match = /command:codocs\.openSource\?([^\s)]+)/u.exec(markdown);
+  assert.ok(match, 'codocs.openSource command URI was not found');
+  const values = JSON.parse(decodeURIComponent(match[1]));
+  assert.ok(Array.isArray(values) && values.length === 1);
+  return values[0];
+}
+
+/** 지정 URI를 표시 중인 탭 수를 반환한다. */
+function tabsForUri(uri) {
+  return vscode.window.tabGroups.all
+    .flatMap((group) => group.tabs)
+    .filter((tab) => tab.input && tab.input.uri?.toString() === uri.toString())
+    .length;
+}
+
+/** p 분위수의 nearest-rank 값을 반환한다. */
+function percentile(values, ratio) {
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.max(0, Math.ceil(sorted.length * ratio) - 1);
+  return sorted[index];
+}
+
+/** Extension Host 공통 환경을 활성화하고 서버 PID를 확인한다. */
+async function activateExtension(extensionRoot) {
+  await checkpoint('activate-extension:start');
   const folders = vscode.workspace.workspaceFolders ?? [];
-  assert.equal(folders.length, 4);
-  const missingCodocs = path.join(fixtureRoot, 'missing', '.codocs');
-  await expectMissing(missingCodocs);
-
+  assert.ok(folders.length > 0);
   const extension = vscode.extensions.getExtension(extensionIdentifier);
   assert.ok(extension, `Extension is not installed: ${extensionIdentifier}`);
   await extension.activate();
   assert.equal(extension.isActive, true);
   const commands = await vscode.commands.getCommands(true);
   assert.ok(commands.includes(restartCommand));
-
+  assert.ok(commands.includes(openSourceCommand));
   const serverPath = path.join(extensionRoot, 'dist/server/index.cjs');
   /** 모든 workspace folder에 language server가 시작됐는지 확인한다. */
   const checkInitialProcesses = () => {
@@ -101,12 +182,208 @@ async function run() {
     'one server per workspace folder',
     checkInitialProcesses,
   );
-  await expectMissing(missingCodocs);
+  await checkpoint('activate-extension:ready', {
+    workspaceFolders: folders.length,
+    serverProcesses: initialProcesses.length,
+  });
+  return { extension, folders, serverPath, initialProcesses };
+}
 
+/** 실제 Hover·원문 열기·탭 보존·workspace 라우팅을 검증한다. */
+async function verifyHoverAndOpenSource(fixtureRoot) {
   const sourcePath = path.join(fixtureRoot, 'parent', 'nested', 'source.java');
-  const diskText = await readFile(sourcePath, 'utf8');
   const document = await vscode.workspace.openTextDocument(sourcePath);
-  await vscode.window.showTextDocument(document);
+  await vscode.window.showTextDocument(document, { preview: false });
+  const composite = 'reservationReturnZones';
+  const compositeStart = document.getText().indexOf(composite);
+  assert.ok(compositeStart >= 0);
+  const reservationPosition = document.positionAt(compositeStart + 3);
+  const returnZonePosition = document.positionAt(compositeStart + 15);
+  await checkpoint('functional:hover-input', {
+    uri: document.uri.toString(),
+    languageId: document.languageId,
+    text: document.getText(),
+    reservationPosition,
+    returnZonePosition,
+  });
+  let reservationAttempts = 0;
+  const reservation = await waitFor(
+    'reservation Hover',
+    /** 예약 토큰의 본문이 준비된 Hover를 반환한다. */
+    async () => {
+      const hovers = await executeHover(document, reservationPosition);
+      reservationAttempts += 1;
+      if (reservationAttempts === 1)
+        await checkpoint('functional:hover-first-response', {
+          value: hoverSnapshot(hovers),
+        });
+      return hoverMarkdown(hovers).includes('예약 본문')
+        ? { hovers, markdown: hoverMarkdown(hovers) }
+        : undefined;
+    },
+    30_000,
+  );
+  await checkpoint('functional:hover-reservation');
+  const returnZone = await waitFor(
+    'return-zone Hover',
+    /** 반납 구역 토큰의 본문이 준비된 Hover를 반환한다. */
+    async () => {
+      const hovers = await executeHover(document, returnZonePosition);
+      return hoverMarkdown(hovers).includes('반납 본문')
+        ? { hovers, markdown: hoverMarkdown(hovers) }
+        : undefined;
+    },
+    30_000,
+  );
+  await checkpoint('functional:hover-return-zone');
+  assert.match(reservation.markdown, /반납 구역/u);
+  assert.doesNotMatch(reservation.markdown, /반납 본문/u);
+  assert.match(returnZone.markdown, /예약/u);
+  assert.doesNotMatch(returnZone.markdown, /예약 본문/u);
+  const reservationRange = reservation.hovers[0].range;
+  const returnZoneRange = returnZone.hovers[0].range;
+  assert.equal(document.getText(reservationRange), 'reservation');
+  assert.equal(document.getText(returnZoneRange), 'ReturnZones');
+  const trusted = returnZone.hovers
+    .flatMap((hover) => hover.contents)
+    .find((content) => content.value?.includes('command:codocs.openSource'));
+  assert.deepEqual(trusted.isTrusted, { enabledCommands: [openSourceCommand] });
+
+  const nestedStart = document.getText().indexOf('nestedZone');
+  const nestedHovers = await waitFor(
+    'nearest nested workspace Hover',
+    /** 중첩 workspace 문서만 포함한 Hover를 반환한다. */
+    async () => {
+      const hovers = await executeHover(
+        document,
+        document.positionAt(nestedStart + 2),
+      );
+      return hoverMarkdown(hovers).includes('Nested Zone') ? hovers : undefined;
+    },
+    30_000,
+  );
+  await checkpoint('functional:hover-nearest-workspace');
+  assert.doesNotMatch(hoverMarkdown(nestedHovers), /Parent Zone/u);
+  const parentStart = document.getText().indexOf('parentZone');
+  const parentHovers = await executeHover(
+    document,
+    document.positionAt(parentStart + 2),
+  );
+  assert.equal(parentHovers.length, 0);
+
+  const argument = commandArgument(returnZone.markdown);
+  const sourceUri = vscode.Uri.parse(argument.uri);
+  assert.match(sourceUri.fsPath, /한글 원문[/\\]반납 구역\.yaml$/u);
+  assert.ok(argument.range);
+  assert.match(argument.revision, /^[a-f0-9]{64}$/u);
+  assert.ok(Number.isSafeInteger(argument.catalogVersion));
+  const beforeOpenTabs = tabsForUri(sourceUri);
+  assert.equal(
+    await vscode.commands.executeCommand(openSourceCommand, argument),
+    true,
+  );
+  const openedEditor = vscode.window.activeTextEditor;
+  assert.equal(openedEditor.document.uri.toString(), sourceUri.toString());
+  assert.equal(openedEditor.selection.start.line, argument.range.start.line);
+  assert.equal(
+    openedEditor.selection.start.character,
+    argument.range.start.character,
+  );
+  assert.equal(openedEditor.selection.end.line, argument.range.end.line);
+  assert.equal(
+    openedEditor.selection.end.character,
+    argument.range.end.character,
+  );
+  assert.equal(tabsForUri(sourceUri), beforeOpenTabs + 1);
+  await checkpoint('functional:open-source-saved');
+  assert.equal(
+    await vscode.commands.executeCommand(openSourceCommand, argument),
+    true,
+  );
+  assert.equal(tabsForUri(sourceUri), beforeOpenTabs + 1);
+
+  const diskYaml = await readFile(sourceUri.fsPath, 'utf8');
+  const dirtyYaml = `${diskYaml}# unsaved fixture edit\r\n`;
+  await replaceDocument(openedEditor.document, dirtyYaml);
+  openedEditor.selection = new vscode.Selection(0, 1, 0, 1);
+  assert.equal(openedEditor.document.isDirty, true);
+  assert.equal(
+    await vscode.commands.executeCommand(openSourceCommand, argument),
+    true,
+  );
+  const reopenedEditor = vscode.window.activeTextEditor;
+  assert.equal(reopenedEditor.document, openedEditor.document);
+  assert.equal(reopenedEditor.document.getText(), dirtyYaml);
+  assert.equal(reopenedEditor.document.isDirty, true);
+  assert.equal(await readFile(sourceUri.fsPath, 'utf8'), diskYaml);
+  assert.deepEqual(reopenedEditor.selection, new vscode.Selection(0, 1, 0, 1));
+  assert.equal(tabsForUri(sourceUri), beforeOpenTabs + 1);
+  await vscode.commands.executeCommand('workbench.action.files.revert');
+  assert.equal(reopenedEditor.document.isDirty, false);
+  await checkpoint('functional:open-source-dirty-preserved');
+
+  const definitionPath = path.join(
+    fixtureRoot,
+    'parent',
+    'nested',
+    'definition.js',
+  );
+  const definitionDocument =
+    await vscode.workspace.openTextDocument(definitionPath);
+  const callOffset = definitionDocument
+    .getText()
+    .lastIndexOf('preservedDefinition');
+  const definitions = await waitFor(
+    'built-in JavaScript definition provider',
+    /** 기본 JavaScript 정의 결과가 준비되면 반환한다. */
+    async () => {
+      const values = await vscode.commands.executeCommand(
+        'vscode.executeDefinitionProvider',
+        definitionDocument.uri,
+        definitionDocument.positionAt(callOffset + 2),
+      );
+      return values?.length ? values : undefined;
+    },
+    30_000,
+  );
+  const definitionTarget = definitions[0].targetUri ?? definitions[0].uri;
+  const definitionRange =
+    definitions[0].targetSelectionRange ?? definitions[0].range;
+  assert.equal(definitionTarget.toString(), definitionDocument.uri.toString());
+  assert.equal(definitionRange.start.line, 0);
+  await checkpoint('functional:definition-provider');
+
+  return {
+    document,
+    sourcePath,
+    reservationRange: {
+      start: reservationRange.start,
+      end: reservationRange.end,
+    },
+    returnZoneRange: { start: returnZoneRange.start, end: returnZoneRange.end },
+    generatedCommandTrusted: true,
+    nearestWorkspaceOnly: true,
+    openedUri: sourceUri.toString(),
+    crlfAndUnicodePathOpened: true,
+    existingTabReused: true,
+    dirtyYamlPreserved: true,
+    dirtySelectionPreservedOnRevisionMismatch: true,
+    defaultDefinitionProviderPreserved: true,
+  };
+}
+
+/** 현재 설치된 VSIX의 기능·재시작 흐름을 실행한다. */
+async function runFunctional(fixtureRoot, extensionRoot) {
+  await checkpoint('functional:start');
+  const missingCodocs = path.join(fixtureRoot, 'missing', '.codocs');
+  await expectMissing(missingCodocs);
+  const activated = await activateExtension(extensionRoot);
+  await expectMissing(missingCodocs);
+  const hoverEvidence = await verifyHoverAndOpenSource(fixtureRoot);
+  const document = hoverEvidence.document;
+  const sourcePath = hoverEvidence.sourcePath;
+  const diskText = await readFile(sourcePath, 'utf8');
+  await vscode.window.showTextDocument(document, { preview: false });
   const unsavedText =
     'class Broken {\n  // nestedZone 😀\n  String value = "nestedZone";\n  nestedZone(\n';
   await replaceDocument(document, unsavedText);
@@ -118,9 +395,9 @@ async function run() {
   await vscode.commands.executeCommand(restartCommand);
   /** 수동 재시작이 모든 기존 프로세스를 교체했는지 확인한다. */
   const checkManualRestart = () => {
-    const current = serverProcesses(serverPath);
-    return current.length === folders.length &&
-      current.every((pid) => !initialProcesses.includes(pid))
+    const current = serverProcesses(activated.serverPath);
+    return current.length === activated.folders.length &&
+      current.every((pid) => !activated.initialProcesses.includes(pid))
       ? current
       : undefined;
   };
@@ -142,14 +419,20 @@ async function run() {
   /** 파일 감시자가 변경을 처리할 시간을 확보한다. */
   const waitForChange = (resolve) => setTimeout(resolve, 500);
   await new Promise(waitForChange);
-  assert.equal(serverProcesses(serverPath).length, folders.length);
+  assert.equal(
+    serverProcesses(activated.serverPath).length,
+    activated.folders.length,
+  );
   await writeFile(
     path.join(missingCodocs, 'created-zone.yaml'),
     'id: created-zone\nname: Changed Zone\ndefinition: changed\ndomains: [test]\n',
     'utf8',
   );
   await new Promise(waitForChange);
-  assert.equal(serverProcesses(serverPath).length, folders.length);
+  assert.equal(
+    serverProcesses(activated.serverPath).length,
+    activated.folders.length,
+  );
 
   let crashProcesses = afterManualRestart;
   let crashPid = crashProcesses[0];
@@ -158,9 +441,9 @@ async function run() {
     const previousProcesses = crashProcesses;
     crashedPids.push(crashPid);
     crashProcesses = await killAndWaitForRestart(
-      serverPath,
+      activated.serverPath,
       crashPid,
-      folders.length,
+      activated.folders.length,
     );
     const replacement = crashProcesses.find(
       (pid) => !previousProcesses.includes(pid),
@@ -173,8 +456,8 @@ async function run() {
   process.kill(finalCrashPid, 'SIGKILL');
   /** 재시작 예산이 소진되어 한 서버가 중단됐는지 확인한다. */
   const checkStoppedProcesses = () => {
-    const current = serverProcesses(serverPath);
-    return current.length === folders.length - 1 &&
+    const current = serverProcesses(activated.serverPath);
+    return current.length === activated.folders.length - 1 &&
       !current.includes(finalCrashPid)
       ? current
       : undefined;
@@ -186,13 +469,16 @@ async function run() {
   /** 중단 상태가 유지되는지 확인할 시간을 확보한다. */
   const waitForStop = (resolve) => setTimeout(resolve, 1_000);
   await new Promise(waitForStop);
-  assert.equal(serverProcesses(serverPath).length, folders.length - 1);
+  assert.equal(
+    serverProcesses(activated.serverPath).length,
+    activated.folders.length - 1,
+  );
 
   await vscode.commands.executeCommand(restartCommand);
   /** 수동 복구 명령 뒤 모든 language server가 돌아왔는지 확인한다. */
   const checkAfterRecovery = () => {
-    const current = serverProcesses(serverPath);
-    return current.length === folders.length ? current : undefined;
+    const current = serverProcesses(activated.serverPath);
+    return current.length === activated.folders.length ? current : undefined;
   };
   const afterRecovery = await waitFor(
     'manual recovery after crash stop',
@@ -202,37 +488,223 @@ async function run() {
   assert.equal(document.getText(), unsavedText);
   assert.equal(document.isDirty, true);
   assert.equal(await readFile(sourcePath, 'utf8'), diskText);
+  await checkpoint('functional:complete');
 
+  return {
+    vscodeVersion: vscode.version,
+    extensionIdentifier,
+    extensionActive: activated.extension.isActive,
+    extensionHost: {
+      node: process.version,
+      platform: process.platform,
+      architecture: process.arch,
+      cpu: os.cpus()[0]?.model ?? 'unknown',
+    },
+    workspaceFolderCount: activated.folders.length,
+    serverCount: activated.initialProcesses.length,
+    hoverAndOpenSource: {
+      reservationRange: hoverEvidence.reservationRange,
+      returnZoneRange: hoverEvidence.returnZoneRange,
+      generatedCommandTrusted: hoverEvidence.generatedCommandTrusted,
+      nearestWorkspaceOnly: hoverEvidence.nearestWorkspaceOnly,
+      openedUri: hoverEvidence.openedUri,
+      crlfAndUnicodePathOpened: hoverEvidence.crlfAndUnicodePathOpened,
+      existingTabReused: hoverEvidence.existingTabReused,
+      dirtyYamlPreserved: hoverEvidence.dirtyYamlPreserved,
+      dirtySelectionPreservedOnRevisionMismatch:
+        hoverEvidence.dirtySelectionPreservedOnRevisionMismatch,
+      defaultDefinitionProviderPreserved:
+        hoverEvidence.defaultDefinitionProviderPreserved,
+    },
+    manualRestartReplacedAllProcesses: true,
+    unsavedDocument: {
+      version: editedVersion,
+      textPreservedAfterRestart: document.getText() === unsavedText,
+      dirtyAfterRestart: document.isDirty,
+      diskUnchanged: (await readFile(sourcePath, 'utf8')) === diskText,
+    },
+    missingCodocsNotGenerated: true,
+    createdAndChangedCodocsObservedWithoutProcessLoss: true,
+    automaticRestartsObserved: 3,
+    repeatedCrashStoppedOneServer:
+      stoppedProcesses.length === activated.folders.length - 1,
+    manualRecoveryRestoredAllServers:
+      afterRecovery.length === activated.folders.length,
+    crashedPids,
+  };
+}
+
+/** 실제 executeHoverProvider 호출의 정확성과 지연 시간을 측정한다. */
+async function runPerformance(fixtureRoot, extensionRoot) {
+  await checkpoint('performance:start');
+  const options = JSON.parse(process.env.COD16_PERFORMANCE_OPTIONS);
+  const fixtureMetadata = JSON.parse(process.env.COD16_FIXTURE_METADATA);
+  const activated = await activateExtension(extensionRoot);
+  const sourcePath = path.join(
+    fixtureRoot,
+    'parent',
+    'nested',
+    'performance.txt',
+  );
+  const document = await vscode.workspace.openTextDocument(sourcePath);
+  await vscode.window.showTextDocument(document, { preview: false });
+  const width = Math.max(4, String(options.documents - 1).length);
+  /** 한 인덱스의 예상 Hover가 준비됐는지 확인한다. */
+  const query = async (index, timeoutMilliseconds = 10_000) => {
+    const serial = String(index).padStart(width, '0');
+    const hovers = await executeHover(
+      document,
+      new vscode.Position(index, 5),
+      timeoutMilliseconds,
+    );
+    const markdown = hoverMarkdown(hovers);
+    return {
+      success:
+        hovers.length > 0 && markdown.includes(`Performance Term ${serial}`),
+      markdown,
+    };
+  };
+  await waitFor(
+    '1,000-document Hover index readiness',
+    async () => ((await query(0, 60_000)).success ? true : undefined),
+    60_000,
+  );
+  await checkpoint('performance:index-ready');
+  let state = options.seed >>> 0;
+  /** 고정 LCG로 다음 queryable 문서 줄을 선택한다. */
+  const nextIndex = () => {
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+    return state % fixtureMetadata.queryableDocumentCount;
+  };
+  const failures = [];
+  for (let run = 0; run < options.warmupRuns; run += 1) {
+    const index = nextIndex();
+    await checkpoint('performance:warmup-request-start', {
+      run,
+      index,
+      position: { line: index, character: 5 },
+    });
+    let result;
+    try {
+      result = await query(index);
+    } catch (error) {
+      await checkpoint('performance:warmup-request-failure', {
+        run,
+        index,
+        position: { line: index, character: 5 },
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    await checkpoint('performance:warmup-request-complete', {
+      run,
+      index,
+      success: result.success,
+    });
+    if (!result.success && failures.length < 20)
+      failures.push({ phase: 'warmup', run, index, markdown: result.markdown });
+  }
+  await checkpoint('performance:warmup-complete');
+  const delay = monitorEventLoopDelay({ resolution: 10 });
+  delay.enable();
+  const memoryBefore = process.memoryUsage();
+  const samples = [];
+  for (let run = 0; run < options.queryRuns; run += 1) {
+    const index = nextIndex();
+    const started = performance.now();
+    let result;
+    let error;
+    try {
+      result = await query(index);
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : String(caught);
+    }
+    const durationMilliseconds = performance.now() - started;
+    const success = error === undefined && result.success;
+    samples.push({
+      run,
+      index,
+      durationMilliseconds,
+      success,
+      ...(error ? { error } : {}),
+    });
+    if (!success && failures.length < 20)
+      failures.push({
+        phase: 'measured',
+        run,
+        index,
+        ...(error ? { error } : { markdown: result.markdown }),
+      });
+  }
+  const memoryAfter = process.memoryUsage();
+  delay.disable();
+  const durations = samples.map((sample) => sample.durationMilliseconds);
+  const p95Milliseconds = percentile(durations, 0.95);
+  const accuracyFailureCount =
+    samples.filter((sample) => !sample.success).length +
+    failures.filter((failure) => failure.phase === 'warmup').length;
+  await checkpoint('performance:measured-complete', {
+    p95Milliseconds,
+    accuracyFailureCount,
+  });
+  return {
+    vscodeVersion: vscode.version,
+    extensionIdentifier,
+    extensionActive: activated.extension.isActive,
+    extensionHost: {
+      node: process.version,
+      platform: process.platform,
+      architecture: process.arch,
+      cpu: os.cpus()[0]?.model ?? 'unknown',
+    },
+    workspaceFolderCount: activated.folders.length,
+    serverCount: activated.initialProcesses.length,
+    performance: {
+      warmupRuns: options.warmupRuns,
+      queryRuns: options.queryRuns,
+      targetMilliseconds: options.targetMilliseconds,
+      measurementBoundary:
+        'from immediately before the query calls vscode.executeHoverProvider until its Promise resolves and the returned Hover Markdown is checked; report serialization is excluded',
+      medianMilliseconds: percentile(durations, 0.5),
+      p95Milliseconds,
+      maximumMilliseconds: Math.max(...durations),
+      accuracyFailureCount,
+      failures,
+      samples,
+      memory: { before: memoryBefore, after: memoryAfter },
+      eventLoopDelay: {
+        minimumMilliseconds: delay.min / 1e6,
+        medianMilliseconds: delay.percentile(50) / 1e6,
+        p95Milliseconds: delay.percentile(95) / 1e6,
+        maximumMilliseconds: delay.max / 1e6,
+      },
+      passed:
+        accuracyFailureCount === 0 &&
+        Number.isFinite(p95Milliseconds) &&
+        p95Milliseconds <= options.targetMilliseconds,
+    },
+  };
+}
+
+/** Extension Host 시나리오를 실행하고 증거 파일을 기록한다. */
+async function run() {
+  const fixtureRoot = process.env.COD16_FIXTURE_ROOT;
+  const extensionRoot = process.env.COD16_EXTENSION_ROOT;
+  const evidencePath = process.env.COD16_EVIDENCE_PATH;
+  assert.ok(fixtureRoot, 'COD16_FIXTURE_ROOT is required');
+  assert.ok(extensionRoot, 'COD16_EXTENSION_ROOT is required');
+  assert.ok(evidencePath, 'COD16_EVIDENCE_PATH is required');
+  await checkpoint('run:start', { vscodeVersion: vscode.version });
+  const evidence =
+    process.env.COD16_HOVER_PERFORMANCE === '1'
+      ? await runPerformance(fixtureRoot, extensionRoot)
+      : await runFunctional(fixtureRoot, extensionRoot);
   await writeFile(
     evidencePath,
-    `${JSON.stringify(
-      {
-        vscodeVersion: vscode.version,
-        extensionIdentifier,
-        extensionActive: extension.isActive,
-        workspaceFolderCount: folders.length,
-        serverCount: initialProcesses.length,
-        manualRestartReplacedAllProcesses: true,
-        unsavedDocument: {
-          version: editedVersion,
-          textPreservedAfterRestart: document.getText() === unsavedText,
-          dirtyAfterRestart: document.isDirty,
-          diskUnchanged: (await readFile(sourcePath, 'utf8')) === diskText,
-        },
-        missingCodocsNotGenerated: true,
-        createdAndChangedCodocsObservedWithoutProcessLoss: true,
-        automaticRestartsObserved: 3,
-        repeatedCrashStoppedOneServer:
-          stoppedProcesses.length === folders.length - 1,
-        manualRecoveryRestoredAllServers:
-          afterRecovery.length === folders.length,
-        crashedPids,
-      },
-      null,
-      2,
-    )}\n`,
+    `${JSON.stringify(evidence, null, 2)}\n`,
     'utf8',
   );
+  await checkpoint('run:evidence-written');
 }
 
 exports.run = run;
