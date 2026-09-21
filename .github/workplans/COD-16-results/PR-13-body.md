@@ -30,11 +30,15 @@
 
 최신 main 통합 후 기본 `pnpm test:run`을 두 번 실행했고, 두 실행 모두 **674/675 통과**했다. `packages/workspace/src/watcher/watcher.test.ts`의 `nested/deep/alpha.yaml` 생성 감지에서 경로 알림을 받지 못했다. 감시 코드와 해당 테스트는 main 및 기존 검증 커밋과 동일하며 통합 중 제품 코드를 변경하지 않았다.
 
-해당 파일만 실행하면 **14/14**, `pnpm test:run --no-file-parallelism`으로 전체를 직렬 실행하면 **675/675**가 통과했다. 실행 조건에 따라 결과가 달라지지만 원인은 아직 특정하지 못했으므로 이를 해결된 실패로 처리하지 않는다. 타입·린트·서식·빌드, 개발·빌드 검사와 측정기 집중 검사는 통합 후에도 통과했다.
+해당 파일만 실행하면 **14/14**, `pnpm test:run --no-file-parallelism`으로 전체를 직렬 실행하면 **675/675**가 통과했다. 추가 조사에서는 감시 준비 직후의 이벤트 누락을 독립적으로 재현했다. 수정 없는 기본 전체 재실행은 **675/675** 통과했지만 간헐적 누락을 해결한 것으로 처리하지 않는다. 타입·린트·서식·빌드, 개발·빌드 검사와 측정기 집중 검사는 통합 후에도 통과했다.
 
 [통합 재검증 결과와 실패 로그](https://github.com/SeoJaeWan/codocs/blob/feature/COD-16/.github/workplans/COD-16-results/pr-13-integration-20260921/README.md)
 
+기존 감시 문제의 수정과 검증은 후속 범위로 분리한다. 감시 구현·테스트·시간 제한은 변경하지 않았으며, 이 문제가 해결되었다고 간주하지 않는다. [원인 조사와 별도 검증 결정](https://github.com/SeoJaeWan/codocs/blob/feature/COD-16/.github/workplans/COD-16-results/pr-13-integration-20260921/watcher-follow-up.md)을 보존한다.
+
 ## 후속 범위
+
+기존 감시 이벤트 누락의 보완과 Windows·macOS 양쪽의 검증은 별도 작업이다.
 
 Hover 지연의 원인 분석과 최적화는 후속 작업이다. 목록·필터·커서, 변경 계획, MCP 통신, 쓰기 전체는 이번 성능 측정에 포함하지 않았다. 측정 환경은 macOS이며 Windows 성능을 검증한 결과로 간주하지 않는다.
 
