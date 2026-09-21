@@ -164,12 +164,11 @@ class VscodeFolderClient implements FolderClientBoundary {
   }
 
   async restart(): Promise<void> {
+    if (this.#client?.state === State.Starting)
+      await this.#waitForStartTransition(this.#client);
+    await this.stop();
     this.#budget.reset();
-    if (!this.#client) {
-      await this.start();
-      return;
-    }
-    await this.#client.restart();
+    await this.start();
   }
 
   async stop(): Promise<void> {
@@ -213,16 +212,40 @@ class VscodeFolderClient implements FolderClientBoundary {
     };
   }
 
+  async #waitForStartTransition(client: LanguageClient): Promise<void> {
+    if (client.state !== State.Starting) return;
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        listener.dispose();
+        reject(
+          new Error(
+            `Codocs language client 시작 전환이 완료되지 않았습니다: ${this.#folder.name}`,
+          ),
+        );
+      }, 5_000);
+      const listener = client.onDidChangeState((event) => {
+        if (event.newState === State.Starting) return;
+        clearTimeout(timer);
+        listener.dispose();
+        resolve();
+      });
+    });
+  }
+
   #errorHandler(): ErrorHandler {
     return {
       error: (_error, _message, count) => ({
         action: (count ?? 0) < 3 ? ErrorAction.Continue : ErrorAction.Shutdown,
       }),
-      closed: async () => {
+      closed: () => {
         if (this.#stopping) return { action: CloseAction.DoNotRestart };
         if (this.#budget.recordFailure())
           return { action: CloseAction.Restart };
-        await this.#showStoppedMessage();
+        this.#showStoppedMessage().catch((error: unknown) => {
+          this.#output.appendLine(
+            `Codocs language server 중지 안내를 표시하지 못했습니다: ${errorMessage(error)}`,
+          );
+        });
         return { action: CloseAction.DoNotRestart, handled: true };
       },
     };
