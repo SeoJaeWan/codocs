@@ -1,0 +1,15 @@
+id: completion
+name: '코드 자동완성'
+domains:
+  - 'Language Server'
+definition: |
+  코드의 입력 중인 식별자를 현재 문서 ID에 맞는 표기로 완성하는 계약이다.
+  [[문서 동기화]]의 최신 내용과 위치를 사용하며, 삽입할 대상은 [[문서]]의 현재 ID를 기준으로 한다.
+
+  ## 후보와 삽입 표기
+
+  현재 id를 후보로 사용하고 문서용 이름·도메인·설명으로 구분한다. 문서용 이름과 이전 명칭은 코드 자동완성에 사용하지 않는다.
+  삽입은 현재 식별자의 대소문자·구분자를 따르고 단서가 없으면 camelCase다. 프로젝트 전체에서 표기를 추측하지 않는다.
+  Return Zone의 예: returnZ → returnZone, ReturnZ → ReturnZone, return_z → return_zone, RETURN_Z → RETURN_ZONE.
+  changeReturnZ → changeReturnZone처럼 기존 앞 단어를 유지하고 해당 완성 범위만 교체한다.
+  등록 ID의 단수·복수 형태를 사용하며 문맥에 따라 임의 변환하지 않는다. 약어는 HTTP Server → HTTPServer(PascalCase), httpServer(camelCase)처럼 살린다. 구체 교체 범위는 테스트한다.
