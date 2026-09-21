@@ -36,11 +36,10 @@ definition: |
   | message | 필수 | 사람이 이해할 설명 |
   | path | 해당 시 | 문제가 발생한 파일 경로 |
   | range | 위치 확인 시 | 원문 시작·끝 위치 |
-  | fieldPath | 해당 시 | 속성 이름·배열 인덱스로 구성한 경로 배열 |
+  | fieldPath | 해당 시 | [[필드 경로]]로 표현한 문제 위치 |
   | relatedIds | 해당 시 | 관련 문서 ID |
   | suggestion | 해결 방법이 있을 때 | 다음 행동 안내 |
 
-  fieldPath가 ["deprecatedAliases", 0, "id"]이면 첫 번째 이전 ID 항목의 id를 뜻한다.
   range의 start/end는 각각 line·character를 가지며 character는 화면 너비가 아닌 UTF-16 코드 단위 수다.
   [[YAML 파싱]]의 전체 원문 offset을 외부 range로 변환할 때 앞의 좌표 기준을 적용한다.
 
@@ -86,7 +85,7 @@ definition: |
   경고 코드는 unknown_field(사용자 정의 문서 속성), deprecated_reference(폐기 상태 지식 참조)를 사용한다. 오류 코드만으로 저장 여부를 추측하지 않도록 saved·indexUpdated 등 실제 결과 필드를 유지한다.
 
   이 표는 외부 도구에 전달하는 진단 코드의 의미를 정의한다.
-  unsupported_yaml_feature의 대상 구문은 [[YAML 파싱]]에서 정의하며 공통 코드는 원인을 메시지와 위치로 구분한다.
+  unsupported_yaml_feature의 대상 구문은 [[문서]]의 YAML 저장 형식에서 정의하며 공통 코드는 원인을 메시지와 위치로 구분한다.
   라이브러리의 오류·경고 분류를 그대로 노출하지 않고 제품 진단으로 변환한다.
 
   ## 코드와 검증 위치
