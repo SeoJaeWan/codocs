@@ -1,0 +1,15 @@
+file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/extension-host/run.mjs:998
+      throw new Error(
+            ^
+
+Error: Interrupted by SIGINT
+Preserved failure evidence: /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/.workbench/evidence/host-1.136.1-performance-1789989131525-21259
+    at file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/extension-host/run.mjs:998:13 {
+  [cause]: Error: Interrupted by SIGINT
+      at ChildProcess.<anonymous> (file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/extension-host/run.mjs:180:18)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+}
+
+Node.js v24.21.0

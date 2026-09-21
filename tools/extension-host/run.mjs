@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import {
   access,
@@ -18,6 +18,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import {
+  describeProgress,
+  readProgress,
+  summarizeOutcomes,
+} from './progress.mjs';
 
 const repositoryRoot = path.resolve(import.meta.dirname, '../..');
 const extensionTestPath = path.join(
@@ -58,20 +63,24 @@ function positiveIntegerOption(name, fallback) {
 }
 
 const vsixPath = optionValue('--vsix');
+const renderExisting = optionValue('--render-existing-performance');
 const requestedCodeVersion = optionValue('--code-version');
 const outputPrefix = optionValue('--output');
 const reportPath = optionValue('--report');
 const hoverPerformance = process.argv.includes('--hover-performance');
 const evidenceRunId =
   process.env.COD16_EVIDENCE_RUN_ID ?? `${Date.now()}-${process.pid}`;
+const performanceDocuments = positiveIntegerOption('--documents', 1_000);
 const performanceOptions = {
-  documents: positiveIntegerOption('--documents', 1_000),
+  documents: performanceDocuments,
   warmupRuns: positiveIntegerOption('--warmup-runs', 100),
   queryRuns: positiveIntegerOption('--query-runs', 1_000),
   seed: performanceSeed,
-  targetMilliseconds: performanceTargetMilliseconds,
+  targetMilliseconds:
+    performanceDocuments === 1_000 ? performanceTargetMilliseconds : null,
 };
-if (!vsixPath) throw new Error('--vsix requires an archive path');
+if (!vsixPath && !renderExisting)
+  throw new Error('--vsix requires an archive path');
 if (outputPrefix && !hoverPerformance)
   throw new Error('--output requires --hover-performance');
 
@@ -102,7 +111,10 @@ function runProcess(executable, arguments_, options = {}) {
     });
     let stdout = '';
     let stderr = '';
-    const timeoutMilliseconds = options.timeoutMilliseconds ?? 120_000;
+    const timeoutMilliseconds =
+      options.timeoutMilliseconds === null
+        ? null
+        : (options.timeoutMilliseconds ?? 120_000);
     /** 제한 시간이 지나면 자식 프로세스를 종료한다. */
     const terminateAfterTimeout = () => {
       child.kill('SIGKILL');
@@ -112,7 +124,35 @@ function runProcess(executable, arguments_, options = {}) {
         ),
       );
     };
-    const timer = setTimeout(terminateAfterTimeout, timeoutMilliseconds);
+    const timer =
+      timeoutMilliseconds === null
+        ? null
+        : setTimeout(terminateAfterTimeout, timeoutMilliseconds);
+    /** 사용자의 중단 신호는 이 호출에서 시작한 자식에만 전달한다. */
+    let interruptedSignal;
+    /** 신호를 실행 중인 자식에 전달한다. */
+    const interrupt = (signal) => {
+      interruptedSignal = signal;
+      try {
+        options.onInterrupt?.(signal);
+      } catch (error) {
+        process.stderr.write(
+          `중단 기록 오류: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+      }
+      child.kill(signal);
+    };
+    /** 중단 신호를 현재 자식에 전달한다. */
+    const onInterrupt = () => interrupt('SIGINT');
+    /** 종료 신호를 현재 자식에 전달한다. */
+    const onTerminate = () => interrupt('SIGTERM');
+    process.once('SIGINT', onInterrupt);
+    process.once('SIGTERM', onTerminate);
+    /** 설치된 신호 수신기를 해제한다. */
+    const cleanListeners = () => {
+      process.off('SIGINT', onInterrupt);
+      process.off('SIGTERM', onTerminate);
+    };
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
@@ -121,14 +161,26 @@ function runProcess(executable, arguments_, options = {}) {
     child.stderr.on('data', (chunk) => {
       stderr += chunk;
     });
-    child.once('error', (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.once('exit', (code, signal) => {
-      clearTimeout(timer);
-      resolve({ code, signal, stdout, stderr });
-    });
+    child.once(
+      'error',
+      /** 자식 시작 오류를 전달한다. */
+      (error) => {
+        clearTimeout(timer);
+        cleanListeners();
+        reject(error);
+      },
+    );
+    child.once(
+      'exit',
+      /** 자식 종료 상태를 전달한다. */
+      (code, signal) => {
+        clearTimeout(timer);
+        cleanListeners();
+        if (interruptedSignal)
+          reject(new Error(`Interrupted by ${interruptedSignal}`));
+        else resolve({ code, signal, stdout, stderr });
+      },
+    );
   };
   return new Promise(execute);
 }
@@ -445,55 +497,235 @@ async function createFixture(temporaryRoot) {
   return { ...fixture, workspacePath };
 }
 
-/** JSON과 사람이 읽는 Markdown 성능 보고서를 함께 기록한다. */
+/** 성공한 완료 표본만으로 보간 percentile을 계산한다. */
+function percentile(values, fraction) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const position = (sorted.length - 1) * fraction;
+  const low = Math.floor(position);
+  const high = Math.ceil(position);
+  return sorted[low] + (sorted[high] - sorted[low]) * (position - low);
+}
+
+/** 완료·부분·오류 상태에 공통인 한국어 성능 보고서를 기록한다. */
 async function writePerformanceReport(prefix, report) {
   const resolved = path.resolve(repositoryRoot, prefix);
   await mkdir(path.dirname(resolved), { recursive: true });
   await writeFile(
-    `${resolved}.json`,
+    `${resolved}.json.partial`,
     `${JSON.stringify(report, null, 2)}\n`,
     'utf8',
   );
-  const performance = report.evidence.performance;
-  const fixture = report.fixture;
-  const markdown = `# COD-16 actual VS Code Hover performance\n\n- Result: **${performance.passed ? 'PASS' : 'FAIL'}**\n- VS Code: \`${report.vscode.version}\` (${report.vscode.architecture})\n- Source commit: \`${report.artifacts.sourceCommit}\`\n- VSIX SHA-256: \`${report.artifacts.vsixSha256}\`\n- Extension bundle SHA-256: \`${report.artifacts.extensionBundleSha256}\`\n- Server bundle SHA-256: \`${report.artifacts.serverBundleSha256}\`\n- OS: \`${report.environment.platform} ${report.environment.release} ${report.environment.architecture}\`\n- CPU: \`${report.environment.cpu}\`\n- Node (runner / Extension Host): \`${report.environment.runnerNode}\` / \`${report.evidence.extensionHost.node}\`\n- File cache: ${report.environment.fileCache}\n- Measurement boundary: ${performance.measurementBoundary}\n\n## Dataset and requests\n\n- Seed: \`${fixture.seed}\`\n- Project documents: ${fixture.projectDocumentCount} (${fixture.queryableDocumentCount} queryable, ${fixture.invalidDocumentCount} invalid, ${fixture.collisionDocumentCount} collision documents / ${fixture.collisionIdCount} collision IDs)\n- References: ${fixture.referenceCount}; long definitions: ${fixture.longDefinitionCount}\n- Document bytes total/min/median/max: ${fixture.documentBytes.total} / ${fixture.documentBytes.minimum} / ${fixture.documentBytes.median} / ${fixture.documentBytes.maximum}\n- Code input bytes / UTF-16 units / lines / identifiers: ${fixture.codeInput.utf8Bytes} / ${fixture.codeInput.utf16CodeUnits} / ${fixture.codeInput.lines} / ${fixture.codeInput.identifiers}\n- Request positions: ${fixture.codeInput.requestPositionSelection}\n- Warmup / measured requests: ${performance.warmupRuns} / ${performance.queryRuns}\n\n## Latency\n\n| Metric | Milliseconds |\n| --- | ---: |\n| median | ${performance.medianMilliseconds.toFixed(3)} |\n| p95 | ${performance.p95Milliseconds.toFixed(3)} |\n| maximum | ${performance.maximumMilliseconds.toFixed(3)} |\n| target | ${performance.targetMilliseconds.toFixed(3)} |\n\nAccuracy failures: ${performance.accuracyFailureCount}. Event-loop delay p95: ${performance.eventLoopDelay.p95Milliseconds.toFixed(3)} ms. Raw request samples and failure details are in the adjacent JSON report.\n`;
-  await writeFile(`${resolved}.md`, markdown, 'utf8');
+  await rename(`${resolved}.json.partial`, `${resolved}.json`);
+  const p = report.evidence?.performance ?? report.performance;
+  const fixture = report.fixture ?? {};
+  const samples = p.samples ?? [];
+  const warmups = p.warmups ?? [];
+  const pending = p.pending;
+  /** nullable 지연 시간을 표 형식으로 변환한다. */
+  const number = (value) => (value == null ? '미측정' : value.toFixed(3));
+  const firstReadiness = p.readiness?.[0]?.durationMilliseconds;
+  const warmupDurations = warmups
+    .filter((sample) => sample.success)
+    .map((sample) => sample.durationMilliseconds);
+  const firstWarmup = warmups[0]?.durationMilliseconds;
+  const warmupMedian = percentile(warmupDurations, 0.5);
+  const warmupMaximum = warmupDurations.length
+    ? Math.max(...warmupDurations)
+    : null;
+  const eventLoopPhases = p.eventLoopDelay?.phases ?? {};
+  const resourcePhaseLabels = {
+    'before-readiness': '준비 전',
+    'after-readiness': '준비 후',
+    'after-warmup': '워밍업 후',
+    'after-measured': '본 측정 후',
+  };
+  const requestPhaseLabels = {
+    'performance:readiness-request-start': '첫 준비 확인',
+    'performance:warmup-request-start': '워밍업',
+    'performance:measured-request-start': '본 측정',
+  };
+  const pendingRun =
+    pending?.run == null
+      ? '미확인'
+      : pending.phase === 'performance:readiness-request-start'
+        ? pending.run
+        : pending.run + 1;
+  const pendingDescription = pending
+    ? `${requestPhaseLabels[pending.phase] ?? '현재 요청'} ${pendingRun}회차, 문서 위치 ${pending.index ?? '미확인'}, 대기 ${number(pending.elapsedWaitingMs)} ms`
+    : '없음';
+  /** 원본 로그를 JSON에 남기고 사람용 문장에는 짧은 한국어 이유를 쓴다. */
+  function describeFailure() {
+    if (!p.failure) return '없음';
+    const signal = /^(?:Interrupted by )?(SIGINT|SIGTERM)(?:$|\s)/u.exec(
+      p.failure,
+    )?.[1];
+    if (signal) return `사용자 ${signal} 신호로 측정을 중단했습니다.`;
+    const exit = /^VS Code exited with ([^\n]+)/u.exec(p.failure)?.[1];
+    if (exit) {
+      const exitSignal = /\((SIG[A-Z]+)\)/u.exec(exit)?.[1];
+      return `VS Code 자식 프로세스가 ${exitSignal ? `${exitSignal} 신호로` : `${exit} 상태로`} 비정상 종료되어 현재 요청이 완료되지 않았습니다. 원본 로그는 JSON과 실행 기록에 보존했습니다.`;
+    }
+    return p.failure.includes('\n')
+      ? `측정 중 오류가 발생했습니다: ${p.failure.split('\n', 1)[0]}. 원본 로그는 JSON과 실행 기록에 보존했습니다.`
+      : p.failure;
+  }
+  const failureDescription = describeFailure();
+  const markdown = [
+    '# COD-16 실제 VS Code Hover 성능 관찰 보고서',
+    '',
+    `- 실행 상태: ${report.status === 'completed' ? '완료' : report.status === 'interrupted' ? '중단됨' : '부분 완료'}`,
+    `- 정확성: ${p.passed ? '통과' : p.accuracyFailureCount ? '실패' : '미확인'}`,
+    `- VS Code: ${report.vscode?.version ?? '미확인'}; 실행기 Node: ${report.environment?.runnerNode ?? process.version}`,
+    `- 소스 커밋: ${report.artifacts?.sourceCommit ?? '미확인'}; VSIX SHA-256: ${report.artifacts?.vsixSha256 ?? '미확인'}`,
+    `- 확장 번들 SHA-256: ${report.artifacts?.extensionBundleSha256 ?? '미확인'}; 서버 번들 SHA-256: ${report.artifacts?.serverBundleSha256 ?? '미확인'}`,
+    `- 운영체제: ${report.environment?.platform ?? process.platform} ${report.environment?.release ?? os.release()} ${report.environment?.architecture ?? process.arch}`,
+    `- 데이터: seed ${fixture.seed ?? performanceSeed}, 문서 ${fixture.projectDocumentCount ?? performanceOptions.documents}개, 정상 조회 가능 ${fixture.queryableDocumentCount ?? '미확인'}개, 무효 ${fixture.invalidDocumentCount ?? '미확인'}개, 충돌 ${fixture.collisionDocumentCount ?? '미확인'}개`,
+    `- 실행 회차: 준비 확인 시도 ${p.attemptedReadiness ?? p.readinessAttempts ?? '미확인'}회/완료 ${p.completedReadiness ?? p.readiness?.length ?? '미확인'}회; 워밍업 요청 ${p.warmupRuns}회/시도 ${p.attemptedWarmupRuns ?? warmups.length}회/완료 ${p.completedWarmupRuns ?? warmups.length}회; 측정 요청 ${p.queryRuns}회/시도 ${p.attemptedMeasuredRuns ?? samples.length}회/완료 ${p.completedMeasuredRuns ?? samples.length}회`,
+    `- 정확성 실패: ${p.accuracyFailureCount ?? 0}개; 정확한 완료 측정 표본: ${p.successfulLatencySampleCount ?? samples.filter((sample) => sample.success).length}개`,
+    `- 취소되어 완료된 요청: ${p.cancelledCount ?? [...warmups, ...samples].filter((sample) => sample.cancelled || sample.error === 'Canceled').length}개; 미완료 대기 요청: ${pending ? 1 : 0}개`,
+    `- 현재 대기 요청: ${pendingDescription}`,
+    `- 오류 이유: ${failureDescription}`,
+    `- 진행 기록 무결성: ${(p.progressIntegrity ?? report.performanceProgressIntegrity) === 'corrupt' ? '손상된 중간 기록 있음' : '확인됨'}`,
+    '',
+    '## 실제 완료 지연 (ms)',
+    '',
+    `- 첫 준비 확인 요청: ${number(firstReadiness)} ms`,
+    `- 첫 워밍업 요청: ${number(firstWarmup)} ms`,
+    `- 정확한 워밍업 완료: ${warmupDurations.length}개; 중앙값 ${number(warmupMedian)} ms; 최대 ${number(warmupMaximum)} ms`,
+    `- VS Code Extension Host 프로세스의 단계별 메모리 RSS: 준비 전 ${p.memory?.beforeReadiness?.rss ?? p.memory?.['before-readiness']?.rss ?? '미측정'} B; 준비 후 ${p.memory?.afterReadiness?.rss ?? p.memory?.['after-readiness']?.rss ?? '미측정'} B; 워밍업 후 ${p.memory?.afterWarmup?.rss ?? p.memory?.['after-warmup']?.rss ?? '미측정'} B; 측정 후 ${p.memory?.afterMeasured?.rss ?? p.memory?.['after-measured']?.rss ?? '미측정'} B`,
+    ...Object.entries(eventLoopPhases).map(
+      ([boundary, observation]) =>
+        `- Extension Host ${resourcePhaseLabels[boundary] ?? boundary} 이벤트 루프 표본 ${observation.count ?? '미확인'}회·p95: ${number(observation.p95Milliseconds)} ms`,
+    ),
+    ...(Object.keys(eventLoopPhases).length
+      ? []
+      : [
+          `- Extension Host 전체 관찰 이벤트 루프 p95: ${number(p.eventLoopDelay?.p95Milliseconds)} ms`,
+        ]),
+    '',
+    '',
+    '| 항목 | 값 |',
+    '| --- | ---: |',
+    `| 성공 표본 중앙값 | ${number(p.medianMilliseconds)} |`,
+    `| 성공 표본 p95 | ${number(p.p95Milliseconds)} |`,
+    `| 성공 표본 최댓값 | ${number(p.maximumMilliseconds)} |`,
+    ...(p.targetMilliseconds == null
+      ? []
+      : [`| 1,000개 문서 참고 기준 | ${number(p.targetMilliseconds)} |`]),
+    '',
+    `Hover 요청은 실제 Promise 완료까지 기다렸습니다. p95에는 정확하게 완료된 측정 요청만 포함했습니다. 틀린 응답의 실제 완료 시간과 모든 워밍업·준비 확인 결과는 인접 JSON의 원시 기록에 남습니다. ${p.targetMilliseconds == null ? '이 문서 규모에는 시간 참고 기준을 적용하지 않습니다.' : '100ms 기준 초과만으로 실행이나 정확성 검사를 실패 처리하지 않습니다.'}`,
+    '',
+    '현재 범위는 설치된 VS Code의 Hover입니다. 목록/필터/커서, 변경 계획, MCP 통신 및 쓰기 전체는 이 명령에서 측정하지 않았습니다. 현재 제공 범위 밖인 자동완성은 성능 판정 대상에서 제외합니다.',
+    '',
+  ];
+  await writeFile(`${resolved}.md.partial`, `${markdown.join('\n')}\n`, 'utf8');
+  await rename(`${resolved}.md.partial`, `${resolved}.md`);
 }
 
-/** 성능 실행이 Hover 요청 단계에서 실패해도 계획된 workload와 미측정 상태를 기록한다. */
+/** Host 오류 때 완료된 진행 기록을 복구하고 미완료 요청은 별도로 표시한다. */
 async function writePerformanceFailureReport(prefix, details) {
-  const resolved = path.resolve(repositoryRoot, prefix);
-  await mkdir(path.dirname(resolved), { recursive: true });
   const progress = details.progress ?? [];
-  const warmupStarts = progress.filter(
-    (item) => item.phase === 'performance:warmup-request-start',
+  /** 지정 단계의 시작 기록을 추출한다. */
+  const starts = (phase) =>
+    progress.filter(
+      (item) => item.phase === `performance:${phase}-request-start`,
+    );
+  /** 지정 단계의 완료 기록을 추출한다. */
+  const complete = (phase) =>
+    progress.filter(
+      (item) => item.phase === `performance:${phase}-request-complete`,
+    );
+  const warmups = complete('warmup').map(
+    /** 진행 기록의 워밍업 완료 표본을 보존한다. */
+    ({
+      run,
+      index,
+      durationMilliseconds,
+      success,
+      cancelled,
+      error,
+      markdown,
+    }) => ({
+      run,
+      index,
+      durationMilliseconds,
+      success,
+      cancelled: cancelled ?? error === 'Canceled',
+      error,
+      markdown,
+    }),
   );
-  const warmupCompletions = progress.filter(
-    (item) => item.phase === 'performance:warmup-request-complete',
+  const samples = complete('measured').map(
+    /** 진행 기록의 측정 완료 표본을 보존한다. */
+    ({
+      run,
+      index,
+      durationMilliseconds,
+      success,
+      cancelled,
+      error,
+      markdown,
+    }) => ({
+      run,
+      index,
+      durationMilliseconds,
+      success,
+      cancelled: cancelled ?? error === 'Canceled',
+      error,
+      markdown,
+    }),
   );
-  const warmupFailures = progress.filter(
-    (item) => item.phase === 'performance:warmup-request-failure',
+  const readiness = complete('readiness');
+  const corruptProgress = progress.filter(
+    (item) => item.phase === 'progress:corrupt',
   );
-  const measuredStarts = progress.filter(
-    (item) => item.phase === 'performance:measured-request-start',
+  const memory = Object.fromEntries(
+    progress
+      .filter((item) => item.phase === 'performance:resources')
+      .map((item) => [item.boundary, item.memory]),
   );
-  const measuredFailures = progress.filter(
-    (item) => item.phase === 'performance:measured-request-failure',
+  const eventLoopPhases = Object.fromEntries(
+    progress
+      .filter(
+        (item) => item.phase === 'performance:resources' && item.eventLoop,
+      )
+      .map((item) => [item.boundary, item.eventLoop]),
   );
-  const completedWarmupRuns = warmupCompletions.length;
-  const completedMeasuredRuns = progress.some(
-    (item) => item.phase === 'performance:measured-complete',
-  )
-    ? performanceOptions.queryRuns
-    : measuredStarts.length - measuredFailures.length;
-  const attemptedWarmupRuns = warmupStarts.length;
-  const attemptedMeasuredRuns = measuredStarts.length;
-  const failureSamples = [...warmupFailures, ...measuredFailures];
+  const allStarts = progress.filter((item) =>
+    item.phase?.endsWith('-request-start'),
+  );
+  const lastStart = allStarts.at(-1);
+  const subsequent = lastStart
+    ? progress.slice(progress.lastIndexOf(lastStart) + 1)
+    : [];
+  const pending =
+    lastStart &&
+    !subsequent.some(
+      (item) =>
+        item.phase === lastStart.phase.replace('-start', '-complete') &&
+        item.run === lastStart.run,
+    )
+      ? {
+          phase: lastStart.phase,
+          run: lastStart.run,
+          index: lastStart.index,
+          elapsedWaitingMs:
+            Date.now() - Date.parse(lastStart.startedAt ?? lastStart.at),
+        }
+      : null;
+  const durations = samples
+    .filter((sample) => sample.success)
+    .map((sample) => sample.durationMilliseconds);
+  const { accuracyFailureCount, cancelledCount } = summarizeOutcomes(
+    readiness,
+    warmups,
+    samples,
+  );
   const report = {
     kind: 'actual-vscode-hover-performance',
     packageKind: 'installed-vsix',
-    status: 'FAIL',
-    result: 'p95 NOT_MEASURED',
+    status: details.interrupted ? 'interrupted' : 'partial',
     runId: evidenceRunId,
     vscode: {
       requestedVersion: requestedCodeVersion ?? null,
@@ -515,29 +747,38 @@ async function writePerformanceFailureReport(prefix, details) {
       serverBundleSha256: details.serverBundleSha256,
     },
     performance: {
-      targetMilliseconds: performanceTargetMilliseconds,
+      targetMilliseconds: performanceOptions.targetMilliseconds,
       warmupRuns: performanceOptions.warmupRuns,
       queryRuns: performanceOptions.queryRuns,
-      completedWarmupRuns,
-      completedMeasuredRuns,
-      attemptedWarmupRuns,
-      attemptedMeasuredRuns,
-      p95Milliseconds: null,
-      p95Status: 'NOT_MEASURED',
-      failure: details.failureIdentity,
-      failureSamples,
+      readinessAttempts: readiness.length,
+      attemptedReadiness: starts('readiness').length,
+      completedReadiness: readiness.length,
+      readiness,
+      memory,
+      eventLoopDelay: { phases: eventLoopPhases },
+      progressIntegrity: corruptProgress.length ? 'corrupt' : 'recovered',
+      attemptedWarmupRuns: starts('warmup').length,
+      completedWarmupRuns: warmups.length,
+      attemptedMeasuredRuns: starts('measured').length,
+      completedMeasuredRuns: samples.length,
+      warmups,
+      samples,
+      pending,
+      successfulLatencySampleCount: durations.length,
+      medianMilliseconds: percentile(durations, 0.5),
+      p95Milliseconds: percentile(durations, 0.95),
+      maximumMilliseconds: durations.length ? Math.max(...durations) : null,
+      accuracyFailureCount,
+      cancelledCount,
+      passed: false,
+      failure: [
+        details.failureIdentity,
+        ...corruptProgress.map((item) => item.error),
+      ].join('; '),
       progress,
     },
   };
-  await writeFile(
-    `${resolved}.json`,
-    `${JSON.stringify(report, null, 2)}\n`,
-    'utf8',
-  );
-  const fixture = details.fixtureMetadata;
-  const firstFailure = failureSamples[0];
-  const markdown = `# COD-16 actual VS Code Hover performance\n\n- Result: **FAIL**; p95: **NOT_MEASURED**.\n- VS Code: \`${details.actualCodeVersion}\`; runner Node: \`${process.version}\`\n- Source commit: \`${details.sourceCommit}\`\n- VSIX SHA-256: \`${details.vsixSha256}\`\n- Extension bundle SHA-256: \`${details.extensionBundleSha256}\`\n- Server bundle SHA-256: \`${details.serverBundleSha256}\`\n- Seed: \`${fixture?.seed ?? performanceSeed}\`; workload: ${fixture?.projectDocumentCount ?? performanceOptions.documents} documents, ${fixture?.queryableDocumentCount ?? 'NOT_RECORDED'} queryable\n- Warmup / measured requests planned: ${performanceOptions.warmupRuns} / ${performanceOptions.queryRuns}; attempted: ${attemptedWarmupRuns} / ${attemptedMeasuredRuns}; completed: ${completedWarmupRuns} / ${completedMeasuredRuns}\n- Bounded request timeout: 10,000 ms\n- Failure: \`${String(details.failureIdentity).replaceAll('`', "'")}\`\n- Failure sample: ${firstFailure ? `phase \`${firstFailure.phase}\`, run ${firstFailure.run}, line ${firstFailure.position?.line}, character ${firstFailure.position?.character}` : 'NOT_RECORDED'}\n\nThe adjacent JSON preserves progress checkpoints, failure identity, artifact hashes, and workload metadata. The full workload was retained; no reduced run is acceptance evidence.\n`;
-  await writeFile(`${resolved}.md`, markdown, 'utf8');
+  await writePerformanceReport(prefix, report);
 }
 
 /** 실패한 Host의 단계 기록과 VS Code 로그를 task evidence 디렉터리에 보존한다. */
@@ -582,211 +823,306 @@ async function preserveHostFailure({
   return destination;
 }
 
-await mkdir(path.join(repositoryRoot, '.workbench/fixtures'), {
-  recursive: true,
-});
-const temporaryRoot = await mkdtemp(
-  path.join(repositoryRoot, '.workbench/fixtures/cod16-host-'),
-);
-let runtimeTemporaryRoot;
-try {
-  const runtime = await resolveCodeRuntime();
-  const versionResult = await runProcess(runtime.cli, ['--version'], {
-    description: 'VS Code version query',
+if (renderExisting) {
+  const resolved = path.resolve(repositoryRoot, renderExisting);
+  if (!resolved.endsWith('.json'))
+    throw new Error('--render-existing-performance requires a JSON report');
+  await writePerformanceReport(
+    resolved.slice(0, -'.json'.length),
+    JSON.parse(await readFile(resolved, 'utf8')),
+  );
+} else {
+  await mkdir(path.join(repositoryRoot, '.workbench/fixtures'), {
+    recursive: true,
   });
-  assert.equal(versionResult.code, 0, versionResult.stderr);
-  const [actualCodeVersion, , architecture = process.arch] =
-    versionResult.stdout.trim().split(/\r?\n/u);
-  if (requestedCodeVersion)
-    assert.equal(actualCodeVersion, requestedCodeVersion, versionResult.stdout);
-
-  const fixture = await createFixture(temporaryRoot);
-  const evidencePath = path.join(temporaryRoot, 'extension-host-evidence.json');
-  const progressPath = path.join(temporaryRoot, 'extension-host-progress.json');
-  runtimeTemporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'c16-runtime-'));
-  const userData = path.join(runtimeTemporaryRoot, 'user-data');
-  const extensions = path.join(runtimeTemporaryRoot, 'extensions');
-  await Promise.all([mkdir(userData), mkdir(extensions)]);
-
-  await requireFile(vsixPath, 'VSIX archive');
-  const installResult = await runProcess(
-    runtime.cli,
-    [
-      '--install-extension',
-      path.resolve(vsixPath),
-      '--force',
-      '--user-data-dir',
-      userData,
-      '--extensions-dir',
-      extensions,
-    ],
-    { description: 'VSIX installation' },
+  const temporaryRoot = await mkdtemp(
+    path.join(repositoryRoot, '.workbench/fixtures/cod16-host-'),
   );
-  assert.equal(
-    installResult.code,
-    0,
-    `VSIX installation failed: ${installResult.stdout}${installResult.stderr}`,
-  );
-  const installed = (await readdir(extensions)).find((entry) =>
-    entry.startsWith('codocs.codocs-'),
-  );
-  assert.ok(installed, 'Installed codocs extension directory was not found');
-  const extensionRoot = path.join(extensions, installed);
-  const extensionBundle = path.join(extensionRoot, 'dist/index.cjs');
-  const serverBundle = path.join(extensionRoot, 'dist/server/index.cjs');
-  await Promise.all([
-    requireFile(extensionBundle, 'built extension bundle'),
-    requireFile(serverBundle, 'bundled language server'),
-  ]);
-
-  let result;
+  let runtimeTemporaryRoot;
+  let performanceProgressPath;
+  let performanceReportWritten = false;
   try {
-    result = await runProcess(
-      runtime.executable,
+    const runtime = await resolveCodeRuntime();
+    const versionResult = await runProcess(runtime.cli, ['--version'], {
+      description: 'VS Code version query',
+    });
+    assert.equal(versionResult.code, 0, versionResult.stderr);
+    const [actualCodeVersion, , architecture = process.arch] =
+      versionResult.stdout.trim().split(/\r?\n/u);
+    if (requestedCodeVersion)
+      assert.equal(
+        actualCodeVersion,
+        requestedCodeVersion,
+        versionResult.stdout,
+      );
+
+    const fixture = await createFixture(temporaryRoot);
+    const evidencePath = path.join(
+      temporaryRoot,
+      'extension-host-evidence.json',
+    );
+    const progressPath =
+      hoverPerformance && outputPrefix
+        ? path.resolve(repositoryRoot, `${outputPrefix}.progress.jsonl`)
+        : path.join(temporaryRoot, 'extension-host-progress.jsonl');
+    const cancelPath = path.join(temporaryRoot, 'extension-host-cancelled');
+    performanceProgressPath = progressPath;
+    await mkdir(path.dirname(progressPath), { recursive: true });
+    await writeFile(progressPath, '');
+    runtimeTemporaryRoot = await mkdtemp(
+      path.join(os.tmpdir(), 'c16-runtime-'),
+    );
+    const userData = path.join(runtimeTemporaryRoot, 'user-data');
+    const extensions = path.join(runtimeTemporaryRoot, 'extensions');
+    await Promise.all([mkdir(userData), mkdir(extensions)]);
+
+    await requireFile(vsixPath, 'VSIX archive');
+    const installResult = await runProcess(
+      runtime.cli,
       [
-        '--extensionDevelopmentPath',
-        extensionRoot,
-        '--extensionTestsPath',
-        extensionTestPath,
+        '--install-extension',
+        path.resolve(vsixPath),
+        '--force',
         '--user-data-dir',
         userData,
         '--extensions-dir',
         extensions,
-        '--disable-extensions',
-        '--disable-gpu',
-        '--disable-workspace-trust',
-        '--logExtensionHostCommunication',
-        '--skip-welcome',
-        '--skip-release-notes',
-        fixture.workspacePath,
       ],
-      {
-        description: 'VS Code Extension Host',
-        timeoutMilliseconds: hoverPerformance ? 300_000 : 240_000,
-        environment: {
-          ...process.env,
-          COD16_FIXTURE_ROOT: temporaryRoot,
-          COD16_EXTENSION_ROOT: extensionRoot,
-          COD16_EVIDENCE_PATH: evidencePath,
-          COD16_PROGRESS_PATH: progressPath,
-          COD16_HOVER_PERFORMANCE: hoverPerformance ? '1' : '0',
-          COD16_PERFORMANCE_OPTIONS: JSON.stringify(performanceOptions),
-          COD16_FIXTURE_METADATA: JSON.stringify(fixture.metadata ?? null),
-        },
-      },
+      { description: 'VSIX installation' },
     );
     assert.equal(
-      result.code,
+      installResult.code,
       0,
-      `VS Code exited with ${String(result.code)} (${String(result.signal)})\n${result.stdout}\n${result.stderr}`,
+      `VSIX installation failed: ${installResult.stdout}${installResult.stderr}`,
     );
-  } catch (error) {
-    const destination = await preserveHostFailure({
-      actualCodeVersion,
-      mode: hoverPerformance ? 'performance' : 'functional',
-      evidencePath,
-      error,
-      progressPath,
-      userData,
-    });
-    if (hoverPerformance && outputPrefix) {
-      let progress;
-      try {
-        progress = JSON.parse(await readFile(progressPath, 'utf8'));
-      } catch {
-        progress = [];
-      }
-      let sourceCommit;
-      try {
-        sourceCommit = (
-          await runProcess('git', ['rev-parse', 'HEAD'])
-        ).stdout.trim();
-      } catch {
-        sourceCommit = 'unknown';
-      }
-      await writePerformanceFailureReport(outputPrefix, {
+    const installed = (await readdir(extensions)).find((entry) =>
+      entry.startsWith('codocs.codocs-'),
+    );
+    assert.ok(installed, 'Installed codocs extension directory was not found');
+    const extensionRoot = path.join(extensions, installed);
+    const extensionBundle = path.join(extensionRoot, 'dist/index.cjs');
+    const serverBundle = path.join(extensionRoot, 'dist/server/index.cjs');
+    await Promise.all([
+      requireFile(extensionBundle, 'built extension bundle'),
+      requireFile(serverBundle, 'bundled language server'),
+    ]);
+
+    let result;
+    let progressTimer;
+    if (hoverPerformance) {
+      progressTimer = setInterval(
+        /** 설치된 VS Code의 현재 요청과 완료 수를 알린다. */
+        () => {
+          void readProgress(progressPath)
+            .then(
+              /** 완료한 원시 진행 기록을 한국어로 출력한다. */
+              (events) => {
+                process.stderr.write(
+                  `${describeProgress(events, performanceOptions.warmupRuns, performanceOptions.queryRuns)}\n`,
+                );
+              },
+            )
+            .catch(
+              /** 진행 파일 확인 실패를 출력한다. */
+              (error) => {
+                process.stderr.write(
+                  `진행 기록 확인 오류: ${error instanceof Error ? error.message : String(error)}\n`,
+                );
+              },
+            );
+        },
+        30_000,
+      );
+      progressTimer.unref();
+    }
+    try {
+      result = await runProcess(
+        runtime.executable,
+        [
+          '--extensionDevelopmentPath',
+          extensionRoot,
+          '--extensionTestsPath',
+          extensionTestPath,
+          '--user-data-dir',
+          userData,
+          '--extensions-dir',
+          extensions,
+          '--disable-extensions',
+          '--disable-gpu',
+          '--disable-workspace-trust',
+          '--logExtensionHostCommunication',
+          '--skip-welcome',
+          '--skip-release-notes',
+          fixture.workspacePath,
+        ],
+        {
+          description: 'VS Code Extension Host',
+          timeoutMilliseconds: hoverPerformance ? null : 240_000,
+          onInterrupt: hoverPerformance
+            ? /** 사용자가 중단하면 다음 Hover 호출 전에 읽을 표시를 남긴다. */
+              (signal) => writeFileSync(cancelPath, signal, 'utf8')
+            : undefined,
+          environment: {
+            ...process.env,
+            COD16_FIXTURE_ROOT: temporaryRoot,
+            COD16_EXTENSION_ROOT: extensionRoot,
+            COD16_EVIDENCE_PATH: evidencePath,
+            COD16_PROGRESS_PATH: progressPath,
+            COD16_CANCEL_PATH: hoverPerformance ? cancelPath : '',
+            COD16_HOVER_PERFORMANCE: hoverPerformance ? '1' : '0',
+            COD16_PERFORMANCE_OPTIONS: JSON.stringify(performanceOptions),
+            COD16_FIXTURE_METADATA: JSON.stringify(fixture.metadata ?? null),
+          },
+        },
+      );
+      assert.equal(
+        result.code,
+        0,
+        `VS Code exited with ${String(result.code)} (${String(result.signal)})\n${result.stdout}\n${result.stderr}`,
+      );
+    } catch (error) {
+      const destination = await preserveHostFailure({
         actualCodeVersion,
-        failureIdentity:
-          progress.findLast((item) => item.phase.endsWith('-failure'))?.error ??
-          'executeHoverProvider timed out',
-        error: error instanceof Error ? error.message : String(error),
-        fixtureMetadata: fixture.metadata,
-        progress,
-        sourceCommit,
+        mode: hoverPerformance ? 'performance' : 'functional',
+        evidencePath,
+        error,
+        progressPath,
+        userData,
+      });
+      if (hoverPerformance && outputPrefix) {
+        const progress = await readProgress(progressPath);
+        let sourceCommit;
+        try {
+          sourceCommit = (
+            await runProcess('git', ['rev-parse', 'HEAD'])
+          ).stdout.trim();
+        } catch {
+          sourceCommit = 'unknown';
+        }
+        await writePerformanceFailureReport(outputPrefix, {
+          actualCodeVersion,
+          failureIdentity:
+            progress.findLast((item) => item.phase.endsWith('-failure'))
+              ?.error ??
+            (error instanceof Error ? error.message : String(error)),
+          interrupted:
+            error instanceof Error &&
+            error.message.startsWith('Interrupted by'),
+          error: error instanceof Error ? error.message : String(error),
+          fixtureMetadata: fixture.metadata,
+          progress,
+          sourceCommit,
+          vsixSha256: await fileSha256(vsixPath),
+          extensionBundleSha256: await fileSha256(extensionBundle),
+          serverBundleSha256: await fileSha256(serverBundle),
+        });
+        performanceReportWritten = true;
+      }
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)}\nPreserved failure evidence: ${destination}`,
+        { cause: error },
+      );
+    } finally {
+      if (progressTimer) clearInterval(progressTimer);
+    }
+    const evidence = JSON.parse(await readFile(evidencePath, 'utf8'));
+    const sourceCommitResult = await runProcess('git', ['rev-parse', 'HEAD']);
+    assert.equal(sourceCommitResult.code, 0, sourceCommitResult.stderr);
+    const report = {
+      kind: hoverPerformance
+        ? 'actual-vscode-hover-performance'
+        : 'actual-vscode-extension-host',
+      packageKind: 'installed-vsix',
+      vscode: {
+        requestedVersion: requestedCodeVersion ?? null,
+        version: actualCodeVersion,
+        architecture,
+        executable: runtime.executable,
+        runtimeRoot: runtime.runtimeRoot,
+        downloadedThisRun: runtime.downloaded,
+      },
+      environment: {
+        platform: process.platform,
+        release: os.release(),
+        architecture: process.arch,
+        cpu: os.cpus()[0]?.model ?? 'unknown',
+        cpuCount: os.cpus().length,
+        memoryBytes: os.totalmem(),
+        runnerNode: process.version,
+        fileCache: 'OS file cache was not forcibly cleared',
+        profileIsolation:
+          'new user-data and extensions directories for this run',
+      },
+      fixture: fixture.metadata ?? null,
+      artifacts: {
+        sourceCommit: sourceCommitResult.stdout.trim(),
+        vsixPath: path.resolve(vsixPath),
+        vsixBytes: (await stat(vsixPath)).size,
         vsixSha256: await fileSha256(vsixPath),
         extensionBundleSha256: await fileSha256(extensionBundle),
         serverBundleSha256: await fileSha256(serverBundle),
+        vscodeSourceSha256: await fileSha256(
+          path.join(repositoryRoot, 'packages/vscode/src/index.ts'),
+        ),
+        languageServerSourceSha256: await fileSha256(
+          path.join(repositoryRoot, 'packages/language-server/src/index.ts'),
+        ),
+      },
+      install: {
+        extensionRoot,
+        stdout: installResult.stdout,
+        stderr: installResult.stderr,
+      },
+      exitCode: result.code,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      evidence,
+    };
+    if (hoverPerformance) report.status = 'completed';
+    if (hoverPerformance) {
+      const progress = await readProgress(progressPath);
+      report.performanceProgressIntegrity = progress.some(
+        (item) => item.phase === 'progress:corrupt',
+      )
+        ? 'corrupt'
+        : 'complete';
+    }
+    if (hoverPerformance && outputPrefix)
+      await writePerformanceReport(outputPrefix, report);
+    if (hoverPerformance && outputPrefix) performanceReportWritten = true;
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (reportPath)
+      await writeFile(
+        path.resolve(repositoryRoot, reportPath),
+        `${JSON.stringify(report, null, 2)}\n`,
+        'utf8',
+      );
+    if (hoverPerformance) assert.equal(evidence.performance.passed, true);
+  } catch (error) {
+    if (hoverPerformance && outputPrefix && !performanceReportWritten) {
+      await writePerformanceFailureReport(outputPrefix, {
+        actualCodeVersion: requestedCodeVersion ?? '미확인',
+        failureIdentity: error instanceof Error ? error.message : String(error),
+        interrupted:
+          error instanceof Error && error.message.startsWith('Interrupted by'),
+        fixtureMetadata: null,
+        progress: performanceProgressPath
+          ? await readProgress(performanceProgressPath)
+          : [],
+        sourceCommit: (
+          await runProcess('git', ['rev-parse', 'HEAD']).catch(() => ({
+            stdout: 'unknown',
+          }))
+        ).stdout.trim(),
+        vsixSha256: await fileSha256(vsixPath).catch(() => null),
+        extensionBundleSha256: null,
+        serverBundleSha256: null,
       });
     }
-    throw new Error(
-      `${error instanceof Error ? error.message : String(error)}\nPreserved failure evidence: ${destination}`,
-      { cause: error },
-    );
+    throw error;
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+    if (runtimeTemporaryRoot)
+      await rm(runtimeTemporaryRoot, { recursive: true, force: true });
   }
-  const evidence = JSON.parse(await readFile(evidencePath, 'utf8'));
-  const sourceCommitResult = await runProcess('git', ['rev-parse', 'HEAD']);
-  assert.equal(sourceCommitResult.code, 0, sourceCommitResult.stderr);
-  const report = {
-    kind: hoverPerformance
-      ? 'actual-vscode-hover-performance'
-      : 'actual-vscode-extension-host',
-    packageKind: 'installed-vsix',
-    vscode: {
-      requestedVersion: requestedCodeVersion ?? null,
-      version: actualCodeVersion,
-      architecture,
-      executable: runtime.executable,
-      runtimeRoot: runtime.runtimeRoot,
-      downloadedThisRun: runtime.downloaded,
-    },
-    environment: {
-      platform: process.platform,
-      release: os.release(),
-      architecture: process.arch,
-      cpu: os.cpus()[0]?.model ?? 'unknown',
-      cpuCount: os.cpus().length,
-      memoryBytes: os.totalmem(),
-      runnerNode: process.version,
-      fileCache: 'OS file cache was not forcibly cleared',
-      profileIsolation: 'new user-data and extensions directories for this run',
-    },
-    fixture: fixture.metadata ?? null,
-    artifacts: {
-      sourceCommit: sourceCommitResult.stdout.trim(),
-      vsixPath: path.resolve(vsixPath),
-      vsixBytes: (await stat(vsixPath)).size,
-      vsixSha256: await fileSha256(vsixPath),
-      extensionBundleSha256: await fileSha256(extensionBundle),
-      serverBundleSha256: await fileSha256(serverBundle),
-      vscodeSourceSha256: await fileSha256(
-        path.join(repositoryRoot, 'packages/vscode/src/index.ts'),
-      ),
-      languageServerSourceSha256: await fileSha256(
-        path.join(repositoryRoot, 'packages/language-server/src/index.ts'),
-      ),
-    },
-    install: {
-      extensionRoot,
-      stdout: installResult.stdout,
-      stderr: installResult.stderr,
-    },
-    exitCode: result.code,
-    stdout: result.stdout,
-    stderr: result.stderr,
-    evidence,
-  };
-  if (hoverPerformance && outputPrefix)
-    await writePerformanceReport(outputPrefix, report);
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  if (reportPath)
-    await writeFile(
-      path.resolve(repositoryRoot, reportPath),
-      `${JSON.stringify(report, null, 2)}\n`,
-      'utf8',
-    );
-  if (hoverPerformance) assert.equal(evidence.performance.passed, true);
-} finally {
-  await rm(temporaryRoot, { recursive: true, force: true });
-  if (runtimeTemporaryRoot)
-    await rm(runtimeTemporaryRoot, { recursive: true, force: true });
 }

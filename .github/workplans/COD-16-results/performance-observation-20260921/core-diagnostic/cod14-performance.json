@@ -1,0 +1,1714 @@
+{
+  "schemaVersion": 2,
+  "report": "COD-14 deterministic performance harness",
+  "generatedAt": "2026-09-21T07:36:24.260Z",
+  "status": "completed",
+  "errors": [],
+  "units": {
+    "latency": "milliseconds",
+    "memory": "bytes",
+    "eventLoopDelay": "milliseconds"
+  },
+  "configuration": {
+    "seed": "cod14-fixed-seed-v1",
+    "documentCounts": [100],
+    "startupRuns": 1,
+    "warmupRuns": 1,
+    "queryRuns": 1,
+    "propagationRuns": 1,
+    "propagationTimeoutMs": null,
+    "output": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/.github/workplans/COD-16-results/performance-observation-20260921/core-diagnostic",
+    "fixtureRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/.workbench/fixtures/perf-001-core-diagnostic",
+    "independentChildProcesses": true
+  },
+  "environment": {
+    "nodeVersion": "v22.22.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "scales": [
+    {
+      "documentCount": 100,
+      "progress": {
+        "requestedProcessRuns": 1,
+        "attemptedProcessRuns": 1,
+        "completedProcessRuns": 1,
+        "pending": null,
+        "failure": null
+      },
+      "fixture": {
+        "manifestDigest": "76fa04f4f0251d131db3335ff11de667f5071b270fc50411d88dff6185467cbb",
+        "expectedValuesDigest": "6ba9b59695ba554652109174f8c4126de042ed466731f59b5c924d167e311a7d",
+        "manifest": {
+          "schemaVersion": 1,
+          "generator": "tools/performance/generator.mjs",
+          "seed": "cod14-fixed-seed-v1",
+          "documentCount": 100,
+          "composition": {
+            "fileFormat": "yaml",
+            "documentsPerFile": 1,
+            "domainCount": 7,
+            "kinds": ["policy", "procedure", "decision", "discussion"],
+            "statuses": ["proposed", "confirmed", "deprecated"],
+            "references": "none"
+          },
+          "expectedValuesDigest": "6ba9b59695ba554652109174f8c4126de042ed466731f59b5c924d167e311a7d",
+          "files": [
+            {
+              "path": ".codocs/document-00001.yaml",
+              "sha256": "c3a6649ec5076f2ebb9edc64f3912851b7048f4fce20816d642ae5552adada2f"
+            },
+            {
+              "path": ".codocs/document-00002.yaml",
+              "sha256": "81b350221ec477cb8ae6f2601f45211f0255e892a327fe5425a3968a8bd98a46"
+            },
+            {
+              "path": ".codocs/document-00003.yaml",
+              "sha256": "81761db2d2da75ba52401b6d46cb0db0e9164de8920531f220814eb02364496c"
+            },
+            {
+              "path": ".codocs/document-00004.yaml",
+              "sha256": "9bddae1a14f4e7fb9c0c3374f4a0994eb86e668dcc33439867b10fcdddaae0a4"
+            },
+            {
+              "path": ".codocs/document-00005.yaml",
+              "sha256": "e73e447d67d9bf32f569c439be61ed09ae408cb9a7b8cee151973be61dc2fb16"
+            },
+            {
+              "path": ".codocs/document-00006.yaml",
+              "sha256": "f6f357b56bbffc81675b6cdc6a85aa02967dc7ab3fcc5571b22b7a29743fde61"
+            },
+            {
+              "path": ".codocs/document-00007.yaml",
+              "sha256": "5a7d368173f7c1d1c4a15bf1260156776ae75ab3e85247dba77b1d8482337757"
+            },
+            {
+              "path": ".codocs/document-00008.yaml",
+              "sha256": "ca8fc5e3bb84e5786e6b43e773722d0169cac796ec5158a6c1a75c09fa2add6d"
+            },
+            {
+              "path": ".codocs/document-00009.yaml",
+              "sha256": "9148cdaed0bdcd4d1f7c8d96d0817c59a34dd334c7070c4c7239290524c52754"
+            },
+            {
+              "path": ".codocs/document-00010.yaml",
+              "sha256": "e65cfa04d85c973e55d8b956266039bc563070a3a98af4fcf8489eb7527b918e"
+            },
+            {
+              "path": ".codocs/document-00011.yaml",
+              "sha256": "7c68c355238c794ba9165b9100275a6633674a838dbb2d649b20ad3143c70f61"
+            },
+            {
+              "path": ".codocs/document-00012.yaml",
+              "sha256": "a8d893f51a69187bdc2c08366b432a3d3c7a683083cb32543061d543af89932a"
+            },
+            {
+              "path": ".codocs/document-00013.yaml",
+              "sha256": "77efa93dbf8302a9b3f1d8f5d1088d0505fcd5ad8e9dd52ebed11b471f22af0f"
+            },
+            {
+              "path": ".codocs/document-00014.yaml",
+              "sha256": "8d7ee41756097182dd545effe40e815be0c65c7c7d54db789a147b33359325c3"
+            },
+            {
+              "path": ".codocs/document-00015.yaml",
+              "sha256": "a3a45af18c18d3533db5344994e2a8831984d3b4a5231de8f8577f72b0bdf02c"
+            },
+            {
+              "path": ".codocs/document-00016.yaml",
+              "sha256": "bd8c0bffc6a15de22aec0037c10f732fcbddd042a5545ba6daf618ec223e1b87"
+            },
+            {
+              "path": ".codocs/document-00017.yaml",
+              "sha256": "b59ae74bb4e52f69a5646a8719315de50b0550eafda0cd260f9bd725ff2fbca3"
+            },
+            {
+              "path": ".codocs/document-00018.yaml",
+              "sha256": "0a880fa59d513c1a66c2b1061fe7e10e5456067d830ac2a214aff1a32e012657"
+            },
+            {
+              "path": ".codocs/document-00019.yaml",
+              "sha256": "c663753b77c63262d90611bd64f678deb2149fb45fbd6d1c58ecf9979a32847b"
+            },
+            {
+              "path": ".codocs/document-00020.yaml",
+              "sha256": "1a0291e5b0816eeea6885adbb68fae6682b4762e3b15b4e08c20fbc113f19249"
+            },
+            {
+              "path": ".codocs/document-00021.yaml",
+              "sha256": "bccf1ce5244dec2ce9598f89f61a05e906067b98f8a733bfb49a542f8f48b5eb"
+            },
+            {
+              "path": ".codocs/document-00022.yaml",
+              "sha256": "9efd8ab317fa35c48465668a981f0f3363ea1e9cc1b65f9d5216898c8ee00365"
+            },
+            {
+              "path": ".codocs/document-00023.yaml",
+              "sha256": "6b29e993e71b07f53b01715625252ff6feea98cc1cc16bdc98d9309d133b1c00"
+            },
+            {
+              "path": ".codocs/document-00024.yaml",
+              "sha256": "eb7090680eb37dacaadb44fe182d813232aa0a83bdbd99ec21c774f0aae790fa"
+            },
+            {
+              "path": ".codocs/document-00025.yaml",
+              "sha256": "2bf04802b5d1f40057156ab1701f1a15329ffbc908752ce22b47bbe77ace98ee"
+            },
+            {
+              "path": ".codocs/document-00026.yaml",
+              "sha256": "02940f94ce5c7c1429d2ce21d8c22c5a442eae277f5d9eaba02fe99de1a6a57a"
+            },
+            {
+              "path": ".codocs/document-00027.yaml",
+              "sha256": "3e367ad7b8b844936699af1f9ceebd0e16a73170cc99cee960e7fbf7d269067e"
+            },
+            {
+              "path": ".codocs/document-00028.yaml",
+              "sha256": "9c3ec491526cc8fe0736f6aeac48b270b2211bf423e56c984e0b12d2903a56ff"
+            },
+            {
+              "path": ".codocs/document-00029.yaml",
+              "sha256": "7a2904b91f612625fd2c9ade000ec563542e39d49bc2ad04819d6a7522de9044"
+            },
+            {
+              "path": ".codocs/document-00030.yaml",
+              "sha256": "9cbcb06984602d3eb41bf244de0833c7b78d77fd6da7ffe725f20ffbc250c103"
+            },
+            {
+              "path": ".codocs/document-00031.yaml",
+              "sha256": "c51d849f467556e1e07274aaba1165dabd35e433baa90473111fb5b33a27f838"
+            },
+            {
+              "path": ".codocs/document-00032.yaml",
+              "sha256": "905f2902dba72188805dd728f227a6a34dc838896c02476975022446b55c81d4"
+            },
+            {
+              "path": ".codocs/document-00033.yaml",
+              "sha256": "e39aef3d7227854aa3fadf57e07d0ce5befadb2794268c573778b094b2bfbd01"
+            },
+            {
+              "path": ".codocs/document-00034.yaml",
+              "sha256": "d5d060ebb21d988e457db6ae47b69527c25f05706f6a8f81d092390547c29740"
+            },
+            {
+              "path": ".codocs/document-00035.yaml",
+              "sha256": "6c9396ae1daf83dda6627e4832b341df2507c8013e06711834dd49dc66bf5df1"
+            },
+            {
+              "path": ".codocs/document-00036.yaml",
+              "sha256": "afd9a1cc5cf7cf86056f784263bf8c7ba09c1494efb8612828e3c03ff4dd3dbb"
+            },
+            {
+              "path": ".codocs/document-00037.yaml",
+              "sha256": "440616268200ca38361fff1e037a8c465fbc177715a53f7578524bc7872a1a30"
+            },
+            {
+              "path": ".codocs/document-00038.yaml",
+              "sha256": "bd5c258e3749d975ef5773dd7f38d3f68424bd2c990d46e7c8c74a466b99e212"
+            },
+            {
+              "path": ".codocs/document-00039.yaml",
+              "sha256": "165728cc1994dad092bdec346d05652cb089846c29ffebdf55d4d28b38c3f0d0"
+            },
+            {
+              "path": ".codocs/document-00040.yaml",
+              "sha256": "f957f327cf3261383fc8f416d0e83fa0f0ffc55e93759c77ee7164aa1d0dd4e4"
+            },
+            {
+              "path": ".codocs/document-00041.yaml",
+              "sha256": "f1d92268d2b3fb09ff8bdc8317360d0b6fb8f35f3295290d05f7ea7644cc2124"
+            },
+            {
+              "path": ".codocs/document-00042.yaml",
+              "sha256": "26cfc2e142c81fd6b7c7cd3dc17ad9c64a31c7bc85d436d29e95a7569dd7be32"
+            },
+            {
+              "path": ".codocs/document-00043.yaml",
+              "sha256": "f5c1168c83a69732efb3689e54e33a1d3ed4e61470507c84a858b8cd81c46a0b"
+            },
+            {
+              "path": ".codocs/document-00044.yaml",
+              "sha256": "60124ede0d8303f934ca773a883d08f759ec8a89573795b69bbae6e8530cd270"
+            },
+            {
+              "path": ".codocs/document-00045.yaml",
+              "sha256": "cf48dfdbb18faf2e703effd76de9d697a52e45603922210febd1128ad6e0c4da"
+            },
+            {
+              "path": ".codocs/document-00046.yaml",
+              "sha256": "dbcf36cba12aab75a1893c07c9634f1fe91832c95e7aa7890f5d1c133db85ebb"
+            },
+            {
+              "path": ".codocs/document-00047.yaml",
+              "sha256": "404e7c4aae20342b9f0d28c5377e9ecb5756a843cf4669da692cfe239cfa9a48"
+            },
+            {
+              "path": ".codocs/document-00048.yaml",
+              "sha256": "fb2067545b01530c7d33412f0ce16a5eb66e57f08f0c7e64784ab71ccd6d58bb"
+            },
+            {
+              "path": ".codocs/document-00049.yaml",
+              "sha256": "271d38908918e559234b20b81f51cb97fc6abc6028601afa9ef3d8b6254b6568"
+            },
+            {
+              "path": ".codocs/document-00050.yaml",
+              "sha256": "3ac27f7b12c8fd9f3c1a989b883ae0be6e5741b009a14e7996c902d9a5f676a5"
+            },
+            {
+              "path": ".codocs/document-00051.yaml",
+              "sha256": "41d23741d951ca01dc6e4ee9c93b27bccf1f2d1a7a2fc4d04803872e0716eed5"
+            },
+            {
+              "path": ".codocs/document-00052.yaml",
+              "sha256": "f8eb79c0480409647dcb53a9009bc007a0955123371573f536c60fcf6441a60d"
+            },
+            {
+              "path": ".codocs/document-00053.yaml",
+              "sha256": "3e7060c0100cb06bfe21a3b2d3daa3ccdec280fd5b5a8afe9ef9577913503121"
+            },
+            {
+              "path": ".codocs/document-00054.yaml",
+              "sha256": "8ba64c0f150b7a09d69b7146c0946cfa1c5ada3b9867cec5220a37eb82e9c7c0"
+            },
+            {
+              "path": ".codocs/document-00055.yaml",
+              "sha256": "1cdc9fc9c598eed644a82254bc54847de3a1c83091ddb9575bcb65e9869e8429"
+            },
+            {
+              "path": ".codocs/document-00056.yaml",
+              "sha256": "aa8b03c7c4199d41873821ea7b8a5663f52d41f8129955381f715565dcfb25e6"
+            },
+            {
+              "path": ".codocs/document-00057.yaml",
+              "sha256": "bc357166222dde724a85299ae93ef9014767e4f8bb3f6f657eb605677629d75d"
+            },
+            {
+              "path": ".codocs/document-00058.yaml",
+              "sha256": "ae57abe3867bbfbb774ce60c098dc9c88f8620cfda0f35a4421eb0db9c97895d"
+            },
+            {
+              "path": ".codocs/document-00059.yaml",
+              "sha256": "d4e10ad130875c79b54618ff43b9865e7682952bb1982fdacf5f1ce619986b51"
+            },
+            {
+              "path": ".codocs/document-00060.yaml",
+              "sha256": "8166df9d65d14a929d317c43268ef5e23e00a034a8821629626eda626f1520ce"
+            },
+            {
+              "path": ".codocs/document-00061.yaml",
+              "sha256": "ea6654926eaae20bf9ba1e9d269c8be2b47f6499957298b77351c91ec0816612"
+            },
+            {
+              "path": ".codocs/document-00062.yaml",
+              "sha256": "40fdf8a41f82b9d4d16ff3ceff02a78e29fa59dc90e7cc7e84eb653077d096d0"
+            },
+            {
+              "path": ".codocs/document-00063.yaml",
+              "sha256": "c17cd0fd25a062925c3693953addfc27df7a4f408392c06e459fc4e46690fdef"
+            },
+            {
+              "path": ".codocs/document-00064.yaml",
+              "sha256": "ef9e7f945ea6f4e2428b20dcf5b2f54a4dc4bf62febfc541f21123723c9fa43c"
+            },
+            {
+              "path": ".codocs/document-00065.yaml",
+              "sha256": "01098d967090ddf695877f1dbf59f439ec07ba6345404f52f500f2be3eb7e969"
+            },
+            {
+              "path": ".codocs/document-00066.yaml",
+              "sha256": "1517c57bb6df7c819497ca95b78ce38fcfa363b1e56a9322ecf94a9c8ff8c92e"
+            },
+            {
+              "path": ".codocs/document-00067.yaml",
+              "sha256": "a244f6437e43461cf6348c812049c24978a224aa8424da52c4d55c221d77a777"
+            },
+            {
+              "path": ".codocs/document-00068.yaml",
+              "sha256": "5d467017e5b2aa9e33840a5587421d51c81aed5a7d06ac75db3a82f5d95d3439"
+            },
+            {
+              "path": ".codocs/document-00069.yaml",
+              "sha256": "88f261169232abf2355bff362915c3e5d7ed48c6088611d64fd231b88842b378"
+            },
+            {
+              "path": ".codocs/document-00070.yaml",
+              "sha256": "4139c0dc90de132b68e47b7c48485ae67cb158565876f1e57628b748477cdca0"
+            },
+            {
+              "path": ".codocs/document-00071.yaml",
+              "sha256": "6e0bf30c66555de27171dddf2926205895c11fd9d28ba07c02d14310a8a58f79"
+            },
+            {
+              "path": ".codocs/document-00072.yaml",
+              "sha256": "0bcc46e2bc772616125dc672b2c4a884771d2b72541a3d9002573eb84de8f8bc"
+            },
+            {
+              "path": ".codocs/document-00073.yaml",
+              "sha256": "8d3bc3713920283c3be53dd48218e4a274d9c4aaae5b05d3618faf18d4cb2bdc"
+            },
+            {
+              "path": ".codocs/document-00074.yaml",
+              "sha256": "39b03580e9a34da18301b88aaeee96e37408d3dc0202e13b04320df0aeba6d21"
+            },
+            {
+              "path": ".codocs/document-00075.yaml",
+              "sha256": "7ae8bf41e2d64e25e231970667c7e66762961021d2d120ff384dffaa56468b5e"
+            },
+            {
+              "path": ".codocs/document-00076.yaml",
+              "sha256": "8cce871ad2e60cd241012de5dbcc36f8cc224980767ab9a81c49dc86b204b7cf"
+            },
+            {
+              "path": ".codocs/document-00077.yaml",
+              "sha256": "23653e2bc932ba1eb78805b9d22e9cec8747ca9ef8463ab670939e241a7169fe"
+            },
+            {
+              "path": ".codocs/document-00078.yaml",
+              "sha256": "96fd30c4fd0926ac3474ec11ae129a859c72ba793afadfb4df2cdbf16736686d"
+            },
+            {
+              "path": ".codocs/document-00079.yaml",
+              "sha256": "abca600281e2f95a7e812ec5a3adfce260aca38c15ba3403a346acf113797f3e"
+            },
+            {
+              "path": ".codocs/document-00080.yaml",
+              "sha256": "ad5e2efcf1ab8dcef1fac0036e8a606ae6c413232c09ef8e58e9e7742366506e"
+            },
+            {
+              "path": ".codocs/document-00081.yaml",
+              "sha256": "00043d2301f732b37ae51c8f4559c88dbf38d4be63b19ef6228d4daebcb25f07"
+            },
+            {
+              "path": ".codocs/document-00082.yaml",
+              "sha256": "b04f5d151005d7432973a70081362d685b96a89e00817cd8d348bdfa64bf1f75"
+            },
+            {
+              "path": ".codocs/document-00083.yaml",
+              "sha256": "890915bfe36a2b3176fe7e086fff1288ee4c51aca94e8d3994f910e0a4c84a9f"
+            },
+            {
+              "path": ".codocs/document-00084.yaml",
+              "sha256": "65a5025ba68e63f3a0289922d22dc2740f58523310dda68cf071d3ee42c5306b"
+            },
+            {
+              "path": ".codocs/document-00085.yaml",
+              "sha256": "165c63b4a7386025273071bf39e3d9b8b056973c4a507ab0d804d5fc4419561f"
+            },
+            {
+              "path": ".codocs/document-00086.yaml",
+              "sha256": "051d75489c4e1a4176b09dd0f21bb24a77f94a7a67d411ed2a147645b8dbb411"
+            },
+            {
+              "path": ".codocs/document-00087.yaml",
+              "sha256": "715ab85958a4d35bd5251da4ddc69d88a274dfc5d9b8c247f92479c412ef8630"
+            },
+            {
+              "path": ".codocs/document-00088.yaml",
+              "sha256": "b02b259c03ef61f0e1958a0c362998d513e4ee5254a1c6b0ddf3c99f8aa4d697"
+            },
+            {
+              "path": ".codocs/document-00089.yaml",
+              "sha256": "a67695cffe84e29a544d0d2878657e46815756fc8e7c0e7ab9f5e974bc547b6e"
+            },
+            {
+              "path": ".codocs/document-00090.yaml",
+              "sha256": "8dd3141e119377951c20abb00051d3f9b0f65c74133333589e638d4f025f94b2"
+            },
+            {
+              "path": ".codocs/document-00091.yaml",
+              "sha256": "5fc1da724d0ddb678da5d23033910705d69d5acb17d0de5a466754536ee23c8b"
+            },
+            {
+              "path": ".codocs/document-00092.yaml",
+              "sha256": "5772afe5846333f07c245b8bf7ffcb5ac79971820f5ff254d962217e89292e78"
+            },
+            {
+              "path": ".codocs/document-00093.yaml",
+              "sha256": "3bcccd91290da9ce6b59ff3f2c200823cc4d609ccef95655a49f556415eed3c4"
+            },
+            {
+              "path": ".codocs/document-00094.yaml",
+              "sha256": "81cf1ba0b1ca3eb55142f1d2a0284bd3af9d62c0611ecb01a20891215b8818c7"
+            },
+            {
+              "path": ".codocs/document-00095.yaml",
+              "sha256": "ab1dfe3f0dba6375e487ca23266471a5d2e9f74e9016453ee82a1e5253cc19d8"
+            },
+            {
+              "path": ".codocs/document-00096.yaml",
+              "sha256": "ba26637ac4cd3e701dfbedad959b26f1dcf522a3f041b6cf179472a0ea8dc810"
+            },
+            {
+              "path": ".codocs/document-00097.yaml",
+              "sha256": "bfb009f95c8f8177ce122dd0541dc70c5c655ba806558b08460dffb831cc0283"
+            },
+            {
+              "path": ".codocs/document-00098.yaml",
+              "sha256": "1dc12093fa639cb132e42dff78fa8d77a6f8b1caa74db8373249c2ec75266b34"
+            },
+            {
+              "path": ".codocs/document-00099.yaml",
+              "sha256": "c4b22bb4cc5a1d78710e7e39ef59bef0221299b58c9eef2f4d9777ebb8008017"
+            },
+            {
+              "path": ".codocs/document-00100.yaml",
+              "sha256": "619d27470fbb8e32afc627f926a51b50a451d2cc71d4cf5984c55d8fbd6a3265"
+            }
+          ]
+        },
+        "expectedValues": {
+          "schemaVersion": 1,
+          "seed": "cod14-fixed-seed-v1",
+          "documentCount": 100,
+          "documents": [
+            {
+              "id": "cod14-doc-00001",
+              "name": "COD14 Document 00001 b9b0b31d",
+              "definition": "Deterministic performance document 00001 bea2d14a8df4f472.",
+              "domains": ["cod14-domain-6"],
+              "kind": "procedure",
+              "status": "proposed",
+              "path": ".codocs/document-00001.yaml"
+            },
+            {
+              "id": "cod14-doc-00002",
+              "name": "COD14 Document 00002 c7e26368",
+              "definition": "Deterministic performance document 00002 b9b8e0cbb653f214.",
+              "domains": ["cod14-domain-6"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00002.yaml"
+            },
+            {
+              "id": "cod14-doc-00003",
+              "name": "COD14 Document 00003 2c33b7d6",
+              "definition": "Deterministic performance document 00003 2ffe611ee2d8d105.",
+              "domains": ["cod14-domain-1"],
+              "kind": "decision",
+              "status": "confirmed",
+              "path": ".codocs/document-00003.yaml"
+            },
+            {
+              "id": "cod14-doc-00004",
+              "name": "COD14 Document 00004 b8596664",
+              "definition": "Deterministic performance document 00004 9a84df7539ab5083.",
+              "domains": ["cod14-domain-5"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00004.yaml"
+            },
+            {
+              "id": "cod14-doc-00005",
+              "name": "COD14 Document 00005 83070fcf",
+              "definition": "Deterministic performance document 00005 a4d9609228542e16.",
+              "domains": ["cod14-domain-0"],
+              "kind": "policy",
+              "status": "deprecated",
+              "path": ".codocs/document-00005.yaml"
+            },
+            {
+              "id": "cod14-doc-00006",
+              "name": "COD14 Document 00006 162be9bb",
+              "definition": "Deterministic performance document 00006 993141bf1f4ae1b5.",
+              "domains": ["cod14-domain-5"],
+              "kind": "procedure",
+              "status": "proposed",
+              "path": ".codocs/document-00006.yaml"
+            },
+            {
+              "id": "cod14-doc-00007",
+              "name": "COD14 Document 00007 766887c9",
+              "definition": "Deterministic performance document 00007 7cc853724e1ec944.",
+              "domains": ["cod14-domain-5"],
+              "kind": "policy",
+              "status": "deprecated",
+              "path": ".codocs/document-00007.yaml"
+            },
+            {
+              "id": "cod14-doc-00008",
+              "name": "COD14 Document 00008 503caabb",
+              "definition": "Deterministic performance document 00008 091a3b03eda5e9df.",
+              "domains": ["cod14-domain-3"],
+              "kind": "procedure",
+              "status": "proposed",
+              "path": ".codocs/document-00008.yaml"
+            },
+            {
+              "id": "cod14-doc-00009",
+              "name": "COD14 Document 00009 4cc311b2",
+              "definition": "Deterministic performance document 00009 e6d7b14a5d5fa43e.",
+              "domains": ["cod14-domain-3"],
+              "kind": "policy",
+              "status": "confirmed",
+              "path": ".codocs/document-00009.yaml"
+            },
+            {
+              "id": "cod14-doc-00010",
+              "name": "COD14 Document 00010 5ef56e53",
+              "definition": "Deterministic performance document 00010 11a102d74c4b001d.",
+              "domains": ["cod14-domain-3"],
+              "kind": "discussion",
+              "status": "proposed",
+              "path": ".codocs/document-00010.yaml"
+            },
+            {
+              "id": "cod14-doc-00011",
+              "name": "COD14 Document 00011 64c110ee",
+              "definition": "Deterministic performance document 00011 97593c5400fd37dc.",
+              "domains": ["cod14-domain-2"],
+              "kind": "policy",
+              "status": "proposed",
+              "path": ".codocs/document-00011.yaml"
+            },
+            {
+              "id": "cod14-doc-00012",
+              "name": "COD14 Document 00012 2d0ed8c5",
+              "definition": "Deterministic performance document 00012 5abbb4d9251f34b9.",
+              "domains": ["cod14-domain-6"],
+              "kind": "discussion",
+              "status": "proposed",
+              "path": ".codocs/document-00012.yaml"
+            },
+            {
+              "id": "cod14-doc-00013",
+              "name": "COD14 Document 00013 713291bd",
+              "definition": "Deterministic performance document 00013 7c9cd3276ae7fea0.",
+              "domains": ["cod14-domain-1"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00013.yaml"
+            },
+            {
+              "id": "cod14-doc-00014",
+              "name": "COD14 Document 00014 06377047",
+              "definition": "Deterministic performance document 00014 dd63434723c7f6c4.",
+              "domains": ["cod14-domain-6"],
+              "kind": "procedure",
+              "status": "deprecated",
+              "path": ".codocs/document-00014.yaml"
+            },
+            {
+              "id": "cod14-doc-00015",
+              "name": "COD14 Document 00015 16b47786",
+              "definition": "Deterministic performance document 00015 e9e4194d111d6167.",
+              "domains": ["cod14-domain-0"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00015.yaml"
+            },
+            {
+              "id": "cod14-doc-00016",
+              "name": "COD14 Document 00016 9ba5d58c",
+              "definition": "Deterministic performance document 00016 ebfbfdc9a3f25594.",
+              "domains": ["cod14-domain-1"],
+              "kind": "policy",
+              "status": "confirmed",
+              "path": ".codocs/document-00016.yaml"
+            },
+            {
+              "id": "cod14-doc-00017",
+              "name": "COD14 Document 00017 abb82c05",
+              "definition": "Deterministic performance document 00017 ce4d9d0777029ebf.",
+              "domains": ["cod14-domain-3"],
+              "kind": "procedure",
+              "status": "deprecated",
+              "path": ".codocs/document-00017.yaml"
+            },
+            {
+              "id": "cod14-doc-00018",
+              "name": "COD14 Document 00018 6e6dfe00",
+              "definition": "Deterministic performance document 00018 f47739c0d17fb707.",
+              "domains": ["cod14-domain-3"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00018.yaml"
+            },
+            {
+              "id": "cod14-doc-00019",
+              "name": "COD14 Document 00019 dbfe7cea",
+              "definition": "Deterministic performance document 00019 911208576e164dd4.",
+              "domains": ["cod14-domain-1"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00019.yaml"
+            },
+            {
+              "id": "cod14-doc-00020",
+              "name": "COD14 Document 00020 927a1aef",
+              "definition": "Deterministic performance document 00020 260a9797898a25ce.",
+              "domains": ["cod14-domain-3"],
+              "kind": "procedure",
+              "status": "deprecated",
+              "path": ".codocs/document-00020.yaml"
+            },
+            {
+              "id": "cod14-doc-00021",
+              "name": "COD14 Document 00021 f844781c",
+              "definition": "Deterministic performance document 00021 4cd045ec93f1aceb.",
+              "domains": ["cod14-domain-2"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00021.yaml"
+            },
+            {
+              "id": "cod14-doc-00022",
+              "name": "COD14 Document 00022 c6041854",
+              "definition": "Deterministic performance document 00022 922db0ed655c6ad4.",
+              "domains": ["cod14-domain-3"],
+              "kind": "policy",
+              "status": "proposed",
+              "path": ".codocs/document-00022.yaml"
+            },
+            {
+              "id": "cod14-doc-00023",
+              "name": "COD14 Document 00023 3164cac0",
+              "definition": "Deterministic performance document 00023 578d189b35a45acf.",
+              "domains": ["cod14-domain-0"],
+              "kind": "decision",
+              "status": "deprecated",
+              "path": ".codocs/document-00023.yaml"
+            },
+            {
+              "id": "cod14-doc-00024",
+              "name": "COD14 Document 00024 c677e3e5",
+              "definition": "Deterministic performance document 00024 dee495a67c67bf18.",
+              "domains": ["cod14-domain-2"],
+              "kind": "procedure",
+              "status": "deprecated",
+              "path": ".codocs/document-00024.yaml"
+            },
+            {
+              "id": "cod14-doc-00025",
+              "name": "COD14 Document 00025 7e85d87b",
+              "definition": "Deterministic performance document 00025 f2f16b6f17db0b97.",
+              "domains": ["cod14-domain-5"],
+              "kind": "policy",
+              "status": "deprecated",
+              "path": ".codocs/document-00025.yaml"
+            },
+            {
+              "id": "cod14-doc-00026",
+              "name": "COD14 Document 00026 dd9123fc",
+              "definition": "Deterministic performance document 00026 a670590d7535c609.",
+              "domains": ["cod14-domain-5"],
+              "kind": "procedure",
+              "status": "deprecated",
+              "path": ".codocs/document-00026.yaml"
+            },
+            {
+              "id": "cod14-doc-00027",
+              "name": "COD14 Document 00027 faf2886b",
+              "definition": "Deterministic performance document 00027 770ef20988896e82.",
+              "domains": ["cod14-domain-0"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00027.yaml"
+            },
+            {
+              "id": "cod14-doc-00028",
+              "name": "COD14 Document 00028 2b305603",
+              "definition": "Deterministic performance document 00028 b610e52416bdba54.",
+              "domains": ["cod14-domain-3"],
+              "kind": "decision",
+              "status": "proposed",
+              "path": ".codocs/document-00028.yaml"
+            },
+            {
+              "id": "cod14-doc-00029",
+              "name": "COD14 Document 00029 6d642155",
+              "definition": "Deterministic performance document 00029 29c3eb7d9c4cb925.",
+              "domains": ["cod14-domain-0"],
+              "kind": "policy",
+              "status": "deprecated",
+              "path": ".codocs/document-00029.yaml"
+            },
+            {
+              "id": "cod14-doc-00030",
+              "name": "COD14 Document 00030 79985441",
+              "definition": "Deterministic performance document 00030 548b1e4543af81d9.",
+              "domains": ["cod14-domain-6"],
+              "kind": "discussion",
+              "status": "proposed",
+              "path": ".codocs/document-00030.yaml"
+            },
+            {
+              "id": "cod14-doc-00031",
+              "name": "COD14 Document 00031 aa832c7e",
+              "definition": "Deterministic performance document 00031 61f787013c051e24.",
+              "domains": ["cod14-domain-6"],
+              "kind": "decision",
+              "status": "deprecated",
+              "path": ".codocs/document-00031.yaml"
+            },
+            {
+              "id": "cod14-doc-00032",
+              "name": "COD14 Document 00032 d8f6facc",
+              "definition": "Deterministic performance document 00032 927e4fc8ade87936.",
+              "domains": ["cod14-domain-1"],
+              "kind": "decision",
+              "status": "proposed",
+              "path": ".codocs/document-00032.yaml"
+            },
+            {
+              "id": "cod14-doc-00033",
+              "name": "COD14 Document 00033 3149e2d2",
+              "definition": "Deterministic performance document 00033 d503d5172579254e.",
+              "domains": ["cod14-domain-1"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00033.yaml"
+            },
+            {
+              "id": "cod14-doc-00034",
+              "name": "COD14 Document 00034 88d15e2f",
+              "definition": "Deterministic performance document 00034 233ad0df54dd595f.",
+              "domains": ["cod14-domain-6"],
+              "kind": "policy",
+              "status": "deprecated",
+              "path": ".codocs/document-00034.yaml"
+            },
+            {
+              "id": "cod14-doc-00035",
+              "name": "COD14 Document 00035 7fafbcda",
+              "definition": "Deterministic performance document 00035 5f0a4f79a16072a9.",
+              "domains": ["cod14-domain-2"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00035.yaml"
+            },
+            {
+              "id": "cod14-doc-00036",
+              "name": "COD14 Document 00036 c14cc14c",
+              "definition": "Deterministic performance document 00036 ec7e445925a296db.",
+              "domains": ["cod14-domain-1"],
+              "kind": "decision",
+              "status": "proposed",
+              "path": ".codocs/document-00036.yaml"
+            },
+            {
+              "id": "cod14-doc-00037",
+              "name": "COD14 Document 00037 4d9571e7",
+              "definition": "Deterministic performance document 00037 40223543075f0569.",
+              "domains": ["cod14-domain-0"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00037.yaml"
+            },
+            {
+              "id": "cod14-doc-00038",
+              "name": "COD14 Document 00038 6219c37d",
+              "definition": "Deterministic performance document 00038 db798fbf0c12180e.",
+              "domains": ["cod14-domain-1"],
+              "kind": "decision",
+              "status": "deprecated",
+              "path": ".codocs/document-00038.yaml"
+            },
+            {
+              "id": "cod14-doc-00039",
+              "name": "COD14 Document 00039 187b0114",
+              "definition": "Deterministic performance document 00039 252b59933ba0421e.",
+              "domains": ["cod14-domain-2"],
+              "kind": "discussion",
+              "status": "proposed",
+              "path": ".codocs/document-00039.yaml"
+            },
+            {
+              "id": "cod14-doc-00040",
+              "name": "COD14 Document 00040 8a395e76",
+              "definition": "Deterministic performance document 00040 923c0fe39897a62e.",
+              "domains": ["cod14-domain-5"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00040.yaml"
+            },
+            {
+              "id": "cod14-doc-00041",
+              "name": "COD14 Document 00041 89a73afd",
+              "definition": "Deterministic performance document 00041 0b725640e9e62674.",
+              "domains": ["cod14-domain-1"],
+              "kind": "policy",
+              "status": "confirmed",
+              "path": ".codocs/document-00041.yaml"
+            },
+            {
+              "id": "cod14-doc-00042",
+              "name": "COD14 Document 00042 e9bbeeca",
+              "definition": "Deterministic performance document 00042 5c0aac0e5dbd4f96.",
+              "domains": ["cod14-domain-5"],
+              "kind": "policy",
+              "status": "deprecated",
+              "path": ".codocs/document-00042.yaml"
+            },
+            {
+              "id": "cod14-doc-00043",
+              "name": "COD14 Document 00043 3c16c508",
+              "definition": "Deterministic performance document 00043 97a7d877d12b52c7.",
+              "domains": ["cod14-domain-1"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00043.yaml"
+            },
+            {
+              "id": "cod14-doc-00044",
+              "name": "COD14 Document 00044 6f78a90f",
+              "definition": "Deterministic performance document 00044 9c5d55d825642f8d.",
+              "domains": ["cod14-domain-6"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00044.yaml"
+            },
+            {
+              "id": "cod14-doc-00045",
+              "name": "COD14 Document 00045 af7544bd",
+              "definition": "Deterministic performance document 00045 3cb007578a498a67.",
+              "domains": ["cod14-domain-6"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00045.yaml"
+            },
+            {
+              "id": "cod14-doc-00046",
+              "name": "COD14 Document 00046 db46f9a8",
+              "definition": "Deterministic performance document 00046 b4774648d160690d.",
+              "domains": ["cod14-domain-5"],
+              "kind": "decision",
+              "status": "deprecated",
+              "path": ".codocs/document-00046.yaml"
+            },
+            {
+              "id": "cod14-doc-00047",
+              "name": "COD14 Document 00047 091193cf",
+              "definition": "Deterministic performance document 00047 bcc95d2e96f2f29b.",
+              "domains": ["cod14-domain-3"],
+              "kind": "decision",
+              "status": "proposed",
+              "path": ".codocs/document-00047.yaml"
+            },
+            {
+              "id": "cod14-doc-00048",
+              "name": "COD14 Document 00048 ce928f92",
+              "definition": "Deterministic performance document 00048 b8eaa1cb2e2c1bbc.",
+              "domains": ["cod14-domain-5"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00048.yaml"
+            },
+            {
+              "id": "cod14-doc-00049",
+              "name": "COD14 Document 00049 c21ba2f6",
+              "definition": "Deterministic performance document 00049 516ad29c1ee9db17.",
+              "domains": ["cod14-domain-2"],
+              "kind": "procedure",
+              "status": "proposed",
+              "path": ".codocs/document-00049.yaml"
+            },
+            {
+              "id": "cod14-doc-00050",
+              "name": "COD14 Document 00050 3f1303e8",
+              "definition": "Deterministic performance document 00050 6e00ec81aa098978.",
+              "domains": ["cod14-domain-5"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00050.yaml"
+            },
+            {
+              "id": "cod14-doc-00051",
+              "name": "COD14 Document 00051 e26d2c6e",
+              "definition": "Deterministic performance document 00051 38e922ee9cb0b543.",
+              "domains": ["cod14-domain-3"],
+              "kind": "decision",
+              "status": "proposed",
+              "path": ".codocs/document-00051.yaml"
+            },
+            {
+              "id": "cod14-doc-00052",
+              "name": "COD14 Document 00052 bdc29430",
+              "definition": "Deterministic performance document 00052 0f790c94cac05d99.",
+              "domains": ["cod14-domain-0"],
+              "kind": "policy",
+              "status": "confirmed",
+              "path": ".codocs/document-00052.yaml"
+            },
+            {
+              "id": "cod14-doc-00053",
+              "name": "COD14 Document 00053 62834888",
+              "definition": "Deterministic performance document 00053 65d31f672e7f6427.",
+              "domains": ["cod14-domain-3"],
+              "kind": "decision",
+              "status": "confirmed",
+              "path": ".codocs/document-00053.yaml"
+            },
+            {
+              "id": "cod14-doc-00054",
+              "name": "COD14 Document 00054 5641a72e",
+              "definition": "Deterministic performance document 00054 8a8251fedb9ab24c.",
+              "domains": ["cod14-domain-3"],
+              "kind": "policy",
+              "status": "confirmed",
+              "path": ".codocs/document-00054.yaml"
+            },
+            {
+              "id": "cod14-doc-00055",
+              "name": "COD14 Document 00055 ffeb7bf2",
+              "definition": "Deterministic performance document 00055 c886a0dfcdc1f934.",
+              "domains": ["cod14-domain-0"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00055.yaml"
+            },
+            {
+              "id": "cod14-doc-00056",
+              "name": "COD14 Document 00056 b690f3da",
+              "definition": "Deterministic performance document 00056 38d28e454ab8dde6.",
+              "domains": ["cod14-domain-1"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00056.yaml"
+            },
+            {
+              "id": "cod14-doc-00057",
+              "name": "COD14 Document 00057 c09e9a53",
+              "definition": "Deterministic performance document 00057 9e9fe71a1d65dbcd.",
+              "domains": ["cod14-domain-2"],
+              "kind": "decision",
+              "status": "confirmed",
+              "path": ".codocs/document-00057.yaml"
+            },
+            {
+              "id": "cod14-doc-00058",
+              "name": "COD14 Document 00058 fb01f6dd",
+              "definition": "Deterministic performance document 00058 1e59cea22fc5e727.",
+              "domains": ["cod14-domain-3"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00058.yaml"
+            },
+            {
+              "id": "cod14-doc-00059",
+              "name": "COD14 Document 00059 746fd89e",
+              "definition": "Deterministic performance document 00059 72757e89fe861790.",
+              "domains": ["cod14-domain-6"],
+              "kind": "procedure",
+              "status": "proposed",
+              "path": ".codocs/document-00059.yaml"
+            },
+            {
+              "id": "cod14-doc-00060",
+              "name": "COD14 Document 00060 1ee75cb2",
+              "definition": "Deterministic performance document 00060 5c4714226eaba219.",
+              "domains": ["cod14-domain-0"],
+              "kind": "procedure",
+              "status": "proposed",
+              "path": ".codocs/document-00060.yaml"
+            },
+            {
+              "id": "cod14-doc-00061",
+              "name": "COD14 Document 00061 746c74cd",
+              "definition": "Deterministic performance document 00061 b7a3b8e2084f76c3.",
+              "domains": ["cod14-domain-5"],
+              "kind": "policy",
+              "status": "proposed",
+              "path": ".codocs/document-00061.yaml"
+            },
+            {
+              "id": "cod14-doc-00062",
+              "name": "COD14 Document 00062 6db26250",
+              "definition": "Deterministic performance document 00062 6c9c0c3ece748ce8.",
+              "domains": ["cod14-domain-4"],
+              "kind": "procedure",
+              "status": "proposed",
+              "path": ".codocs/document-00062.yaml"
+            },
+            {
+              "id": "cod14-doc-00063",
+              "name": "COD14 Document 00063 b38cf019",
+              "definition": "Deterministic performance document 00063 184caff45d36826c.",
+              "domains": ["cod14-domain-0"],
+              "kind": "procedure",
+              "status": "deprecated",
+              "path": ".codocs/document-00063.yaml"
+            },
+            {
+              "id": "cod14-doc-00064",
+              "name": "COD14 Document 00064 9ce86187",
+              "definition": "Deterministic performance document 00064 05d9dccbc9e95023.",
+              "domains": ["cod14-domain-4"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00064.yaml"
+            },
+            {
+              "id": "cod14-doc-00065",
+              "name": "COD14 Document 00065 896ed0c2",
+              "definition": "Deterministic performance document 00065 b526cf943095de10.",
+              "domains": ["cod14-domain-1"],
+              "kind": "decision",
+              "status": "proposed",
+              "path": ".codocs/document-00065.yaml"
+            },
+            {
+              "id": "cod14-doc-00066",
+              "name": "COD14 Document 00066 3206ef63",
+              "definition": "Deterministic performance document 00066 902becd9526055f0.",
+              "domains": ["cod14-domain-4"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00066.yaml"
+            },
+            {
+              "id": "cod14-doc-00067",
+              "name": "COD14 Document 00067 e1872c3b",
+              "definition": "Deterministic performance document 00067 ca290bdecf72b94c.",
+              "domains": ["cod14-domain-4"],
+              "kind": "procedure",
+              "status": "deprecated",
+              "path": ".codocs/document-00067.yaml"
+            },
+            {
+              "id": "cod14-doc-00068",
+              "name": "COD14 Document 00068 0027da60",
+              "definition": "Deterministic performance document 00068 5e45a1b8e9d6d4de.",
+              "domains": ["cod14-domain-4"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00068.yaml"
+            },
+            {
+              "id": "cod14-doc-00069",
+              "name": "COD14 Document 00069 19748fbb",
+              "definition": "Deterministic performance document 00069 4106a93237d490ca.",
+              "domains": ["cod14-domain-6"],
+              "kind": "policy",
+              "status": "confirmed",
+              "path": ".codocs/document-00069.yaml"
+            },
+            {
+              "id": "cod14-doc-00070",
+              "name": "COD14 Document 00070 d0049c5c",
+              "definition": "Deterministic performance document 00070 4485e92c21024492.",
+              "domains": ["cod14-domain-5"],
+              "kind": "policy",
+              "status": "confirmed",
+              "path": ".codocs/document-00070.yaml"
+            },
+            {
+              "id": "cod14-doc-00071",
+              "name": "COD14 Document 00071 a9c1034c",
+              "definition": "Deterministic performance document 00071 57a17da74530ea6c.",
+              "domains": ["cod14-domain-2"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00071.yaml"
+            },
+            {
+              "id": "cod14-doc-00072",
+              "name": "COD14 Document 00072 5899f901",
+              "definition": "Deterministic performance document 00072 7d054d4b750dd825.",
+              "domains": ["cod14-domain-6"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00072.yaml"
+            },
+            {
+              "id": "cod14-doc-00073",
+              "name": "COD14 Document 00073 3f4b1115",
+              "definition": "Deterministic performance document 00073 0d8b927ac557b29b.",
+              "domains": ["cod14-domain-6"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00073.yaml"
+            },
+            {
+              "id": "cod14-doc-00074",
+              "name": "COD14 Document 00074 8ca969c3",
+              "definition": "Deterministic performance document 00074 250647412293140d.",
+              "domains": ["cod14-domain-3"],
+              "kind": "decision",
+              "status": "confirmed",
+              "path": ".codocs/document-00074.yaml"
+            },
+            {
+              "id": "cod14-doc-00075",
+              "name": "COD14 Document 00075 6b7dd817",
+              "definition": "Deterministic performance document 00075 0076352f30620503.",
+              "domains": ["cod14-domain-6"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00075.yaml"
+            },
+            {
+              "id": "cod14-doc-00076",
+              "name": "COD14 Document 00076 9368f37e",
+              "definition": "Deterministic performance document 00076 396a4651a3e83833.",
+              "domains": ["cod14-domain-6"],
+              "kind": "decision",
+              "status": "confirmed",
+              "path": ".codocs/document-00076.yaml"
+            },
+            {
+              "id": "cod14-doc-00077",
+              "name": "COD14 Document 00077 56b6aa7b",
+              "definition": "Deterministic performance document 00077 b70a709f5e2480ae.",
+              "domains": ["cod14-domain-0"],
+              "kind": "decision",
+              "status": "deprecated",
+              "path": ".codocs/document-00077.yaml"
+            },
+            {
+              "id": "cod14-doc-00078",
+              "name": "COD14 Document 00078 d357a003",
+              "definition": "Deterministic performance document 00078 5050e202d8d305b0.",
+              "domains": ["cod14-domain-6"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00078.yaml"
+            },
+            {
+              "id": "cod14-doc-00079",
+              "name": "COD14 Document 00079 8ec23d9f",
+              "definition": "Deterministic performance document 00079 820a944218c9c414.",
+              "domains": ["cod14-domain-5"],
+              "kind": "decision",
+              "status": "confirmed",
+              "path": ".codocs/document-00079.yaml"
+            },
+            {
+              "id": "cod14-doc-00080",
+              "name": "COD14 Document 00080 d06b685f",
+              "definition": "Deterministic performance document 00080 a527bd54d4ecb27c.",
+              "domains": ["cod14-domain-4"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00080.yaml"
+            },
+            {
+              "id": "cod14-doc-00081",
+              "name": "COD14 Document 00081 09594d4e",
+              "definition": "Deterministic performance document 00081 9337c2d9bf87fcec.",
+              "domains": ["cod14-domain-2"],
+              "kind": "policy",
+              "status": "proposed",
+              "path": ".codocs/document-00081.yaml"
+            },
+            {
+              "id": "cod14-doc-00082",
+              "name": "COD14 Document 00082 6f829d29",
+              "definition": "Deterministic performance document 00082 9679687e549358a4.",
+              "domains": ["cod14-domain-1"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00082.yaml"
+            },
+            {
+              "id": "cod14-doc-00083",
+              "name": "COD14 Document 00083 d2b2f19e",
+              "definition": "Deterministic performance document 00083 0c89bb38a8f1ed22.",
+              "domains": ["cod14-domain-5"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00083.yaml"
+            },
+            {
+              "id": "cod14-doc-00084",
+              "name": "COD14 Document 00084 3a90606b",
+              "definition": "Deterministic performance document 00084 857e11676071b48f.",
+              "domains": ["cod14-domain-4"],
+              "kind": "decision",
+              "status": "proposed",
+              "path": ".codocs/document-00084.yaml"
+            },
+            {
+              "id": "cod14-doc-00085",
+              "name": "COD14 Document 00085 31b69478",
+              "definition": "Deterministic performance document 00085 367482bf796a1dc1.",
+              "domains": ["cod14-domain-1"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00085.yaml"
+            },
+            {
+              "id": "cod14-doc-00086",
+              "name": "COD14 Document 00086 4a6497c0",
+              "definition": "Deterministic performance document 00086 c60dd6a211b6ef3b.",
+              "domains": ["cod14-domain-1"],
+              "kind": "decision",
+              "status": "deprecated",
+              "path": ".codocs/document-00086.yaml"
+            },
+            {
+              "id": "cod14-doc-00087",
+              "name": "COD14 Document 00087 661481cc",
+              "definition": "Deterministic performance document 00087 7a4c98088c429d64.",
+              "domains": ["cod14-domain-5"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00087.yaml"
+            },
+            {
+              "id": "cod14-doc-00088",
+              "name": "COD14 Document 00088 128d20ce",
+              "definition": "Deterministic performance document 00088 c1c2afe389a07a75.",
+              "domains": ["cod14-domain-3"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00088.yaml"
+            },
+            {
+              "id": "cod14-doc-00089",
+              "name": "COD14 Document 00089 e4eea47d",
+              "definition": "Deterministic performance document 00089 fc4053edf02f69ef.",
+              "domains": ["cod14-domain-4"],
+              "kind": "discussion",
+              "status": "confirmed",
+              "path": ".codocs/document-00089.yaml"
+            },
+            {
+              "id": "cod14-doc-00090",
+              "name": "COD14 Document 00090 fa4367d9",
+              "definition": "Deterministic performance document 00090 f0044d7d07ec452c.",
+              "domains": ["cod14-domain-3"],
+              "kind": "discussion",
+              "status": "deprecated",
+              "path": ".codocs/document-00090.yaml"
+            },
+            {
+              "id": "cod14-doc-00091",
+              "name": "COD14 Document 00091 948e6e67",
+              "definition": "Deterministic performance document 00091 af98e2da571e3874.",
+              "domains": ["cod14-domain-4"],
+              "kind": "procedure",
+              "status": "deprecated",
+              "path": ".codocs/document-00091.yaml"
+            },
+            {
+              "id": "cod14-doc-00092",
+              "name": "COD14 Document 00092 3228f4de",
+              "definition": "Deterministic performance document 00092 61581470942d280f.",
+              "domains": ["cod14-domain-0"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00092.yaml"
+            },
+            {
+              "id": "cod14-doc-00093",
+              "name": "COD14 Document 00093 54163cb9",
+              "definition": "Deterministic performance document 00093 d454fd8659034175.",
+              "domains": ["cod14-domain-1"],
+              "kind": "decision",
+              "status": "deprecated",
+              "path": ".codocs/document-00093.yaml"
+            },
+            {
+              "id": "cod14-doc-00094",
+              "name": "COD14 Document 00094 1eda5505",
+              "definition": "Deterministic performance document 00094 6189b2b8dedbc816.",
+              "domains": ["cod14-domain-3"],
+              "kind": "decision",
+              "status": "confirmed",
+              "path": ".codocs/document-00094.yaml"
+            },
+            {
+              "id": "cod14-doc-00095",
+              "name": "COD14 Document 00095 5c6d9eb6",
+              "definition": "Deterministic performance document 00095 1fad067987917939.",
+              "domains": ["cod14-domain-4"],
+              "kind": "decision",
+              "status": "proposed",
+              "path": ".codocs/document-00095.yaml"
+            },
+            {
+              "id": "cod14-doc-00096",
+              "name": "COD14 Document 00096 f0403d96",
+              "definition": "Deterministic performance document 00096 3134587efe0ba1fe.",
+              "domains": ["cod14-domain-1"],
+              "kind": "discussion",
+              "status": "proposed",
+              "path": ".codocs/document-00096.yaml"
+            },
+            {
+              "id": "cod14-doc-00097",
+              "name": "COD14 Document 00097 1d970623",
+              "definition": "Deterministic performance document 00097 b44e2ed6de5b1699.",
+              "domains": ["cod14-domain-3"],
+              "kind": "procedure",
+              "status": "confirmed",
+              "path": ".codocs/document-00097.yaml"
+            },
+            {
+              "id": "cod14-doc-00098",
+              "name": "COD14 Document 00098 0d1f8aba",
+              "definition": "Deterministic performance document 00098 2509ae7dde16ea8c.",
+              "domains": ["cod14-domain-3"],
+              "kind": "policy",
+              "status": "deprecated",
+              "path": ".codocs/document-00098.yaml"
+            },
+            {
+              "id": "cod14-doc-00099",
+              "name": "COD14 Document 00099 ab6af639",
+              "definition": "Deterministic performance document 00099 482e7a6e4b3cd9de.",
+              "domains": ["cod14-domain-5"],
+              "kind": "decision",
+              "status": "deprecated",
+              "path": ".codocs/document-00099.yaml"
+            },
+            {
+              "id": "cod14-doc-00100",
+              "name": "COD14 Document 00100 4e948ba2",
+              "definition": "Deterministic performance document 00100 fe5bcc4526b2155a.",
+              "domains": ["cod14-domain-6"],
+              "kind": "procedure",
+              "status": "deprecated",
+              "path": ".codocs/document-00100.yaml"
+            }
+          ]
+        }
+      },
+      "startup": {
+        "boundary": "after fixture generation and immediately before spawning a fresh Node process, through the first indexed, watcher-ready public codocs_get return",
+        "observations": [
+          {
+            "processRun": 1,
+            "processId": 85864,
+            "classification": "success",
+            "correctness": "passed",
+            "latencyMs": 213.639892578125,
+            "readiness": {
+              "state": "ready",
+              "ready": true,
+              "scanStatus": "complete",
+              "canRead": true,
+              "canWrite": true,
+              "canValidate": true,
+              "canGuide": true,
+              "canRefresh": true
+            },
+            "response": {
+              "success": true,
+              "scanStatus": "complete",
+              "resultCount": 1,
+              "results": [
+                {
+                  "id": "cod14-doc-00001",
+                  "found": true,
+                  "conflict": false,
+                  "revision": "c3a6649ec5076f2ebb9edc64f3912851b7048f4fce20816d642ae5552adada2f",
+                  "definition": "Deterministic performance document 00001 bea2d14a8df4f472."
+                }
+              ]
+            }
+          }
+        ],
+        "summary": {
+          "unit": "milliseconds",
+          "observationCount": 1,
+          "successfulLatencySampleCount": 1,
+          "classifications": {
+            "success": 1
+          },
+          "min": 213.639892578125,
+          "median": 213.639892578125,
+          "p95": 213.639892578125,
+          "p99": 213.639892578125,
+          "max": 213.639892578125,
+          "mean": 213.639892578125
+        }
+      },
+      "queries": {
+        "timingBoundary": "public codocs_get promise invocation through resolution",
+        "warmupRunsPerProcess": 1,
+        "sampleRunsPerProcess": 1,
+        "warmups": {
+          "1": {
+            "requestedCount": 1,
+            "observations": [
+              {
+                "processRun": 1,
+                "requestedCount": 1,
+                "sample": 1,
+                "phase": "warmup",
+                "classification": "success",
+                "correctness": "passed",
+                "latencyMs": 0.04679199999998218
+              }
+            ],
+            "summary": {
+              "unit": "milliseconds",
+              "observationCount": 1,
+              "successfulLatencySampleCount": 1,
+              "classifications": {
+                "success": 1
+              },
+              "min": 0.04679199999998218,
+              "median": 0.04679199999998218,
+              "p95": 0.04679199999998218,
+              "p99": 0.04679199999998218,
+              "max": 0.04679199999998218,
+              "mean": 0.04679199999998218
+            }
+          },
+          "10": {
+            "requestedCount": 10,
+            "observations": [
+              {
+                "processRun": 1,
+                "requestedCount": 10,
+                "sample": 1,
+                "phase": "warmup",
+                "classification": "success",
+                "correctness": "passed",
+                "latencyMs": 0.33329200000000014
+              }
+            ],
+            "summary": {
+              "unit": "milliseconds",
+              "observationCount": 1,
+              "successfulLatencySampleCount": 1,
+              "classifications": {
+                "success": 1
+              },
+              "min": 0.33329200000000014,
+              "median": 0.33329200000000014,
+              "p95": 0.33329200000000014,
+              "p99": 0.33329200000000014,
+              "max": 0.33329200000000014,
+              "mean": 0.33329200000000014
+            }
+          },
+          "20": {
+            "requestedCount": 20,
+            "observations": [
+              {
+                "processRun": 1,
+                "requestedCount": 20,
+                "sample": 1,
+                "phase": "warmup",
+                "classification": "success",
+                "correctness": "passed",
+                "latencyMs": 0.12216700000001879
+              }
+            ],
+            "summary": {
+              "unit": "milliseconds",
+              "observationCount": 1,
+              "successfulLatencySampleCount": 1,
+              "classifications": {
+                "success": 1
+              },
+              "min": 0.12216700000001879,
+              "median": 0.12216700000001879,
+              "p95": 0.12216700000001879,
+              "p99": 0.12216700000001879,
+              "max": 0.12216700000001879,
+              "mean": 0.12216700000001879
+            }
+          }
+        },
+        "valid": {
+          "1": {
+            "requestedCount": 1,
+            "observations": [
+              {
+                "processRun": 1,
+                "requestedCount": 1,
+                "sample": 1,
+                "phase": "measured",
+                "classification": "success",
+                "correctness": "passed",
+                "latencyMs": 0.11904099999998152
+              }
+            ],
+            "summary": {
+              "unit": "milliseconds",
+              "observationCount": 1,
+              "successfulLatencySampleCount": 1,
+              "classifications": {
+                "success": 1
+              },
+              "min": 0.11904099999998152,
+              "median": 0.11904099999998152,
+              "p95": 0.11904099999998152,
+              "p99": 0.11904099999998152,
+              "max": 0.11904099999998152,
+              "mean": 0.11904099999998152
+            }
+          },
+          "10": {
+            "requestedCount": 10,
+            "observations": [
+              {
+                "processRun": 1,
+                "requestedCount": 10,
+                "sample": 1,
+                "phase": "measured",
+                "classification": "success",
+                "correctness": "passed",
+                "latencyMs": 0.06070900000000279
+              }
+            ],
+            "summary": {
+              "unit": "milliseconds",
+              "observationCount": 1,
+              "successfulLatencySampleCount": 1,
+              "classifications": {
+                "success": 1
+              },
+              "min": 0.06070900000000279,
+              "median": 0.06070900000000279,
+              "p95": 0.06070900000000279,
+              "p99": 0.06070900000000279,
+              "max": 0.06070900000000279,
+              "mean": 0.06070900000000279
+            }
+          },
+          "20": {
+            "requestedCount": 20,
+            "observations": [
+              {
+                "processRun": 1,
+                "requestedCount": 20,
+                "sample": 1,
+                "phase": "measured",
+                "classification": "success",
+                "correctness": "passed",
+                "latencyMs": 0.10358399999998369
+              }
+            ],
+            "summary": {
+              "unit": "milliseconds",
+              "observationCount": 1,
+              "successfulLatencySampleCount": 1,
+              "classifications": {
+                "success": 1
+              },
+              "min": 0.10358399999998369,
+              "median": 0.10358399999998369,
+              "p95": 0.10358399999998369,
+              "p99": 0.10358399999998369,
+              "max": 0.10358399999998369,
+              "mean": 0.10358399999998369
+            }
+          }
+        },
+        "invalid": {
+          "requestedCount": 21,
+          "expectedBehavior": "whole-request invalid_input rejection",
+          "observations": [
+            {
+              "processRun": 1,
+              "requestedCount": 21,
+              "sample": 1,
+              "phase": "invalid",
+              "classification": "invalid_request",
+              "correctness": "passed",
+              "latencyMs": 0.04800000000000182,
+              "response": {
+                "success": false,
+                "scanStatus": "failed",
+                "errorCode": "invalid_input",
+                "errorMessage": "조회 입력이 올바르지 않습니다."
+              }
+            }
+          ],
+          "summary": {
+            "unit": "milliseconds",
+            "observationCount": 1,
+            "successfulLatencySampleCount": 1,
+            "classifications": {
+              "invalid_request": 1
+            },
+            "min": 0.04800000000000182,
+            "median": 0.04800000000000182,
+            "p95": 0.04800000000000182,
+            "p99": 0.04800000000000182,
+            "max": 0.04800000000000182,
+            "mean": 0.04800000000000182
+          }
+        }
+      },
+      "propagation": {
+        "timingBoundary": "completed external write through exact public codocs_get content visibility; refresh is never called",
+        "timeoutMs": null,
+        "observations": [
+          {
+            "processRun": 1,
+            "sample": 1,
+            "id": "cod14-doc-00001",
+            "writeCompletedBeforeMeasurement": true,
+            "usedRefresh": false,
+            "expectedDefinition": "Deterministic performance document 00001 bea2d14a8df4f472. External change 1.",
+            "classification": "success",
+            "correctness": "passed",
+            "latencyMs": 87.20529199999999,
+            "response": {
+              "success": true,
+              "scanStatus": "complete",
+              "resultCount": 1,
+              "results": [
+                {
+                  "id": "cod14-doc-00001",
+                  "found": true,
+                  "conflict": false,
+                  "revision": "da1b0b4b265522b1c67e590da428ef4aad68cb5c285183894ab439f2e065e4a5",
+                  "definition": "Deterministic performance document 00001 bea2d14a8df4f472. External change 1."
+                }
+              ]
+            }
+          }
+        ],
+        "summary": {
+          "unit": "milliseconds",
+          "observationCount": 1,
+          "successfulLatencySampleCount": 1,
+          "classifications": {
+            "success": 1
+          },
+          "min": 87.20529199999999,
+          "median": 87.20529199999999,
+          "p95": 87.20529199999999,
+          "p99": 87.20529199999999,
+          "max": 87.20529199999999,
+          "mean": 87.20529199999999
+        },
+        "within500Ms": true
+      },
+      "processMetrics": [
+        {
+          "processRun": 1,
+          "processId": 85864,
+          "memory": {
+            "unit": "bytes",
+            "rss": 93978624,
+            "heapTotal": 50642944,
+            "heapUsed": 21275320,
+            "external": 2042239,
+            "arrayBuffers": 73349
+          },
+          "eventLoop": {
+            "unit": "milliseconds",
+            "resolutionMs": 10,
+            "minMs": 9.314304,
+            "maxMs": 28.835839,
+            "meanMs": 12.088661333333334,
+            "p99Ms": 28.835839
+          }
+        }
+      ]
+    }
+  ],
+  "correctness": {
+    "passed": true,
+    "status": "passed",
+    "failedCount": 0,
+    "unconfirmedCount": 0,
+    "failureCount": 0,
+    "failures": [],
+    "latencyExclusionRule": "Only correct completed observations with the expected classification contribute to latency summaries."
+  },
+  "reporting": {
+    "unit": "milliseconds",
+    "jsonSerializationMs": 0.16491700000000264,
+    "markdownSerializationMs": 0.02812499999998863,
+    "excludedFromQueryTiming": true
+  }
+}

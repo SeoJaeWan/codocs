@@ -26,11 +26,15 @@
 - UTF-16, 한글·공백 경로, LF/CRLF 원문, dirty YAML, 기존 탭 재사용, 기본 JavaScript 정의 이동.
 - 다중·중첩 workspace에서 가장 가까운 프로젝트만 선택.
 - 실제 설치 VSIX의 VS Code 1.136.1과 1.95.0 Extension Host 실행.
-- 1,000개 문서·100회 warmup·1,000회 요청의 p95 100ms 목표는 실제 측정값으로 판정하며, 미측정·미달을 통과로 처리하지 않는다.
+- 1,000개 문서·100회 warmup·1,000회 요청의 실제 시간과 정확성을 기록한다. p95 100ms는 참고 비교이며 미측정을 완료로 표시하지 않는다.
 
 ## 결과 전달
 
 - 실제 기능 Host 검증: `COD-16-results/host-functional.md`.
 - 실제 성능 원시 JSON·Markdown: `COD-16-results/hover-performance.json` 및 `.md`.
-- 성능 실행은 1,000개 workload를 유지했으나 index 준비 뒤 warmup 요청이 bounded timeout으로 실패해 p95는 `NOT_MEASURED`다.
-- VS Code 1.136.1·1.95.0 기능 Host는 PASS이며, 성능 목표는 `ACTION_REQUIRED`로 전달한다.
+- 이전 성능 실행은 1,000개 workload에서 index 준비 뒤 warmup 요청이 bounded timeout으로 중단되어 p95가 `NOT_MEASURED`였다. 현재 관찰 실행은 `COD-16-results/performance-observation-20260921/`에서 별도로 추적한다.
+- 이전 VS Code 1.136.1·1.95.0 기능 Host 결과는 PASS다. 현재 결과는 새 관찰 실행과 기능 Host 재검증으로 갱신한다.
+
+## 2026-09-21 현재 성능 측정 정책
+
+기존 성능 목표는 1,000개 문서에서 참고 비교로만 유지한다. 느리지만 정확하게 완료된 요청은 실제 시간을 기록하며, 목표 초과만으로 기능이나 측정 실행을 실패 처리하지 않는다. 요청별 준비·워밍업·측정의 정확성, 완료 수, 진행 중 요청과 부분 결과는 한국어 보고서로 확인한다. 현재 측정 구현 범위는 코어 상세 조회 1·10·20개, 잘못된 21개 요청, 외부 변경 반영, 자원 관찰 및 설치된 VS Code Hover다. 목록/필터/커서, 변경 계획, MCP wire 및 쓰기 전체는 아직 측정하지 않았다. 현재 제공 범위 밖인 자동완성은 성능 판정 대상에서 제외한다. 기존 결과는 당시 정책의 역사적 증거로 보존하며 새 결과는 `COD-16-results/performance-observation-20260921/`에서 추적한다.

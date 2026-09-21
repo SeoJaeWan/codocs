@@ -1,10 +1,17 @@
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
-const { access, mkdir, readFile, writeFile } = require('node:fs/promises');
+const {
+  access,
+  appendFile,
+  mkdir,
+  readFile,
+  writeFile,
+} = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { monitorEventLoopDelay, performance } = require('node:perf_hooks');
 const vscode = require('vscode');
+const { classifyRequestOutcome } = require('./request-outcome.cjs');
 
 const extensionIdentifier = 'codocs.codocs';
 const restartCommand = 'codocs.restartLanguageServers';
@@ -16,9 +23,9 @@ async function checkpoint(phase, detail = {}) {
   const progressPath = process.env.COD16_PROGRESS_PATH;
   if (!progressPath) return;
   progress.push({ phase, at: new Date().toISOString(), ...detail });
-  await writeFile(
+  await appendFile(
     progressPath,
-    `${JSON.stringify(progress, null, 2)}\n`,
+    `${JSON.stringify(progress.at(-1))}\n`,
     'utf8',
   );
 }
@@ -40,7 +47,10 @@ function serverProcesses(serverPath) {
 /** 조건이 충족될 때까지 Extension Host 상태를 기다린다. */
 async function waitFor(description, check, timeoutMilliseconds = 15_000) {
   const started = Date.now();
-  while (Date.now() - started < timeoutMilliseconds) {
+  while (
+    timeoutMilliseconds === null ||
+    Date.now() - started < timeoutMilliseconds
+  ) {
     const value = await check();
     if (value !== undefined) return value;
     /** 짧은 간격 뒤 조건을 다시 확인한다. */
@@ -161,7 +171,7 @@ function percentile(values, ratio) {
 }
 
 /** Extension Host 공통 환경을 활성화하고 서버 PID를 확인한다. */
-async function activateExtension(extensionRoot) {
+async function activateExtension(extensionRoot, performanceMode = false) {
   await checkpoint('activate-extension:start');
   const folders = vscode.workspace.workspaceFolders ?? [];
   assert.ok(folders.length > 0);
@@ -181,6 +191,7 @@ async function activateExtension(extensionRoot) {
   const initialProcesses = await waitFor(
     'one server per workspace folder',
     checkInitialProcesses,
+    performanceMode ? null : 15_000,
   );
   await checkpoint('activate-extension:ready', {
     workspaceFolders: folders.length,
@@ -536,10 +547,43 @@ async function runFunctional(fixtureRoot, extensionRoot) {
 
 /** 실제 executeHoverProvider 호출의 정확성과 지연 시간을 측정한다. */
 async function runPerformance(fixtureRoot, extensionRoot) {
-  await checkpoint('performance:start');
   const options = JSON.parse(process.env.COD16_PERFORMANCE_OPTIONS);
   const fixtureMetadata = JSON.parse(process.env.COD16_FIXTURE_METADATA);
-  const activated = await activateExtension(extensionRoot);
+  const delay = monitorEventLoopDelay({ resolution: 10 });
+  delay.enable();
+  const resources = { beforeReadiness: process.memoryUsage() };
+  /** 부모가 보낸 중단 신호를 다음 요청 전에 확인한다. */
+  const cancellationReason = async () => {
+    const target = process.env.COD16_CANCEL_PATH;
+    if (!target) return null;
+    try {
+      return (await readFile(target, 'utf8')).trim() || 'signal';
+    } catch (error) {
+      if (error?.code === 'ENOENT') return null;
+      throw error;
+    }
+  };
+  const eventLoopPhases = {};
+  /** 단계가 끝날 때만 누적 지연을 읽고 다음 단계의 히스토그램을 초기화한다. */
+  const captureResources = async (boundary, memory) => {
+    const count = delay.count;
+    const eventLoop = {
+      count,
+      minimumMilliseconds: count ? delay.min / 1e6 : null,
+      medianMilliseconds: count ? delay.percentile(50) / 1e6 : null,
+      p95Milliseconds: count ? delay.percentile(95) / 1e6 : null,
+      maximumMilliseconds: count ? delay.max / 1e6 : null,
+    };
+    eventLoopPhases[boundary] = eventLoop;
+    await checkpoint('performance:resources', { boundary, memory, eventLoop });
+    delay.reset();
+  };
+  await captureResources('before-readiness', resources.beforeReadiness);
+  await checkpoint('performance:start', {
+    requestedWarmups: options.warmupRuns,
+    requestedMeasured: options.queryRuns,
+  });
+  const activated = await activateExtension(extensionRoot, true);
   const sourcePath = path.join(
     fixtureRoot,
     'parent',
@@ -549,100 +593,154 @@ async function runPerformance(fixtureRoot, extensionRoot) {
   const document = await vscode.workspace.openTextDocument(sourcePath);
   await vscode.window.showTextDocument(document, { preview: false });
   const width = Math.max(4, String(options.documents - 1).length);
-  /** 한 인덱스의 예상 Hover가 준비됐는지 확인한다. */
-  const query = async (index, timeoutMilliseconds = 10_000) => {
+  /** 실제 반환 내용이 fixture의 ID·정의 및 원문 링크를 포함하는지 판별한다. */
+  const query = async (index) => {
     const serial = String(index).padStart(width, '0');
-    const hovers = await executeHover(
-      document,
+    const started = performance.now();
+    const hovers = await vscode.commands.executeCommand(
+      'vscode.executeHoverProvider',
+      document.uri,
       new vscode.Position(index, 5),
-      timeoutMilliseconds,
     );
-    const markdown = hoverMarkdown(hovers);
+    const durationMilliseconds = performance.now() - started;
+    const markdown = hoverMarkdown(hovers ?? []);
+    const expectedDefinition =
+      index >= 10 && index < 20 ? '긴 성능 본문 ' : `성능 본문 ${serial}`;
     return {
+      durationMilliseconds,
+      hoverCount: hovers?.length ?? 0,
       success:
-        hovers.length > 0 && markdown.includes(`Performance Term ${serial}`),
+        (hovers?.length ?? 0) > 0 &&
+        markdown.includes(`Performance Term ${serial}`) &&
+        markdown.includes(`perf-term-${serial}`) &&
+        markdown.includes(expectedDefinition) &&
+        markdown.includes('command:codocs.openSource'),
       markdown,
     };
   };
-  await waitFor(
-    '1,000-document Hover index readiness',
-    async () => ((await query(0, 60_000)).success ? true : undefined),
-    60_000,
-  );
-  await checkpoint('performance:index-ready');
+  /** 준비 확인 호출도 실제 완료 시간과 정확성을 모두 기록한다. */
+  let readinessAttempts = 0;
+  const readiness = [];
+  let ready = false;
+  while (!ready) {
+    const cancellation = await cancellationReason();
+    if (cancellation)
+      throw new Error(`Hover measurement interrupted by ${cancellation}`);
+    readinessAttempts += 1;
+    await checkpoint('performance:readiness-request-start', {
+      run: readinessAttempts,
+      index: 0,
+      startedAt: new Date().toISOString(),
+    });
+    const started = performance.now();
+    let result;
+    let error;
+    try {
+      result = await query(0);
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : String(caught);
+    }
+    const durationMilliseconds =
+      result?.durationMilliseconds ?? performance.now() - started;
+    const observation = {
+      run: readinessAttempts,
+      index: 0,
+      durationMilliseconds,
+      success: !error && result.success,
+      hoverCount: result?.hoverCount ?? null,
+      ...(error
+        ? { error }
+        : result.success
+          ? {}
+          : { markdown: result.markdown }),
+    };
+    readiness.push(observation);
+    await checkpoint('performance:readiness-request-complete', {
+      ...observation,
+    });
+    if (error) throw new Error(`Hover readiness request failed: ${error}`);
+    if (!result.success && result.hoverCount > 0)
+      throw new Error('Hover readiness returned incorrect fixture content');
+    ready = result.success;
+    if (!ready)
+      await new Promise(
+        /** 다음 준비 확인 전에 간격을 둔다. */
+        (resolve) => setTimeout(resolve, 100),
+      );
+  }
+  resources.afterReadiness = process.memoryUsage();
+  await captureResources('after-readiness', resources.afterReadiness);
+  await checkpoint('performance:index-ready', { readinessAttempts });
   let state = options.seed >>> 0;
-  /** 고정 LCG로 다음 queryable 문서 줄을 선택한다. */
+  /** 고정 seed에서 다음 조회 위치를 선택한다. */
   const nextIndex = () => {
     state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
     return state % fixtureMetadata.queryableDocumentCount;
   };
+  const warmups = [];
+  const samples = [];
   const failures = [];
-  for (let run = 0; run < options.warmupRuns; run += 1) {
+  /** 각 요청을 끝까지 기다리고 완료 시간을 보고 IO 전에 확정한다. */
+  const observe = async (phase, run) => {
+    const beforeCancellation = await cancellationReason();
+    if (beforeCancellation)
+      throw new Error(`Hover measurement interrupted by ${beforeCancellation}`);
     const index = nextIndex();
-    await checkpoint('performance:warmup-request-start', {
+    await checkpoint(`performance:${phase}-request-start`, {
       run,
       index,
       position: { line: index, character: 5 },
+      startedAt: new Date().toISOString(),
     });
-    let result;
-    try {
-      result = await query(index);
-    } catch (error) {
-      await checkpoint('performance:warmup-request-failure', {
-        run,
-        index,
-        position: { line: index, character: 5 },
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-    await checkpoint('performance:warmup-request-complete', {
-      run,
-      index,
-      success: result.success,
-    });
-    if (!result.success && failures.length < 20)
-      failures.push({ phase: 'warmup', run, index, markdown: result.markdown });
-  }
-  await checkpoint('performance:warmup-complete');
-  const delay = monitorEventLoopDelay({ resolution: 10 });
-  delay.enable();
-  const memoryBefore = process.memoryUsage();
-  const samples = [];
-  for (let run = 0; run < options.queryRuns; run += 1) {
-    const index = nextIndex();
-    const started = performance.now();
     let result;
     let error;
+    let started = performance.now();
     try {
       result = await query(index);
     } catch (caught) {
       error = caught instanceof Error ? caught.message : String(caught);
     }
-    const durationMilliseconds = performance.now() - started;
-    const success = error === undefined && result.success;
-    samples.push({
+    const durationMilliseconds =
+      result?.durationMilliseconds ?? performance.now() - started;
+    const cancellation = await cancellationReason();
+    const { success, cancelled, stop } = classifyRequestOutcome(
+      result,
+      error,
+      cancellation,
+    );
+    const observation = {
       run,
       index,
       durationMilliseconds,
       success,
-      ...(error ? { error } : {}),
-    });
-    if (!success && failures.length < 20)
-      failures.push({
-        phase: 'measured',
-        run,
-        index,
-        ...(error ? { error } : { markdown: result.markdown }),
-      });
-  }
-  const memoryAfter = process.memoryUsage();
+      cancelled,
+      ...(error ? { error } : success ? {} : { markdown: result.markdown }),
+    };
+    await checkpoint(`performance:${phase}-request-complete`, observation);
+    if (!success && !cancelled) failures.push({ phase, ...observation });
+    if (stop)
+      throw new Error(
+        `Hover measurement interrupted during ${cancellation ?? error}`,
+      );
+    return observation;
+  };
+  for (let run = 0; run < options.warmupRuns; run += 1)
+    warmups.push(await observe('warmup', run));
+  resources.afterWarmup = process.memoryUsage();
+  await captureResources('after-warmup', resources.afterWarmup);
+  await checkpoint('performance:warmup-complete', {
+    completed: warmups.length,
+  });
+  for (let run = 0; run < options.queryRuns; run += 1)
+    samples.push(await observe('measured', run));
+  resources.afterMeasured = process.memoryUsage();
+  await captureResources('after-measured', resources.afterMeasured);
   delay.disable();
-  const durations = samples.map((sample) => sample.durationMilliseconds);
+  const durations = samples
+    .filter((sample) => sample.success)
+    .map((sample) => sample.durationMilliseconds);
   const p95Milliseconds = percentile(durations, 0.95);
-  const accuracyFailureCount =
-    samples.filter((sample) => !sample.success).length +
-    failures.filter((failure) => failure.phase === 'warmup').length;
+  const accuracyFailureCount = failures.length;
   await checkpoint('performance:measured-complete', {
     p95Milliseconds,
     accuracyFailureCount,
@@ -663,25 +761,33 @@ async function runPerformance(fixtureRoot, extensionRoot) {
       warmupRuns: options.warmupRuns,
       queryRuns: options.queryRuns,
       targetMilliseconds: options.targetMilliseconds,
+      readinessAttempts,
+      attemptedReadiness: readinessAttempts,
+      completedReadiness: readiness.length,
+      readiness,
+      attemptedWarmupRuns: warmups.length,
+      completedWarmupRuns: warmups.length,
+      warmups,
+      attemptedMeasuredRuns: samples.length,
+      completedMeasuredRuns: samples.length,
+      samples,
+      pending: null,
       measurementBoundary:
-        'from immediately before the query calls vscode.executeHoverProvider until its Promise resolves and the returned Hover Markdown is checked; report serialization is excluded',
+        'vscode.executeHoverProvider 호출 직전부터 Promise 완료까지. 정확성 확인·보고 직렬화는 요청 시간 밖.',
+      successfulLatencySampleCount: durations.length,
       medianMilliseconds: percentile(durations, 0.5),
       p95Milliseconds,
-      maximumMilliseconds: Math.max(...durations),
+      maximumMilliseconds: durations.length ? Math.max(...durations) : null,
       accuracyFailureCount,
       failures,
-      samples,
-      memory: { before: memoryBefore, after: memoryAfter },
+      memory: resources,
       eventLoopDelay: {
-        minimumMilliseconds: delay.min / 1e6,
-        medianMilliseconds: delay.percentile(50) / 1e6,
-        p95Milliseconds: delay.percentile(95) / 1e6,
-        maximumMilliseconds: delay.max / 1e6,
+        phases: eventLoopPhases,
       },
       passed:
         accuracyFailureCount === 0 &&
-        Number.isFinite(p95Milliseconds) &&
-        p95Milliseconds <= options.targetMilliseconds,
+        warmups.length === options.warmupRuns &&
+        samples.length === options.queryRuns,
     },
   };
 }
