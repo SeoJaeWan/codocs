@@ -1,6 +1,8 @@
 import type * as vscode from 'vscode';
 import { VscodeExtensionRuntime } from './vscode-client/index.js';
 
+export * from './open-source/index.js';
+
 let runtime: VscodeExtensionRuntime | undefined;
 
 /** VS Code Extension Host에서 폴더별 language client를 시작한다. */

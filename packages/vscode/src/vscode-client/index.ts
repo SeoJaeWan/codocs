@@ -18,8 +18,20 @@ import {
   type WorkspaceFolderBoundary,
   type WorkspaceHostBoundary,
 } from '../client-manager/index.js';
+import {
+  openSource,
+  openSourceCommand,
+  trustGeneratedOpenSourceHoverContents,
+  type OpenSourceDocument,
+  type OpenSourceHost,
+  type OpenSourceShowOptions,
+} from '../open-source/index.js';
 import { bundledServerPath } from '../package-assembly/index.js';
-import { isOwnedByWorkspaceRoot } from '../workspace-routing/index.js';
+import {
+  isOwnedByWorkspaceRoot,
+  routeOwnedRequest,
+  type WorkspaceRoot,
+} from '../workspace-routing/index.js';
 
 const refreshMethod = 'codocs/refresh';
 
@@ -47,6 +59,9 @@ export class VscodeExtensionRuntime {
       vscode.commands.registerCommand(
         'codocs.restartLanguageServers',
         async () => this.#manager.restartAll(),
+      ),
+      vscode.commands.registerCommand(openSourceCommand, async (argument) =>
+        openSource(argument, vscodeOpenSourceHost()),
       ),
     );
     await this.#manager.activate();
@@ -205,20 +220,21 @@ class VscodeFolderClient implements FolderClientBoundary {
   /** 현재 folder가 소유한 문서만 language client에 전달한다. */
   #documentMiddleware(): Middleware {
     const synchronized = new Set<string>();
+    /** 현재 workspace folder를 경로 소유권 경계로 변환한다. */
+    const root = (): WorkspaceRoot => ({
+      fsPath: this.#folder.uri.fsPath,
+      uri: this.#folder.uri.toString(),
+    });
+    /** 현재 host의 모든 workspace folder 경계를 반환한다. */
+    const roots = (): WorkspaceRoot[] =>
+      (vscode.workspace.workspaceFolders ?? []).map((folder) => ({
+        fsPath: folder.uri.fsPath,
+        uri: folder.uri.toString(),
+      }));
     /** 현재 language client folder가 문서를 소유하는지 확인한다. */
     const owns = (document: vscode.TextDocument): boolean => {
       if (document.uri.scheme !== 'file') return false;
-      return isOwnedByWorkspaceRoot(
-        document.uri.fsPath,
-        {
-          fsPath: this.#folder.uri.fsPath,
-          uri: this.#folder.uri.toString(),
-        },
-        (vscode.workspace.workspaceFolders ?? []).map((folder) => ({
-          fsPath: folder.uri.fsPath,
-          uri: folder.uri.toString(),
-        })),
-      );
+      return isOwnedByWorkspaceRoot(document.uri.fsPath, root(), roots());
     };
     return {
       /** 소유한 문서의 열림 이벤트를 LSP client에 전달한다. */
@@ -236,6 +252,18 @@ class VscodeFolderClient implements FolderClientBoundary {
       didClose: async (document, next) => {
         if (!synchronized.delete(document.uri.toString())) return;
         await next(document);
+      },
+      /** Hover도 가장 가까운 workspace folder의 client에만 요청한다. */
+      provideHover: async (document, position, token, next) => {
+        if (document.uri.scheme !== 'file') return undefined;
+        const hover = await routeOwnedRequest(
+          document.uri.fsPath,
+          root(),
+          roots(),
+          async () => next(document, position, token),
+        );
+        if (hover) trustGeneratedOpenSourceHoverContents(hover.contents);
+        return hover;
       },
     };
   }
@@ -331,6 +359,85 @@ class VscodeFolderClient implements FolderClientBoundary {
     if (selection === restart)
       await vscode.commands.executeCommand('codocs.restartLanguageServers');
   }
+}
+
+/** VS Code 문서와 원문 열기 경계가 공유하는 editor 관측이다. */
+interface VscodeOpenSourceDocument extends OpenSourceDocument {
+  document: vscode.TextDocument;
+}
+
+/** 현재 VS Code 문서를 저장·재로딩 없이 원문 열기 관측으로 변환한다. */
+function toOpenSourceDocument(
+  document: vscode.TextDocument,
+): VscodeOpenSourceDocument {
+  return {
+    uri: document.uri.toString(),
+    text: document.getText(),
+    document,
+  };
+}
+
+/** 열린 text tab 전체에서 URI가 같은 기존 group의 열을 찾는다. */
+function existingTextTabColumn(uri: string): vscode.ViewColumn | undefined {
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      if (
+        tab.input instanceof vscode.TabInputText &&
+        tab.input.uri.toString() === uri
+      )
+        return group.viewColumn;
+    }
+  }
+  return undefined;
+}
+
+/** 원문 열기 순수 경계를 VS Code의 문서·탭 API에 연결한다. */
+function vscodeOpenSourceHost(): OpenSourceHost<VscodeOpenSourceDocument> {
+  return {
+    /** 이미 열린 dirty 문서를 포함해 URI가 같은 현재 buffer를 찾는다. */
+    findOpenDocument: (uri) => {
+      const document = vscode.workspace.textDocuments.find(
+        (candidate) => candidate.uri.toString() === uri,
+      );
+      return document ? toOpenSourceDocument(document) : undefined;
+    },
+    /** 보이지 않는 tab group을 포함해 기존 탭의 열을 찾는다. */
+    findExistingViewColumn: existingTextTabColumn,
+    /** 새 문서만 VS Code workspace를 통해 연다. */
+    openDocument: async (uri) =>
+      toOpenSourceDocument(
+        await vscode.workspace.openTextDocument(vscode.Uri.parse(uri, true)),
+      ),
+    /** 기존 열과 검증된 선택 범위를 사용해 editor를 표시한다. */
+    showDocument: async (source, options) => {
+      await vscode.window.showTextDocument(
+        source.document,
+        vscodeShowOptions(options),
+      );
+    },
+  };
+}
+
+/** 프로토콜 범위를 VS Code의 UTF-16 editor 범위로 바꾼다. */
+function vscodeShowOptions(
+  options: OpenSourceShowOptions,
+): vscode.TextDocumentShowOptions {
+  return {
+    preview: options.preview,
+    ...(options.viewColumn === undefined
+      ? {}
+      : { viewColumn: options.viewColumn }),
+    ...(options.selection === undefined
+      ? {}
+      : {
+          selection: new vscode.Range(
+            options.selection.start.line,
+            options.selection.start.character,
+            options.selection.end.line,
+            options.selection.end.character,
+          ),
+        }),
+  };
 }
 
 /** VS Code folder를 serialization 가능한 manager 경계로 바꾼다. */
