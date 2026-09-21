@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc -- VS Code 이벤트 adapter 콜백은 SDK 타입으로 설명한다. */
 import * as vscode from 'vscode';
 import {
   CloseAction,
@@ -36,9 +35,10 @@ export class VscodeExtensionRuntime {
     this.#context = context;
     this.#output = vscode.window.createOutputChannel('Codocs');
     const host = this.#workspaceHost();
-    this.#manager = new WorkspaceClientManager(host, (folder) =>
-      this.#createFolderClient(folder),
-    );
+    /** manager가 요청한 folder를 실제 VS Code client로 만든다. */
+    const createFolderClient = (folder: WorkspaceFolderBoundary) =>
+      this.#createFolderClient(folder);
+    this.#manager = new WorkspaceClientManager(host, createFolderClient);
   }
 
   /** 명령과 workspace 연결을 활성화한다. */
@@ -61,22 +61,33 @@ export class VscodeExtensionRuntime {
 
   /** VS Code workspace API를 테스트 가능한 host 경계로 감싼다. */
   #workspaceHost(): WorkspaceHostBoundary {
-    /* eslint-disable jsdoc/require-jsdoc -- VS Code adapter 콜백은 계약 타입으로 설명한다. */
-    return {
-      folders: () =>
-        (vscode.workspace.workspaceFolders ?? []).map(toFolderBoundary),
-      onDidChangeFolders: (listener): DisposableBoundary =>
-        vscode.workspace.onDidChangeWorkspaceFolders((event) => {
-          listener({
-            added: event.added.map(toFolderBoundary),
-            removed: event.removed.map(toFolderBoundary),
-          });
-        }),
-      reportFailure: (message, error) => {
-        this.#output.appendLine(`${message} ${errorMessage(error)}`);
-      },
+    /** 현재 VS Code workspace folder 목록을 경계 타입으로 반환한다. */
+    const folders = (): WorkspaceFolderBoundary[] =>
+      (vscode.workspace.workspaceFolders ?? []).map(toFolderBoundary);
+    /** VS Code folder 변경을 manager 경계 이벤트로 변환한다. */
+    const onDidChangeFolders = (
+      listener: Parameters<WorkspaceHostBoundary['onDidChangeFolders']>[0],
+    ): DisposableBoundary => {
+      /** VS Code folder 변경 이벤트를 manager listener에 전달한다. */
+      const handleFolderChange = (
+        event: vscode.WorkspaceFoldersChangeEvent,
+      ) => {
+        listener({
+          added: event.added.map(toFolderBoundary),
+          removed: event.removed.map(toFolderBoundary),
+        });
+      };
+      return vscode.workspace.onDidChangeWorkspaceFolders(handleFolderChange);
     };
-    /* eslint-enable jsdoc/require-jsdoc */
+    /** VS Code output channel에 host 경계 오류를 기록한다. */
+    const reportFailure = (message: string, error: unknown): void => {
+      this.#output.appendLine(`${message} ${errorMessage(error)}`);
+    };
+    return {
+      folders,
+      onDidChangeFolders,
+      reportFailure,
+    };
   }
 
   /** 직렬화한 folder 경계를 실제 VS Code folder client로 연결한다. */
@@ -152,6 +163,13 @@ class VscodeFolderClient implements FolderClientBoundary {
     this.#client = client;
     /** knowledge 파일 변경 뒤 해당 작업 공간의 catalog를 갱신한다. */
     const refresh = () => this.#refresh();
+    /** 실행 상태가 되면 연결 사실을 output channel에 기록한다. */
+    const reportRunning = (event: { newState: State }): void => {
+      if (event.newState === State.Running)
+        this.#output.appendLine(
+          `Codocs language server가 연결되었습니다: ${this.#folder.name}`,
+        );
+    };
     this.#disposables.push(
       directoryWatcher,
       contentsWatcher,
@@ -161,12 +179,7 @@ class VscodeFolderClient implements FolderClientBoundary {
       contentsWatcher.onDidCreate(refresh),
       contentsWatcher.onDidChange(refresh),
       contentsWatcher.onDidDelete(refresh),
-      client.onDidChangeState((event) => {
-        if (event.newState === State.Running)
-          this.#output.appendLine(
-            `Codocs language server가 연결되었습니다: ${this.#folder.name}`,
-          );
-      }),
+      client.onDidChangeState(reportRunning),
     );
     await client.start();
   }
@@ -191,8 +204,8 @@ class VscodeFolderClient implements FolderClientBoundary {
 
   /** 현재 folder가 소유한 문서만 language client에 전달한다. */
   #documentMiddleware(): Middleware {
-    /* eslint-disable jsdoc/require-jsdoc -- LSP middleware 콜백은 SDK 타입으로 설명한다. */
     const synchronized = new Set<string>();
+    /** 현재 language client folder가 문서를 소유하는지 확인한다. */
     const owns = (document: vscode.TextDocument): boolean => {
       if (document.uri.scheme !== 'file') return false;
       return isOwnedByWorkspaceRoot(
@@ -208,79 +221,94 @@ class VscodeFolderClient implements FolderClientBoundary {
       );
     };
     return {
+      /** 소유한 문서의 열림 이벤트를 LSP client에 전달한다. */
       didOpen: async (document, next) => {
         if (!owns(document)) return;
         synchronized.add(document.uri.toString());
         await next(document);
       },
+      /** 이미 동기화한 문서의 변경 이벤트를 LSP client에 전달한다. */
       didChange: async (event, next) => {
         if (!synchronized.has(event.document.uri.toString())) return;
         await next(event);
       },
+      /** 닫힌 문서를 동기화 집합에서 제거하고 LSP client에 전달한다. */
       didClose: async (document, next) => {
         if (!synchronized.delete(document.uri.toString())) return;
         await next(document);
       },
     };
-    /* eslint-enable jsdoc/require-jsdoc */
   }
 
   /** client가 Starting 상태에서 벗어날 때까지 기다린다. */
   async #waitForStartTransition(client: LanguageClient): Promise<void> {
     if (client.state !== State.Starting) return;
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
+    /** language client 상태 변화를 기다리고 제한 시간을 적용한다. */
+    const waitForTransition = (
+      resolve: () => void,
+      reject: (reason?: unknown) => void,
+    ): void => {
+      /** 시작 전환이 지연되면 대기를 실패시킨다. */
+      const rejectAfterTimeout = (): void => {
         listener.dispose();
         reject(
           new Error(
             `Codocs language client 시작 전환이 완료되지 않았습니다: ${this.#folder.name}`,
           ),
         );
-      }, 5_000);
-      const listener = client.onDidChangeState((event) => {
+      };
+      const timer = setTimeout(rejectAfterTimeout, 5_000);
+      /** Starting 상태가 끝나면 대기 중인 작업을 재개한다. */
+      const handleStateChange = (event: { newState: State }): void => {
         if (event.newState === State.Starting) return;
         clearTimeout(timer);
         listener.dispose();
         resolve();
-      });
-    });
+      };
+      const listener = client.onDidChangeState(handleStateChange);
+    };
+    await new Promise<void>(waitForTransition);
   }
 
   /** 예기치 않은 연결 오류의 재시작·중단 정책을 반환한다. */
   #errorHandler(): ErrorHandler {
-    /* eslint-disable jsdoc/require-jsdoc -- language client 오류 콜백은 SDK 타입으로 설명한다. */
     return {
+      /** 오류 횟수에 따라 연결을 계속하거나 종료한다. */
       error: (_error, _message, count) => ({
         action: (count ?? 0) < 3 ? ErrorAction.Continue : ErrorAction.Shutdown,
       }),
+      /** 종료 원인에 따라 자동 재시작 또는 사용자 안내를 선택한다. */
       closed: () => {
         if (this.#stopping) return { action: CloseAction.DoNotRestart };
         if (this.#budget.recordFailure())
           return { action: CloseAction.Restart };
-        this.#showStoppedMessage().catch((error: unknown) => {
+        /** 중단 안내 표시 실패를 output channel에 기록한다. */
+        const reportStoppedMessageFailure = (error: unknown): void => {
           this.#output.appendLine(
             `Codocs language server 중지 안내를 표시하지 못했습니다: ${errorMessage(error)}`,
           );
-        });
+        };
+        this.#showStoppedMessage().catch(reportStoppedMessageFailure);
         return { action: CloseAction.DoNotRestart, handled: true };
       },
     };
-    /* eslint-enable jsdoc/require-jsdoc */
   }
 
   /** 현재 작업 공간의 catalog 갱신 요청을 서버에 보낸다. */
   #refresh(): void {
     const client = this.#client;
     if (!client?.isRunning()) return;
+    /** catalog 갱신 요청 실패를 output channel에 기록한다. */
+    const reportRefreshFailure = (error: unknown): void => {
+      this.#output.appendLine(
+        `Codocs knowledge 갱신에 실패했습니다: ${errorMessage(error)}`,
+      );
+    };
     client
       .sendRequest(refreshMethod, {
         workspaceUri: this.#folder.uri.toString(),
       })
-      .catch((error: unknown) => {
-        this.#output.appendLine(
-          `Codocs knowledge 갱신에 실패했습니다: ${errorMessage(error)}`,
-        );
-      });
+      .catch(reportRefreshFailure);
   }
 
   /** 반복 시작 실패 뒤 중단 상태와 수동 복구 방법을 기록한다. */
