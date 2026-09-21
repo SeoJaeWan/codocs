@@ -9,7 +9,9 @@ import {
 import {
   workspaceLifecycleStates,
   workspaceDiagnosticCodes,
+  workspaceQueryDiagnosticCodes,
   type WorkspaceMatchResult,
+  type WorkspacePathGetResponse,
 } from '@codocs/workspace';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -128,12 +130,67 @@ function matchSuccess(source: string): WorkspaceMatchResult {
   };
 }
 
+function hoverMatchSuccess(source: string): WorkspaceMatchResult {
+  const result = matchSuccess(source);
+  if (!result.success) return result;
+  const found = {
+    ...evidence(source),
+    token: source,
+    range: { start: 0, end: source.length },
+  };
+  return {
+    ...result,
+    candidates: result.candidates.map((candidate) => ({
+      ...candidate,
+      evidence: [found],
+    })),
+    evidence: [found],
+  };
+}
+
+function pathDetails(
+  source: string,
+  expectedCatalogVersion: number,
+): WorkspacePathGetResponse {
+  const documentPath = `.codocs/${source}.yaml`;
+  return {
+    success: true,
+    scanStatus: scanStatuses.complete,
+    catalogVersion: expectedCatalogVersion,
+    results: [
+      {
+        path: documentPath,
+        found: true,
+        source: {
+          path: documentPath,
+          uri: pathToFileURL(path.resolve(documentPath)).href,
+        },
+        confirmation: catalogConfirmations.confirmed,
+        id: source,
+        document: {
+          id: source,
+          name: source,
+          definition: `${source} definition`,
+          domains: ['test'],
+        },
+        diagnostics: [],
+      },
+    ],
+  };
+}
+
 function fakeBoundary(
   match: (text: string) => Promise<WorkspaceMatchResult>,
+  getByPaths: WorkspaceSessionBoundary['getByPaths'] = (
+    _paths,
+    expectedCatalogVersion,
+  ) => Promise.resolve(pathDetails('unused', expectedCatalogVersion)),
 ): WorkspaceSessionBoundary {
   return {
     readiness: { state: workspaceLifecycleStates.ready, ready: true },
+    catalogVersion: 1,
     match,
+    getByPaths,
     refresh: () =>
       Promise.resolve({
         success: true,
@@ -279,6 +336,130 @@ describe('LanguageServerSession: 작업 공간별 현재 문서 매칭', () => {
       requestedVersion: 1,
       currentVersion: 2,
     });
+  });
+
+  it('Hover 상세 조회 도중 코드 버전이 바뀌면 이전 위치와 내용을 폐기한다', async () => {
+    const root = await temporaryRoot();
+    let finish: ((result: WorkspacePathGetResponse) => void) | undefined;
+    const delayed = new Promise<WorkspacePathGetResponse>((resolve) => {
+      finish = resolve;
+    });
+    const session = new LanguageServerSession(() =>
+      fakeBoundary(
+        () => Promise.resolve(hoverMatchSuccess('zone')),
+        () => delayed,
+      ),
+    );
+    await initialize(session, [root]);
+    const uri = openDocument(session, root, 'zone', 1);
+
+    const pending = session.hoverDocument({
+      textDocument: { uri },
+      position: { line: 0, character: 1 },
+    });
+    session.changeDocument({
+      textDocument: { uri, version: 2 },
+      contentChanges: [{ text: 'other' }],
+    });
+    finish?.(pathDetails('zone', 1));
+
+    await expect(pending).resolves.toBeNull();
+  });
+
+  it('Hover 매칭 실패가 늦게 도착해도 새 코드에 이전 실패 상태를 표시하지 않는다', async () => {
+    const root = await temporaryRoot();
+    let finish: ((result: WorkspaceMatchResult) => void) | undefined;
+    const delayed = new Promise<WorkspaceMatchResult>((resolve) => {
+      finish = resolve;
+    });
+    const session = new LanguageServerSession(() =>
+      fakeBoundary(() => delayed),
+    );
+    await initialize(session, [root]);
+    const uri = openDocument(session, root, 'zone', 1);
+
+    const pending = session.hoverDocument({
+      textDocument: { uri },
+      position: { line: 0, character: 1 },
+    });
+    session.changeDocument({
+      textDocument: { uri, version: 2 },
+      contentChanges: [{ text: 'other' }],
+    });
+    finish?.({
+      success: false,
+      scanStatus: scanStatuses.failed,
+      error: {
+        code: workspaceDiagnosticCodes.readFailed,
+        severity: diagnosticSeverities.error,
+        message: 'old failure',
+      },
+    });
+
+    await expect(pending).resolves.toBeNull();
+  });
+
+  it('Hover 매칭 뒤 catalogVersion이 바뀌면 서로 다른 관측을 섞지 않는다', async () => {
+    const root = await temporaryRoot();
+    const getByPaths = vi.fn(
+      (
+        _paths: readonly string[],
+        expectedCatalogVersion: number,
+      ): Promise<WorkspacePathGetResponse> =>
+        Promise.resolve({
+          success: false,
+          scanStatus: scanStatuses.complete,
+          catalogVersion: expectedCatalogVersion + 1,
+          expectedCatalogVersion,
+          error: {
+            code: workspaceQueryDiagnosticCodes.catalogVersionMismatch,
+            severity: diagnosticSeverities.error,
+            message: 'catalog changed',
+          },
+        }),
+    );
+    const session = new LanguageServerSession(() =>
+      fakeBoundary(
+        () => Promise.resolve(hoverMatchSuccess('zone')),
+        getByPaths,
+      ),
+    );
+    await initialize(session, [root]);
+    const uri = openDocument(session, root, 'zone');
+
+    const hover = await session.hoverDocument({
+      textDocument: { uri },
+      position: { line: 0, character: 1 },
+    });
+
+    expect(hover).toBeNull();
+    expect(getByPaths).toHaveBeenCalledWith(['.codocs/zone.yaml'], 1);
+  });
+
+  it('상세 조회 응답 뒤 catalog 관측이 바뀌면 성공 응답도 Hover에 적용하지 않는다', async () => {
+    const root = await temporaryRoot();
+    let catalogVersion = 1;
+    const boundary = fakeBoundary(
+      () => Promise.resolve(hoverMatchSuccess('zone')),
+      (_paths, expectedCatalogVersion) => {
+        const result = pathDetails('zone', expectedCatalogVersion);
+        catalogVersion = 2;
+        return Promise.resolve(result);
+      },
+    );
+    Object.defineProperty(boundary, 'catalogVersion', {
+      get: () => catalogVersion,
+    });
+    const session = new LanguageServerSession(() => boundary);
+    await initialize(session, [root]);
+    const uri = openDocument(session, root, 'zone');
+
+    const hover = await session.hoverDocument({
+      textDocument: { uri },
+      position: { line: 0, character: 1 },
+    });
+
+    expect(hover).toBeNull();
   });
 
   it('없는 .codocs를 만들지 않고 기다린 뒤 생성된 catalog를 관측한다', async () => {

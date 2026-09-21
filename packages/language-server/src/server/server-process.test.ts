@@ -130,8 +130,8 @@ describe('language server stdio 프로세스', () => {
     const output = path.join(root, 'server.cjs');
     await mkdir(path.join(root, '.codocs'));
     await writeFile(
-      path.join(root, '.codocs/return-zone.yaml'),
-      'id: return-zone\nname: Return Zone\ndefinition: test\ndomains: [test]\n',
+      path.join(root, '.codocs/반납 구역.yaml'),
+      'id: return-zone\r\nname: Return Zone\r\ndefinition: 한글 본문\r\ndomains: [test]\r\n',
       'utf8',
     );
     await build({
@@ -158,7 +158,10 @@ describe('language server stdio 프로세스', () => {
       });
       expect(initialized.error).toBeUndefined();
       expect(initialized.result).toMatchObject({
-        capabilities: { textDocumentSync: { openClose: true, change: 1 } },
+        capabilities: {
+          textDocumentSync: { openClose: true, change: 1 },
+          hoverProvider: true,
+        },
       });
       client.send('initialized', {});
       client.send('textDocument/didOpen', {
@@ -180,6 +183,24 @@ describe('language server stdio 프로세스', () => {
         version: 1,
         candidates: [{ id: 'return-zone' }],
       });
+      const hover = await client.request(20, 'textDocument/hover', {
+        textDocument: { uri: documentUri },
+        position: { line: 0, character: 20 },
+      });
+      expect(hover.error).toBeUndefined();
+      expect(hover.result).toMatchObject({
+        contents: { kind: 'markdown' },
+        range: {
+          start: { line: 0, character: 15 },
+          end: { line: 0, character: 25 },
+        },
+      });
+      expect(
+        (hover.result as { contents: { value: string } }).contents.value,
+      ).toContain('Return Zone');
+      expect(
+        (hover.result as { contents: { value: string } }).contents.value,
+      ).toContain('command:codocs.openSource');
 
       client.send('textDocument/didChange', {
         textDocument: { uri: documentUri, version: 2 },
@@ -330,6 +351,23 @@ describe('language server stdio 프로세스', () => {
           nestedResult.result as { candidates: { id: string }[] }
         ).candidates.map((candidate) => candidate.id),
       ).toEqual(['nested-zone']);
+      const nestedHover = await firstClient.request(13, 'textDocument/hover', {
+        textDocument: { uri: nestedUri },
+        position: { line: 2, character: 5 },
+      });
+      expect(nestedHover.result).toMatchObject({
+        contents: { kind: 'markdown' },
+        range: {
+          start: { line: 2, character: 3 },
+          end: { line: 2, character: 13 },
+        },
+      });
+      expect(
+        (nestedHover.result as { contents: { value: string } }).contents.value,
+      ).toContain('Nested Zone');
+      expect(
+        (nestedHover.result as { contents: { value: string } }).contents.value,
+      ).not.toContain('Parent Zone');
 
       const siblingResult = await firstClient.request(
         3,
@@ -411,6 +449,20 @@ describe('language server stdio 프로세스', () => {
         version: 2,
         candidates: [{ id: 'changed-zone' }],
       });
+      const changedHover = await firstClient.request(14, 'textDocument/hover', {
+        textDocument: { uri: missingUri },
+        position: { line: 0, character: 5 },
+      });
+      expect(changedHover.result).toMatchObject({
+        contents: { kind: 'markdown' },
+        range: {
+          start: { line: 0, character: 3 },
+          end: { line: 0, character: 14 },
+        },
+      });
+      expect(
+        (changedHover.result as { contents: { value: string } }).contents.value,
+      ).toContain('Changed Zone');
 
       const shutdown = await firstClient.request(10, 'shutdown', null);
       expect(shutdown.error).toBeUndefined();
