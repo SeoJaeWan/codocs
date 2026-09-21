@@ -1,27 +1,41 @@
-# PR #13 — Hover confirmed documents and open source YAML
+## 변경 내용
 
-## Problem
+코드의 현재 커서에서 확인한 용어의 정의·이전 명칭·관련 지식을 Hover로 표시하고, 확인된 YAML 원문으로 이동할 수 있게 한다. 현재 ID가 없는 문서도 이전 ID로 검색할 수 있지만, 결과의 `id`·`documentId`에 이전 ID를 현재 ID처럼 채우지 않는다.
 
-Hover results must distinguish the document confirmed at the current code cursor from previous identifiers and other candidates. Users also need to inspect the exact YAML source without losing an existing tab or unsaved content.
+- `userName`, `user_name`, `user-name`의 복합 매칭과 `user name`의 공백 경계를 구분한다.
+- 현재 ID → 연속 매칭 토큰 길이 → 정확한 표기 순으로 커서 후보를 비교한다. 최상위 동률은 모두 표시하고 같은 식별자의 다른 후보는 링크로 제공한다.
+- 정의·현재 ID·도메인·이전 ID 안내·직접 참조·역참조를 구분하고, 문서 오류나 부분 읽기 상태를 함께 표시한다.
+- 매칭의 문서 경로와 catalogVersion으로 상세 결과를 확인하며, 코드 버전이 바뀌면 오래된 내용과 좌표를 적용하지 않는다.
+- 원문 이동은 확인된 URI·범위·원문 revision을 사용한다. 기존 탭과 저장하지 않은 편집을 보존하고 revision이 다르면 선택 범위를 옮기지 않는다.
 
-## Change
+## 성능 측정과 한국어 보고서
 
-- Keep `id`/`documentId` optional and emit them only for a valid current identifier; retain previous evidence, candidates, paths, and diagnostics.
-- Rank cursor evidence by current identifier, contiguous token count, and exact match. Render every top-level tie and link remaining candidates under the same identifier.
-- Render definition, confirmed current ID, domains, source link, direct references, and reverse references in separate non-empty sections.
-- Add the standard LSP Hover output and the VS Code-only `codocs.openSource` command. The command accepts a confirmed URI, range, catalogVersion, and raw-byte revision payload, then moves the selection only when the range and revision checks pass.
-- Reuse an existing tab and preserve unsaved content/selection when the current buffer and source revision no longer match.
+기존 코어·설치형 Hover 성능 명령은 실제 완료까지 기다리며 준비·웜업·본 요청·파일 변경 반영·자원 관찰을 기록한다. 2초·100ms·500ms 목표는 참고값으로 유지하고 정확성·측정 완결성과 분리한다. 진행 기록과 중단·자식 프로세스 실패의 부분 결과를 보존하며 사람이 읽는 보고서는 한국어로 작성한다.
 
-## Validation
+- Hover: 1,000문서, 웜업 100회, 본 요청 1,000회 모두 완료, 정확성 실패 0건. 첫 웜업 **11.618초**, 본 요청 p95 **11.786초**.
+- 코어 1,000문서: 독립 준비 10회, 상세 1·10·20개 조회 각각 10,000회, 잘못된 21개 요청 10,000회, 외부 변경 반영 1,000회 모두 정확하게 완료. 준비 p95 **611.126ms**, 상세 20개 p95 **0.065ms**, 변경 반영 p95 **276.467ms**.
+- 100·5,000·10,000문서 비교 측정도 완료했다. 비교 규모의 초기 준비는 각각 단일 표본이며 반복 설정과 한계는 보고서에 명시했다.
 
-- Installed VSIX functional runs pass on VS Code 1.136.1 and pinned 1.95.0.
-- Evidence covers UTF-16 positions, Korean/space paths, LF/CRLF source, nested workspace routing, dirty YAML, default definition navigation, watcher changes, and server restart recovery.
-- The earlier 1,000-document run used seed 16018 and planned 100 warmups plus 1,000 measured requests. Its fixed 10-second warmup timeout stopped measurement; that historical result remains unchanged. The new unbounded observation run, correctness, and full sample counts are recorded under `COD-16-results/performance-observation-20260921/`. The 100 ms goal is informational.
+## 검증
 
-## Follow-up
+- `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build` 통과.
+- 앞선 구현 검증에서는 기능 테스트 **675/675**, 개발 검사 **81/81**, 빌드 검사 **32/32**, 측정기 집중 검사 **13/13**이 통과했다. 최신 main 통합 재검증의 파일 감시 실패는 아래에 별도 기록한다.
+- 동일 VSIX로 VS Code **1.136.1·1.95.0**의 실제 설치형 기능 검사 통과. UTF-16, 한글·공백 경로, LF/CRLF, 중첩 작업 공간, 저장 전 편집 보존, 기본 정의 이동, 파일 변경 감지와 서버 재시작·충돌 복구를 확인했다.
+- 실제 SIGINT·SIGTERM·자식 프로세스 강제 종료에서 완료·취소·미완료 결과를 구분하고 완료하지 않은 시간을 성공 표본에 넣지 않는 것을 확인했다.
+- 최신 main의 자동완성 제공 범위 제외 결정을 유지했다. 통합 과정의 변경은 문서에 한정하고 검증된 제품·측정기 코드를 유지했다.
 
-The performance bottleneck and watcher path canonicalization finding require a separate product-owned follow-up. This draft is prepared for manual PR delivery; no GitHub mutation was performed.
+[실측 결과와 재현 조건](https://github.com/SeoJaeWan/codocs/blob/8fc5c76a49d934ff326bcbd7fb6f2280e3b2d20e/.github/workplans/COD-16-results/performance-observation-20260921/README.md)
 
-## 2026-09-21 현재 성능 측정 정책
+## 통합 검증에서 남은 사항
 
-기존 성능 목표는 1,000개 문서에서 참고 비교로만 유지한다. 느리지만 정확하게 완료된 요청은 실제 시간을 기록하며, 목표 초과만으로 기능이나 측정 실행을 실패 처리하지 않는다. 요청별 준비·워밍업·측정의 정확성, 완료 수, 진행 중 요청과 부분 결과는 한국어 보고서로 확인한다. 현재 측정 구현 범위는 코어 상세 조회 1·10·20개, 잘못된 21개 요청, 외부 변경 반영, 자원 관찰 및 설치된 VS Code Hover다. 목록/필터/커서, 변경 계획, MCP wire 및 쓰기 전체는 아직 측정하지 않았다. 현재 제공 범위 밖인 자동완성은 성능 판정 대상에서 제외한다. 기존 결과는 당시 정책의 역사적 증거로 보존하며 새 결과는 `COD-16-results/performance-observation-20260921/`에서 추적한다.
+최신 main 통합 후 기본 `pnpm test:run`을 두 번 실행했고, 두 실행 모두 **674/675 통과**했다. `packages/workspace/src/watcher/watcher.test.ts`의 `nested/deep/alpha.yaml` 생성 감지에서 경로 알림을 받지 못했다. 감시 코드와 해당 테스트는 main 및 기존 검증 커밋과 동일하며 통합 중 제품 코드를 변경하지 않았다.
+
+해당 파일만 실행하면 **14/14**, `pnpm test:run --no-file-parallelism`으로 전체를 직렬 실행하면 **675/675**가 통과했다. 실행 조건에 따라 결과가 달라지지만 원인은 아직 특정하지 못했으므로 이를 해결된 실패로 처리하지 않는다. 타입·린트·서식·빌드, 개발·빌드 검사와 측정기 집중 검사는 통합 후에도 통과했다.
+
+[통합 재검증 결과와 실패 로그](https://github.com/SeoJaeWan/codocs/blob/feature/COD-16/.github/workplans/COD-16-results/pr-13-integration-20260921/README.md)
+
+## 후속 범위
+
+Hover 지연의 원인 분석과 최적화는 후속 작업이다. 목록·필터·커서, 변경 계획, MCP 통신, 쓰기 전체는 이번 성능 측정에 포함하지 않았다. 측정 환경은 macOS이며 Windows 성능을 검증한 결과로 간주하지 않는다.
+
+관련 작업: [COD-16](https://seojaewan.atlassian.net/browse/COD-16)
