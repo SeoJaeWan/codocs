@@ -8,7 +8,7 @@
     "prepare": "husky",
     "check:staged": "lint-staged",
     "typecheck": "node tools/build/build.mjs typecheck",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "format:check": "prettier . --check",
     "test": "node tools/check/run.mjs test",
     "check:development": "node tools/check/run.mjs development",
@@ -21,7 +21,7 @@
   },
   "lint-staged": {
     "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}": [
-      "eslint --fix",
+      "eslint --fix --max-warnings=0",
       "prettier --write"
     ],
     "*.{json,jsonc,md,mdx,yaml,yml,css,scss,html,svg}": "prettier --write"
