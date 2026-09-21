@@ -5,6 +5,8 @@
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
+    "prepare": "husky",
+    "check:staged": "lint-staged",
     "typecheck": "node tools/build/build.mjs typecheck",
     "lint": "eslint .",
     "format:check": "prettier . --check",
@@ -17,15 +19,24 @@
     "performance:cod14": "node tools/performance/runner.mjs",
     "check": "node tools/check/run.mjs all"
   },
+  "lint-staged": {
+    "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,mdx,yaml,yml,css,scss,html,svg}": "prettier --write"
+  },
   "devDependencies": {
     "@types/node": "22.19.3",
     "esbuild": "0.28.2",
     "eslint": "10.10.0",
+    "eslint-plugin-check-file": "3.3.2",
     "eslint-plugin-jsdoc": "64.3.10",
+    "husky": "9.1.7",
+    "lint-staged": "17.5.1",
     "prettier": "3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0",
-    "vitest": "5.0.0",
-    "eslint-plugin-check-file": "3.3.2"
+    "vitest": "5.0.0"
   }
 }

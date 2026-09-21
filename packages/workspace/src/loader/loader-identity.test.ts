@@ -7,8 +7,7 @@ import { workspaceTargetKinds } from '../paths/domain-values.js';
 import { resolveWorkspacePath } from '../paths/index.js';
 import { detectFileSystemTestCapabilities } from '../test-support/file-system.js';
 
-const { symlink: symlinkSupported } =
-  await detectFileSystemTestCapabilities();
+const { symlink: symlinkSupported } = await detectFileSystemTestCapabilities();
 
 vi.mock(
   '../paths/index.js',
@@ -50,33 +49,36 @@ afterEach(
 );
 
 describe('loadWorkspace: 연결 폴더의 순환 식별', /** 내부 경로 확인 결과를 바꾸어 OS별 식별 정보 조건을 재현한다. */ () => {
-  it.skipIf(!symlinkSupported)('같은 실제 폴더의 realPath 표기가 다르면 현재 bigint 폴더 정보로 순환을 중단한다', /** 실제 폴더 IO를 유지하며 서로 다른 실경로 표기만 모의한다. */ async () => {
-    await writeFile(path.join(codocs, 'ok.yaml'), raw);
-    await symlink(codocs, path.join(codocs, 'back'), 'dir');
-    const original =
-      await vi.importActual<typeof import('../paths/index.js')>(
-        '../paths/index.js',
+  it.skipIf(!symlinkSupported)(
+    '같은 실제 폴더의 realPath 표기가 다르면 현재 bigint 폴더 정보로 순환을 중단한다',
+    /** 실제 폴더 IO를 유지하며 서로 다른 실경로 표기만 모의한다. */ async () => {
+      await writeFile(path.join(codocs, 'ok.yaml'), raw);
+      await symlink(codocs, path.join(codocs, 'back'), 'dir');
+      const original =
+        await vi.importActual<typeof import('../paths/index.js')>(
+          '../paths/index.js',
+        );
+      vi.mocked(resolveWorkspacePath).mockImplementation(
+        /** 연결 경로의 실경로 표기만 다르게 만들어 조상 식별을 확인한다. */ async (
+          root,
+          input,
+        ) => {
+          const target = await original.resolveWorkspacePath(root, input);
+          if (target.success && target.logicalPath.endsWith(path.sep + 'back'))
+            return {
+              ...target,
+              realPath: target.realPath + '-alternate-spelling',
+            };
+          return target;
+        },
       );
-    vi.mocked(resolveWorkspacePath).mockImplementation(
-      /** 연결 경로의 실경로 표기만 다르게 만들어 조상 식별을 확인한다. */ async (
-        root,
-        input,
-      ) => {
-        const target = await original.resolveWorkspacePath(root, input);
-        if (target.success && target.logicalPath.endsWith(path.sep + 'back'))
-          return {
-            ...target,
-            realPath: target.realPath + '-alternate-spelling',
-          };
-        return target;
-      },
-    );
-    const result = await loadWorkspace({ cwd: project });
-    expect(result.status).toBe('complete');
-    expect(result.documents).toHaveLength(1);
-    expect(result.skippedCycles).toHaveLength(1);
-    expect(result.skippedCycles[0]?.path).toBe(path.join('.codocs', 'back'));
-  });
+      const result = await loadWorkspace({ cwd: project });
+      expect(result.status).toBe('complete');
+      expect(result.documents).toHaveLength(1);
+      expect(result.skippedCycles).toHaveLength(1);
+      expect(result.skippedCycles[0]?.path).toBe(path.join('.codocs', 'back'));
+    },
+  );
   it('폴더 식별 정보가 0이면 다른 폴더를 같은 조상으로 합치지 않는다', /** 제공되지 않은 식별 정보도 realPath 비교만 수행한다. */ async () => {
     await mkdir(path.join(codocs, 'nested'));
     await writeFile(path.join(codocs, 'nested', 'ok.yaml'), raw);

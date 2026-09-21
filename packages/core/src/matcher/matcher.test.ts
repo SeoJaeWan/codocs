@@ -254,6 +254,31 @@ describe('matchCode: 코드와 문서 ID 매칭', () => {
         }),
       ]);
     });
+    it('주석·문자열과 문법이 끝나지 않은 CRLF 원문도 그대로 매칭한다', () => {
+      const code = '😀// returnZone\r\nconst broken = "returnZone';
+      const result = matchCode({
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [returnZone.path, returnZone],
+          ]),
+        },
+        code,
+      });
+      const first = code.indexOf('returnZone');
+      const second = code.lastIndexOf('returnZone');
+
+      expect(result.candidates[0]?.evidence).toEqual([
+        expect.objectContaining({
+          token: 'returnZone',
+          range: { start: first, end: first + 'returnZone'.length },
+        }),
+        expect.objectContaining({
+          token: 'returnZone',
+          range: { start: second, end: second + 'returnZone'.length },
+        }),
+      ]);
+    });
     it('약어 뒤에 일반 단어가 이어지면 두 토큰으로 매칭한다', () => {
       const document = {
         ...documentBase,
