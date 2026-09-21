@@ -1,5 +1,5 @@
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
-import { readFile, writeFile } from 'node:fs/promises';
+import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -120,11 +120,40 @@ async function main() {
   const warmupRuns = numberSetting(settings, 'warmup-runs');
   const queryRuns = numberSetting(settings, 'query-runs');
   const propagationRuns = numberSetting(settings, 'propagation-runs');
-  const propagationTimeoutMs = numberSetting(
-    settings,
-    'propagation-timeout-ms',
-  );
+  const progressPath = settings['progress-path'];
+  /** 단계 기록은 개별 요청 시간 측정 경계 밖에 내구성 있게 추가한다. */
+  const checkpoint = async (phase, detail = {}) => {
+    if (progressPath)
+      await appendFile(
+        progressPath,
+        `${JSON.stringify({ event: phase, at: new Date().toISOString(), ...detail })}\n`,
+      );
+  };
   const startupStartedAtMs = numberSetting(settings, 'startup-started-at-ms');
+  const eventLoop = monitorEventLoopDelay({ resolution: 10 });
+  eventLoop.enable();
+  /** 표본이 없는 히스토그램의 sentinel을 측정값으로 내보내지 않는다. */
+  const eventLoopObservation = () => {
+    const count = eventLoop.count;
+    return {
+      count,
+      minMs: count ? eventLoop.min / 1e6 : null,
+      maxMs: count ? eventLoop.max / 1e6 : null,
+      meanMs: count ? eventLoop.mean / 1e6 : null,
+      p99Ms: count ? eventLoop.percentile(99) / 1e6 : null,
+    };
+  };
+  /** 단계 경계에서 메모리와 누적 이벤트 루프 지연을 읽는다. */
+  const resources = () => ({
+    memory: process.memoryUsage(),
+    eventLoop: eventLoopObservation(),
+  });
+  const beforeReadiness = resources();
+  await checkpoint('startup:start', { startedAtMs: startupStartedAtMs });
+  await checkpoint('resources', {
+    boundary: 'before-readiness',
+    ...beforeReadiness,
+  });
   const expected = JSON.parse(
     await readFile(path.join(fixture, 'expected-values.json'), 'utf8'),
   );
@@ -132,101 +161,254 @@ async function main() {
     path.join(repository, 'packages/mcp/dist/index.js'),
   ).href;
   const { createCodocsQueryHandlers } = await import(moduleUrl);
-  const eventLoop = monitorEventLoopDelay({ resolution: 10 });
-  eventLoop.enable();
   const handlers = createCodocsQueryHandlers({ project: fixture });
   const firstDocument = expected.documents[0];
-  const firstResponse = await handlers.codocsGet({ ids: [firstDocument.id] });
+  const readinessObservations = [];
+  /** 준비 확인 호출의 실제 완료 시간과 내용 판정을 개별 표본으로 기록한다. */
+  const recordReadiness = async (attempt, latencyMs, response, error) => {
+    const rebuilding = !error && isRebuilding(response);
+    const correct = !error && exactResponse(response, [firstDocument]);
+    const observation = {
+      attempt,
+      latencyMs,
+      classification: error
+        ? 'error'
+        : rebuilding
+          ? 'rebuilding'
+          : correct
+            ? 'success'
+            : 'incorrect',
+      correctness:
+        error || rebuilding ? 'unconfirmed' : correct ? 'passed' : 'failed',
+      ...(error ? { error } : { response: responseSummary(response) }),
+    };
+    readinessObservations.push(observation);
+    await checkpoint('readiness:attempt', { observation });
+  };
+  const firstStartedAt = performance.now();
+  let firstResponse;
+  let startupError;
+  try {
+    firstResponse = await handlers.codocsGet({ ids: [firstDocument.id] });
+  } catch (caught) {
+    startupError = caught instanceof Error ? caught.message : String(caught);
+  }
+  const firstRequestMs = performance.now() - firstStartedAt;
+  await recordReadiness(1, firstRequestMs, firstResponse, startupError);
+  let readinessAttempts = 1;
+  while (!startupError && isRebuilding(firstResponse)) {
+    await delay(5);
+    const attemptStartedAt = performance.now();
+    try {
+      firstResponse = await handlers.codocsGet({ ids: [firstDocument.id] });
+    } catch (caught) {
+      startupError = caught instanceof Error ? caught.message : String(caught);
+    }
+    readinessAttempts += 1;
+    await recordReadiness(
+      readinessAttempts,
+      performance.now() - attemptStartedAt,
+      firstResponse,
+      startupError,
+    );
+  }
   const startupEndedAtMs = performance.timeOrigin + performance.now();
   const startupCorrect =
-    exactResponse(firstResponse, [firstDocument]) && handlers.access.ready;
+    !startupError &&
+    exactResponse(firstResponse, [firstDocument]) &&
+    handlers.access.ready;
   const startup = {
-    classification: startupCorrect ? 'success' : 'incorrect',
-    correctness: startupCorrect ? 'passed' : 'failed',
-    latencyMs: startupCorrect ? startupEndedAtMs - startupStartedAtMs : null,
+    classification: startupError
+      ? 'error'
+      : startupCorrect
+        ? 'success'
+        : 'incorrect',
+    correctness: startupError
+      ? 'unconfirmed'
+      : startupCorrect
+        ? 'passed'
+        : 'failed',
+    latencyMs: startupEndedAtMs - startupStartedAtMs,
+    firstRequestMs,
+    readinessAttempts,
+    readinessObservations,
     readiness: handlers.access,
-    response: responseSummary(firstResponse),
+    ...(startupError
+      ? { error: startupError }
+      : { response: responseSummary(firstResponse) }),
   };
 
+  await checkpoint('startup:complete', { observation: startup });
+  const phases = { beforeReadiness, startup: resources() };
+  await checkpoint('resources', {
+    boundary: 'after-startup',
+    ...phases.startup,
+  });
+  const warmups = [];
   const queries = [];
   for (const requestedCount of [1, 10, 20]) {
     for (let run = 0; run < warmupRuns + queryRuns; run++) {
+      if (run === warmupRuns) {
+        phases[`warmup-${requestedCount}`] = resources();
+        await checkpoint('resources', {
+          boundary: `after-warmup-${requestedCount}`,
+          ...phases[`warmup-${requestedCount}`],
+        });
+      }
       const offset = (run * 23 + requestedCount) % expected.documentCount;
       const documents = Array.from(
         { length: requestedCount },
         (_, index) =>
           expected.documents[(offset + index) % expected.documentCount],
       );
-      const startedAt = performance.now();
-      const response = await handlers.codocsGet({
-        ids: documents.map((document) => document.id),
-      });
-      const latencyMs = performance.now() - startedAt;
-      if (run < warmupRuns) continue;
-      const correct = exactResponse(response, documents);
-      queries.push({
+      const phase = run < warmupRuns ? 'warmup' : 'measured';
+      const sample = phase === 'warmup' ? run + 1 : run - warmupRuns + 1;
+      await checkpoint('request:start', {
+        phase,
         requestedCount,
-        sample: run - warmupRuns + 1,
-        classification: correct ? 'success' : 'incorrect',
-        correctness: correct ? 'passed' : 'failed',
-        latencyMs: correct ? latencyMs : null,
-        ...(correct ? {} : { response: responseSummary(response) }),
+        sample,
+        startedAt: new Date().toISOString(),
       });
+      const startedAt = performance.now();
+      let response;
+      let error;
+      try {
+        response = await handlers.codocsGet({
+          ids: documents.map((document) => document.id),
+        });
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : String(caught);
+      }
+      const latencyMs = performance.now() - startedAt;
+      const correct = !error && exactResponse(response, documents);
+      const observation = {
+        requestedCount,
+        sample,
+        phase,
+        classification: error ? 'error' : correct ? 'success' : 'incorrect',
+        correctness: error ? 'unconfirmed' : correct ? 'passed' : 'failed',
+        latencyMs,
+        ...(error
+          ? { error }
+          : correct
+            ? {}
+            : { response: responseSummary(response) }),
+      };
+      (phase === 'warmup' ? warmups : queries).push(observation);
+      await checkpoint('request:complete', { observation });
     }
+    phases[`query-${requestedCount}`] = resources();
+    await checkpoint('resources', {
+      boundary: `after-query-${requestedCount}`,
+      ...phases[`query-${requestedCount}`],
+    });
   }
 
+  phases.queries = resources();
+  await checkpoint('resources', {
+    boundary: 'after-warmups-and-queries',
+    ...phases.queries,
+  });
   const invalidRequests = [];
   const invalidDocuments = expected.documents.slice(0, 21);
   for (let run = 0; run < queryRuns; run++) {
-    const startedAt = performance.now();
-    const response = await handlers.codocsGet({
-      ids: invalidDocuments.map((document) => document.id),
-    });
-    const latencyMs = performance.now() - startedAt;
-    const correct =
-      response?.success === false && response.error?.code === 'invalid_input';
-    invalidRequests.push({
+    await checkpoint('request:start', {
+      phase: 'invalid',
       requestedCount: 21,
       sample: run + 1,
-      classification: correct ? 'invalid_request' : 'incorrect',
-      correctness: correct ? 'passed' : 'failed',
-      latencyMs: correct ? latencyMs : null,
-      response: responseSummary(response),
+      startedAt: new Date().toISOString(),
     });
+    const startedAt = performance.now();
+    let response;
+    let error;
+    try {
+      response = await handlers.codocsGet({
+        ids: invalidDocuments.map((document) => document.id),
+      });
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : String(caught);
+    }
+    const latencyMs = performance.now() - startedAt;
+    const correct =
+      !error &&
+      response?.success === false &&
+      response.error?.code === 'invalid_input';
+    const observation = {
+      requestedCount: 21,
+      sample: run + 1,
+      phase: 'invalid',
+      classification: error
+        ? 'error'
+        : correct
+          ? 'invalid_request'
+          : 'incorrect',
+      correctness: error ? 'unconfirmed' : correct ? 'passed' : 'failed',
+      latencyMs,
+      ...(error ? { error } : { response: responseSummary(response) }),
+    };
+    invalidRequests.push(observation);
+    await checkpoint('request:complete', { observation });
   }
 
   const propagation = [];
   for (let run = 0; run < propagationRuns; run++) {
     const document = expected.documents[run % expected.documentCount];
+    await checkpoint('propagation:prepare-start', {
+      sample: run + 1,
+      id: document.id,
+      startedAt: new Date().toISOString(),
+    });
     let before;
+    let preparationError;
     const preparationStartedAt = performance.now();
     do {
-      before = await handlers.codocsGet({ ids: [document.id] });
-      if (exactResponse(before, [document])) break;
-      if (
-        !isRebuilding(before) ||
-        performance.now() - preparationStartedAt > 30_000
-      )
+      try {
+        before = await handlers.codocsGet({ ids: [document.id] });
+      } catch (caught) {
+        preparationError =
+          caught instanceof Error ? caught.message : String(caught);
         break;
+      }
+      if (exactResponse(before, [document])) break;
+      if (!isRebuilding(before)) break;
       await delay(5);
     } while (true);
+    const preparationMs = performance.now() - preparationStartedAt;
+    await checkpoint('propagation:prepare-complete', {
+      sample: run + 1,
+      id: document.id,
+      latencyMs: preparationMs,
+      correctness: preparationError
+        ? 'unconfirmed'
+        : exactResponse(before, [document])
+          ? 'passed'
+          : 'failed',
+      ...(preparationError
+        ? { error: preparationError }
+        : { response: responseSummary(before) }),
+    });
     if (!exactResponse(before, [document])) {
-      propagation.push({
+      const observation = {
         sample: run + 1,
         id: document.id,
         writeCompletedBeforeMeasurement: false,
         usedRefresh: false,
         expectedDefinition: document.definition,
-        classification: 'incorrect',
-        correctness: 'failed',
-        latencyMs: null,
-        response: responseSummary(before),
-      });
+        classification: preparationError ? 'error' : 'incorrect',
+        correctness: preparationError ? 'unconfirmed' : 'failed',
+        latencyMs: preparationMs,
+        ...(preparationError
+          ? { error: preparationError }
+          : { response: responseSummary(before) }),
+      };
+      propagation.push(observation);
+      await checkpoint('propagation:complete', { observation });
       continue;
     }
     const previousResult = before?.success ? before.results?.[0] : undefined;
     const nextDefinition = `${document.definition} External change ${run + 1}.`;
     const changedDocument = { ...document, definition: nextDefinition };
+    await checkpoint('propagation:start', { sample: run + 1, id: document.id });
     await writeFile(
       path.join(fixture, document.path),
       changedYaml(document, nextDefinition),
@@ -236,12 +418,17 @@ async function main() {
     let lastResponse = before;
     let changedObservation = false;
     let incorrect = !exactResponse(before, [document]);
+    let observationError;
     let latencyMs = null;
-    while (
-      !incorrect &&
-      performance.now() - writeCompletedAt <= propagationTimeoutMs
-    ) {
-      const response = await handlers.codocsGet({ ids: [document.id] });
+    while (!incorrect) {
+      let response;
+      try {
+        response = await handlers.codocsGet({ ids: [document.id] });
+      } catch (caught) {
+        observationError =
+          caught instanceof Error ? caught.message : String(caught);
+        break;
+      }
       lastResponse = response;
       if (exactResponse(response, [changedDocument])) {
         latencyMs = performance.now() - writeCompletedAt;
@@ -266,17 +453,20 @@ async function main() {
     const classification =
       latencyMs !== null
         ? 'success'
-        : incorrect
-          ? 'incorrect'
-          : changedObservation
-            ? 'event_only'
-            : 'timeout';
-    propagation.push({
+        : observationError
+          ? 'error'
+          : incorrect
+            ? 'incorrect'
+            : changedObservation
+              ? 'event_only'
+              : 'timeout';
+    const observation = {
       sample: run + 1,
       id: document.id,
       writeCompletedBeforeMeasurement: true,
       usedRefresh: false,
       expectedDefinition: nextDefinition,
+      preparationMs,
       classification,
       correctness:
         classification === 'success'
@@ -284,21 +474,34 @@ async function main() {
           : classification === 'incorrect'
             ? 'failed'
             : 'unconfirmed',
-      latencyMs,
-      response: responseSummary(lastResponse),
-    });
+      latencyMs: latencyMs ?? performance.now() - writeCompletedAt,
+      ...(observationError
+        ? { error: observationError }
+        : { response: responseSummary(lastResponse) }),
+    };
+    propagation.push(observation);
+    await checkpoint('propagation:complete', { observation });
+    if (classification !== 'success') break;
     document.definition = nextDefinition;
   }
 
+  phases.propagation = resources();
+  await checkpoint('resources', {
+    boundary: 'after-propagation',
+    ...phases.propagation,
+  });
   eventLoop.disable();
   const memory = process.memoryUsage();
   return {
     processId: process.pid,
     documentCount: expected.documentCount,
     startup,
+    readinessObservations,
+    warmups,
     queries,
     invalidRequests,
     propagation,
+    phases,
     memory: {
       unit: 'bytes',
       rss: memory.rss,
@@ -310,10 +513,7 @@ async function main() {
     eventLoop: {
       unit: 'milliseconds',
       resolutionMs: 10,
-      minMs: eventLoop.min / 1e6,
-      maxMs: eventLoop.max / 1e6,
-      meanMs: eventLoop.mean / 1e6,
-      p99Ms: eventLoop.percentile(99) / 1e6,
+      ...eventLoopObservation(),
     },
   };
 }

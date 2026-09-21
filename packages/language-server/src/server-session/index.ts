@@ -6,12 +6,16 @@ import type {
 import {
   createWorkspaceQuerySession,
   type WorkspaceMatchResult,
+  type WorkspacePathGetResponse,
   type WorkspaceRefreshResult,
   type WorkspaceReadiness,
 } from '@codocs/workspace';
 import type {
+  CancellationToken,
   DidChangeTextDocumentParams,
   DidOpenTextDocumentParams,
+  Hover,
+  HoverParams,
   InitializeParams,
   Range,
   WorkspaceFolder,
@@ -23,6 +27,14 @@ import {
   SynchronizedDocuments,
   utf16OffsetsToRange,
 } from '../document-sync/index.js';
+import {
+  createEmptyHover,
+  createHover,
+  createStatusHover,
+  hoverCandidatePaths,
+  hoverDetailPaths,
+  selectHover,
+} from '../hover/index.js';
 export {
   documentMatchErrorCodes,
   type DocumentMatchErrorCode,
@@ -99,7 +111,12 @@ export interface WorkspaceRefreshResponse {
 /** 세션 구현을 테스트에서 결정적으로 바꾸기 위한 최소 경계다. */
 export interface WorkspaceSessionBoundary {
   readonly readiness: WorkspaceReadiness;
+  readonly catalogVersion: number;
   match(text: string): Promise<WorkspaceMatchResult>;
+  getByPaths(
+    paths: readonly string[],
+    expectedCatalogVersion: number,
+  ): Promise<WorkspacePathGetResponse>;
   refresh(): Promise<WorkspaceRefreshResult>;
   close(): Promise<void>;
 }
@@ -219,6 +236,72 @@ export class LanguageServerSession {
     return mapMatchResult(current, workspace, result);
   }
 
+  /** 같은 코드·catalog 관측의 커서 후보와 경로 상세로 표준 Hover를 만든다. */
+  async hoverDocument(
+    params: HoverParams,
+    cancellation?: CancellationToken,
+  ): Promise<Hover | null> {
+    const uri = params.textDocument.uri;
+    const snapshot = this.documents.get(uri);
+    if (!snapshot) return null;
+    const snapshotVersion = snapshot.version;
+    const snapshotText = snapshot.getText();
+    const workspace = this.#workspaceForDocument(uri);
+    if (!workspace) return null;
+    if (cancellation?.isCancellationRequested) return null;
+    const result = await workspace.session.match(snapshotText);
+    if (
+      cancellation?.isCancellationRequested ||
+      !this.#isCurrentSnapshot(uri, snapshotVersion, snapshotText, workspace)
+    )
+      return null;
+    if (!result.success)
+      return createStatusHover(workspace.session.readiness, result.error);
+    const match = mapMatchResult(snapshot, workspace, result);
+    const selection = selectHover(snapshot, match, params.position);
+    if (!selection) return createEmptyHover(match);
+    const candidatePaths = hoverCandidatePaths(selection);
+    const candidateQueryVersion = workspace.session.catalogVersion;
+    let details = await workspace.session.getByPaths(
+      candidatePaths,
+      match.catalogVersion,
+    );
+    if (
+      cancellation?.isCancellationRequested ||
+      !this.#isCurrentSnapshot(uri, snapshotVersion, snapshotText, workspace) ||
+      workspace.session.catalogVersion !== candidateQueryVersion
+    )
+      return null;
+    if (!details.success)
+      return 'expectedCatalogVersion' in details
+        ? null
+        : createStatusHover(workspace.session.readiness, details.error);
+    const allPaths = hoverDetailPaths(candidatePaths, details);
+    if (allPaths.length !== candidatePaths.length) {
+      const detailQueryVersion = workspace.session.catalogVersion;
+      details = await workspace.session.getByPaths(
+        allPaths,
+        match.catalogVersion,
+      );
+      if (
+        cancellation?.isCancellationRequested ||
+        !this.#isCurrentSnapshot(
+          uri,
+          snapshotVersion,
+          snapshotText,
+          workspace,
+        ) ||
+        workspace.session.catalogVersion !== detailQueryVersion
+      )
+        return null;
+      if (!details.success)
+        return 'expectedCatalogVersion' in details
+          ? null
+          : createStatusHover(workspace.session.readiness, details.error);
+    }
+    return createHover(selection, match, details);
+  }
+
   /** 선택한 작업 공간 또는 모든 작업 공간을 명시적으로 갱신한다. */
   async refreshWorkspaces(
     request: WorkspaceRefreshRequest = {},
@@ -298,6 +381,21 @@ export class LanguageServerSession {
     return [...this.#workspaces.values()]
       .filter((workspace) => containsPath(workspace.rootPath, documentPath))
       .sort((left, right) => right.rootPath.length - left.rootPath.length)[0];
+  }
+
+  /** 비동기 조회 뒤에도 열린 문서와 선택한 workspace가 같은지 확인한다. */
+  #isCurrentSnapshot(
+    uri: string,
+    version: number,
+    text: string,
+    workspace: WorkspaceBinding,
+  ): boolean {
+    const current = this.documents.get(uri);
+    return (
+      current?.version === version &&
+      current.getText() === text &&
+      this.#workspaces.get(workspace.uri) === workspace
+    );
   }
 }
 

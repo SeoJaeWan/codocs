@@ -45,11 +45,17 @@ afterAll(
 const consumer = path.join(fixture, 'consumer');
 const folders = ['core', 'workspace', 'mcp', 'language-server', 'vscode'];
 const names = ['core', 'workspace', 'mcp', 'language-server', 'vscode'];
+const nodePackageNames = names.filter((name) => name !== 'vscode');
 const tsc = path.join(root, 'node_modules/typescript/bin/tsc');
+const subprocessOutputLimit = 16 * 1024 * 1024;
 
 /** 실제 subprocess를 실행해 stdout과 실패 상태를 확인한다. */
 function run(args: string[], cwd = consumer): string {
-  return execFileSync(process.execPath, args, { cwd, encoding: 'utf8' });
+  return execFileSync(process.execPath, args, {
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: subprocessOutputLimit,
+  });
 }
 
 /** 원본 또는 배포된 예제를 소스 없는 소비자의 공개 파서와 검증기로 검사한다. */
@@ -156,9 +162,13 @@ beforeAll(
       path.join(consumer, 'package.json'),
       JSON.stringify({
         type: 'module',
-        dependencies: Object.fromEntries(
-          names.map((name) => [`@codocs/${name}`, `file:../${name}.tgz`]),
-        ),
+        dependencies: Object.fromEntries([
+          ...names.map(
+            (name) => [`@codocs/${name}`, `file:../${name}.tgz`] as const,
+          ),
+          ['@types/node', '22.19.3'] as const,
+          ['@types/vscode', '1.95.0'] as const,
+        ]),
       }),
     );
     // workspace:* references in packed manifests resolve to the same local tarballs.
@@ -636,7 +646,7 @@ for (const issue of diagnostics) {
       const script = `
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
-for (const name of ${JSON.stringify(names)}) {
+for (const name of ${JSON.stringify(nodePackageNames)}) {
   const value = await import('@codocs/' + name);
   if (typeof value !== 'object') throw new Error('Invalid module: ' + name);
 }
@@ -659,14 +669,14 @@ if (!coreRequire.resolve('yaml').startsWith(installed)) throw new Error('Yaml de
 console.log('JS packages loaded');`;
       writeFileSync(path.join(consumer, 'consume.mjs'), script);
       expect(run(['consume.mjs'])).toContain('JS packages loaded');
-      for (const name of names) {
+      for (const name of nodePackageNames) {
         expect(
           existsSync(path.join(consumer, 'node_modules/@codocs', name, 'src')),
         ).toBe(false);
       }
     });
 
-    it.each(['language-server', 'vscode'])(
+    it.each(['language-server'])(
       'Node subprocess가 %s의 CJS 공개 진입점을 require하면 모듈을 반환한다',
       (name) => {
         const script = `const value = require('@codocs/${name}');
@@ -773,7 +783,7 @@ console.log('Validator external contract verified');`;
 
     it('별도 TS 소비자가 dist d.ts를 해석하고 금지 subpath를 거부한다', /** 타입 namespace를 출력 없이 검사하고 해석 경로를 확인한다. */ () => {
       const code =
-        names
+        nodePackageNames
           .map(
             (name, index) =>
               `import type * as Package${index} from '@codocs/${name}';\nexport type Module${index} = typeof Package${index};`,
@@ -842,8 +852,20 @@ void knowledgeStructure;
         JSON.stringify(config),
       );
       writeFileSync(path.join(consumer, 'consume.ts'), code + validatorTypes);
-      const trace = run([tsc, '-p', 'tsconfig.json', '--traceResolution']);
-      for (const name of names) {
+      const tracedTypes = spawnSync(
+        process.execPath,
+        [tsc, '-p', 'tsconfig.json', '--traceResolution'],
+        {
+          cwd: consumer,
+          encoding: 'utf8',
+          maxBuffer: subprocessOutputLimit,
+        },
+      );
+      expect(tracedTypes.status, tracedTypes.stdout + tracedTypes.stderr).toBe(
+        0,
+      );
+      const trace = tracedTypes.stdout;
+      for (const name of nodePackageNames) {
         expect(trace.replaceAll('\\', '/')).toContain(
           `@codocs/${name}/dist/index.d.ts`,
         );
@@ -852,7 +874,7 @@ void knowledgeStructure;
       // 공개 입력 타입만 사용해도 root 선언의 Zod URL 의존성은 남는다.
       writeFileSync(
         path.join(consumer, 'consume.ts'),
-        "import type {ValidateDocumentInput} from '@codocs/core';\nexport const input: ValidateDocumentInput = {data: {}};\n",
+        "import type {ValidateDocumentInput} from '@codocs/core';\nexport const input: ValidateDocumentInput = {data: {}};\n// @ts-expect-error core 선언은 Node 전역을 가져오지 않는다.\nexport const nodeProcess = process;\n",
       );
       writeFileSync(
         path.join(consumer, 'tsconfig.json'),
@@ -888,6 +910,52 @@ void knowledgeStructure;
       );
       expect(failure.status).not.toBe(0);
       expect(failure.stdout + failure.stderr).toContain('TS2307');
+    });
+
+    it('VS Code 타입 환경의 strict 소비자가 확장 공개 d.ts를 해석한다', /** 호스트 런타임과 분리해 배포 선언의 vscode 타입 의존성과 공개 진입점을 확인한다. */ () => {
+      writeFileSync(
+        path.join(consumer, 'vscode-consumer.ts'),
+        `import {activate, deactivate, openSourceCommand} from '@codocs/vscode';
+import type {ExtensionContext} from 'vscode';
+const start: (context: ExtensionContext) => Promise<void> = activate;
+const stop: () => Promise<void> = deactivate;
+const command: string = openSourceCommand;
+void start; void stop; void command;
+`,
+      );
+      writeFileSync(
+        path.join(consumer, 'vscode-consumer.json'),
+        JSON.stringify({
+          compilerOptions: {
+            strict: true,
+            exactOptionalPropertyTypes: true,
+            noEmit: true,
+            module: 'NodeNext',
+            moduleResolution: 'NodeNext',
+            target: 'ES2022',
+            lib: ['ES2022'],
+            types: ['node', 'vscode'],
+            skipLibCheck: false,
+          },
+          files: ['vscode-consumer.ts'],
+        }),
+      );
+      const tracedTypes = spawnSync(
+        process.execPath,
+        [tsc, '-p', 'vscode-consumer.json', '--traceResolution'],
+        {
+          cwd: consumer,
+          encoding: 'utf8',
+          maxBuffer: subprocessOutputLimit,
+        },
+      );
+      expect(tracedTypes.status, tracedTypes.stdout + tracedTypes.stderr).toBe(
+        0,
+      );
+      const trace = tracedTypes.stdout.replaceAll('\\', '/');
+      expect(trace).toContain('@codocs/vscode/dist/index.d.ts');
+      expect(trace).toContain('@types/vscode/index.d.ts');
+      expect(trace).not.toContain('/src/index.ts');
     });
 
     it('Node도 package 내부 subpath를 거부한다', /** runtime exports가 내부 접근을 차단하는지 실제 오류 코드로 확인한다. */ () => {

@@ -28,6 +28,17 @@ export function isOwnedByWorkspaceRoot(
   return nearestWorkspaceRoot(documentPath, roots)?.uri === root.uri;
 }
 
+/** 가장 가까운 workspace가 소유한 요청만 해당 client에 전달한다. */
+export async function routeOwnedRequest<Result>(
+  documentPath: string,
+  root: WorkspaceRoot,
+  roots: readonly WorkspaceRoot[],
+  request: () => Promise<Result>,
+): Promise<Result | undefined> {
+  if (!isOwnedByWorkspaceRoot(documentPath, root, roots)) return undefined;
+  return request();
+}
+
 /** 플랫폼 경로 구분자 기준으로 실제 하위 경로만 포함한다. */
 function containsPath(rootPath: string, candidatePath: string): boolean {
   const relative = path.relative(

@@ -51,6 +51,7 @@ export function bindLanguageServer(
           openClose: true,
           change: TextDocumentSyncKind.Full,
         },
+        hoverProvider: true,
         workspace: {
           workspaceFolders: {
             supported: true,
@@ -91,6 +92,10 @@ export function bindLanguageServer(
     session.closeDocument(params.textDocument.uri);
   };
   connection.onDidCloseTextDocument(didCloseTextDocument);
+  /** 표준 Hover 요청을 최신 문서와 같은 catalog 관측으로 처리한다. */
+  const hover: Parameters<Connection['onHover']>[0] = (params, token) =>
+    session.hoverDocument(params, token);
+  connection.onHover(hover);
   /** 초기화 완료 뒤 workspace folder 변경 알림을 등록한다. */
   const initialized: Parameters<Connection['onInitialized']>[0] = () => {
     if (!supportsWorkspaceFolderChanges) return;

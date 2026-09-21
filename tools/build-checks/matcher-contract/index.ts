@@ -1,11 +1,12 @@
 /** 소스 없는 JS 소비자에서 공개 코드 매칭 API와 배포 의존성을 검사하는 프로그램이다. */
 export const matcherContractJs = String.raw`import assert from 'node:assert/strict';
-import {buildCatalog, matchCode, matchIdentifier, matcherComparisonKinds, matcherEvidenceKinds, parseYaml, scanStatuses} from '@codocs/core';
+import {buildCatalog, compareEvidencePriority, matchCode, matchIdentifier, matcherComparisonKinds, matcherEvidenceKinds, parseYaml, scanStatuses} from '@codocs/core';
 
 const observe = (path, source) => ({path, parsed: parseYaml(source, path)});
 const catalog = buildCatalog({status: scanStatuses.complete, observations: [
   observe('current.yaml', 'id: order-item\nname: 주문 항목\ndefinition: 설명\ndomains: [판매]\ndeprecatedAliases:\n  - id: legacy-order\n    message: 이전 주문 ID입니다.\n'),
   observe('broken.yaml', 'id: broken\nname: 진단 문서\ndefinition: 설명\ndomains: [판매]\ndeprecatedAliases:\n  - message: ID 누락\n'),
+  observe('alias-only.yaml', 'name: 이전 ID 전용\ndefinition: 설명\ndomains: [판매]\ndeprecatedAliases:\n  - id: old-name\n'),
 ]});
 
 const source = '😀 legacyOrders and orderItem';
@@ -45,6 +46,17 @@ assert.equal(diagnosed.candidates.length, 1);
 assert.ok(diagnosed.candidates[0].diagnostics.length > 0);
 assert.ok(diagnosed.candidates[0].errors.length > 0);
 assert.ok(diagnosed.diagnostics.some(issue => issue.code === 'missing_required_field'));
+const aliasOnly = matchCode(catalog, 'oldName');
+assert.equal(aliasOnly.candidates.length, 1);
+assert.equal('id' in aliasOnly.candidates[0], false);
+assert.equal('documentId' in aliasOnly.candidates[0], false);
+assert.equal(aliasOnly.candidates[0].path, 'alias-only.yaml');
+assert.equal(aliasOnly.candidates[0].evidence[0].sourceId, 'old-name');
+assert.ok(aliasOnly.candidates[0].diagnostics.some(issue => issue.code === 'missing_required_field'));
+const currentEvidence = current.evidence.find(item => item.kind === matcherEvidenceKinds.current);
+assert.ok(currentEvidence);
+assert.ok(compareEvidencePriority(currentEvidence, previous) < 0);
+assert.equal(compareEvidencePriority(currentEvidence, {...currentEvidence, range: {start: 99, end: 108}}), 0);
 
 const previousCatalog = buildCatalog({status: scanStatuses.complete, observations: [observe('old.yaml', 'id: retained\nname: 보존\ndefinition: 설명\ndomains: [판매]\n')]});
 const partial = buildCatalog({status: scanStatuses.partial, observations: [], failures: [{kind: 'folder', path: '.codocs'}]}, previousCatalog);
@@ -75,7 +87,7 @@ export const matcherContractConfig = {
 };
 
 /** strict NodeNext에서 매처 요청·후보·근거·부분 결과의 공개 선언을 확인한다. */
-export const matcherContractTs = String.raw`import {buildCatalog, matchCode, matchIdentifier, matcherComparisonKinds, matcherEvidenceKinds, parseYaml, scanStatuses} from '@codocs/core';
+export const matcherContractTs = String.raw`import {buildCatalog, compareEvidencePriority, matchCode, matchIdentifier, matcherComparisonKinds, matcherEvidenceKinds, parseYaml, scanStatuses} from '@codocs/core';
 import type {Catalog, CodeMatchCandidate, CodeMatchEvidence, CodeMatchRequest, CodeMatchResult, MatcherComparisonKind, MatcherEvidenceKind} from '@codocs/core';
 
 const catalog: Catalog = buildCatalog({status: scanStatuses.complete, observations: [{path: 'term.yaml', parsed: parseYaml('id: term\nname: 이름\ndefinition: 본문\ndomains: [영역]\n')}]});
@@ -84,13 +96,14 @@ const result: CodeMatchResult = matchCode(request);
 const second: CodeMatchResult = matchIdentifier(catalog, {text: 'term'});
 const candidate: CodeMatchCandidate | undefined = result.candidates[0];
 if (candidate) {
-  const id: string = candidate.id;
+  const id: string | undefined = candidate.id;
+  const documentId: string | undefined = candidate.documentId;
   const path: string = candidate.path;
   const domains: readonly string[] = candidate.domains;
   const confirmation: 'confirmed' | 'unconfirmed' = candidate.confirmation;
   const diagnostics = candidate.diagnostics;
   const errors = candidate.errors;
-  void id; void path; void domains; void confirmation; void diagnostics; void errors;
+  void id; void documentId; void path; void domains; void confirmation; void diagnostics; void errors;
   for (const evidence of candidate.evidence) {
     const kind: MatcherEvidenceKind = evidence.kind;
     const comparison: MatcherComparisonKind = evidence.comparison;
@@ -102,6 +115,8 @@ if (candidate) {
       void sourceId; void message;
     }
     if (evidence.comparison === matcherComparisonKinds.singular) console.log(count, range);
+    const priority: number = compareEvidencePriority(evidence, evidence);
+    void priority;
     void kind; void comparison;
   }
 }

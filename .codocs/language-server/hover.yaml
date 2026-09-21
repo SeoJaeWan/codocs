@@ -32,3 +32,10 @@ definition: |
   필수 필드 누락 등 문서 오류는 Hover에도 표시하고 확인 가능한 내용·원문 링크를 유지한다. 예: “필수 필드 definition이 누락되었습니다.” 잘못된 message에는 기본 변경 안내와 필드 오류를 표시한다. 현재 ID를 확인할 수 없으면 해당 오류를 안내한다.
   현재 ID 중복은 중복 오류와 모든 충돌 문서의 링크를 제공하며 정상 대표 내용을 선택하지 않는다.
   읽지 못한 문서가 있으면 “일부 문서를 읽지 못해 후보가 누락될 수 있습니다”라고 안내한다.
+
+  ## 프로토콜과 원문 명령
+
+  Language Server는 initialize에서 표준 hoverProvider를 알리고 textDocument/hover에 표준 Markdown Hover를 반환한다. 매칭이 없는 완전한 관측은 null이며, 부분 관측·색인 준비·조회 실패는 서로 다른 안내를 제공한다.
+  매칭에 사용한 코드 버전이 상세 조회 중 바뀌거나 상세 조회의 catalogVersion이 매칭 관측과 다르면 늦은 결과를 폐기한다. 취소된 요청도 본문이나 범위를 반환하지 않는다.
+
+  원문 링크는 Language Server가 생성한 codocs.openSource command만 사용한다. 링크 인자는 file URI, 같은 관측의 catalogVersion, 확인된 경우에만 YAML 최상위 range와 원문 revision을 포함한다. 이름·정의·message·진단 같은 문서 입력은 command 링크나 임의 Markdown 실행 구문이 되지 않도록 표시용으로 이스케이프한다.
