@@ -1,0 +1,391 @@
+{
+  "schemaVersion": 1,
+  "purpose": "독립 프로토타입의 관측 결과와 후속 구현용 원문 사례. 의미 중복 전체의 정답 집합이나 제품 정확도 보장이 아니다.",
+  "experiment": {
+    "date": "2026-09-21",
+    "node": "v24.21.0",
+    "algorithmSha256": {
+      "engine.mjs": "4d0628c89f0bae8d736b11c2ce6d026a8bc1facb2f6bcf0200a0b872ec509f1b",
+      "core-adapter.mjs": "c261347fc7a1172c3f2ec090b0340bc26dc965b8be30b9c21e09f10183136ba1"
+    },
+    "config": {
+      "minChars": 30,
+      "gramSize": 4,
+      "threshold": 0.65,
+      "minOrdered": 0.7,
+      "maxChars": 1200
+    },
+    "fields": ["definition", "examples"],
+    "historyCommitCount": 8,
+    "uniqueSnapshotCount": 13,
+    "allSnapshotsComplete": true,
+    "sourceOccurrencesChecked": 50
+  },
+  "coordinates": {
+    "startEnd": "원본 YAML 전체 문자열의 0 기반 UTF-16 offset, 시작 포함·끝 제외",
+    "line": "1 기반 시작 행"
+  },
+  "scoreBasis": {
+    "reported-pair": "전체 검사에서 실제 보고된 쌍의 점수",
+    "manual-span-comparison": "원문에서 지정한 두 구절의 직접 비교. 자동 탐지 성공이나 전체 문서 중 최대 점수를 의미하지 않는다."
+  },
+  "reviewLabels": {
+    "reviewable-repetition": "반복 정의를 정리할지 검토할 사례. 자동 삭제 지시가 아니다.",
+    "known-limit": "사람이 정리했지만 기존 기준으로 놓친 사례. 초기 기능의 탐지 보장 밖이다.",
+    "keep-contextual-reference": "정상적인 안내를 유지할 수 있어, 후보 발생과 정리 필요를 구분해야 하는 대조 사례."
+  },
+  "historyRuns": [
+    {
+      "commit": "44188d2e25510f5419274034142f30689d1add9b",
+      "parent": "5238ff2a1d003386efab6af924bc5306df689c52",
+      "subject": "docs: avoid redundant reference guidance",
+      "before": {
+        "files": 72,
+        "pairs": 2,
+        "status": "complete"
+      },
+      "after": {
+        "files": 72,
+        "pairs": 2,
+        "status": "complete"
+      }
+    },
+    {
+      "commit": "5238ff2a1d003386efab6af924bc5306df689c52",
+      "parent": "d91c87213adaef92f82e5f81c482f03741ef9526",
+      "subject": "docs: refine document ownership and separation guidelines",
+      "before": {
+        "files": 72,
+        "pairs": 2,
+        "status": "complete"
+      },
+      "after": {
+        "files": 72,
+        "pairs": 2,
+        "status": "complete"
+      }
+    },
+    {
+      "commit": "609a21c2ed5b412fdbbcd9063e93b5fb2b1674bc",
+      "parent": "61b801bd07863b5be44fcc9a1f0c5c5959a4b29e",
+      "subject": "docs: clarify YAML contracts and concept ownership",
+      "before": {
+        "files": 70,
+        "pairs": 2,
+        "status": "complete"
+      },
+      "after": {
+        "files": 72,
+        "pairs": 2,
+        "status": "complete"
+      }
+    },
+    {
+      "commit": "e4b05a9ee7040da5840d79390b49e4b2a95e2b9f",
+      "parent": "c53afc3a6ad5289e7970b7d2cbff9768eb32ab5d",
+      "subject": "docs: organize contracts by responsibility and align code references",
+      "before": {
+        "files": 61,
+        "pairs": 2,
+        "status": "complete"
+      },
+      "after": {
+        "files": 69,
+        "pairs": 2,
+        "status": "complete"
+      }
+    },
+    {
+      "commit": "c53afc3a6ad5289e7970b7d2cbff9768eb32ab5d",
+      "parent": "97d140cd990d6091e01951eb51e653f864c51ad1",
+      "subject": "docs: organize parsing contracts and align document IDs with code",
+      "before": {
+        "files": 60,
+        "pairs": 2,
+        "status": "complete"
+      },
+      "after": {
+        "files": 61,
+        "pairs": 2,
+        "status": "complete"
+      }
+    },
+    {
+      "commit": "97d140cd990d6091e01951eb51e653f864c51ad1",
+      "parent": "2ad2805e98f53852bb993b4268fc07e9ba6d3729",
+      "subject": "docs: consolidate package guidance and separate change planning contracts",
+      "before": {
+        "files": 58,
+        "pairs": 1,
+        "status": "complete"
+      },
+      "after": {
+        "files": 60,
+        "pairs": 2,
+        "status": "complete"
+      }
+    },
+    {
+      "commit": "e347e2defa8fabe49a6e7958209aae60866c594d",
+      "parent": "1989759db19184877786d70a8c1cf7ba9cb7dd89",
+      "subject": "docs: 작성 지침과 패키지별 문서 책임 정리",
+      "before": {
+        "files": 43,
+        "pairs": 2,
+        "status": "complete"
+      },
+      "after": {
+        "files": 59,
+        "pairs": 1,
+        "status": "complete"
+      }
+    },
+    {
+      "commit": "4c415b271f585222287900b9aae0ff46d7aa941b",
+      "parent": "0c1f0a46ae7c4ae7f30f474c2ba4372fa6eab5aa",
+      "subject": "docs: 문서 작성 지침 구조 정리",
+      "before": {
+        "files": 43,
+        "pairs": 3,
+        "status": "complete"
+      },
+      "after": {
+        "files": 43,
+        "pairs": 2,
+        "status": "complete"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "duplicate-id-response",
+      "description": "중복 ID 조회의 응답 규칙 반복",
+      "commit": "e347e2defa8fabe49a6e7958209aae60866c594d",
+      "detectedBefore": true,
+      "sameReportedPairAfter": false,
+      "score": {
+        "jaccard": 0.7682926829268293,
+        "ordered": 0.9315960912052117
+      },
+      "a": {
+        "path": ".codocs/integration/error-document-access.yaml",
+        "text": "중복 ID 조회는 found:true·conflict:true, duplicate_id 진단과 모든 충돌 paths만 반환한다. 대표 문서를 선택하지 않으며 document·rawYaml·revision은 반환하지 않는다. 같은 요청의 다른 ID 결과는 계속 처리한다.",
+        "start": 829,
+        "end": 979,
+        "line": 33,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/1989759db19184877786d70a8c1cf7ba9cb7dd89/.codocs/integration/error-document-access.yaml#L33",
+        "fieldPath": ["definition"]
+      },
+      "b": {
+        "path": ".codocs/integration/query.yaml",
+        "text": "중복 ID의 get 결과는 found:true·conflict:true, duplicate_id 진단과 모든 충돌 paths만 반환한다. 대표 문서를 고르지 않으며 document·rawYaml·revision은 반환하지 않는다. 같은 요청의 다른 정상 ID 결과는 계속 반환한다.",
+        "start": 3116,
+        "end": 3273,
+        "line": 51,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/1989759db19184877786d70a8c1cf7ba9cb7dd89/.codocs/integration/query.yaml#L51",
+        "fieldPath": ["definition"]
+      },
+      "scoreBasis": "reported-pair",
+      "reviewLabel": "reviewable-repetition",
+      "snapshotCommit": "1989759db19184877786d70a8c1cf7ba9cb7dd89",
+      "observedPhase": "before"
+    },
+    {
+      "id": "guide-scope",
+      "description": "작성 권장 사항의 비강제성 반복",
+      "commit": "e347e2defa8fabe49a6e7958209aae60866c594d",
+      "detectedBefore": true,
+      "sameReportedPairAfter": false,
+      "score": {
+        "jaccard": 0.6792452830188679,
+        "ordered": 0.8631578947368421
+      },
+      "a": {
+        "path": ".codocs/document-model/document.yaml",
+        "text": "따르지 않았다는 이유로 제품이 검증 오류·경고를 만들거나 저장을 차단하지 않는다.",
+        "start": 805,
+        "end": 850,
+        "line": 30,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/1989759db19184877786d70a8c1cf7ba9cb7dd89/.codocs/document-model/document.yaml#L30",
+        "fieldPath": ["definition"]
+      },
+      "b": {
+        "path": ".codocs/document-model/explanation-separation.yaml",
+        "text": "이 권장 사항을 따르지 않았다는 이유로 검증 오류·경고를 만들거나 저장을 차단하지 않는다.",
+        "start": 512,
+        "end": 562,
+        "line": 20,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/1989759db19184877786d70a8c1cf7ba9cb7dd89/.codocs/document-model/explanation-separation.yaml#L20",
+        "fieldPath": ["definition"]
+      },
+      "scoreBasis": "reported-pair",
+      "reviewLabel": "reviewable-repetition",
+      "snapshotCommit": "1989759db19184877786d70a8c1cf7ba9cb7dd89",
+      "observedPhase": "before"
+    },
+    {
+      "id": "status-meaning",
+      "description": "status의 의미를 요약한 문장 반복",
+      "commit": "4c415b271f585222287900b9aae0ff46d7aa941b",
+      "detectedBefore": true,
+      "sameReportedPairAfter": false,
+      "score": {
+        "jaccard": 0.7142857142857143,
+        "ordered": 0.8974358974358975
+      },
+      "a": {
+        "path": ".codocs/document-model/document.yaml",
+        "text": "문서의 status는 내용의 합의·적용 상태이며 개발 작업의 진행도가 아니다.",
+        "start": 789,
+        "end": 832,
+        "line": 31,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/0c1f0a46ae7c4ae7f30f474c2ba4372fa6eab5aa/.codocs/document-model/document.yaml#L31",
+        "fieldPath": ["definition"]
+      },
+      "b": {
+        "path": ".codocs/index.yaml",
+        "text": "status는 내용의 합의·적용 상태이며 개발 진행도가 아니다.",
+        "start": 630,
+        "end": 665,
+        "line": 31,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/0c1f0a46ae7c4ae7f30f474c2ba4372fa6eab5aa/.codocs/index.yaml#L31",
+        "fieldPath": ["definition"]
+      },
+      "scoreBasis": "reported-pair",
+      "reviewLabel": "reviewable-repetition",
+      "snapshotCommit": "0c1f0a46ae7c4ae7f30f474c2ba4372fa6eab5aa",
+      "observedPhase": "before"
+    },
+    {
+      "id": "redundant-reference-guidance",
+      "description": "참조 뒤에 덧붙인 불필요한 상세 안내",
+      "commit": "44188d2e25510f5419274034142f30689d1add9b",
+      "detectedBefore": false,
+      "removedAfter": true,
+      "score": {
+        "jaccard": 0.010638297872340425,
+        "ordered": 0.33663366336633666
+      },
+      "a": {
+        "path": ".codocs/core/parser/yaml-parsing.yaml",
+        "text": "문자열을 해석할 때 [[문자열 위치 대응]]으로 해석값과 원문 구간을 연결한다.",
+        "start": 1009,
+        "end": 1053,
+        "line": 35,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/5238ff2a1d003386efab6af924bc5306df689c52/.codocs/core/parser/yaml-parsing.yaml#L35",
+        "fieldPath": ["definition"]
+      },
+      "b": {
+        "path": ".codocs/core/parser/yaml-parsing.yaml",
+        "text": "escape·줄 접기로 길이가 달라지는 경우의 대응과 문자열 내부 범위 조회는 해당 문서에서 확인한다.",
+        "start": 1056,
+        "end": 1113,
+        "line": 36,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/5238ff2a1d003386efab6af924bc5306df689c52/.codocs/core/parser/yaml-parsing.yaml#L36",
+        "fieldPath": ["definition"]
+      },
+      "scoreBasis": "manual-span-comparison",
+      "reviewLabel": "known-limit",
+      "snapshotCommit": "5238ff2a1d003386efab6af924bc5306df689c52",
+      "observedPhase": "before"
+    },
+    {
+      "id": "field-path-definition",
+      "description": "문장과 표에서 표현이 달라진 필드 경로의 정의",
+      "commit": "609a21c2ed5b412fdbbcd9063e93b5fb2b1674bc",
+      "detectedBefore": false,
+      "movedToDedicatedDocument": true,
+      "score": {
+        "jaccard": 0.20967741935483872,
+        "ordered": 0.5925925925925926
+      },
+      "a": {
+        "path": ".codocs/core/parser/yaml-parsing.yaml",
+        "text": "fieldPath는 속성 이름과 배열 인덱스를 순서대로 담는다.",
+        "start": 1101,
+        "end": 1136,
+        "line": 40,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/61b801bd07863b5be44fcc9a1f0c5c5959a4b29e/.codocs/core/parser/yaml-parsing.yaml#L40",
+        "fieldPath": ["definition"]
+      },
+      "b": {
+        "path": ".codocs/core/diagnostics/diagnostics.yaml",
+        "text": "| fieldPath | 해당 시 | 속성 이름·배열 인덱스로 구성한 경로 배열 |",
+        "start": 880,
+        "end": 926,
+        "line": 39,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/61b801bd07863b5be44fcc9a1f0c5c5959a4b29e/.codocs/core/diagnostics/diagnostics.yaml#L39",
+        "fieldPath": ["definition"]
+      },
+      "scoreBasis": "manual-span-comparison",
+      "reviewLabel": "known-limit",
+      "snapshotCommit": "61b801bd07863b5be44fcc9a1f0c5c5959a4b29e",
+      "observedPhase": "before"
+    },
+    {
+      "id": "leftover-after-split",
+      "description": "변경 계획 문서 분리 뒤 두 곳에 남은 동일 규칙",
+      "commit": "97d140cd990d6091e01951eb51e653f864c51ad1",
+      "detectedBefore": false,
+      "detectedAfter": true,
+      "score": {
+        "jaccard": 1,
+        "ordered": 1
+      },
+      "a": {
+        "path": ".codocs/core/change-plan/document-change-plan.yaml",
+        "text": "create 실패를 update로 바꾸거나 없는 update를 자동 생성하지 않는다.",
+        "start": 335,
+        "end": 382,
+        "line": 12,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/97d140cd990d6091e01951eb51e653f864c51ad1/.codocs/core/change-plan/document-change-plan.yaml#L12",
+        "fieldPath": ["definition"]
+      },
+      "b": {
+        "path": ".codocs/workspace/storage.yaml",
+        "text": "create 실패를 update로 바꾸거나 없는 update를 자동 생성하지 않는다.",
+        "start": 918,
+        "end": 965,
+        "line": 26,
+        "url": "https://github.com/SeoJaeWan/codocs/blob/97d140cd990d6091e01951eb51e653f864c51ad1/.codocs/workspace/storage.yaml#L26",
+        "fieldPath": ["definition"]
+      },
+      "scoreBasis": "reported-pair",
+      "reviewLabel": "reviewable-repetition",
+      "snapshotCommit": "97d140cd990d6091e01951eb51e653f864c51ad1",
+      "observedPhase": "after"
+    },
+    {
+      "id": "contextual-reference-navigation",
+      "description": "각 문맥에서 같은 오류 수정 절차로 이동하는 참조 안내",
+      "snapshotCommit": "5238ff2a1d003386efab6af924bc5306df689c52",
+      "observedPhase": "snapshot",
+      "detected": true,
+      "score": {
+        "jaccard": 0.6833333333333333,
+        "ordered": 0.8727272727272727
+      },
+      "scoreBasis": "reported-pair",
+      "reviewLabel": "keep-contextual-reference",
+      "reviewRationale": "문자 유사도로 후보가 될 수 있으나 같은 참조 안내라는 이유만으로 중복 관리 문제나 삭제 대상으로 판단하지 않는다. 이는 단일 검토자의 정성 분류이며 독립 정답 라벨은 아니다.",
+      "a": {
+        "path": ".codocs/core/query/query-projection.yaml",
+        "text": "이 결과로 오류를 고치는 사용 순서는 [[검증 오류가 있는 문서를 조회하고 수정하는 절차]]에서 확인한다.",
+        "start": 1581,
+        "end": 1640,
+        "line": 48,
+        "fieldPath": ["definition"],
+        "url": "https://github.com/SeoJaeWan/codocs/blob/5238ff2a1d003386efab6af924bc5306df689c52/.codocs/core/query/query-projection.yaml#L48"
+      },
+      "b": {
+        "path": ".codocs/mcp/validation/document-validation-request.yaml",
+        "text": "오류를 수정하는 순서는 [[검증 오류가 있는 문서를 조회하고 수정하는 절차]]에서 확인한다.",
+        "start": 504,
+        "end": 555,
+        "line": 18,
+        "fieldPath": ["definition"],
+        "url": "https://github.com/SeoJaeWan/codocs/blob/5238ff2a1d003386efab6af924bc5306df689c52/.codocs/mcp/validation/document-validation-request.yaml#L18"
+      }
+    }
+  ]
+}
