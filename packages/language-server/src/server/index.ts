@@ -13,7 +13,7 @@ import {
   type DocumentMatchRequest,
   type DocumentMatchResponse,
   type WorkspaceRefreshRequest,
-} from './server-session.js';
+} from '../server-session/index.js';
 
 /** 프로토콜 외 로그를 stdout과 분리하는 최소 로거다. */
 export interface ServerLogger {

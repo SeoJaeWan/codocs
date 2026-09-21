@@ -1,9 +1,9 @@
 /* eslint-disable codocs/korean-jsdoc -- 실행 인수 판별 콜백은 공개 선언 함수가 아니다. */
-export * from './document-sync.js';
-export * from './server-session.js';
-export * from './server.js';
+export * from './document-sync/index.js';
+export * from './server-session/index.js';
+export * from './server/index.js';
 
-import { runLanguageServer } from './server.js';
+import { runLanguageServer } from './server/index.js';
 
 /**
  * 직접 실행일 때 SDK가 인식하는 프로토콜 전송 인수가 있는지 확인한다.

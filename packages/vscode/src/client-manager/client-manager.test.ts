@@ -6,7 +6,7 @@ import {
   type FolderClientBoundary,
   type WorkspaceFolderBoundary,
   type WorkspaceHostBoundary,
-} from './client-manager.js';
+} from './index.js';
 
 const first = { name: 'first', uri: 'file:///workspace/first' };
 const second = { name: 'second', uri: 'file:///workspace/second' };

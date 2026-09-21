@@ -1,4 +1,4 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- VS Code 이벤트 adapter 콜백은 SDK 타입으로 설명한다. */
+/* eslint-disable codocs/korean-jsdoc -- VS Code 이벤트 adapter 콜백은 SDK 타입으로 설명한다. */
 import * as vscode from 'vscode';
 import {
   CloseAction,
@@ -18,9 +18,9 @@ import {
   type FolderClientBoundary,
   type WorkspaceFolderBoundary,
   type WorkspaceHostBoundary,
-} from './client-manager.js';
-import { bundledServerPath } from './package-paths.js';
-import { isOwnedByWorkspaceRoot } from './workspace-routing.js';
+} from '../client-manager/index.js';
+import { bundledServerPath } from '../package-assembly/index.js';
+import { isOwnedByWorkspaceRoot } from '../workspace-routing/index.js';
 
 const refreshMethod = 'codocs/refresh';
 
@@ -59,7 +59,9 @@ export class VscodeExtensionRuntime {
     this.#output.dispose();
   }
 
+  /** VS Code workspace API를 테스트 가능한 host 경계로 감싼다. */
   #workspaceHost(): WorkspaceHostBoundary {
+    /* eslint-disable jsdoc/require-jsdoc -- VS Code adapter 콜백은 계약 타입으로 설명한다. */
     return {
       folders: () =>
         (vscode.workspace.workspaceFolders ?? []).map(toFolderBoundary),
@@ -74,8 +76,10 @@ export class VscodeExtensionRuntime {
         this.#output.appendLine(`${message} ${errorMessage(error)}`);
       },
     };
+    /* eslint-enable jsdoc/require-jsdoc */
   }
 
+  /** 직렬화한 folder 경계를 실제 VS Code folder client로 연결한다. */
   #createFolderClient(folder: WorkspaceFolderBoundary): FolderClientBoundary {
     const vscodeFolder = workspaceFolder(folder.uri);
     if (!vscodeFolder)
@@ -98,6 +102,7 @@ class VscodeFolderClient implements FolderClientBoundary {
   #client: LanguageClient | undefined;
   #stopping = false;
 
+  /** 실제 workspace folder와 서버 경로를 관리하는 client를 만든다. */
   constructor(
     folder: vscode.WorkspaceFolder,
     serverPath: string,
@@ -108,6 +113,7 @@ class VscodeFolderClient implements FolderClientBoundary {
     this.#output = output;
   }
 
+  /** folder용 watcher와 language client를 시작한다. */
   async start(): Promise<void> {
     if (this.#client) return;
     this.#stopping = false;
@@ -128,6 +134,7 @@ class VscodeFolderClient implements FolderClientBoundary {
       documentSelector: [{ scheme: 'file' }],
       middleware: this.#documentMiddleware(),
       errorHandler: this.#errorHandler(),
+      /** 시작 실패를 제한된 횟수만 자동 재시작한다. */
       initializationFailedHandler: (error) => {
         const restart = this.#budget.recordFailure();
         if (!restart) this.#reportStopped(error);
@@ -143,6 +150,7 @@ class VscodeFolderClient implements FolderClientBoundary {
       clientOptions,
     );
     this.#client = client;
+    /** knowledge 파일 변경 뒤 해당 작업 공간의 catalog를 갱신한다. */
     const refresh = () => this.#refresh();
     this.#disposables.push(
       directoryWatcher,
@@ -163,6 +171,7 @@ class VscodeFolderClient implements FolderClientBoundary {
     await client.start();
   }
 
+  /** 시작 중인 client를 정리하고 현재 열린 문서를 다시 동기화한다. */
   async restart(): Promise<void> {
     if (this.#client?.state === State.Starting)
       await this.#waitForStartTransition(this.#client);
@@ -171,6 +180,7 @@ class VscodeFolderClient implements FolderClientBoundary {
     await this.start();
   }
 
+  /** watcher·listener·language client와 서버 프로세스를 종료한다. */
   async stop(): Promise<void> {
     this.#stopping = true;
     for (const disposable of this.#disposables.splice(0)) disposable.dispose();
@@ -179,7 +189,9 @@ class VscodeFolderClient implements FolderClientBoundary {
     if (client) await client.dispose();
   }
 
+  /** 현재 folder가 소유한 문서만 language client에 전달한다. */
   #documentMiddleware(): Middleware {
+    /* eslint-disable jsdoc/require-jsdoc -- LSP middleware 콜백은 SDK 타입으로 설명한다. */
     const synchronized = new Set<string>();
     const owns = (document: vscode.TextDocument): boolean => {
       if (document.uri.scheme !== 'file') return false;
@@ -210,8 +222,10 @@ class VscodeFolderClient implements FolderClientBoundary {
         await next(document);
       },
     };
+    /* eslint-enable jsdoc/require-jsdoc */
   }
 
+  /** client가 Starting 상태에서 벗어날 때까지 기다린다. */
   async #waitForStartTransition(client: LanguageClient): Promise<void> {
     if (client.state !== State.Starting) return;
     await new Promise<void>((resolve, reject) => {
@@ -232,7 +246,9 @@ class VscodeFolderClient implements FolderClientBoundary {
     });
   }
 
+  /** 예기치 않은 연결 오류의 재시작·중단 정책을 반환한다. */
   #errorHandler(): ErrorHandler {
+    /* eslint-disable jsdoc/require-jsdoc -- language client 오류 콜백은 SDK 타입으로 설명한다. */
     return {
       error: (_error, _message, count) => ({
         action: (count ?? 0) < 3 ? ErrorAction.Continue : ErrorAction.Shutdown,
@@ -249,8 +265,10 @@ class VscodeFolderClient implements FolderClientBoundary {
         return { action: CloseAction.DoNotRestart, handled: true };
       },
     };
+    /* eslint-enable jsdoc/require-jsdoc */
   }
 
+  /** 현재 작업 공간의 catalog 갱신 요청을 서버에 보낸다. */
   #refresh(): void {
     const client = this.#client;
     if (!client?.isRunning()) return;
@@ -265,12 +283,14 @@ class VscodeFolderClient implements FolderClientBoundary {
       });
   }
 
+  /** 반복 시작 실패 뒤 중단 상태와 수동 복구 방법을 기록한다. */
   #reportStopped(error: unknown): void {
     this.#output.appendLine(
       `Codocs language server가 반복해서 시작하지 못해 중지되었습니다 (${this.#folder.name}): ${errorMessage(error)}. “Codocs: Restart Language Servers” 명령을 실행하세요.`,
     );
   }
 
+  /** 중단 안내를 표시하고 사용자가 선택하면 수동 재시작한다. */
   async #showStoppedMessage(): Promise<void> {
     const restart = 'Restart Codocs';
     const selection = await vscode.window.showErrorMessage(

@@ -1,10 +1,7 @@
 /* eslint-disable codocs/korean-jsdoc -- 테스트 콜백이다. */
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  isOwnedByWorkspaceRoot,
-  nearestWorkspaceRoot,
-} from './workspace-routing.js';
+import { isOwnedByWorkspaceRoot, nearestWorkspaceRoot } from './index.js';
 
 describe('nearestWorkspaceRoot: workspace 문서 소유권', () => {
   it('중첩된 workspace에서는 문서에 가장 가까운 루트를 선택한다', () => {

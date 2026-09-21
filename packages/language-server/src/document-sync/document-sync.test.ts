@@ -5,7 +5,7 @@ import {
   documentUpdateRejections,
   SynchronizedDocuments,
   utf16OffsetsToRange,
-} from './document-sync.js';
+} from './index.js';
 
 describe('SynchronizedDocuments: 전체 원문과 단조 버전 동기화', () => {
   it('임의 언어의 문법 오류 원문을 열면 그대로 저장한다', () => {

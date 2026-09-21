@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   documentMatchRequestMethod,
   workspaceRefreshRequestMethod,
-} from './server-session.js';
+} from '../server-session/index.js';
 
 interface JsonRpcResponse {
   id: number;
@@ -136,7 +136,7 @@ describe('language server stdio 프로세스', () => {
       'utf8',
     );
     await build({
-      entryPoints: [fileURLToPath(new URL('./index.ts', import.meta.url))],
+      entryPoints: [fileURLToPath(new URL('../index.ts', import.meta.url))],
       outfile: output,
       bundle: true,
       platform: 'node',
@@ -248,7 +248,7 @@ describe('language server stdio 프로세스', () => {
       ),
     ]);
     await build({
-      entryPoints: [fileURLToPath(new URL('./index.ts', import.meta.url))],
+      entryPoints: [fileURLToPath(new URL('../index.ts', import.meta.url))],
       outfile: output,
       bundle: true,
       platform: 'node',

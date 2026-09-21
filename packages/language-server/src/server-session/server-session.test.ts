@@ -21,7 +21,7 @@ import {
   LanguageServerSession,
   type WorkspaceSessionBoundary,
   type WorkspaceSessionFactory,
-} from './server-session.js';
+} from './index.js';
 
 const temporaryRoots: string[] = [];
 const runningSessions: LanguageServerSession[] = [];

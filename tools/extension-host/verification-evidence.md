@@ -50,7 +50,7 @@ The intentional `SIGKILL` crash sequence makes the VS Code host write `Unexpecte
 
 ## Child-process language-server protocol
 
-`packages/language-server/src/server-process.test.ts` starts real bundled Node processes over stdio and verifies:
+`packages/language-server/src/server/server-process.test.ts` starts real bundled Node processes over stdio and verifies:
 
 - LSP framing, initialize, full-document synchronization, shutdown, and exit;
 - a nested workspace matches only its own catalog while a sibling document returns the explicit `workspace_not_found` state;

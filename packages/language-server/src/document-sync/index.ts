@@ -8,6 +8,14 @@ import {
   TextDocument,
   type TextDocumentContentChangeEvent,
 } from 'vscode-languageserver-textdocument';
+export {
+  documentUpdateRejections,
+  type DocumentUpdateRejection,
+} from './domain-values.js';
+import {
+  documentUpdateRejections,
+  type DocumentUpdateRejection,
+} from './domain-values.js';
 
 /** 코어가 사용하는 UTF-16 반개방 offset 범위다. */
 export interface Utf16OffsetRange {
@@ -15,19 +23,12 @@ export interface Utf16OffsetRange {
   end: number;
 }
 
-/** 열린 문서 갱신을 거부한 이유다. @domainValues */
-export const documentUpdateRejections = {
-  notOpen: 'not_open',
-  staleVersion: 'stale_version',
-  incrementalChange: 'incremental_change',
-} as const;
-
 /** 열린 문서 갱신 결과다. */
 export type DocumentUpdateResult =
   | { accepted: true; document: TextDocument }
   | {
       accepted: false;
-      reason: (typeof documentUpdateRejections)[keyof typeof documentUpdateRejections];
+      reason: DocumentUpdateRejection;
     };
 
 /** SDK TextDocument로 전체 원문과 단조 증가 버전을 관리한다. */
