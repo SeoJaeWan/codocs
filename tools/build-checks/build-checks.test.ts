@@ -307,7 +307,7 @@ describe('빌드된 패키지의 외부 소비자 계약', () => {
       expect(run([tsc, '-p', 'name-references.json'])).toBe('');
     });
 
-    it('workspace tarball만 설치한 JS·TS 소비자가 실제 문서를 로딩하고 내부 subpath를 거부한다', /** 소스 없는 배포 소비자의 실제 IO와 구분된 반환 타입 및 exports 경계를 검증한다. */ () => {
+    it('workspace tarball만 설치한 JS·TS 소비자가 실제 문서를 로딩하고 내부 subpath를 거부한다', /** 소스 없는 배포 소비자의 실제 파일 IO와 모의 링크 syscall로 반환 타입 및 exports 경계를 검증한다. */ () => {
       const directory = mkdtempSync(path.join(fixture, 'workspace packed '));
       const packedConsumer = path.join(directory, 'consumer');
       try {
@@ -386,8 +386,15 @@ describe('빌드된 패키지의 외부 소비자 계약', () => {
           ).toBe(false);
         }
         writeFileSync(
+          path.join(packedConsumer, 'file-system-boundary.mjs'),
+          readFileSync(
+            path.join(root, 'tools/build-checks/file-system-boundary.mjs'),
+          ),
+        );
+        writeFileSync(
           path.join(packedConsumer, 'workspace.mjs'),
-          `import assert from 'node:assert/strict';
+          `import './file-system-boundary.mjs';
+import assert from 'node:assert/strict';
 import {mkdtemp, mkdir, writeFile, symlink, realpath, rm} from 'node:fs/promises';
 import path from 'node:path';
 import {loadWorkspace, resolveWorkspacePath, workspaceDiagnosticCodes, workspaceDiagnosticMessages} from '@codocs/workspace';

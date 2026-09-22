@@ -96,3 +96,16 @@ The full Prettier baseline reports two COD-14 performance JSON artifacts and fiv
 ## Mechanically necessary repair
 
 Crash injection found that a stopped `vscode-languageclient` could not be recovered by the advertised manual command. The repair recreates a folder client on manual restart, waits for an in-flight `Starting` transition before disposal, and lets the repeated-crash close handler reach `DoNotRestart` without blocking on the error-message selection. The final installed-VSIX run proves the stopped client can be recovered while unsaved text remains open and unchanged on disk.
+
+## COD-19 통합 인수 기록
+
+아래 기존 COD-15 기록은 당시 범위의 증거이며 현재 후보의 OS 지원 완료를 의미하지 않는다. COD-19는 전달된 정확한 SHA와 검사 트리 해시를 기준으로 다음 결과를 분리한다.
+
+| 구분                 | 현재 상태와 증거                                                                                                                                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows 로컬         | 선행 `07b543d33f2d14740ac58eaf20130db3fe66c262`에서 실제 VS Code 46개 기능, 외부 관측 1,142회, 시험 창 14개, 잔여 프로세스 0 확인. 통합 변경본의 커밋 검사는 `.workbench/commit-check/<실행 ID>/result.json`의 tree·passed와 같은 디렉터리 `vscode-tests/<실행 ID>`의 결과로 별도 판단한다. |
+| 사용자 Mac 로컬      | 미실행. GUI 격리 어댑터는 미구현이므로 실제 VS Code·Hover·커밋 훅은 준비 실패한다. 기능·코어 성능 명령은 [Mac 인수 안내](../ui-tests/verification.md)로 수집한다.                                                                                                                           |
+| CI Windows 환경 계약 | 아직 미실행. `native-windows-2025-<SHA>`의 execution/results JSON 필요.                                                                                                                                                                                                                     |
+| CI macOS 환경 계약   | 아직 미실행. `native-macos-15-<SHA>`의 execution/results JSON 필요.                                                                                                                                                                                                                         |
+
+Windows 설치 VSIX의 기존 기능 20개와 재시작·복구 검사는 선행 결과에서 통과했다. 기존 화면·제어 상태 인수 묶음 12개는 [잔여 대응표](../vscode-tests/legacy-coverage.md)에 미검증으로 남는다. API 기능 결과로 화면 인수를 완료 처리하지 않는다. 같은 최종 SHA의 Mac 실행 및 두 CI 계약이 없으므로 최종 OS 검증은 완료되지 않았다.

@@ -21,7 +21,8 @@
     "check": "node tools/check/run.mjs all",
     "test:environment": "node tools/environment-tests/run.mjs",
     "test:tools": "node tools/check/run.mjs test:tools",
-    "test:vscode": "node tools/vscode-tests/run.mjs"
+    "test:vscode": "node tools/vscode-tests/run.mjs",
+    "check:commit": "node tools/check/pre-commit.mjs"
   },
   "lint-staged": {
     "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}": [
@@ -40,6 +41,7 @@
     "eslint-plugin-jsdoc": "64.3.10",
     "husky": "9.1.7",
     "lint-staged": "17.5.1",
+    "pnpm": "10.34.5",
     "prettier": "3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0",

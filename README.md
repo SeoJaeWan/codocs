@@ -31,9 +31,11 @@ pnpm build
 
 `pnpm install`은 `prepare` 스크립트로 Husky의 커밋 전 검사 훅을 설치한다. 기존 체크아웃에서는 `pnpm prepare`로 설치할 수 있다. 훅 명령은 `.husky/pre-commit`, 파일별 검사 설정은 `package.json`의 `lint-staged`에서 관리한다.
 
-커밋할 때 lint-staged가 스테이징된 코드 파일에 `eslint --fix`와 `prettier --write`를 순서대로 실행하고, 문서·데이터·스타일 파일에는 Prettier를 적용한다. 자동 수정 후 검사를 통과하면 수정 결과도 커밋에 포함한다. 자동 수정할 수 없는 ESLint 오류나 파싱 오류가 남으면 커밋을 중단하고 파일·원인을 안내한다. ESLint 경고만 남으면 커밋을 허용한다.
+커밋할 때 lint-staged가 스테이징된 코드에 ESLint 자동 수정과 Prettier를 적용한다. 오류·경고 또는 서식 처리 실패가 남으면 커밋을 중단한다. 부분 스테이징의 미스테이징 변경은 복원하며, 자동 수정 단계 실패·취소에는 원래 상태를 복원한다.
 
-부분 스테이징 파일의 미스테이징 변경은 검사 중 임시로 숨겼다가 복원한다. 검사 실패 시 lint-staged는 기본적으로 자동 수정도 되돌린다. 오류를 직접 수정하고 다시 스테이징한 뒤 커밋한다. `pnpm check:staged`로 같은 자동 수정을 수동 실행할 수 있다. 기존 파일 전체의 오류까지 고치는 것은 아니므로 전체 검증에는 계속 `pnpm check`를 사용한다. 로컬 훅은 `--no-verify`로 우회할 수 있다.
+이후 자동 수정된 인덱스를 독립 복사본으로 만들고 frozen install, 기능 단일 실행, 실제 VS Code 검사를 순서대로 실행한다. 모든 검사가 성공하고 검사 중 인덱스·HEAD가 바뀌지 않아야 커밋을 허용한다. 기능 검사 실패 시 성공한 자동 수정은 인덱스에 남고 사용자 미스테이징·미추적 파일은 유지한다. 취소는 실행 중인 단계의 복원·정리가 끝난 뒤 실패로 처리하므로 즉시 끝나지 않을 수 있다.
+
+`pnpm check:commit`은 훅 전체를, `pnpm check:staged`는 자동 수정만 실행한다. 복사본은 Windows 경로 길이 제한을 피하는 고유 OS 임시 경로에 만든다. 검사 트리 해시·VS Code 로그는 `.workbench/commit-check/<실행 ID>`에 보존하고 성공한 복사본은 정리한다. 실패한 복사본 경로는 결과 JSON에 남긴다. CI 환경 계약과 성능은 훅에서 실행하지 않는다. 전체 타입·설치·패키지 소비 검사는 `pnpm check`로 별도 실행한다. Mac은 GUI 격리 어댑터가 미구현이므로 실제 VS Code 검사와 새 커밋 훅이 준비 실패한다.
 
 ```sh
 pnpm test              # 기능 테스트 watch
@@ -58,3 +60,9 @@ Windows는 별도 데스크톱에서 준비·실행하고 Job Object로 모든 �
 `node tools/vscode-tests/lifecycle.mjs`는 실제 VS Code의 시작 실패·기능 실패·시간 제한·준비 후 취소 경로와 자식 정리를 별도로 검사한다. 기능 검사의 대응 범위와 API/화면 관측 구분은 [이전 대응표](tools/vscode-tests/coverage.md), 공유 실행 계약은 [실행기 안내](tools/test-runtime/README.md)에 있다.
 
 **macOS 격리 실행은 아직 구현·검증되지 않았다.** 현재 Mac에서 명령을 실행하면 창을 열기 전에 준비 실패와 증거 경로를 반환한다. [macOS 검토와 필요한 환경 결정](tools/test-runtime/macos-isolation.md)을 확인한다. Mac 로컬 기능·포커스 수락은 같은 최종 후보 SHA에서 안전한 어댑터 구현 후 사용자 Mac 결과를 받아야 완료된다. Windows 통과나 준비 실패를 Mac 통과로 집계하지 않는다.
+
+## OS 환경 계약과 Mac 인수
+
+CI는 동일 이벤트 SHA를 Windows와 macOS native runner에서 체크아웃하여 `pnpm test:environment`만 실행한다. 필수 링크·권한 준비 실패는 실패로 기록하며 로컬 기능·VS Code·성능 검사는 중복 실행하지 않는다. 두 OS의 같은 SHA가 모두 통과해야 OS 환경 검증 완료다.
+
+[Mac 실행 명령과 결과 수집](tools/ui-tests/verification.md)을 따라 전달된 정확한 SHA에서 로컬 기능과 코어 성능을 확인한다. Windows 결과·사용자 Mac 결과·CI 결과는 각각 기록하며, Mac GUI 격리 미구현과 기존 화면 인수 미검증을 통과로 처리하지 않는다.

@@ -19,21 +19,33 @@ export function assertNodeVersion() {
 }
 
 /** pnpm 실행 환경과 PATH에서 실제 CLI를 찾아 고정 버전을 확인한다. */
-export function resolvePnpm() {
-  const candidates = [process.env.npm_execpath];
-  for (const directory of (process.env.PATH ?? '').split(path.delimiter)) {
+export function resolvePnpm(env = process.env, repository = root) {
+  const candidates = [
+    path.join(repository, 'node_modules/pnpm/bin/pnpm.cjs'),
+    path.join(repository, 'node_modules/pnpm/bin/pnpm.mjs'),
+    env.npm_execpath,
+  ];
+  for (const directory of (env.PATH ?? '').split(path.delimiter)) {
     candidates.push(
       path.join(directory, 'pnpm'),
       path.join(directory, 'pnpm.cjs'),
+      path.join(directory, 'node_modules/pnpm/bin/pnpm.cjs'),
+      path.join(directory, 'node_modules/pnpm/bin/pnpm.mjs'),
+      path.join(directory, '../lib/node_modules/pnpm/bin/pnpm.cjs'),
+      path.join(directory, '../lib/node_modules/pnpm/bin/pnpm.mjs'),
     );
   }
   const expected = JSON.parse(
-    readFileSync(path.join(root, 'package.json'), 'utf8'),
+    readFileSync(path.join(repository, 'package.json'), 'utf8'),
   ).packageManager.split('@')[1];
   for (const candidate of candidates) {
     if (!candidate || !existsSync(candidate)) continue;
     const resolved = realpathSync(candidate);
     try {
+      const manifest = JSON.parse(
+        readFileSync(path.resolve(resolved, '../../package.json'), 'utf8'),
+      );
+      if (manifest.name !== 'pnpm' || manifest.version !== expected) continue;
       const version = execFileSync(process.execPath, [resolved, '--version'], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],

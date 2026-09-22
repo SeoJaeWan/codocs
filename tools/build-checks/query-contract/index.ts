@@ -32,8 +32,8 @@ try {
   assert.equal(matched.success, true);
   const byPaths = await session.getByPaths(['.codocs/b.yaml'], matched.catalogVersion);
   assert.equal(byPaths.success, true);
-  assert.equal(byPaths.results[0].path, '.codocs/b.yaml');
-  assert.equal(byPaths.results[0].references[0].path, '.codocs/a.yaml');
+  assert.equal(byPaths.results[0].path, path.join('.codocs', 'b.yaml'));
+  assert.equal(byPaths.results[0].references[0].path, path.join('.codocs', 'a.yaml'));
   assert.equal(byPaths.results[0].references[0].id, 'a');
   assert.equal(typeof byPaths.results[0].references[0].uri, 'string');
   await session.close();
