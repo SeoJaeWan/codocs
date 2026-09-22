@@ -1,0 +1,11 @@
+{
+  "hashes": [
+    "b0c73df1c2ab53d98ae7b773c8469e1d345d006b35c8a14fd248e85ec2d70b9b",
+    "f24548b3aa4075e5d5b4795c6999b286b1027bc7cba02d3793feac4ea3e92112"
+  ],
+  "verified": true,
+  "workerModel": "gpt-6-astra",
+  "workerReasoningEffort": "low",
+  "runtimeEvidence": "session turn_context",
+  "baseCommit": "66686f70c254675e7263912604e90298d556f98d"
+}

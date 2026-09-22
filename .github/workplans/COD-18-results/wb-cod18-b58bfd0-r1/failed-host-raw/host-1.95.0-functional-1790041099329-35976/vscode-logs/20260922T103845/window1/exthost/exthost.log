@@ -1,0 +1,48 @@
+2026-09-22 10:38:47.766 [info] Extension host with pid 36641 started
+2026-09-22 10:38:47.766 [info] Skipping acquiring lock for /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/runtime-NcpSE6/user-data/User/workspaceStorage/d33048b09066876d54edd00a9fb99fec.
+2026-09-22 10:38:47.779 [info] ExtensionService#_doActivateExtension vscode.git-base, startup: true, activationEvent: '*', root cause: vscode.git
+2026-09-22 10:38:47.784 [info] ExtensionService#_doActivateExtension vscode.git, startup: true, activationEvent: '*'
+2026-09-22 10:38:47.824 [info] ExtensionService#_doActivateExtension vscode.github, startup: true, activationEvent: '*'
+2026-09-22 10:38:47.881 [warning] [vscode.git] Accessing a resource scoped configuration without providing a resource is not expected. To get the effective value for 'git.openRepositoryInParentFolders', provide the URI of a resource or 'null' for any resource.
+2026-09-22 10:38:47.881 [warning] [vscode.git] Accessing a resource scoped configuration without providing a resource is not expected. To get the effective value for 'git.showProgress', provide the URI of a resource or 'null' for any resource.
+2026-09-22 10:38:47.892 [info] Eager extensions activated
+2026-09-22 10:38:47.893 [warning] Could not identify extension for 'vscode' require call from file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs. These are the extension path mappings: 
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/runtime-NcpSE6/extensions/codocs.codocs-0.0.0 -> codocs.codocs
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/configuration-editing -> vscode.configuration-editing
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/css-language-features -> vscode.css-language-features
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/debug-auto-launch -> vscode.debug-auto-launch
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/debug-server-ready -> vscode.debug-server-ready
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/emmet -> vscode.emmet
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/extension-editing -> vscode.extension-editing
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/git -> vscode.git
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/git-base -> vscode.git-base
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/github -> vscode.github
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/github-authentication -> vscode.github-authentication
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/grunt -> vscode.grunt
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/gulp -> vscode.gulp
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/html-language-features -> vscode.html-language-features
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/ipynb -> vscode.ipynb
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/jake -> vscode.jake
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/json-language-features -> vscode.json-language-features
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/markdown-language-features -> vscode.markdown-language-features
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/markdown-math -> vscode.markdown-math
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/media-preview -> vscode.media-preview
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/merge-conflict -> vscode.merge-conflict
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/microsoft-authentication -> vscode.microsoft-authentication
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/ms-vscode.js-debug -> ms-vscode.js-debug
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/ms-vscode.js-debug-companion -> ms-vscode.js-debug-companion
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/ms-vscode.vscode-js-profile-table -> ms-vscode.vscode-js-profile-table
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/npm -> vscode.npm
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/php-language-features -> vscode.php-language-features
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/references-view -> vscode.references-view
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/search-result -> vscode.search-result
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/simple-browser -> vscode.simple-browser
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/tunnel-forwarding -> vscode.tunnel-forwarding
+	file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/extensions/typescript-language-features -> vscode.typescript-language-features
+
+2026-09-22 10:38:47.900 [info] ExtensionService#_doActivateExtension vscode.debug-auto-launch, startup: false, activationEvent: 'onStartupFinished'
+2026-09-22 10:38:47.902 [info] ExtensionService#_doActivateExtension vscode.merge-conflict, startup: false, activationEvent: 'onStartupFinished'
+2026-09-22 10:38:47.912 [info] ExtensionService#_doActivateExtension codocs.codocs, startup: false, activationEvent: 'onStartupFinished'
+2026-09-22 10:38:48.584 [info] ExtensionService#_doActivateExtension vscode.emmet, startup: false, activationEvent: 'onLanguage'
+2026-09-22 10:39:03.969 [info] Extension host terminating: renderer closed the MessagePort
+2026-09-22 10:39:03.983 [info] Extension host with pid 36641 exiting with code 0

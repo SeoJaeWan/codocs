@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { summarizeAcceptance } from './acceptance.cjs';
 import { createHash } from 'node:crypto';
 import { createWriteStream, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -68,6 +69,7 @@ const requestedCodeVersion = optionValue('--code-version');
 const outputPrefix = optionValue('--output');
 const reportPath = optionValue('--report');
 const hoverPerformance = process.argv.includes('--hover-performance');
+const interactiveUi = process.argv.includes('--ui');
 const evidenceRunId =
   process.env.COD16_EVIDENCE_RUN_ID ?? `${Date.now()}-${process.pid}`;
 const performanceDocuments = positiveIntegerOption('--documents', 1_000);
@@ -487,6 +489,9 @@ async function createFixture(temporaryRoot) {
         settings: {
           'files.autoSave': 'off',
           'security.workspace.trust.enabled': false,
+          'update.mode': 'none',
+          'extensions.autoUpdate': false,
+          'telemetry.telemetryLevel': 'off',
         },
       },
       null,
@@ -800,6 +805,10 @@ async function preserveHostFailure({
   for (const [source, relative] of [
     [progressPath, 'progress.json'],
     [evidencePath, 'extension-host-evidence.json'],
+    [
+      path.join(path.dirname(evidencePath), 'provenance.json'),
+      'provenance.json',
+    ],
     [path.join(userData, 'logs'), 'vscode-logs'],
   ]) {
     try {
@@ -869,11 +878,9 @@ if (renderExisting) {
     performanceProgressPath = progressPath;
     await mkdir(path.dirname(progressPath), { recursive: true });
     await writeFile(progressPath, '');
-    runtimeTemporaryRoot = await mkdtemp(
-      path.join(os.tmpdir(), 'c16-runtime-'),
-    );
-    const userData = path.join(runtimeTemporaryRoot, 'user-data');
-    const extensions = path.join(runtimeTemporaryRoot, 'extensions');
+    runtimeTemporaryRoot = await mkdtemp(path.join(repositoryRoot, '.r'));
+    const userData = path.join(runtimeTemporaryRoot, 'u');
+    const extensions = path.join(runtimeTemporaryRoot, 'e');
     await Promise.all([mkdir(userData), mkdir(extensions)]);
 
     await requireFile(vsixPath, 'VSIX archive');
@@ -900,12 +907,48 @@ if (renderExisting) {
     );
     assert.ok(installed, 'Installed codocs extension directory was not found');
     const extensionRoot = path.join(extensions, installed);
+    const harnessHashes = Object.fromEntries(
+      await Promise.all(
+        [
+          'run.mjs',
+          'extension-test.cjs',
+          'cod18.cjs',
+          'acceptance.cjs',
+          'request-outcome.cjs',
+        ].map(
+          /** 실행 전 harness의 실제 바이트를 식별한다. */ async (file) => [
+            file,
+            await fileSha256(
+              path.join(repositoryRoot, 'tools/extension-host', file),
+            ),
+          ],
+        ),
+      ),
+    );
     const extensionBundle = path.join(extensionRoot, 'dist/index.cjs');
     const serverBundle = path.join(extensionRoot, 'dist/server/index.cjs');
     await Promise.all([
       requireFile(extensionBundle, 'built extension bundle'),
       requireFile(serverBundle, 'bundled language server'),
     ]);
+    const provenance = {
+      productSourceCommit: (
+        await runProcess('git', ['rev-parse', 'HEAD'])
+      ).stdout.trim(),
+      harnessHashes,
+      vsixSha256: await fileSha256(vsixPath),
+      extensionBundleSha256: await fileSha256(extensionBundle),
+      serverBundleSha256: await fileSha256(serverBundle),
+      workspaceFixtureSha256: await fileSha256(fixture.workspacePath),
+      vscodeVersion: actualCodeVersion,
+      runtimeTemporaryRoot,
+      fixtureRoot: temporaryRoot,
+      capturedBeforeHost: true,
+    };
+    await writeFile(
+      path.join(temporaryRoot, 'provenance.json'),
+      `${JSON.stringify(provenance, null, 2)}\n`,
+    );
 
     let result;
     let progressTimer;
@@ -953,11 +996,15 @@ if (renderExisting) {
           '--logExtensionHostCommunication',
           '--skip-welcome',
           '--skip-release-notes',
+          '--disable-updates',
+          '--disable-telemetry',
+          '--disable-crash-reporter',
           fixture.workspacePath,
         ],
         {
           description: 'VS Code Extension Host',
-          timeoutMilliseconds: hoverPerformance ? null : 240_000,
+          timeoutMilliseconds:
+            hoverPerformance || interactiveUi ? null : 240_000,
           onInterrupt: hoverPerformance
             ? /** 사용자가 중단하면 다음 Hover 호출 전에 읽을 표시를 남긴다. */
               (signal) => writeFileSync(cancelPath, signal, 'utf8')
@@ -970,6 +1017,7 @@ if (renderExisting) {
             COD16_PROGRESS_PATH: progressPath,
             COD16_CANCEL_PATH: hoverPerformance ? cancelPath : '',
             COD16_HOVER_PERFORMANCE: hoverPerformance ? '1' : '0',
+            COD18_UI: interactiveUi ? '1' : '0',
             COD16_PERFORMANCE_OPTIONS: JSON.stringify(performanceOptions),
             COD16_FIXTURE_METADATA: JSON.stringify(fixture.metadata ?? null),
           },
@@ -1055,7 +1103,12 @@ if (renderExisting) {
       },
       fixture: fixture.metadata ?? null,
       artifacts: {
+        provenance,
         sourceCommit: sourceCommitResult.stdout.trim(),
+        productSourceCommit: sourceCommitResult.stdout.trim(),
+        harnessState:
+          'content hashes captured before Host; harness may be uncommitted',
+        harnessHashes,
         vsixPath: path.resolve(vsixPath),
         vsixBytes: (await stat(vsixPath)).size,
         vsixSha256: await fileSha256(vsixPath),
@@ -1074,6 +1127,10 @@ if (renderExisting) {
         stderr: installResult.stderr,
       },
       exitCode: result.code,
+      acceptance:
+        hoverPerformance || interactiveUi
+          ? undefined
+          : summarizeAcceptance(evidence.cod18 ?? []),
       stdout: result.stdout,
       stderr: result.stderr,
       evidence,
@@ -1098,6 +1155,8 @@ if (renderExisting) {
         'utf8',
       );
     if (hoverPerformance) assert.equal(evidence.performance.passed, true);
+    else if (evidence.cod18?.some((row) => row.status === 'fail'))
+      process.exitCode = 1;
   } catch (error) {
     if (hoverPerformance && outputPrefix && !performanceReportWritten) {
       await writePerformanceFailureReport(outputPrefix, {
