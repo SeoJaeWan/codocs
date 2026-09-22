@@ -501,6 +501,18 @@ async function scanPath(
           const files: ResolvedPath[] = [];
           for (const child of children) {
             if (!child.success) {
+              // 열거 후 lstat으로 직접 확인한 부재는 실패한 읽기·깨진 링크와 다르다.
+              if (
+                child.status === workspacePathFailureStatuses.missing &&
+                child.path !== undefined &&
+                child.logicalPath !== undefined
+              ) {
+                absent.push({
+                  path: child.path,
+                  logicalPath: child.logicalPath,
+                });
+                continue;
+              }
               failures.push(pathFailure(child));
               diagnostics.push(...child.diagnostics);
               continue;

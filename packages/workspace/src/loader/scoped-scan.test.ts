@@ -556,3 +556,28 @@ describe('loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상', (
     },
   );
 });
+
+describe('열거 뒤 항목 부재의 직접 확인', () => {
+  it('열거한 파일이 lstat 전에 삭제되면 확인 부재로 반환하고 IO 실패로 남기지 않는다', async () => {
+    const target = path.join(codocs, 'a.yaml');
+    await writeFile(target, rawA);
+    const original =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+    vi.mocked(readdir).mockImplementationOnce(
+      async (...args: Parameters<typeof original.readdir>) => {
+        const entries = await original.readdir(...args);
+        await rm(target);
+        return entries;
+      },
+    );
+    const result = await loadWorkspacePath(root, codocs);
+    expect(result.outcome).toBe('complete');
+    expect(result.documents).toEqual([]);
+    expect(result.failures).toEqual([]);
+    expect(result.absent).toEqual([
+      { path: path.join('.codocs', 'a.yaml'), logicalPath: target },
+    ]);
+  });
+});

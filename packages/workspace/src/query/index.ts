@@ -42,14 +42,18 @@ import {
 import { buildWorkspaceCatalog } from '../indexing/index.js';
 import {
   loadWorkspace,
+  loadWorkspacePath,
+  WorkspaceObservationCache,
+  containsWorkspacePath,
+  workspacePathsForLinkEvent,
   type WorkspaceScanDiagnostic,
   type WorkspaceScanResult,
 } from '../loader/index.js';
 import { workspaceTargetKinds } from '../paths/domain-values.js';
-import {
-  createWorkspaceWatcher,
-  type WorkspaceWatcher,
-} from '../watcher/index.js';
+import { WorkspaceWatcher } from '../watcher/index.js';
+import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
+import type { WorkspacePathLink } from '../paths/index.js';
+import { QueryObservations } from './observations.js';
 import {
   workspaceLifecycleStates,
   type WorkspaceReadiness,
@@ -478,7 +482,10 @@ export class WorkspaceQuerySession {
   #refreshPromise: Promise<WorkspaceScanResult> | undefined;
   #explicitRefreshPromise: Promise<WorkspaceRefreshResult> | undefined;
   #watcher: WorkspaceWatcher | undefined;
-  #dirty = false;
+  #root: ProjectRoot | undefined;
+  #cache = new WorkspaceObservationCache();
+  readonly #pending = new Set<string>();
+  readonly #links = new Map<string, WorkspacePathLink>();
   #closed = false;
 
   /** 프로젝트 선택의 own data 값만 고정하고 IO는 각 요청 시 수행한다. */
@@ -486,46 +493,88 @@ export class WorkspaceQuerySession {
     this.#input = sessionInput(input);
   }
 
-  /** 하나의 스캔에서 문서·참조·진단·revision을 함께 게시한다. */
-  async #scanOnce(): Promise<WorkspaceScanResult> {
-    const previousListFingerprint = this.#catalog
+  /** 감시 신호를 허용된 발견 경로로만 되돌리고 진행 중 읽기의 세대를 무효화한다. */
+  #collect(paths: readonly string[]): void {
+    if (this.#closed || !this.#root) return;
+    for (const changed of paths) {
+      const scopes = workspacePathsForLinkEvent(
+        [...this.#links.values()],
+        changed,
+      );
+      if (containsWorkspacePath(this.#root.codocsPath, changed))
+        scopes.push(changed);
+      else if (containsWorkspacePath(changed, this.#root.codocsPath))
+        scopes.push(this.#root.codocsPath);
+      for (const scope of new Set(scopes)) {
+        this.#cache.invalidate(scope);
+        if (
+          [...this.#pending].some((parent) =>
+            containsWorkspacePath(parent, scope),
+          )
+        )
+          continue;
+        for (const child of this.#pending)
+          if (containsWorkspacePath(scope, child)) this.#pending.delete(child);
+        this.#pending.add(scope);
+      }
+    }
+    if (this.#pending.size && !this.#refreshPromise)
+      void this.#synchronize(false).catch(() => undefined);
+  }
+
+  /** 새 연결은 읽기 전에 감시 준비를 기다리며 발견 경로별 대응을 보존한다. */
+  async #register(link: WorkspacePathLink): Promise<void> {
+    if (this.#closed) return;
+    this.#links.set(link.logicalPath, link);
+    await this.#watcher?.trackTargets([
+      ...new Set([link.targetPath, ...(link.realPath ? [link.realPath] : [])]),
+    ]);
+  }
+
+  /** 프로젝트 선택 후 첫 문서 IO 전에 구독과 감시 준비를 완료한다. */
+  async #prepare(): Promise<WorkspaceScanResult | undefined> {
+    if (this.#watcher || this.#closed) return;
+    const selected = await resolveProjectRoot(this.#input);
+    if (this.#closed) return;
+    if (!selected.success)
+      return {
+        status: scanStatuses.failed,
+        documents: [],
+        failures: [],
+        skippedCycles: [],
+        diagnostics: selected.diagnostics,
+        ...(selected.projectRoot ? { projectRoot: selected.projectRoot } : {}),
+      };
+    this.#root = selected.root;
+    const watcher = new WorkspaceWatcher(selected.root.projectRoot);
+    this.#watcher = watcher;
+    watcher.subscribe((batch) => this.#collect(batch.paths));
+    await watcher.start();
+  }
+
+  /** 채택한 관측의 내용·revision·참조·진단을 await 없이 한 번에 게시한다. */
+  #publish(scan: WorkspaceScanResult): void {
+    if (this.#closed) return;
+    const previousFingerprint = this.#catalog
       ? fingerprint(projectCatalogList(this.#catalog, {}).items)
       : undefined;
-    const scan = await loadWorkspace(this.#input);
-    const next =
-      scan.status === scanStatuses.failed
-        ? undefined
-        : buildWorkspaceCatalog(scan, this.#catalog);
-    const revisions =
-      scan.status === scanStatuses.complete
-        ? new Map<string, string>()
-        : new Map(this.#revisions);
-    if (scan.status !== scanStatuses.failed)
+    if (scan.status !== scanStatuses.failed) {
+      const next = buildWorkspaceCatalog(scan, this.#catalog);
+      const revisions =
+        scan.status === scanStatuses.complete
+          ? new Map<string, string>()
+          : new Map(this.#revisions);
       for (const [sourcePath, revision] of scanRevisions(scan))
         revisions.set(sourcePath, revision);
-    if (scan.root && !this.#watcher && !this.#closed) {
-      const watcher = await createWorkspaceWatcher(scan.root.projectRoot);
-      this.#watcher = watcher;
-      watcher.subscribe(() => {
-        if (this.#refreshPromise) this.#dirty = true;
-        else void this.#synchronize().catch(() => undefined);
-      });
-    }
-    await this.#watcher?.trackTargets(
-      scan.documents.map((document) => document.source.realPath),
-    );
-    if (scan.status !== scanStatuses.failed) {
       this.#catalog = next;
       this.#revisions = revisions;
       this.#catalogVersion++;
       if (
-        previousListFingerprint !== undefined &&
-        next &&
-        previousListFingerprint !==
-          fingerprint(projectCatalogList(next, {}).items)
+        previousFingerprint !== undefined &&
+        previousFingerprint !== fingerprint(projectCatalogList(next, {}).items)
       )
         this.#generation++;
-      if (scan.status === scanStatuses.complete && next)
+      if (scan.status === scanStatuses.complete)
         this.#completed = {
           catalog: next,
           revisions,
@@ -533,53 +582,147 @@ export class WorkspaceQuerySession {
         };
     }
     this.#scan = scan;
+  }
+
+  /** 전체 순회를 계속하면서 이후 신호의 파일·하위 범위만 다시 확인한다. */
+  async #scanOperation(full: boolean): Promise<WorkspaceScanResult> {
+    const preparationFailure = await this.#prepare();
+    if (preparationFailure) {
+      this.#publish(preparationFailure);
+      return preparationFailure;
+    }
+    if (this.#closed) return this.#closedScan();
+    const watchFailure = this.#watchFailure();
+    if (watchFailure) {
+      if (this.#scan) return this.#scan;
+      const failed = {
+        ...this.#closedScan(),
+        diagnostics: [
+          { ...watchFailure, severity: diagnosticSeverities.error },
+        ],
+      };
+      this.#publish(failed);
+      return failed;
+    }
+    const options = {
+      cache: this.#cache,
+      /** 발견한 연결의 감시 준비를 내용 읽기 전에 완료한다. */ onLink: (
+        link: WorkspacePathLink,
+      ) => this.#register(link),
+    };
+    let working: QueryObservations;
+    if (
+      full ||
+      !this.#scan ||
+      this.#scan.status === scanStatuses.failed ||
+      !this.#root
+    ) {
+      this.#watcher?.drain();
+      this.#pending.clear();
+      if (this.#root) this.#cache.invalidate(this.#root.codocsPath);
+      const loaded = await loadWorkspace(this.#input, options);
+      if (this.#closed) return this.#closedScan();
+      this.#watcher?.drain();
+      if (!loaded.root) {
+        this.#publish(loaded);
+        return loaded;
+      }
+      working = new QueryObservations(
+        loaded.root,
+        loaded,
+        this.#cache,
+        loaded.observations,
+      );
+    } else working = new QueryObservations(this.#root, this.#scan, this.#cache);
+    while (!this.#closed) {
+      await this.#watcher?.settle();
+      if (this.#closed) return this.#closedScan();
+      const interruptedWatch = this.#watchFailure();
+      if (interruptedWatch) {
+        this.#pending.clear();
+        if (this.#scan) return this.#scan;
+        const failed = {
+          ...this.#closedScan(),
+          diagnostics: [
+            { ...interruptedWatch, severity: diagnosticSeverities.error },
+          ],
+        };
+        this.#publish(failed);
+        return failed;
+      }
+      this.#watcher?.drain();
+      const scopes = [...this.#pending];
+      this.#pending.clear();
+      if (!scopes.length) break;
+      for (const scope of scopes) {
+        if (this.#closed) return this.#closedScan();
+        const result = await loadWorkspacePath(this.#root!, scope, options);
+        this.#watcher?.drain();
+        working.apply(result, this.#cache);
+      }
+    }
+    if (this.#closed) return this.#closedScan();
+    const scan = working.snapshot();
+    this.#publish(scan);
     return scan;
   }
 
-  /** 병행 호출은 하나의 작업을 공유하고 스캔 도중 온 알림도 반영한다. */
-  #synchronize(): Promise<WorkspaceScanResult> {
+  /** 종료된 세션의 늦은 IO 결과를 새 관측으로 게시하지 않는다. */
+  #closedScan(): WorkspaceScanResult {
+    return {
+      status: scanStatuses.failed,
+      documents: [],
+      failures: [],
+      skippedCycles: [],
+      diagnostics: [
+        {
+          code: workspaceDiagnosticCodes.readFailed,
+          severity: diagnosticSeverities.error,
+          message: workspaceDiagnosticMessages.readFailed,
+        },
+      ],
+    };
+  }
+
+  /** 병행 최초 호출은 공유하고 게시와 promise 해제 사이의 신호도 후속 작업으로 유지한다. */
+  #synchronize(full = true): Promise<WorkspaceScanResult> {
     if (this.#refreshPromise) return this.#refreshPromise;
-    /** 변경 알림을 스캔 완료 시점까지 다시 반영한다. */
-    const scanOperation = async (): Promise<WorkspaceScanResult> => {
-      let scan: WorkspaceScanResult;
-      do {
-        this.#dirty = false;
-        try {
-          scan = await this.#scanOnce();
-        } catch (error: unknown) {
-          scan = {
-            status: scanStatuses.failed,
-            documents: [],
-            failures: [],
-            skippedCycles: [],
-            diagnostics: [
-              {
-                code: workspaceDiagnosticCodes.readFailed,
-                severity: diagnosticSeverities.error,
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : workspaceDiagnosticMessages.readFailed,
-              },
-            ],
-          };
-          this.#scan = scan;
-        }
-      } while (this.#dirty && !this.#closed);
-      return scan;
-    };
-    const operation = scanOperation();
+    if (this.#closed) return Promise.resolve(this.#closedScan());
+    const operation = this.#scanOperation(full).catch(
+      /** 예외를 실패 관측으로 게시해 준비 상태를 끝낸다. */ (
+        error: unknown,
+      ) => {
+        const scan = this.#closedScan();
+        scan.diagnostics = [
+          {
+            code: workspaceDiagnosticCodes.readFailed,
+            severity: diagnosticSeverities.error,
+            message:
+              error instanceof Error
+                ? error.message
+                : workspaceDiagnosticMessages.readFailed,
+          },
+        ];
+        this.#publish(scan);
+        return scan;
+      },
+    );
     this.#refreshPromise = operation;
-    /** 스캔 완료 뒤 현재 operation 참조를 정리한다. */
+    /** 공유 작업을 해제할 때도 수집한 변경의 실행 책임을 놓치지 않는다. */
     const clear = (): void => {
-      if (this.#refreshPromise === operation) this.#refreshPromise = undefined;
+      if (this.#refreshPromise !== operation) return;
+      this.#refreshPromise = undefined;
+      this.#watcher?.drain();
+      if (this.#pending.size && !this.#closed)
+        void this.#synchronize(false).catch(() => undefined);
     };
-    void operation.then(clear, clear).catch(() => undefined);
+    void operation.then(clear, clear);
     return operation;
   }
 
   /** 최초 조회만 스캔 완료를 기다리고 이후에는 보유한 단일 snapshot을 읽는다. */
   async #current(): Promise<WorkspaceScanResult> {
+    if (this.#closed) return this.#closedScan();
     if (!this.#scan) return this.#synchronize();
     return this.#scan;
   }
@@ -630,7 +773,7 @@ export class WorkspaceQuerySession {
   }
 
   /** 감시 실패를 마지막 색인의 최신 성공으로 숨기지 않는다. */
-  #watchFailure(): WorkspaceQueryDiagnostic | undefined {
+  #watchFailure(): WorkspaceScanDiagnostic | undefined {
     const readiness = this.#watcher?.readiness;
     if (readiness?.state !== workspaceLifecycleStates.failed) return undefined;
     return {
@@ -870,7 +1013,10 @@ export class WorkspaceQuerySession {
     if (this.#explicitRefreshPromise) return this.#explicitRefreshPromise;
     /** 수동 재연결과 전체 스캔의 결과를 함께 반환한다. */
     const refreshOperation = async (): Promise<WorkspaceRefreshResult> => {
+      if (this.#refreshPromise) await this.#refreshPromise;
+      if (this.#closed) return scanFailure(this.#closedScan());
       if (this.#watcher) await this.#watcher.refresh();
+      while (this.#refreshPromise) await this.#refreshPromise;
       const generation = this.#generation;
       const scan = await this.#synchronize();
       const watchFailure = this.#watchFailure();
@@ -914,6 +1060,8 @@ export class WorkspaceQuerySession {
   /** 연결된 파일 감시를 명시적으로 종료한다. */
   async close(): Promise<void> {
     this.#closed = true;
+    this.#pending.clear();
+    this.#links.clear();
     await this.#watcher?.close();
   }
 }
