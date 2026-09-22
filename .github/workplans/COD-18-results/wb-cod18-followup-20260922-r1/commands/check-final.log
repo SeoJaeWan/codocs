@@ -1,0 +1,36 @@
+
+> codocs@0.0.0 check /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+> node tools/check/run.mjs all
+
+Checking formatting...
+All matched files use Prettier code style!
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+
+
+ Test Files  32 passed (32)
+      Tests  779 passed (779)
+   Start at  12:09:00
+   Duration  4.11s (tests 67%, import 17%, transform 16%, worker 1%)
+
+    Isolate  32 workers spawned · ~154ms startup each (spawn + environment, per file)
+             at least ~395ms faster with isolate: false — reuses workers across files instead of one per file
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+
+
+ Test Files  2 passed (2)
+      Tests  81 passed (81)
+   Start at  12:09:04
+   Duration  20.84s (tests 94%, import 6%, transform 1%)
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+
+
+ Test Files  1 passed (1)
+      Tests  32 passed (32)
+   Start at  12:09:25
+   Duration  24.15s (tests 100%)
+

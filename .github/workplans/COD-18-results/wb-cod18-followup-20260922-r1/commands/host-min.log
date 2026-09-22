@@ -1,0 +1,1354 @@
+{
+  "kind": "actual-vscode-extension-host",
+  "packageKind": "installed-vsix",
+  "vscode": {
+    "requestedVersion": "1.95.0",
+    "version": "1.95.0",
+    "architecture": "arm64",
+    "executable": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/vscode/1.95.0/Visual Studio Code.app/Contents/MacOS/Electron",
+    "runtimeRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/vscode/1.95.0",
+    "downloadedThisRun": true
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "cpu": "Apple M1 Pro",
+    "cpuCount": 10,
+    "memoryBytes": 17179869184,
+    "runnerNode": "v24.21.0",
+    "fileCache": "OS file cache was not forcibly cleared",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": null,
+  "artifacts": {
+    "provenance": {
+      "productSourceCommit": "4a74700a8e36debf572042e53839ccd369fa2c0f",
+      "harnessHashes": {
+        "run.mjs": "a7bfb6048aeaa25da563b0ab4881249fd81352e08f49249c86cb60ce6827f6bf",
+        "extension-test.cjs": "a16ed9af38b0c0bca717117bb0c797224a7db7f56bcdb74e3145fcbcf46274d2",
+        "cod18.cjs": "c19d6d0e0de409fd2c65e535286f1cb7f274d74a4a05770b38dd05636963fd0f",
+        "acceptance.cjs": "a7bc34d003bbe7e7586cde1ff656df03a6f55b49c6d2b78d7de547736ad34927",
+        "request-outcome.cjs": "495679cedec30d662ac2cb9c701168acfc3e63b56daf469079f1760a801e6a06"
+      },
+      "vsixSha256": "7984667d377cc5d69bc76397227d94c8009ce2586556beaeb721c586d163b654",
+      "extensionBundleSha256": "c69420206698bb4a131e774831e5a05806c51f95d597c422efa6fee4ed316bda",
+      "serverBundleSha256": "15a97e6a308885a9410cd2f14ef2e0ac70d0880a6c30fd66815a493b074f8afb",
+      "workspaceFixtureSha256": "4e9e0cc3312d77f1a1ac5982cda7127b2acc7dd8e880affb52811f28116868a3",
+      "vscodeVersion": "1.95.0",
+      "runtimeTemporaryRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.rX64bH0",
+      "fixtureRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd",
+      "capturedBeforeHost": true
+    },
+    "sourceCommit": "4a74700a8e36debf572042e53839ccd369fa2c0f",
+    "productSourceCommit": "4a74700a8e36debf572042e53839ccd369fa2c0f",
+    "productSourceCommitMeaning": "checkout base; precommit product bytes identified by bundle and working diff hashes",
+    "workingDiffSha256": "edeafe701f362189dee58d7e255450e0f589c402da048ed3f072911bdefc5a87",
+    "vscodeExecutableSha256": "a1e06b9858b844e559cbbe8748a28c0620d1de3b83e41ef92a91cdeeaa8f6457",
+    "harnessState": "content hashes captured before Host; harness may be uncommitted",
+    "harnessHashes": {
+      "run.mjs": "a7bfb6048aeaa25da563b0ab4881249fd81352e08f49249c86cb60ce6827f6bf",
+      "extension-test.cjs": "a16ed9af38b0c0bca717117bb0c797224a7db7f56bcdb74e3145fcbcf46274d2",
+      "cod18.cjs": "c19d6d0e0de409fd2c65e535286f1cb7f274d74a4a05770b38dd05636963fd0f",
+      "acceptance.cjs": "a7bc34d003bbe7e7586cde1ff656df03a6f55b49c6d2b78d7de547736ad34927",
+      "request-outcome.cjs": "495679cedec30d662ac2cb9c701168acfc3e63b56daf469079f1760a801e6a06"
+    },
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/cod18-followup-final.vsix",
+    "vsixBytes": 1230594,
+    "vsixSha256": "7984667d377cc5d69bc76397227d94c8009ce2586556beaeb721c586d163b654",
+    "extensionBundleSha256": "c69420206698bb4a131e774831e5a05806c51f95d597c422efa6fee4ed316bda",
+    "serverBundleSha256": "15a97e6a308885a9410cd2f14ef2e0ac70d0880a6c30fd66815a493b074f8afb",
+    "vscodeSourceSha256": "f29f2281d86eaca089526891207270b497bfd9d2be4a505707323075fac0d761",
+    "languageServerSourceSha256": "83547fe075fd9dcd5cf22302f0483b48982efe86212093263f537ecf5745cdae"
+  },
+  "install": {
+    "extensionRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.rX64bH0/e/codocs.codocs-0.0.0",
+    "stdout": "Installing extensions...\nExtension 'cod18-followup-final.vsix' was successfully installed.\n",
+    "stderr": ""
+  },
+  "exitCode": 0,
+  "acceptance": [
+    {
+      "ac": "AC-001",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-001",
+          "name": "CRLF quoted escape/folded/self/malformed and missing reference ranges",
+          "status": "pass",
+          "evidence": [
+            {
+              "range": [
+                {
+                  "line": 2,
+                  "character": 26
+                },
+                {
+                  "line": 2,
+                  "character": 35
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"ZX8-n_84zRhsoILVdUCcoAKUKeQ5X_AQ\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 5,
+                  "character": 4
+                },
+                {
+                  "line": 5,
+                  "character": 13
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"ZX8-n_84zRhsoILVdUCcoAKUKeQ5X_AQ\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 6,
+                  "character": 5
+                },
+                {
+                  "line": 6,
+                  "character": 17
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"7XaAlYmi_NdsAYdQs-y2jVoUkY0eSnXL\"}]"
+              }
+            }
+          ],
+          "durationMilliseconds": 85,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-001",
+          "name": "LF UTF-16 repeated/domain/field boundaries",
+          "status": "pass",
+          "evidence": [
+            {
+              "range": [
+                {
+                  "line": 2,
+                  "character": 16
+                },
+                {
+                  "line": 2,
+                  "character": 25
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"Nt1gvgjDu-y2dIb6xoCZPyoRcnLdRYTq\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 2,
+                  "character": 26
+                },
+                {
+                  "line": 2,
+                  "character": 38
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"Y14Ti8Ftn2sziFTIPD2nvd0unZYFdXUZ\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 2,
+                  "character": 39
+                },
+                {
+                  "line": 2,
+                  "character": 48
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"Nt1gvgjDu-y2dIb6xoCZPyoRcnLdRYTq\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 3,
+                  "character": 12
+                },
+                {
+                  "line": 3,
+                  "character": 21
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"Nt1gvgjDu-y2dIb6xoCZPyoRcnLdRYTq\"}]"
+              }
+            }
+          ],
+          "durationMilliseconds": 2,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-001",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "protocol syntax cases exercised; visible UI range matrix not exhaustive",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-002",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-002",
+          "name": "unsaved replacement/insertion/deletion latest ranges",
+          "status": "pass",
+          "evidence": [
+            {
+              "range": [
+                {
+                  "line": 4,
+                  "character": 2
+                },
+                {
+                  "line": 4,
+                  "character": 11
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"6HiBaGIxOXhaxW1ptFLwWXTlbmHK9Y9D\"}]"
+              }
+            }
+          ],
+          "durationMilliseconds": 17,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-002",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "close/cancellation/controlled async race not exercised through actual UI",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-003",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-003",
+          "name": "ambiguous YAML body has no target; each Hover candidate opens",
+          "status": "pass",
+          "evidence": {
+            "markdown": "- [복수 후보 — cod18/ambiguous\\-a\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2F.codocs%2Fcod18%2Fambiguous-source.yaml%22%2C%22token%22%3A%22uZ4kGEqhqWpfNAQqckPQomPNX_2ooEfB%22%7D%5D)\n- [복수 후보 — cod18/ambiguous\\-b\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2F.codocs%2Fcod18%2Fambiguous-source.yaml%22%2C%22token%22%3A%22qCgiMpyzRptBjUN6Fo9-zkz2wJgWBUHt%22%7D%5D)",
+            "opened": [
+              {
+                "result": true,
+                "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/ambiguous-a.yaml"
+              },
+              {
+                "result": true,
+                "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/ambiguous-b.yaml"
+              }
+            ]
+          },
+          "durationMilliseconds": 168,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-003",
+          "name": "relationship-only code Hover link opens referenced document",
+          "status": "pass",
+          "evidence": {
+            "markdown": "### 예약\n\n예약 본문에서 \\[\\[반납 구역\\]\\]을 참조합니다\\.\n\n**현재 ID:** `reservation`\n\n**도메인:** 운영\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Frelationship.java%22%2C%22token%22%3A%22TBR3qvssAnywnKcmk6T-gFiPe6nRXUb_%22%7D%5D)\n\n**이 문서가 참조**\n\n- [반납 구역](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Frelationship.java%22%2C%22token%22%3A%22nemW1nfL5EGpTbSpUDLiMF692ew5yOqF%22%7D%5D)",
+            "opened": true
+          },
+          "durationMilliseconds": 30,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-003",
+          "name": "reverse relationship selection expires when the relation disappears",
+          "status": "pass",
+          "evidence": {
+            "markdown": "### 역참조 대상\n\nfirst body\n\n**현재 ID:** `reverse-target`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Freverse.java%22%2C%22token%22%3A%22wDj3fl9ET9bl3jl7t3AnSqR5Iq2CpFzU%22%7D%5D)\n\n**이 문서를 참조**\n\n- [역참조 출처](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Freverse.java%22%2C%22token%22%3A%22rWnWC8HP5coOSgpA5I6QKrzN_5RhqRJ8%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+            "newest": "### 역참조 대상\n\nnewest body\n\n**현재 ID:** `reverse-target`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Freverse.java%22%2C%22token%22%3A%22Y-sHEgKUX0TNokxvsj7XSapuyIc_dIuY%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+            "staleRelationRejected": true
+          },
+          "durationMilliseconds": 376,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-003",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "actual source click and each rendered Hover click require UI evidence",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-004",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-004",
+          "name": "content revision change opens from existing token",
+          "status": "pass",
+          "evidence": {
+            "existingTokenOpened": true
+          },
+          "durationMilliseconds": 152,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-004",
+          "name": "confirmed move updates existing token",
+          "status": "pass",
+          "evidence": {
+            "moved": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/moved.yaml"
+          },
+          "durationMilliseconds": 48,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-004",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "next query and click checked; already-visible Hover immediate refresh excluded by approved follow-up",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-005",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-005",
+          "name": "delete and old path reuse cannot open unrelated document",
+          "status": "pass",
+          "evidence": {
+            "oldTokenRejected": true
+          },
+          "durationMilliseconds": 110,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-005",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "visible stale click and no-popup observation require UI evidence",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-006",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-006",
+          "name": "absent YAML hover/link removed; source and broken diagnostic remain",
+          "status": "pass",
+          "evidence": [
+            {
+              "severity": "Error",
+              "message": "Invalid input: expected array, received undefined",
+              "range": [
+                {
+                  "line": 0,
+                  "character": 0
+                },
+                {
+                  "line": 5,
+                  "character": 0
+                }
+              ],
+              "source": "codocs",
+              "code": "missing_required_field"
+            },
+            {
+              "severity": "Error",
+              "message": "참조 이름에 해당하는 문서가 없습니다.",
+              "range": [
+                {
+                  "line": 4,
+                  "character": 2
+                },
+                {
+                  "line": 4,
+                  "character": 11
+                }
+              ],
+              "source": "codocs",
+              "code": "reference_not_found"
+            }
+          ],
+          "durationMilliseconds": 5,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-006",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "visible no-popup observation requires UI evidence",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-007",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-007",
+          "name": "duplicate top retains auxiliary and disambiguated paths",
+          "status": "pass",
+          "evidence": {
+            "markdown": "### ID 충돌\n\n**충돌 문서**\n\n- [같은 이름 — 동일 · cod18/duplicate\\-a\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%228eCaRN-95ztNJnP3gGTO7_QEJreBpFIz%22%7D%5D)\n- [같은 이름 — 동일 · cod18/duplicate\\-b\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22HdxT-FLevjTvHIQQfQYIPjvcpfrAvkHC%22%7D%5D)\n\n**오류**\n\n- 같은 ID를 가진 발견 경로가 여러 개입니다\\.\n- 같은 도메인에 같은 이름을 가진 문서가 여러 개입니다\\.\n- 같은 ID를 가진 발견 경로가 여러 개입니다\\.\n- 같은 도메인에 같은 이름을 가진 문서가 여러 개입니다\\.\n\n---\n\n**함께 매칭된 용어**\n\n- [보조 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22280HN3nO_CKRFVT9wD3m5kVfIMY2PZGp%22%7D%5D)"
+          },
+          "durationMilliseconds": 113,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-007",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "same-name without-domain YAML case and same-domain code case exercised; actual UI not exercised",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-008",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-008",
+          "name": "current plus duplicate alias suppresses notice; previous-only remains",
+          "status": "pass",
+          "evidence": {
+            "current": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+            "previous": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D)\n\n> 이전 ID입니다. 현재 ID: current\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+            "auxiliaryCurrent": "### 보조 후보\n\nauxiliary body\n\n**현재 ID:** `auxiliary`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22Cs7ca6xvXQzMkiW2--2UN2cbZF6aKSGS%22%7D%5D)\n\n**함께 매칭된 용어**\n\n- [현재 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+            "auxiliaryPrevious": "### 보조 후보\n\nauxiliary body\n\n**현재 ID:** `auxiliary`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22Cs7ca6xvXQzMkiW2--2UN2cbZF6aKSGS%22%7D%5D)\n\n**함께 매칭된 용어**\n\n- [현재 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D) \\(이전 ID입니다\\.\\)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+            "mixed": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D)\n\n**같은 식별자의 다른 위치:**\n\n> 이전 ID입니다. 현재 ID: current\n\n**오류**\n\n- Invalid input: expected array, received undefined"
+          },
+          "durationMilliseconds": 163,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-008",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "mixed current/previous occurrences checked programmatically; rendered UI matrix not exhaustive",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-009",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-009",
+          "name": "alias-duplicate YAML diagnostic remains; only that Hover cause is hidden",
+          "status": "pass",
+          "evidence": {
+            "markdown": "### 별칭 오류\n\nbody\n\n**현재 ID:** `invalid-alias`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Finvalid-alias.java%22%2C%22token%22%3A%22N2Rjm60C_vbomIeAwiqwp4hoW5Wz4v-Y%22%7D%5D)\n\n**오류**\n\n- 빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다\\.",
+            "diagnostics": [
+              {
+                "severity": "Error",
+                "message": "빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다.",
+                "range": [
+                  {
+                    "line": 3,
+                    "character": 10
+                  },
+                  {
+                    "line": 3,
+                    "character": 13
+                  }
+                ],
+                "source": "codocs",
+                "code": "invalid_field_value"
+              },
+              {
+                "severity": "Warning",
+                "message": "이전 ID가 현재 ID와 같습니다.",
+                "range": [
+                  {
+                    "line": 5,
+                    "character": 8
+                  },
+                  {
+                    "line": 5,
+                    "character": 21
+                  }
+                ],
+                "source": "codocs",
+                "code": "invalid_field_value"
+              }
+            ]
+          },
+          "durationMilliseconds": 124,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-009",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "protocol case exercised; actual visible diagnostics/hover not exercised",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-010",
+      "status": "fail",
+      "checks": [
+        {
+          "ac": "AC-010",
+          "name": "YAML new/existing/dirty tab top and disk preservation",
+          "status": "pass",
+          "evidence": {
+            "top": true,
+            "diskPreserved": true,
+            "tabsPreserved": true
+          },
+          "durationMilliseconds": 65,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-010",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "actual rendered code/YAML link click requires UI evidence",
+          "durationMilliseconds": 0
+        },
+        {
+          "ac": "AC-010",
+          "name": "legacy code Hover/open source",
+          "status": "fail",
+          "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n1 !== 2\n\n\tat verifyHoverAndOpenSource (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/tools/extension-host/extension-test.cjs:308:10)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/tools/extension-host/extension-test.cjs:406:21)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/tools/extension-host/extension-test.cjs:957:11)",
+          "durationMilliseconds": 98
+        }
+      ]
+    },
+    {
+      "ac": "AC-011",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-011",
+          "name": "deprecated occurrence warning/link retained and state refreshed",
+          "status": "pass",
+          "evidence": [
+            {
+              "severity": "Warning",
+              "message": "폐기 상태의 문서를 참조하고 있습니다.",
+              "range": [
+                {
+                  "line": 2,
+                  "character": 13
+                },
+                {
+                  "line": 2,
+                  "character": 22
+                }
+              ],
+              "source": "codocs",
+              "code": "deprecated_reference"
+            },
+            {
+              "severity": "Warning",
+              "message": "폐기 상태의 문서를 참조하고 있습니다.",
+              "range": [
+                {
+                  "line": 2,
+                  "character": 23
+                },
+                {
+                  "line": 2,
+                  "character": 32
+                }
+              ],
+              "source": "codocs",
+              "code": "deprecated_reference"
+            }
+          ],
+          "durationMilliseconds": 242,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-011",
+          "name": "ordinary/previous-only/ambiguous references have no deprecated warning",
+          "status": "pass",
+          "evidence": [
+            {
+              "severity": "Error",
+              "message": "Invalid input: expected array, received undefined",
+              "range": [
+                {
+                  "line": 0,
+                  "character": 0
+                },
+                {
+                  "line": 3,
+                  "character": 0
+                }
+              ],
+              "source": "codocs",
+              "code": "missing_required_field"
+            },
+            {
+              "severity": "Warning",
+              "message": "확정 참조 대상에 문서 오류가 있습니다.",
+              "range": [
+                {
+                  "line": 2,
+                  "character": 13
+                },
+                {
+                  "line": 2,
+                  "character": 22
+                }
+              ],
+              "source": "codocs",
+              "code": "reference_target_error"
+            },
+            {
+              "severity": "Error",
+              "message": "참조 이름에 해당하는 문서가 여러 개입니다.",
+              "range": [
+                {
+                  "line": 2,
+                  "character": 23
+                },
+                {
+                  "line": 2,
+                  "character": 32
+                }
+              ],
+              "source": "codocs",
+              "code": "reference_ambiguous"
+            }
+          ],
+          "durationMilliseconds": 123,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-011",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "ordinary/alias/ambiguous negative cases exercised; unconfirmed negative case not exercised",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-012",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-012",
+          "name": "invalid current ID name reference survives content revision",
+          "status": "pass",
+          "evidence": {
+            "initialOpen": true,
+            "afterRevisionOpen": true
+          },
+          "durationMilliseconds": 256,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-012",
+          "name": "partial scan preserves confirmed candidate information",
+          "status": "pass",
+          "evidence": {
+            "markdown": "### 폐기 대상\n\nactive body\n\n**현재 ID:** `cod18-deprecated`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Fpartial.java%22%2C%22token%22%3A%22C_AbYlfjFI6XoNmvbeopd9gaBjEGhK9S%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined\n\n---\n\n> 일부 문서를 읽지 못해 후보가 누락될 수 있습니다."
+          },
+          "durationMilliseconds": 145,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-012",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "preparing/failed controlled host states not induced",
+          "durationMilliseconds": 0
+        },
+        {
+          "ac": "AC-012",
+          "name": "native JavaScript definition",
+          "status": "pass",
+          "durationMilliseconds": 586
+        }
+      ]
+    }
+  ],
+  "stdout": "\u001b[90m[main 2026-09-22T03:10:43.081Z]\u001b[0m update#setState disabled\n\u001b[90m[main 2026-09-22T03:10:43.082Z]\u001b[0m update#ctor - updates are disabled by the environment\nLoading development extension at /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.rX64bH0/e/codocs.codocs-0.0.0\nStarted local extension host with pid 21513.\n\u001b[90m[main 2026-09-22T03:10:53.506Z]\u001b[0m Extension host with pid 21513 exited with code: 0, signal: unknown.\n",
+  "stderr": "WARNING: IPC handle \"/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.rX64bH0/u/1.95-main.sock\" is longer than 103 chars, try a shorter --user-data-dir\n2026-09-22 12:10:43.952 Code Helper (Renderer)[21146:2250064] CoreText note: Client requested name \".NewYork-Regular\", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[NSFont systemFontOfSize:].\n2026-09-22 12:10:43.952 Code Helper (Renderer)[21146:2250064] CoreText note: Set a breakpoint on CTFontLogSystemFontNameRequest to debug.\n[network] #2: https://az764295.vo.msecnd.net/extensions/chat.json - error GET Failed to fetch\nFailed to fetch chat participant registry {}\nError: Unexpected SIGPIPE\n\tat process.<anonymous> (file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/out/bootstrap-fork.js:3:11831)\n\tat process.emit (node:events:519:28)\n\u001b[91m[main 2026-09-22T03:10:53.528Z]\u001b[0m [UtilityProcessWorker]: terminated unexpectedly with code 43260800, signal: unknown\n",
+  "evidence": {
+    "vscodeVersion": "1.95.0",
+    "extensionIdentifier": "codocs.codocs",
+    "extensionActive": true,
+    "extensionHost": {
+      "node": "v20.18.0",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M1 Pro"
+    },
+    "workspaceFolderCount": 4,
+    "serverCount": 4,
+    "hoverAndOpenSource": {
+      "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n1 !== 2\n\n\tat verifyHoverAndOpenSource (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/tools/extension-host/extension-test.cjs:308:10)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/tools/extension-host/extension-test.cjs:406:21)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/tools/extension-host/extension-test.cjs:957:11)"
+    },
+    "manualRestartReplacedAllProcesses": true,
+    "unsavedDocument": {
+      "version": 2,
+      "textPreservedAfterRestart": true,
+      "dirtyAfterRestart": true,
+      "diskUnchanged": true
+    },
+    "missingCodocsNotGenerated": true,
+    "createdAndChangedCodocsObservedWithoutProcessLoss": true,
+    "automaticRestartsObserved": 3,
+    "repeatedCrashStoppedOneServer": true,
+    "manualRecoveryRestoredAllServers": true,
+    "crashedPids": [
+      21656,
+      21666,
+      21669,
+      21672
+    ],
+    "cod18": [
+      {
+        "ac": "AC-001",
+        "name": "CRLF quoted escape/folded/self/malformed and missing reference ranges",
+        "status": "pass",
+        "evidence": [
+          {
+            "range": [
+              {
+                "line": 2,
+                "character": 26
+              },
+              {
+                "line": 2,
+                "character": 35
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"ZX8-n_84zRhsoILVdUCcoAKUKeQ5X_AQ\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 5,
+                "character": 4
+              },
+              {
+                "line": 5,
+                "character": 13
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"ZX8-n_84zRhsoILVdUCcoAKUKeQ5X_AQ\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 6,
+                "character": 5
+              },
+              {
+                "line": 6,
+                "character": 17
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"7XaAlYmi_NdsAYdQs-y2jVoUkY0eSnXL\"}]"
+            }
+          }
+        ],
+        "durationMilliseconds": 85,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-001",
+        "name": "LF UTF-16 repeated/domain/field boundaries",
+        "status": "pass",
+        "evidence": [
+          {
+            "range": [
+              {
+                "line": 2,
+                "character": 16
+              },
+              {
+                "line": 2,
+                "character": 25
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"Nt1gvgjDu-y2dIb6xoCZPyoRcnLdRYTq\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 2,
+                "character": 26
+              },
+              {
+                "line": 2,
+                "character": 38
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"Y14Ti8Ftn2sziFTIPD2nvd0unZYFdXUZ\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 2,
+                "character": 39
+              },
+              {
+                "line": 2,
+                "character": 48
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"Nt1gvgjDu-y2dIb6xoCZPyoRcnLdRYTq\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 3,
+                "character": 12
+              },
+              {
+                "line": 3,
+                "character": 21
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"Nt1gvgjDu-y2dIb6xoCZPyoRcnLdRYTq\"}]"
+            }
+          }
+        ],
+        "durationMilliseconds": 2,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-010",
+        "name": "YAML new/existing/dirty tab top and disk preservation",
+        "status": "pass",
+        "evidence": {
+          "top": true,
+          "diskPreserved": true,
+          "tabsPreserved": true
+        },
+        "durationMilliseconds": 65,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-002",
+        "name": "unsaved replacement/insertion/deletion latest ranges",
+        "status": "pass",
+        "evidence": [
+          {
+            "range": [
+              {
+                "line": 4,
+                "character": 2
+              },
+              {
+                "line": 4,
+                "character": 11
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"6HiBaGIxOXhaxW1ptFLwWXTlbmHK9Y9D\"}]"
+            }
+          }
+        ],
+        "durationMilliseconds": 17,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-003",
+        "name": "ambiguous YAML body has no target; each Hover candidate opens",
+        "status": "pass",
+        "evidence": {
+          "markdown": "- [복수 후보 — cod18/ambiguous\\-a\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2F.codocs%2Fcod18%2Fambiguous-source.yaml%22%2C%22token%22%3A%22uZ4kGEqhqWpfNAQqckPQomPNX_2ooEfB%22%7D%5D)\n- [복수 후보 — cod18/ambiguous\\-b\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2F.codocs%2Fcod18%2Fambiguous-source.yaml%22%2C%22token%22%3A%22qCgiMpyzRptBjUN6Fo9-zkz2wJgWBUHt%22%7D%5D)",
+          "opened": [
+            {
+              "result": true,
+              "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/ambiguous-a.yaml"
+            },
+            {
+              "result": true,
+              "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/ambiguous-b.yaml"
+            }
+          ]
+        },
+        "durationMilliseconds": 168,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-004",
+        "name": "content revision change opens from existing token",
+        "status": "pass",
+        "evidence": {
+          "existingTokenOpened": true
+        },
+        "durationMilliseconds": 152,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-004",
+        "name": "confirmed move updates existing token",
+        "status": "pass",
+        "evidence": {
+          "moved": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SOMttd/parent/nested/.codocs/cod18/moved.yaml"
+        },
+        "durationMilliseconds": 48,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-005",
+        "name": "delete and old path reuse cannot open unrelated document",
+        "status": "pass",
+        "evidence": {
+          "oldTokenRejected": true
+        },
+        "durationMilliseconds": 110,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-006",
+        "name": "absent YAML hover/link removed; source and broken diagnostic remain",
+        "status": "pass",
+        "evidence": [
+          {
+            "severity": "Error",
+            "message": "Invalid input: expected array, received undefined",
+            "range": [
+              {
+                "line": 0,
+                "character": 0
+              },
+              {
+                "line": 5,
+                "character": 0
+              }
+            ],
+            "source": "codocs",
+            "code": "missing_required_field"
+          },
+          {
+            "severity": "Error",
+            "message": "참조 이름에 해당하는 문서가 없습니다.",
+            "range": [
+              {
+                "line": 4,
+                "character": 2
+              },
+              {
+                "line": 4,
+                "character": 11
+              }
+            ],
+            "source": "codocs",
+            "code": "reference_not_found"
+          }
+        ],
+        "durationMilliseconds": 5,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-011",
+        "name": "deprecated occurrence warning/link retained and state refreshed",
+        "status": "pass",
+        "evidence": [
+          {
+            "severity": "Warning",
+            "message": "폐기 상태의 문서를 참조하고 있습니다.",
+            "range": [
+              {
+                "line": 2,
+                "character": 13
+              },
+              {
+                "line": 2,
+                "character": 22
+              }
+            ],
+            "source": "codocs",
+            "code": "deprecated_reference"
+          },
+          {
+            "severity": "Warning",
+            "message": "폐기 상태의 문서를 참조하고 있습니다.",
+            "range": [
+              {
+                "line": 2,
+                "character": 23
+              },
+              {
+                "line": 2,
+                "character": 32
+              }
+            ],
+            "source": "codocs",
+            "code": "deprecated_reference"
+          }
+        ],
+        "durationMilliseconds": 242,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-012",
+        "name": "invalid current ID name reference survives content revision",
+        "status": "pass",
+        "evidence": {
+          "initialOpen": true,
+          "afterRevisionOpen": true
+        },
+        "durationMilliseconds": 256,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-012",
+        "name": "partial scan preserves confirmed candidate information",
+        "status": "pass",
+        "evidence": {
+          "markdown": "### 폐기 대상\n\nactive body\n\n**현재 ID:** `cod18-deprecated`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Fpartial.java%22%2C%22token%22%3A%22C_AbYlfjFI6XoNmvbeopd9gaBjEGhK9S%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined\n\n---\n\n> 일부 문서를 읽지 못해 후보가 누락될 수 있습니다."
+        },
+        "durationMilliseconds": 145,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-007",
+        "name": "duplicate top retains auxiliary and disambiguated paths",
+        "status": "pass",
+        "evidence": {
+          "markdown": "### ID 충돌\n\n**충돌 문서**\n\n- [같은 이름 — 동일 · cod18/duplicate\\-a\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%228eCaRN-95ztNJnP3gGTO7_QEJreBpFIz%22%7D%5D)\n- [같은 이름 — 동일 · cod18/duplicate\\-b\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22HdxT-FLevjTvHIQQfQYIPjvcpfrAvkHC%22%7D%5D)\n\n**오류**\n\n- 같은 ID를 가진 발견 경로가 여러 개입니다\\.\n- 같은 도메인에 같은 이름을 가진 문서가 여러 개입니다\\.\n- 같은 ID를 가진 발견 경로가 여러 개입니다\\.\n- 같은 도메인에 같은 이름을 가진 문서가 여러 개입니다\\.\n\n---\n\n**함께 매칭된 용어**\n\n- [보조 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22280HN3nO_CKRFVT9wD3m5kVfIMY2PZGp%22%7D%5D)"
+        },
+        "durationMilliseconds": 113,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-008",
+        "name": "current plus duplicate alias suppresses notice; previous-only remains",
+        "status": "pass",
+        "evidence": {
+          "current": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+          "previous": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D)\n\n> 이전 ID입니다. 현재 ID: current\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+          "auxiliaryCurrent": "### 보조 후보\n\nauxiliary body\n\n**현재 ID:** `auxiliary`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22Cs7ca6xvXQzMkiW2--2UN2cbZF6aKSGS%22%7D%5D)\n\n**함께 매칭된 용어**\n\n- [현재 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+          "auxiliaryPrevious": "### 보조 후보\n\nauxiliary body\n\n**현재 ID:** `auxiliary`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22Cs7ca6xvXQzMkiW2--2UN2cbZF6aKSGS%22%7D%5D)\n\n**함께 매칭된 용어**\n\n- [현재 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D) \\(이전 ID입니다\\.\\)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+          "mixed": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22uarLWGXguqDtl2NDaw_UmQBAV_x61rqL%22%7D%5D)\n\n**같은 식별자의 다른 위치:**\n\n> 이전 ID입니다. 현재 ID: current\n\n**오류**\n\n- Invalid input: expected array, received undefined"
+        },
+        "durationMilliseconds": 163,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-009",
+        "name": "alias-duplicate YAML diagnostic remains; only that Hover cause is hidden",
+        "status": "pass",
+        "evidence": {
+          "markdown": "### 별칭 오류\n\nbody\n\n**현재 ID:** `invalid-alias`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Finvalid-alias.java%22%2C%22token%22%3A%22N2Rjm60C_vbomIeAwiqwp4hoW5Wz4v-Y%22%7D%5D)\n\n**오류**\n\n- 빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다\\.",
+          "diagnostics": [
+            {
+              "severity": "Error",
+              "message": "빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다.",
+              "range": [
+                {
+                  "line": 3,
+                  "character": 10
+                },
+                {
+                  "line": 3,
+                  "character": 13
+                }
+              ],
+              "source": "codocs",
+              "code": "invalid_field_value"
+            },
+            {
+              "severity": "Warning",
+              "message": "이전 ID가 현재 ID와 같습니다.",
+              "range": [
+                {
+                  "line": 5,
+                  "character": 8
+                },
+                {
+                  "line": 5,
+                  "character": 21
+                }
+              ],
+              "source": "codocs",
+              "code": "invalid_field_value"
+            }
+          ]
+        },
+        "durationMilliseconds": 124,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "NFR-004",
+        "name": "external Markdown is escaped and only generated command trusted",
+        "status": "pass",
+        "evidence": {
+          "markdown": "### \\[escape\\]\\(command:evil\\)\n\n\\<script\\>alert\\(1\\)\\</script\\> \\[evil\\]\\(command:evil\\)\n\n**현재 ID:** `escape-term`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Fescape.java%22%2C%22token%22%3A%22PWGn0wpzGO7a-uJe7-zOb3gdHlnqg3tu%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined"
+        },
+        "durationMilliseconds": 110,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-003",
+        "name": "relationship-only code Hover link opens referenced document",
+        "status": "pass",
+        "evidence": {
+          "markdown": "### 예약\n\n예약 본문에서 \\[\\[반납 구역\\]\\]을 참조합니다\\.\n\n**현재 ID:** `reservation`\n\n**도메인:** 운영\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Frelationship.java%22%2C%22token%22%3A%22TBR3qvssAnywnKcmk6T-gFiPe6nRXUb_%22%7D%5D)\n\n**이 문서가 참조**\n\n- [반납 구역](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Frelationship.java%22%2C%22token%22%3A%22nemW1nfL5EGpTbSpUDLiMF692ew5yOqF%22%7D%5D)",
+          "opened": true
+        },
+        "durationMilliseconds": 30,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-011",
+        "name": "ordinary/previous-only/ambiguous references have no deprecated warning",
+        "status": "pass",
+        "evidence": [
+          {
+            "severity": "Error",
+            "message": "Invalid input: expected array, received undefined",
+            "range": [
+              {
+                "line": 0,
+                "character": 0
+              },
+              {
+                "line": 3,
+                "character": 0
+              }
+            ],
+            "source": "codocs",
+            "code": "missing_required_field"
+          },
+          {
+            "severity": "Warning",
+            "message": "확정 참조 대상에 문서 오류가 있습니다.",
+            "range": [
+              {
+                "line": 2,
+                "character": 13
+              },
+              {
+                "line": 2,
+                "character": 22
+              }
+            ],
+            "source": "codocs",
+            "code": "reference_target_error"
+          },
+          {
+            "severity": "Error",
+            "message": "참조 이름에 해당하는 문서가 여러 개입니다.",
+            "range": [
+              {
+                "line": 2,
+                "character": 23
+              },
+              {
+                "line": 2,
+                "character": 32
+              }
+            ],
+            "source": "codocs",
+            "code": "reference_ambiguous"
+          }
+        ],
+        "durationMilliseconds": 123,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-003",
+        "name": "reverse relationship selection expires when the relation disappears",
+        "status": "pass",
+        "evidence": {
+          "markdown": "### 역참조 대상\n\nfirst body\n\n**현재 ID:** `reverse-target`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Freverse.java%22%2C%22token%22%3A%22wDj3fl9ET9bl3jl7t3AnSqR5Iq2CpFzU%22%7D%5D)\n\n**이 문서를 참조**\n\n- [역참조 출처](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Freverse.java%22%2C%22token%22%3A%22rWnWC8HP5coOSgpA5I6QKrzN_5RhqRJ8%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+          "newest": "### 역참조 대상\n\nnewest body\n\n**현재 ID:** `reverse-target`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-followup-20260922-r1%2Ffollowup-001%2F.workbench%2Ffixtures%2Fcod16-host-SOMttd%2Fparent%2Fnested%2Freverse.java%22%2C%22token%22%3A%22Y-sHEgKUX0TNokxvsj7XSapuyIc_dIuY%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+          "staleRelationRejected": true
+        },
+        "durationMilliseconds": 376,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-001",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "protocol syntax cases exercised; visible UI range matrix not exhaustive",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-002",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "close/cancellation/controlled async race not exercised through actual UI",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-003",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "actual source click and each rendered Hover click require UI evidence",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-004",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "next query and click checked; already-visible Hover immediate refresh excluded by approved follow-up",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-005",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "visible stale click and no-popup observation require UI evidence",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-006",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "visible no-popup observation requires UI evidence",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-007",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "same-name without-domain YAML case and same-domain code case exercised; actual UI not exercised",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-008",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "mixed current/previous occurrences checked programmatically; rendered UI matrix not exhaustive",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-009",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "protocol case exercised; actual visible diagnostics/hover not exercised",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-010",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "actual rendered code/YAML link click requires UI evidence",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-011",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "ordinary/alias/ambiguous negative cases exercised; unconfirmed negative case not exercised",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-012",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "preparing/failed controlled host states not induced",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-010",
+        "name": "legacy code Hover/open source",
+        "status": "fail",
+        "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n1 !== 2\n\n\tat verifyHoverAndOpenSource (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/tools/extension-host/extension-test.cjs:308:10)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/tools/extension-host/extension-test.cjs:406:21)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/tools/extension-host/extension-test.cjs:957:11)",
+        "durationMilliseconds": 98
+      },
+      {
+        "ac": "AC-012",
+        "name": "native JavaScript definition",
+        "status": "pass",
+        "durationMilliseconds": 586
+      }
+    ]
+  }
+}

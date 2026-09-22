@@ -16,6 +16,7 @@
     "bundle": "node tools/build/build.mjs bundle",
     "check:build": "node tools/check/run.mjs build",
     "test:run": "node tools/check/run.mjs test:run",
+    "test:ui": "node tools/ui-tests/run.mjs",
     "performance:cod14": "node tools/performance/runner.mjs",
     "check": "node tools/check/run.mjs all"
   },
@@ -27,6 +28,7 @@
     "*.{json,jsonc,md,mdx,yaml,yml,css,scss,html,svg}": "prettier --write"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "22.19.3",
     "esbuild": "0.28.2",
     "eslint": "10.10.0",

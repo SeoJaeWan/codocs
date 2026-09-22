@@ -81,7 +81,7 @@ afterEach(async () => {
   await rm(project, { recursive: true, force: true });
 });
 describe('최초 조회와 실제 파일 감시 연결', () => {
-  it('첫 readFile 반환 전에 수정하면 준비된 감시로 수집해 최신 원문을 게시한다', async () => {
+  it('첫 readFile 반환 전에 수정하면 완료 알림과 live 참조가 같은 최신 원문을 사용한다', async () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
     await writeFile(
       target,
@@ -112,11 +112,45 @@ describe('최초 조회와 실제 파일 감시 연결', () => {
       );
     };
     session = createWorkspaceQuerySession({ cwd: project });
+    const active = session;
+    const versions: number[] = [];
+    const references: ReturnType<WorkspaceQuerySession['references']>[] = [];
+    session.onDidChangeSnapshot((event) => {
+      versions.push(event.catalogVersion);
+      references.push(
+        active.references({
+          sourcePath: '.codocs/source.yaml',
+          text: 'id: source\nname: source\ndomains: [업무]\ndefinition: "[[alpha]]"\n',
+          documentVersion: 1,
+        }),
+      );
+    });
     const result = await session.get(['alpha']);
     expect(result).toMatchObject({
       success: true,
       results: [{ found: true, document: { definition: '최신' } }],
     });
+    expect(versions).toEqual([session.catalogVersion]);
+    expect(await Promise.all(references)).toMatchObject([
+      {
+        success: true,
+        catalogVersion: session.catalogVersion,
+        documentVersion: 1,
+        diagnostics: [],
+        targets: [
+          {
+            found: true,
+            path: '.codocs/alpha.yaml',
+            document: { definition: '최신' },
+            revision: createHash('sha256')
+              .update(
+                'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 최신\n',
+              )
+              .digest('hex'),
+          },
+        ],
+      },
+    ]);
   });
 });
 

@@ -1,0 +1,6 @@
+
+> codocs@0.0.0 format:check /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+> prettier . --check
+
+Checking formatting...
+All matched files use Prettier code style!

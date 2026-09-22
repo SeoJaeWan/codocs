@@ -46,7 +46,7 @@ assert.equal(escaped.occurrences.length, 1);
 assert.equal(escaped.occurrences[0].name, '주문:확인');
 assert.equal(escaped.occurrences[0].domain, '판매:동부');
 assert.equal(referenceDiagnosticCodes.invalidReference, 'invalid_reference');
-assert.deepEqual(Object.values(catalogDiagnosticCodes), ['duplicate_id', 'duplicate_name', 'missing_reference', 'ambiguous_reference', 'self_reference', 'unconfirmed_reference', 'reference_target_error']);
+assert.deepEqual(Object.values(catalogDiagnosticCodes), ['duplicate_id', 'duplicate_name', 'missing_reference', 'ambiguous_reference', 'self_reference', 'unconfirmed_reference', 'reference_target_error', 'deprecated_reference']);
 const partial = buildCatalog({status: 'partial', observations: [records[2]], failures: [{kind: 'folder', path: '.codocs'}]}, catalog);
 assert.equal(partial.documents.get('.codocs/a.yaml').confirmation, 'unconfirmed');
 assert.equal(partial.documents.get('.codocs/s.yaml').confirmation, 'confirmed');

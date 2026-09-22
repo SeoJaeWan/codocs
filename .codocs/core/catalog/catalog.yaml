@@ -27,6 +27,9 @@ definition: |
   폐기 상태는 대상의 부재를 뜻하지 않으므로 직접·역참조 연결은 유지한다. 모호하거나 미확정인 후보 중 하나를 임의로 골라 폐기 상태 참조로 판단하지 않는다.
   문서 자체의 폐기 상태와 [[이전 ID]]는 별개이며 deprecatedAliases의 존재만으로 이 경고를 만들지 않는다.
 
+  live 출처의 참조를 조회할 때는 출처 하나의 관측만 임시 해석하고 기존 디스크 색인의 이름·도메인 후보로 연결한다.
+  임시 출처는 대상 검색 자료나 운영 색인의 역참조를 변경하지 않는다. 디스크 색인과 같은 등장별 연결·진단 규칙을 적용한다.
+
   ## 갱신
 
   문서 추가·이동·삭제와 식별명·이름·소속·본문·status 변경 시 영향을 받는 검색 정보와 연결·진단을 재계산한다.
@@ -42,5 +45,5 @@ definition: |
 
   ## 코드와 검증 위치
 
-  대표 자료형 Catalog와 색인 구성 함수 buildCatalog는 [색인 구현](../../../packages/core/src/catalog/index.ts)에서 확인한다.
+  대표 자료형 Catalog와 색인 구성 함수 buildCatalog·임시 출처 해석 resolveLiveDocument는 [색인 구현](../../../packages/core/src/catalog/index.ts)에서 확인한다.
   경로·이름 검색, 충돌·연결, 관측 갱신 사례는 [인접 테스트](../../../packages/core/src/catalog/catalog.test.ts)에서 확인한다.

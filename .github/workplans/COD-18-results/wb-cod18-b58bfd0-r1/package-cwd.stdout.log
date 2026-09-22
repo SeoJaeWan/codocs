@@ -1,0 +1,38 @@
+ INFO  Files included in the VSIX:
+cod18.vsix
+├─ [Content_Types].xml 
+├─ extension.vsixmanifest 
+└─ extension/
+   ├─ package.json [1.03 KB]
+   └─ dist/
+      ├─ index.cjs [807.77 KB]
+      ├─ index.cjs.map [1.39 MB]
+      ├─ index.d.ts [0.41 KB]
+      ├─ index.d.ts.map [0.31 KB]
+      ├─ client-manager/
+      │  ├─ index.d.ts [2.62 KB]
+      │  └─ index.d.ts.map [1.35 KB]
+      ├─ docs/
+      │  └─ guide/
+      │     └─ README.md [16.54 KB]
+      ├─ examples/
+      │  └─ .codocs/
+      │     ├─ fulfillment.yaml [0.25 KB]
+      │     └─ order.yaml [0.28 KB]
+      ├─ open-source/
+      │  ├─ index.d.ts [2.16 KB]
+      │  └─ index.d.ts.map [1.46 KB]
+      ├─ package-assembly/
+      │  ├─ index.d.ts [0.19 KB]
+      │  └─ index.d.ts.map [0.19 KB]
+      ├─ server/
+      │  ├─ index.cjs [1.62 MB]
+      │  └─ index.cjs.map [3.08 MB]
+      ├─ vscode-client/
+      │  ├─ index.d.ts [0.55 KB]
+      │  └─ index.d.ts.map [0.33 KB]
+      └─ workspace-routing/
+         ├─ index.d.ts [0.84 KB]
+         └─ index.d.ts.map [0.63 KB]
+
+ DONE  Packaged: ../../.workbench/cod18.vsix (22 files, 1.17 MB)

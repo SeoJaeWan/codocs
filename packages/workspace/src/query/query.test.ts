@@ -1,4 +1,5 @@
 import {
+  catalogDiagnosticCodes,
   diagnosticSeverities,
   documentKinds,
   documentStatuses,
@@ -1172,5 +1173,304 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
     expect(source?.offsetRange?.start).toBe(0);
     expect(source?.range?.start).toEqual({ line: 0, character: 0 });
     expect(result.results[0]).not.toHaveProperty('id');
+  });
+});
+
+describe('live 참조와 선택 최신 확인', () => {
+  it('미저장 본문을 조회하면 디스크 출처를 변경하지 않고 같은 버전의 대상 내용을 반환한다', async () => {
+    await file(
+      'target.yaml',
+      'id: target\nname: 대상\ndomains: [업무]\ndefinition: disk\nstatus: deprecated\n',
+    );
+    await file(
+      'source.yaml',
+      'id: source\nname: 출처\ndefinition: 저장된 본문\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const result = await session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: "😀[[대상]] [[대상]]"\r\n',
+      documentVersion: 1,
+    });
+    expect(result).toMatchObject({
+      success: true,
+      documentVersion: 1,
+      targets: [
+        { path: '.codocs/target.yaml', document: { definition: 'disk' } },
+      ],
+    });
+    if (!result.success) throw new Error('참조 조회 실패');
+    expect(
+      result.diagnostics.filter(
+        (item) => item.code === catalogDiagnosticCodes.deprecatedReference,
+      ),
+    ).toHaveLength(2);
+    expect(result.targets[0]).toMatchObject({
+      source: {
+        uri: pathToFileURL(path.join(project, '.codocs/target.yaml')).href,
+      },
+    });
+    expect(await session.get(['source'])).toMatchObject({
+      results: [{ document: { definition: '저장된 본문' } }],
+    });
+  });
+
+  it('최초 탐색 중 새 버전 요청이 오면 이전 문서 결과를 적용하지 않는다', async () => {
+    await file('target.yaml', 'id: target\nname: 대상\ndefinition: disk\n');
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const first = session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: "[[대상]]"',
+      documentVersion: 1,
+    });
+    const second = session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: 삭제',
+      documentVersion: 2,
+    });
+    expect(await first).toMatchObject({
+      success: false,
+      error: { code: workspaceQueryDiagnosticCodes.requestSuperseded },
+    });
+    expect(await second).toMatchObject({
+      success: true,
+      documentVersion: 2,
+      occurrences: [],
+    });
+  });
+
+  it('이전 버전 요청이 늦게 도착하면 최신 출처를 대체하지 않는다', async () => {
+    const session = createWorkspaceQuerySession({ cwd: project });
+    await session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: 최신',
+      documentVersion: 2,
+    });
+    expect(
+      await session.references({
+        sourcePath: '.codocs/source.yaml',
+        text: 'definition: "[[대상]]"',
+        documentVersion: 1,
+      }),
+    ).toMatchObject({
+      success: false,
+      error: { code: workspaceQueryDiagnosticCodes.requestSuperseded },
+    });
+  });
+
+  it('조회 중 출처를 닫으면 진행 중 결과를 폐기한다', async () => {
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const pending = session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: "[[대상]]"',
+      documentVersion: 1,
+    });
+    session.closeDocument('.codocs/source.yaml');
+    expect(await pending).toMatchObject({
+      success: false,
+      error: { code: workspaceQueryDiagnosticCodes.requestSuperseded },
+    });
+  });
+
+  it('조회 중 취소하면 진행 중 결과를 폐기한다', async () => {
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const controller = new AbortController();
+    const pending = session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: "[[대상]]"',
+      documentVersion: 1,
+      signal: controller.signal,
+    });
+    controller.abort();
+    expect(await pending).toMatchObject({
+      success: false,
+      error: { code: workspaceQueryDiagnosticCodes.requestSuperseded },
+    });
+  });
+
+  it('최초 탐색 중 세션을 닫으면 완료 알림과 버전 게시를 막는다', async () => {
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const listener = vi.fn();
+    session.onDidChangeSnapshot(listener);
+    const pending = session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: 설명',
+      documentVersion: 1,
+    });
+    await session.close();
+    expect(await pending).toMatchObject({ success: false });
+    expect(listener).not.toHaveBeenCalled();
+    expect(session.catalogVersion).toBe(0);
+    expect(await session.refresh()).toMatchObject({ success: false });
+  });
+
+  it('완료 알림에서는 게시된 버전을 조회하고 해제 후에는 알리지 않는다', async () => {
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const versions: number[] = [];
+    const dispose = session.onDidChangeSnapshot((event) => {
+      expect(session.catalogVersion).toBe(event.catalogVersion);
+      versions.push(event.catalogVersion);
+    });
+    await session.refresh();
+    expect(versions).toEqual([session.catalogVersion]);
+    dispose();
+    await session.refresh();
+    expect(versions).toHaveLength(1);
+  });
+
+  it('listener가 실패해도 게시한 snapshot과 다른 listener를 유지한다', async () => {
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const listener = vi.fn();
+    session.onDidChangeSnapshot(() => {
+      throw new Error('listener');
+    });
+    session.onDidChangeSnapshot(listener);
+    expect(await session.refresh()).toMatchObject({ success: true });
+    expect(listener).toHaveBeenCalled();
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it.each([
+    { label: '내용 변경', moved: false },
+    { label: '확인가능 이동', moved: true },
+  ])(
+    '$label을 완료 관측하면 선택을 유지하고 최신 내용을 확인한다',
+    async ({ moved }) => {
+      const original = await file(
+        'target.yaml',
+        'id: target\nname: 대상\ndomains: [업무]\ndefinition: 이전\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      await session.refresh();
+      const token = session.captureCandidate(
+        { reference: { name: '대상' }, sourcePath: '.codocs/source.yaml' },
+        '.codocs/target.yaml',
+        session.catalogVersion,
+      )!;
+      expect(token).toBeTypeOf('string');
+      if (moved)
+        await rename(original, path.join(project, '.codocs/새 경로.yaml'));
+      await file(
+        moved ? '새 경로.yaml' : 'target.yaml',
+        'id: target\nname: 대상\ndomains: [업무]\ndefinition: 최신\n',
+      );
+      await session.refresh();
+      const confirmed = await session.confirmCandidate(token);
+      expect(confirmed).toMatchObject({
+        catalogVersion: session.catalogVersion,
+        result: {
+          path: moved ? '.codocs/새 경로.yaml' : '.codocs/target.yaml',
+          document: { definition: '최신' },
+        },
+      });
+    },
+  );
+
+  it('코드 매칭으로 명시 선택한 후보를 이동 후에도 원래 매칭 근거로 확인한다', async () => {
+    const original = await file(
+      'target.yaml',
+      'id: target\nname: 대상\ndefinition: 내용\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    const matched = await session.match('target');
+    if (!matched.success) throw new Error('매칭 실패');
+    const token = session.captureCandidate(
+      { text: 'target' },
+      '.codocs/target.yaml',
+      matched.catalogVersion,
+    )!;
+    await rename(original, path.join(project, '.codocs/moved.yaml'));
+    await session.refresh();
+    expect(await session.confirmCandidate(token)).toMatchObject({
+      result: { path: '.codocs/moved.yaml' },
+    });
+  });
+
+  it.each([
+    { label: '삭제', raw: undefined },
+    {
+      label: '옛 경로를 다른 문서가 재사용',
+      raw: 'id: other\nname: 대상\ndefinition: 다른 문서\n',
+    },
+    {
+      label: '미관측 내용 변경',
+      raw: 'id: target\nname: 대상\ndefinition: 변경\n',
+    },
+  ])(
+    '$label이 표시 후 발생하면 오래된 파일을 열 후보를 반환하지 않는다',
+    async ({ raw }) => {
+      const original = await file(
+        'target.yaml',
+        'id: target\nname: 대상\ndefinition: 내용\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      await session.refresh();
+      const token = session.captureCandidate(
+        { reference: { name: '대상' }, sourcePath: '.codocs/source.yaml' },
+        '.codocs/target.yaml',
+        session.catalogVersion,
+      )!;
+      if (raw === undefined) await rm(original);
+      else await writeFile(original, raw);
+      expect(await session.confirmCandidate(token)).toBeUndefined();
+    },
+  );
+
+  it('옛 경로 재사용을 완료 관측해도 다른 ID를 같은 선택으로 연결하지 않는다', async () => {
+    await file('target.yaml', 'id: target\nname: 대상\ndefinition: 내용\n');
+    const session = createWorkspaceQuerySession({ cwd: project });
+    await session.refresh();
+    const token = session.captureCandidate(
+      { reference: { name: '대상' }, sourcePath: '.codocs/source.yaml' },
+      '.codocs/target.yaml',
+      session.catalogVersion,
+    )!;
+    await file('target.yaml', 'id: other\nname: 대상\ndefinition: 내용\n');
+    await session.refresh();
+    expect(await session.confirmCandidate(token)).toBeUndefined();
+  });
+
+  it('참조가 live 출처에서 삭제되면 기존 선택을 무효화한다', async () => {
+    await file('target.yaml', 'id: target\nname: 대상\ndefinition: 내용\n');
+    const session = createWorkspaceQuerySession({ cwd: project });
+    await session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: "[[대상]]"',
+      documentVersion: 1,
+    });
+    const token = session.captureCandidate(
+      { reference: { name: '대상' }, sourcePath: '.codocs/source.yaml' },
+      '.codocs/target.yaml',
+      session.catalogVersion,
+    )!;
+    await session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: 삭제',
+      documentVersion: 2,
+    });
+    expect(await session.confirmCandidate(token)).toBeUndefined();
+  });
+
+  it('새 조회를 반복해도 대상 전체 색인 버전과 완료 알림을 변경하지 않는다', async () => {
+    await file('target.yaml', 'id: target\nname: 대상\ndefinition: 내용\n');
+    const session = createWorkspaceQuerySession({ cwd: project });
+    await session.refresh();
+    const version = session.catalogVersion;
+    const listener = vi.fn();
+    session.onDidChangeSnapshot(listener);
+    await session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: "[[대상]]"',
+      documentVersion: 1,
+    });
+    await session.references({
+      sourcePath: '.codocs/source.yaml',
+      text: 'definition: "[[대상]] [[대상]]"',
+      documentVersion: 2,
+    });
+    expect(session.catalogVersion).toBe(version);
+    expect(listener).not.toHaveBeenCalled();
   });
 });

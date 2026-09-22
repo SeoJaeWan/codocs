@@ -1,0 +1,13 @@
+{
+  "name": "codocs-ui-observer",
+  "publisher": "codocs-tests",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "main": "./index.cjs",
+  "activationEvents": [
+    "*"
+  ]
+}

@@ -3,6 +3,8 @@ import {
   diagnosticSeverities,
   matcherEvidenceKinds,
   scanStatuses,
+  schemaDiagnosticCodes,
+  schemaDiagnosticMessages,
   type CodeMatchCandidate,
   type CodeMatchEvidence,
   type Diagnostic,
@@ -182,8 +184,16 @@ export function selectHover(
   const groupedCandidates = match.candidates
     .flatMap(
       /** 현재 식별자 묶음의 근거만 후보에 남긴다. */ (candidate) => {
-        const evidence = candidate.evidence.filter((item) =>
-          evidenceInGroup(item, group),
+        const evidence = candidate.evidence.filter(
+          /** 같은 후보·범위의 이전 근거만 현재 근거로 대체한다. */ (item) =>
+            evidenceInGroup(item, group) &&
+            !candidate.evidence.some(
+              /** 원래 후보의 같은 위치에서 현재 근거를 찾는다. */ (current) =>
+                item.kind === matcherEvidenceKinds.previous &&
+                current.kind === matcherEvidenceKinds.current &&
+                current.offsetRange.start === item.offsetRange.start &&
+                current.offsetRange.end === item.offsetRange.end,
+            ),
         );
         return evidence.length ? [{ ...candidate, evidence }] : [];
       },
@@ -240,7 +250,7 @@ export function hoverDetailPaths(
 }
 
 /** Markdown의 사용자 제공 텍스트가 링크·명령·서식을 만들지 못하게 이스케이프한다. */
-function escapeMarkdown(value: string): string {
+export function escapeMarkdown(value: string): string {
   return value
     .replaceAll('\\', '\\\\')
     .replaceAll(/([`*_{}\[\]()#+.!<>|-])/gu, '\\$1');
@@ -265,10 +275,28 @@ function pathLabel(documentPath: string): string {
 }
 
 /** 상세 결과에서 이름·현재 ID·경로 순서로 링크 이름을 선택한다. */
-function detailLabel(result: WorkspacePathDocumentResult): string {
-  return (
-    documentString(result, 'name') ?? result.id ?? pathLabel(result.source.path)
-  );
+export function detailLabel(
+  result: WorkspacePathDocumentResult,
+  peers: readonly WorkspacePathDocumentResult[] = [],
+): string {
+  const name =
+    documentString(result, 'name') ??
+    result.id ??
+    pathLabel(result.source.path);
+  if (
+    peers.filter(
+      (peer) =>
+        (documentString(peer, 'name') ??
+          peer.id ??
+          pathLabel(peer.source.path)) === name,
+    ).length < 2
+  )
+    return name;
+  const domains = result.document?.domains;
+  const labels = Array.isArray(domains)
+    ? domains.filter((value): value is string => typeof value === 'string')
+    : [];
+  return `${name} — ${[...labels, result.path.replace(/^\.codocs[/\\]/u, '')].join(' · ')}`;
 }
 
 /** 프로토콜 명령 인자의 file URI와 선택 범위를 모두 검증한다. */
@@ -305,12 +333,16 @@ function sourceLink(
   result: WorkspacePathDocumentResult,
   catalogVersion: number,
   label: string,
+  relationship?: { path: string; reverse: boolean },
 ): string | undefined {
-  const argument: OpenSourceCommandArgument = {
+  const argument: OpenSourceCommandArgument & {
+    relationship?: { path: string; reverse: boolean };
+  } = {
     uri: result.source.uri,
     ...(result.source.range ? { range: result.source.range } : {}),
     catalogVersion,
     ...(result.revision ? { revision: result.revision } : {}),
+    ...(relationship ? { relationship } : {}),
   };
   if (!isOpenSourceCommandArgument(argument)) return undefined;
   const query = encodeURIComponent(JSON.stringify([argument]));
@@ -340,7 +372,18 @@ function uniqueDiagnostics(
 function diagnosticMarkdown(
   diagnostics: readonly Diagnostic<string>[],
 ): readonly string[] {
-  const unique = uniqueDiagnostics(diagnostics);
+  const unique = uniqueDiagnostics(
+    diagnostics.filter(
+      /** YAML에 남기는 별칭중복 원인만 코드 표시에서 제외한다. */ (
+        diagnostic,
+      ) =>
+        !(
+          diagnostic.code === schemaDiagnosticCodes.invalidFieldValue &&
+          diagnostic.message ===
+            schemaDiagnosticMessages.deprecatedAliasMatchesCurrentId
+        ),
+    ),
+  );
   const errors = unique.filter(
     (diagnostic) => diagnostic.severity === diagnosticSeverities.error,
   );
@@ -364,12 +407,18 @@ function relatedLinks(
   links: readonly WorkspacePathGetLink[] | undefined,
   byPath: ReadonlyMap<string, WorkspacePathDocumentResult>,
   catalogVersion: number,
+  relationship: { path: string; reverse: boolean },
 ): readonly string[] {
   const markdown = new Map<string, string>();
   for (const link of links ?? []) {
     const detail = byPath.get(link.path);
     if (!detail || markdown.has(link.path)) continue;
-    const value = sourceLink(detail, catalogVersion, detailLabel(detail));
+    const value = sourceLink(
+      detail,
+      catalogVersion,
+      detailLabel(detail, [...byPath.values()]),
+      relationship,
+    );
     if (value) markdown.set(link.path, value);
   }
   return [...markdown.values()];
@@ -391,12 +440,11 @@ function previousEvidenceMarkdown(
   currentId: string | undefined,
 ): string | undefined {
   if (evidence.kind !== matcherEvidenceKinds.previous) return undefined;
-  if (evidence.message) return `> ${escapeMarkdown(evidence.message)}`;
   return `> ${previousIdMessage} ${
     currentId
       ? `현재 ID: ${escapeMarkdown(currentId)}`
       : unknownCurrentIdMessage
-  }`;
+  }${evidence.message ? ` — ${escapeMarkdown(evidence.message)}` : ''}`;
 }
 
 /** 후보별 기본 정보·관계·오류를 안전한 Markdown 섹션으로 만든다. */
@@ -408,8 +456,9 @@ function candidateMarkdown(
   catalogVersion: number,
 ): string {
   const parts: string[] = [];
-  const name = documentString(detail, 'name') ?? selected.candidate.name;
-  parts.push(`### ${escapeMarkdown(name ?? pathLabel(detail.source.path))}`);
+  parts.push(
+    `### ${escapeMarkdown(detailLabel(detail, [...byPath.values()]))}`,
+  );
   const definition = documentString(detail, 'definition');
   if (definition) parts.push(escapeMarkdown(definition));
   if (detail.id) parts.push(`**현재 ID:** \`${detail.id}\``);
@@ -420,6 +469,22 @@ function candidateMarkdown(
   if (source) parts.push(source);
   const previous = previousEvidenceMarkdown(selected.evidence, detail.id);
   if (previous) parts.push(previous);
+  const otherPrevious = selected.candidate.evidence
+    .filter(
+      (evidence) =>
+        evidence.kind === matcherEvidenceKinds.previous &&
+        (evidence.offsetRange.start !== selected.evidence.offsetRange.start ||
+          evidence.offsetRange.end !== selected.evidence.offsetRange.end),
+    )
+    .flatMap((evidence) => {
+      const notice = previousEvidenceMarkdown(evidence, detail.id);
+      return notice ? [notice] : [];
+    });
+  if (otherPrevious.length)
+    parts.push(
+      '**같은 식별자의 다른 위치:**\n\n' +
+        [...new Set(otherPrevious)].join('\n\n'),
+    );
   const topPaths = new Set(selection.top.map((item) => item.candidate.path));
   const together = selection.groupedCandidates
     .filter(
@@ -433,7 +498,11 @@ function candidateMarkdown(
       ) => {
         const related = byPath.get(candidate.path);
         if (!related) return [];
-        const link = sourceLink(related, catalogVersion, detailLabel(related));
+        const link = sourceLink(
+          related,
+          catalogVersion,
+          detailLabel(related, [...byPath.values()]),
+        );
         if (!link) return [];
         const previousEvidence = candidate.evidence.find(
           (evidence) => evidence.kind === matcherEvidenceKinds.previous,
@@ -451,12 +520,18 @@ function candidateMarkdown(
   if (togetherSection) parts.push(togetherSection);
   const references = linkSection(
     '이 문서가 참조',
-    relatedLinks(detail.references, byPath, catalogVersion),
+    relatedLinks(detail.references, byPath, catalogVersion, {
+      path: detail.path,
+      reverse: false,
+    }),
   );
   if (references) parts.push(references);
   const referencedBy = linkSection(
     '이 문서를 참조',
-    relatedLinks(detail.referencedBy, byPath, catalogVersion),
+    relatedLinks(detail.referencedBy, byPath, catalogVersion, {
+      path: detail.path,
+      reverse: true,
+    }),
   );
   if (referencedBy) parts.push(referencedBy);
   parts.push(...diagnosticMarkdown(detail.diagnostics));
@@ -476,7 +551,11 @@ function conflictMarkdown(
     /** 충돌 경로가 확인된 상세에만 원문 링크를 만든다. */ (documentPath) => {
       const detail = byPath.get(documentPath);
       if (!detail) return [];
-      const link = sourceLink(detail, catalogVersion, detailLabel(detail));
+      const link = sourceLink(
+        detail,
+        catalogVersion,
+        detailLabel(detail, [...byPath.values()]),
+      );
       return link ? [link] : [];
     },
   );
@@ -528,6 +607,35 @@ export function createHover(
     sections.push(
       conflictMarkdown(conflictDetails, byPath, match.catalogVersion),
     );
+  if (conflictDetails.length === selection.top.length) {
+    const topPaths = new Set(selection.top.map((item) => item.candidate.path));
+    const links = selection.groupedCandidates
+      .filter((candidate) => !topPaths.has(candidate.path))
+      .flatMap(
+        /** 최상위가 모두 충돌해도 정상 보조 링크를 보존한다. */ (
+          candidate,
+        ) => {
+          const detail = byPath.get(candidate.path);
+          if (!detail) return [];
+          const link = sourceLink(
+            detail,
+            match.catalogVersion,
+            detailLabel(detail, found),
+          );
+          return link
+            ? [
+                candidate.evidence.some(
+                  (item) => item.kind === matcherEvidenceKinds.previous,
+                )
+                  ? `${link} ${previousIdMessage}`
+                  : link,
+              ]
+            : [];
+        },
+      );
+    const together = linkSection('함께 매칭된 용어', links);
+    if (together) sections.push(together);
+  }
   if (match.partial || details.scanStatus !== scanStatuses.complete)
     sections.push(`> ${partialMessage}`);
   return {
