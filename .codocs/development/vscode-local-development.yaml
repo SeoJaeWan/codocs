@@ -1,0 +1,61 @@
+id: vscode-local-development
+name: 'VS Code에서 직접 실행하기'
+domains:
+  - '개발'
+kind: procedure
+definition: |
+  로컬 저장소에서 빌드한 Codocs를 개발용 VS Code 창에 불러와 직접 사용하는 절차다.
+  VSIX를 일반 확장으로 설치하거나 Playwright 자동 테스트를 실행하지 않고, 저장소의 .codocs 문서와 코드를 실제 편집기에서 확인한다.
+  자동 UI 검증의 역할과 범위는 [[테스트 컨벤션]]에서 구분한다.
+
+  ## 준비와 빌드
+
+  터미널에서 Codocs 저장소 루트로 이동한다. 아래 셸 예시는 macOS·Linux 기준이다.
+  [[개발 환경]]에 따라 .node-version의 Node.js와 package.json의 packageManager에 지정된 pnpm을 준비한다.
+  nvm을 사용하는 경우 `nvm use "$(cat .node-version)"`으로 저장소의 Node.js 버전을 선택할 수 있다. 설치되지 않은 버전이면 먼저 설치한다.
+
+  ```sh
+  pnpm install --frozen-lockfile
+  pnpm build
+  ```
+
+  빌드가 성공한 다음 창을 연다. pnpm build는 확장과 언어 서버를 함께 만들고, 확장이 사용할 서버 번들도 배치한다.
+  packages/vscode/dist/index.cjs와 packages/vscode/dist/server/index.cjs가 실행에 사용되므로 TypeScript 소스만 수정한 상태로 새 구현이 적용되지는 않는다.
+
+  ## 개발용 창 열기
+
+  저장소 루트에서 다음 명령을 실행한다. code 명령을 PATH에서 사용할 수 있어야 한다.
+
+  ```sh
+  code --new-window --extensionDevelopmentPath="$PWD/packages/vscode" "$PWD"
+  ```
+
+  macOS에서 code 명령을 찾지 못하면 VS Code 명령 팔레트에서 `Shell Command: Install 'code' command in PATH`를 실행하고 터미널을 다시 연다.
+  VS Code가 기본 응용 프로그램 위치에 설치되어 있다면 다음처럼 CLI 전체 경로를 사용할 수도 있다.
+
+  ```sh
+  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" --new-window --extensionDevelopmentPath="$PWD/packages/vscode" "$PWD"
+  ```
+
+  Extension Development Host 창은 packages/vscode의 빌드 결과를 개발용 확장으로 불러오고 저장소 루트를 작업 공간으로 연다.
+  이 실행은 Codocs를 일반 확장으로 설치하지 않는다. 별도 사용자 데이터 경로를 지정하지 않으므로 사용자 설정·다른 확장까지 격리된 테스트 환경으로 간주하지 않는다.
+  작업 공간 신뢰를 묻는 경우 자신이 신뢰하는 저장소인지 확인하고 허용한다.
+
+  ## 직접 확인할 동작
+
+  1. 개발용 창에서 packages/vscode/src/open-source/index.ts를 열고 openSource 식별자에 마우스를 올린다. [[코드 호버]]에 문서 설명과 원문 링크가 표시되는지 확인한다.
+  2. 호버의 원문 링크를 눌러 .codocs/vscode/open-source.yaml로 이동한다. [[원문 열기]]에 따라 파일 맨 위로 이동하는지 확인한다.
+  3. 해당 YAML의 definition 본문에서 `[[문서]]` 또는 `[[코드 호버]]`에 마우스를 올리고 링크를 연다. 편집기가 안내하는 링크 열기 제스처를 사용하며 기본 macOS 설정에서는 Cmd+클릭이다.
+  4. 이름 참조에 복수 후보가 있으면 호버에서 원하는 후보의 링크를 선택한다. 임의의 대표 문서로 이동할 것으로 기대하지 않는다.
+
+  이 창은 복사된 테스트 자료가 아니라 실제 저장소를 연다. 문서나 코드를 편집하고 저장하면 작업 트리에 변경이 남는다.
+
+  ## 변경 사항 반영과 문제 확인
+
+  확장·언어 서버 또는 그 의존 코드의 TypeScript를 수정한 경우 저장소 루트에서 pnpm build를 다시 실행한다.
+  성공한 뒤 개발용 창의 명령 팔레트에서 `Developer: Reload Window`를 실행한다. 소스 변경이 자동으로 재빌드·재로드된다고 가정하지 않는다.
+  .codocs 문서만 편집하는 경우 확장을 다시 빌드할 필요는 없다. 문서 편집과 파일 변경의 반영은 [[문서 동기화]]와 [[작업 공간 파일 감시]]의 책임이다.
+
+  문서 정보가 표시되지 않으면 개발용 창에서 저장소 루트를 열었는지와 빌드 성공 여부를 먼저 확인한다.
+  명령 팔레트의 `Codocs: Restart Language Servers`로 서버 연결을 다시 시작할 수 있지만, 확장 코드 변경을 적용하는 재빌드·창 새로고침을 대신하지는 않는다.
+  계속 실패하면 출력 패널의 Codocs 관련 로그와 확장 활성화 오류를 확인한다. 자세한 연결 책임은 [[언어 서버 연결]]에서 확인한다.
