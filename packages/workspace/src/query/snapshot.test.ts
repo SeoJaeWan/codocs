@@ -1,22 +1,32 @@
 import { scanStatuses, referenceResolutionStatuses } from '@codocs/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
-import { loadWorkspace, type WorkspaceScanResult } from '../loader/index.js';
+import { loadWorkspace, type WorkspaceLoadResult } from '../loader/index.js';
 import { WorkspaceQuerySession } from './index.js';
+import { workspaceTargetKinds } from '../paths/domain-values.js';
 
 const watcher = vi.hoisted(() => ({
   subscribe: vi.fn(),
+  start: vi.fn().mockResolvedValue(undefined),
+  settle: vi.fn().mockResolvedValue(undefined),
+  drain: vi.fn(),
   trackTargets: vi.fn().mockResolvedValue(undefined),
   refresh: vi.fn().mockResolvedValue(undefined),
   close: vi.fn().mockResolvedValue(undefined),
   readiness: { state: 'ready', ready: true },
 }));
-vi.mock('../watcher/index.js', () => ({
-  createWorkspaceWatcher: vi
-    .fn()
-    .mockImplementation(() => Promise.resolve(watcher)),
+vi.mock('../watcher/index.js', () => {
+  const exportName = 'WorkspaceWatcher';
+  return {
+    [exportName]: vi.fn(function () {
+      return watcher;
+    }),
+  };
+});
+vi.mock('../loader/index.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../loader/index.js')>()),
+  loadWorkspace: vi.fn(),
 }));
-vi.mock('../loader/index.js', () => ({ loadWorkspace: vi.fn() }));
 
 const root = {
   startCwd: process.cwd(),
@@ -24,10 +34,12 @@ const root = {
   realPath: process.cwd(),
   codocsPath: path.join(process.cwd(), '.codocs'),
 };
-const complete: WorkspaceScanResult = {
+const complete: WorkspaceLoadResult = {
   status: scanStatuses.complete,
   root,
   documents: [],
+  observations: [],
+  links: [],
   failures: [],
   skippedCycles: [],
   diagnostics: [],
@@ -47,7 +59,7 @@ describe('조회 세션 완료 관측 게시: 로더·감시를 격리한 경합
   it('갱신 중 조회하면 이전 완료 버전과 refreshing을 함께 반환한다', async () => {
     await session.refresh();
     const version = session.catalogVersion;
-    let finish!: (scan: WorkspaceScanResult) => void;
+    let finish!: (scan: WorkspaceLoadResult) => void;
     vi.mocked(loadWorkspace).mockReturnValueOnce(
       new Promise((resolve) => {
         finish = resolve;
@@ -74,6 +86,13 @@ describe('조회 세션 완료 관측 게시: 로더·감시를 격리한 경합
     vi.mocked(loadWorkspace).mockResolvedValue({
       ...complete,
       status: scanStatuses.partial,
+      failures: [
+        {
+          kind: workspaceTargetKinds.file,
+          path: '.codocs/unread.yaml',
+          diagnostics: [],
+        },
+      ],
     });
     const result = await session.references({
       sourcePath: '.codocs/source.yaml',
@@ -117,18 +136,28 @@ describe('조회 세션 완료 관측 게시: 로더·감시를 격리한 경합
     await session.refresh();
     const version = session.catalogVersion;
     watcher.trackTargets.mockRejectedValueOnce(new Error('tracking failed'));
+    vi.mocked(loadWorkspace).mockImplementationOnce(async (_input, options) => {
+      await options?.onLink?.({
+        path: '.codocs/external.yaml',
+        confirmed: false,
+        logicalPath: path.join(root.codocsPath, 'external.yaml'),
+        targetPath: path.resolve(root.projectRoot, '../external.yaml'),
+      });
+      return complete;
+    });
     expect(await session.refresh()).toMatchObject({ success: false });
     expect(session.catalogVersion).toBe(version);
   });
 
   it('명시 갱신 중 닫으면 버전을 게시하지 않고 실패 결과를 반환한다', async () => {
-    let finish!: (scan: WorkspaceScanResult) => void;
+    let finish!: (scan: WorkspaceLoadResult) => void;
     vi.mocked(loadWorkspace).mockReturnValueOnce(
       new Promise((resolve) => {
         finish = resolve;
       }),
     );
     const pending = session.refresh();
+    await vi.waitFor(() => expect(loadWorkspace).toHaveBeenCalledOnce());
     await session.close();
     finish(complete);
     expect(await pending).toMatchObject({ success: false });

@@ -1,6 +1,5 @@
 import type { EventEmitter } from 'node:events';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspaceLifecycleStates } from '../lifecycle/index.js';
@@ -50,7 +49,7 @@ vi.mock('chokidar', async () => {
 import {
   createWorkspaceWatcher,
   watcherRecoveryGuidance,
-  type WorkspaceWatcher,
+  WorkspaceWatcher,
 } from './index.js';
 
 let project: string;
@@ -62,7 +61,9 @@ beforeEach(async () => {
   fake.manualReady = false;
   fake.contentIdentity = undefined;
   fake.statCalls = 0;
-  project = await mkdtemp(path.join(tmpdir(), 'codocs-watcher-recovery-'));
+  const parent = path.resolve('.workbench/fixtures');
+  await mkdir(parent, { recursive: true });
+  project = await mkdtemp(path.join(parent, 'watcher-recovery-'));
 });
 
 afterEach(async () => {
@@ -271,6 +272,157 @@ describe('WorkspaceWatcher 감시 오류 복구', () => {
         cause: 'watch failed',
         guidance: watcherRecoveryGuidance,
       });
+    });
+  });
+});
+
+describe('감시 시작·대상 등록·재연결의 종료 경합', () => {
+  it('start 직후 close하면 늦은 루트 확인이 감시자를 만들지 않는다', async () => {
+    watcher = new WorkspaceWatcher(project);
+    const starting = watcher.start();
+    await watcher.close();
+    await starting;
+    expect(fake.watchers).toHaveLength(0);
+    expect(watcher.readiness.state).toBe(workspaceLifecycleStates.closed);
+  });
+
+  it('최초 ready 대기 중 close하면 ready 없이도 시작 대기와 모든 연결을 정리한다', async () => {
+    fake.manualReady = true;
+    watcher = new WorkspaceWatcher(project);
+    const starting = watcher.start();
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(2));
+    await watcher.close();
+    await starting;
+    for (const connection of fake.watchers)
+      expect(connection.close).toHaveBeenCalled();
+    expect(watcher.readiness.state).toBe(workspaceLifecycleStates.closed);
+  });
+
+  it('같은 외부 대상 등록을 겹쳐 요청하면 하나의 준비 작업을 공유한다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    fake.manualReady = true;
+    const target = path.join(project, 'external.yaml');
+    const first = watcher.trackTargets([target]);
+    const count = fake.watchers.length;
+    const second = watcher.trackTargets([target]);
+    expect(fake.watchers).toHaveLength(count);
+    let complete = false;
+    const completion = first.then(() => {
+      complete = true;
+    });
+    await Promise.resolve();
+    expect(complete).toBe(false);
+    for (const connection of fake.watchers) connection.emit('ready');
+    await Promise.all([first, second, completion]);
+    await watcher.trackTargets([target]);
+    expect(fake.watchers).toHaveLength(count);
+  });
+
+  it('외부 대상 준비 중 close하면 등록 대기를 끝내고 이후 등록을 열지 않는다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    fake.manualReady = true;
+    const registration = watcher.trackTargets([
+      path.join(project, 'external.yaml'),
+    ]);
+    await watcher.close();
+    await registration;
+    const count = fake.watchers.length;
+    await watcher.trackTargets([path.join(project, 'other.yaml')]);
+    expect(fake.watchers).toHaveLength(count);
+    for (const connection of fake.watchers)
+      expect(connection.close).toHaveBeenCalled();
+    expect(watcher.readiness.state).toBe(workspaceLifecycleStates.closed);
+  });
+
+  it('수동 재연결 ready 대기 중 close하면 닫힌 상태를 ready로 되돌리지 않는다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    fake.manualReady = true;
+    const reconnecting = watcher.refresh();
+    await vi.waitFor(() => expect(fake.watchers.length).toBeGreaterThan(2));
+    await watcher.close();
+    expect(await reconnecting).toEqual({
+      state: workspaceLifecycleStates.closed,
+      ready: false,
+    });
+    for (const connection of fake.watchers) {
+      connection.emit('ready');
+      expect(connection.close).toHaveBeenCalled();
+    }
+    expect(watcher.readiness.state).toBe(workspaceLifecycleStates.closed);
+  });
+
+  it('전달 전 배치를 drain하면 같은 경로를 한 번 전달하고 타이머를 비운다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    const listener = vi.fn();
+    watcher.subscribe(listener);
+    const target = path.join(project, '.codocs', 'alpha.yaml');
+    vi.useFakeTimers();
+    fake.watchers[1]!.emit('all', 'change', target);
+    fake.watchers[1]!.emit('all', 'change', target);
+    expect(watcher.hasPendingChanges).toBe(true);
+    watcher.drain();
+    expect(watcher.hasPendingChanges).toBe(false);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(listener).toHaveBeenCalledExactlyOnceWith({ paths: [target] });
+  });
+});
+
+describe('루트 보완 감시의 새 하위 폴더 신호', () => {
+  it('내용 감시가 놓친 하위 폴더를 루트 감시가 발견하면 새 하위 감시를 준비하고 문서 경로를 전달한다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    const directory = path.join(project, '.codocs', 'nested');
+    const target = path.join(directory, 'deep', 'alpha.yaml');
+    const listener = vi.fn();
+    watcher.subscribe(listener);
+    fake.manualReady = true;
+    fake.watchers[0]!.emit('all', 'addDir', directory);
+    expect(fake.watchers).toHaveLength(3);
+    const subtree = fake.watchers[2]!;
+    subtree.emit('all', 'add', target);
+    subtree.emit('ready');
+    await vi.waitFor(() =>
+      expect(listener).toHaveBeenCalledWith({ paths: [directory, target] }),
+    );
+    const count = fake.watchers.length;
+    fake.watchers[0]!.emit('all', 'addDir', directory);
+    expect(fake.watchers).toHaveLength(count);
+  });
+});
+
+describe('동적 대상 준비의 실패와 종료', () => {
+  it('외부 등록 ready 전에 오류가 발생하면 등록을 거부하고 자동 감시 복구를 마친다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    fake.failNext = true;
+    await expect(
+      watcher.trackTargets([path.join(project, 'external.yaml')]),
+    ).rejects.toThrow('watch failed');
+    await vi.waitFor(() =>
+      expect(watcher!.readiness).toEqual({
+        state: workspaceLifecycleStates.ready,
+        ready: true,
+      }),
+    );
+    expect(watcher.automaticRecoveryAttempts).toBe(1);
+  });
+
+  it('새 하위 감시 settle 중 close하면 모든 준비 대기를 끝내고 늦은 ready를 무시한다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    fake.manualReady = true;
+    fake.watchers[0]!.emit(
+      'all',
+      'addDir',
+      path.join(project, '.codocs', 'nested'),
+    );
+    const settling = watcher.settle();
+    await watcher.close();
+    await settling;
+    for (const connection of fake.watchers) {
+      connection.emit('ready');
+      expect(connection.close).toHaveBeenCalled();
+    }
+    expect(watcher.readiness).toEqual({
+      state: workspaceLifecycleStates.closed,
+      ready: false,
     });
   });
 });

@@ -346,6 +346,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
         ...scan,
         status: scanStatuses.partial,
         documents: [],
+        observations: [],
         failures: [
           {
             kind: workspaceTargetKinds.file,
@@ -414,7 +415,17 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
     vi.spyOn(loader, 'loadWorkspace').mockImplementation(async (...args) => {
       const scan = await original(...args);
       if (scan.status === scanStatuses.failed) return scan;
-      return { ...scan, status: scanStatuses.partial };
+      return {
+        ...scan,
+        status: scanStatuses.partial,
+        failures: [
+          {
+            kind: workspaceTargetKinds.file,
+            path: '.codocs/unread.yaml',
+            diagnostics: [],
+          },
+        ],
+      };
     });
     await session.refresh();
     const origin = {
