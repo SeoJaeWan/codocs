@@ -37,6 +37,14 @@ definition: |
   파서가 최상위 YAML 범위를 확인한 문서는 같은 원문의 UTF-16 offset 범위와 0 기반 줄·문자 범위를 제공한다.
   CRLF도 원문 그대로 계산하며 파싱 실패처럼 범위를 확인할 수 없으면 좌표를 만들지 않는다.
 
+  ## 편집 중 YAML 참조
+
+  편집 중 출처의 전체 원문에서 definition·문자열 examples의 등장과 실제 UTF-16 위치를 계산하고 같은 디스크 색인의 후보·내용·진단·revision을 함께 투영한다.
+  문서의 다른 속성 오류 때문에 확인한 문자열을 버리지 않으며 YAML 파싱 실패에서 원문 검색으로 참조를 추측하지 않는다.
+  반복·잘못된 문법·자기 참조·부재·모호함·미확인을 구분한다. 확정되지 않은 후보를 단일 연결로 만들지 않는다.
+  폐기 상태 참조 경고는 코드·문구·위치를 보존하며 대상의 내용과 관계를 제거하지 않는다.
+  요청마다 전체 색인을 재구성하지 않고 출처 하나와 해당 후보만 계산한다.
+
   ## 연결의 ID 표현
 
   색인의 확정 직접 연결 중 유효한 ID가 프로젝트 전체에서 유일한 문서만 references와 referencedBy에 포함한다.
@@ -57,5 +65,5 @@ definition: |
 
   ## 코드와 검증 위치
 
-  대표 함수 projectCatalogList·projectCatalogGet·projectCatalogPaths와 목록·상세 결과는 [조회 투영 구현](../../../packages/core/src/query/index.ts)에서 확인한다.
+  대표 함수 projectCatalogList·projectCatalogGet·projectCatalogPaths·projectLiveReferences와 목록·상세 결과는 [조회 투영 구현](../../../packages/core/src/query/index.ts)에서 확인한다.
   필터·충돌·원문 보존·연결 ID와 입력 보존 사례는 [인접 테스트](../../../packages/core/src/query/query.test.ts)에서 확인한다.

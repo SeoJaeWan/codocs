@@ -12,6 +12,7 @@ const path = require('node:path');
 const { monitorEventLoopDelay, performance } = require('node:perf_hooks');
 const vscode = require('vscode');
 const { classifyRequestOutcome } = require('./request-outcome.cjs');
+const { runCod18 } = require('./cod18.cjs');
 
 const extensionIdentifier = 'codocs.codocs';
 const restartCommand = 'codocs.restartLanguageServers';
@@ -283,35 +284,35 @@ async function verifyHoverAndOpenSource(fixtureRoot) {
   assert.equal(parentHovers.length, 0);
 
   const argument = commandArgument(returnZone.markdown);
-  const sourceUri = vscode.Uri.parse(argument.uri);
+  const sourceUri = vscode.Uri.file(
+    path.join(
+      fixtureRoot,
+      'parent',
+      'nested',
+      '.codocs',
+      '한글 원문',
+      '반납 구역.yaml',
+    ),
+  );
   assert.match(sourceUri.fsPath, /한글 원문[/\\]반납 구역\.yaml$/u);
-  assert.ok(argument.range);
-  assert.match(argument.revision, /^[a-f0-9]{64}$/u);
-  assert.ok(Number.isSafeInteger(argument.catalogVersion));
+  assert.equal(argument.sourceUri, document.uri.toString());
+  assert.match(argument.token, /^[\w-]{32}$/u);
   const beforeOpenTabs = tabsForUri(sourceUri);
+  const expectedOpenTabs = beforeOpenTabs === 0 ? 1 : beforeOpenTabs;
   assert.equal(
     await vscode.commands.executeCommand(openSourceCommand, argument),
     true,
   );
   const openedEditor = vscode.window.activeTextEditor;
   assert.equal(openedEditor.document.uri.toString(), sourceUri.toString());
-  assert.equal(openedEditor.selection.start.line, argument.range.start.line);
-  assert.equal(
-    openedEditor.selection.start.character,
-    argument.range.start.character,
-  );
-  assert.equal(openedEditor.selection.end.line, argument.range.end.line);
-  assert.equal(
-    openedEditor.selection.end.character,
-    argument.range.end.character,
-  );
-  assert.equal(tabsForUri(sourceUri), beforeOpenTabs + 1);
+  assert.deepEqual(openedEditor.selection, new vscode.Selection(0, 0, 0, 0));
+  assert.equal(tabsForUri(sourceUri), expectedOpenTabs);
   await checkpoint('functional:open-source-saved');
   assert.equal(
     await vscode.commands.executeCommand(openSourceCommand, argument),
     true,
   );
-  assert.equal(tabsForUri(sourceUri), beforeOpenTabs + 1);
+  assert.equal(tabsForUri(sourceUri), expectedOpenTabs);
 
   const diskYaml = await readFile(sourceUri.fsPath, 'utf8');
   const dirtyYaml = `${diskYaml}# unsaved fixture edit\r\n`;
@@ -327,8 +328,8 @@ async function verifyHoverAndOpenSource(fixtureRoot) {
   assert.equal(reopenedEditor.document.getText(), dirtyYaml);
   assert.equal(reopenedEditor.document.isDirty, true);
   assert.equal(await readFile(sourceUri.fsPath, 'utf8'), diskYaml);
-  assert.deepEqual(reopenedEditor.selection, new vscode.Selection(0, 1, 0, 1));
-  assert.equal(tabsForUri(sourceUri), beforeOpenTabs + 1);
+  assert.deepEqual(reopenedEditor.selection, new vscode.Selection(0, 0, 0, 0));
+  assert.equal(tabsForUri(sourceUri), expectedOpenTabs);
   await vscode.commands.executeCommand('workbench.action.files.revert');
   assert.equal(reopenedEditor.document.isDirty, false);
   await checkpoint('functional:open-source-dirty-preserved');
@@ -378,7 +379,7 @@ async function verifyHoverAndOpenSource(fixtureRoot) {
     crlfAndUnicodePathOpened: true,
     existingTabReused: true,
     dirtyYamlPreserved: true,
-    dirtySelectionPreservedOnRevisionMismatch: true,
+    dirtySelectionResetToTop: true,
     defaultDefinitionProviderPreserved: true,
   };
 }
@@ -390,7 +391,83 @@ async function runFunctional(fixtureRoot, extensionRoot) {
   await expectMissing(missingCodocs);
   const activated = await activateExtension(extensionRoot);
   await expectMissing(missingCodocs);
-  const hoverEvidence = await verifyHoverAndOpenSource(fixtureRoot);
+  const cod18 = await runCod18({
+    vscode,
+    fixtureRoot,
+    checkpoint,
+    waitFor,
+    replaceDocument,
+    executeHover,
+    hoverMarkdown,
+    commandArgument,
+  });
+  let hoverEvidence;
+  const legacyStarted = Date.now();
+  try {
+    hoverEvidence = await verifyHoverAndOpenSource(fixtureRoot);
+  } catch (error) {
+    const row = {
+      ac: 'AC-010',
+      name: 'legacy code Hover/open source',
+      status: 'fail',
+      error: error.stack,
+      durationMilliseconds: Date.now() - legacyStarted,
+    };
+    cod18.push(row);
+    await checkpoint('cod18:scenario', row);
+    const sourcePath = path.join(
+      fixtureRoot,
+      'parent',
+      'nested',
+      'source.java',
+    );
+    hoverEvidence = {
+      sourcePath,
+      document: await vscode.workspace.openTextDocument(sourcePath),
+      failure: error.stack,
+    };
+  }
+  const definitionStarted = Date.now();
+  try {
+    const doc = await vscode.workspace.openTextDocument(
+      path.join(fixtureRoot, 'parent', 'nested', 'definition.js'),
+    );
+    const definitions = await waitFor(
+      'independent native definition',
+      /** 기본 JavaScript 정의 제공자의 준비를 기다린다. */
+      async () => {
+        const values = await vscode.commands.executeCommand(
+          'vscode.executeDefinitionProvider',
+          doc.uri,
+          new vscode.Position(1, 3),
+        );
+        return values?.length ? values : undefined;
+      },
+      30000,
+    );
+    assert.equal(
+      (definitions[0].targetUri ?? definitions[0].uri).toString(),
+      doc.uri.toString(),
+    );
+    assert.equal(
+      (definitions[0].targetSelectionRange ?? definitions[0].range).start.line,
+      0,
+    );
+    cod18.push({
+      ac: 'AC-012',
+      name: 'native JavaScript definition',
+      status: 'pass',
+      durationMilliseconds: Date.now() - definitionStarted,
+    });
+  } catch (error) {
+    cod18.push({
+      ac: 'AC-012',
+      name: 'native JavaScript definition',
+      status: 'fail',
+      error: error.stack,
+      durationMilliseconds: Date.now() - definitionStarted,
+    });
+  }
   const document = hoverEvidence.document;
   const sourcePath = hoverEvidence.sourcePath;
   const diskText = await readFile(sourcePath, 'utf8');
@@ -514,6 +591,7 @@ async function runFunctional(fixtureRoot, extensionRoot) {
     workspaceFolderCount: activated.folders.length,
     serverCount: activated.initialProcesses.length,
     hoverAndOpenSource: {
+      failure: hoverEvidence.failure,
       reservationRange: hoverEvidence.reservationRange,
       returnZoneRange: hoverEvidence.returnZoneRange,
       generatedCommandTrusted: hoverEvidence.generatedCommandTrusted,
@@ -522,8 +600,7 @@ async function runFunctional(fixtureRoot, extensionRoot) {
       crlfAndUnicodePathOpened: hoverEvidence.crlfAndUnicodePathOpened,
       existingTabReused: hoverEvidence.existingTabReused,
       dirtyYamlPreserved: hoverEvidence.dirtyYamlPreserved,
-      dirtySelectionPreservedOnRevisionMismatch:
-        hoverEvidence.dirtySelectionPreservedOnRevisionMismatch,
+      dirtySelectionResetToTop: hoverEvidence.dirtySelectionResetToTop,
       defaultDefinitionProviderPreserved:
         hoverEvidence.defaultDefinitionProviderPreserved,
     },
@@ -542,6 +619,7 @@ async function runFunctional(fixtureRoot, extensionRoot) {
     manualRecoveryRestoredAllServers:
       afterRecovery.length === activated.folders.length,
     crashedPids,
+    cod18,
   };
 }
 
@@ -793,6 +871,77 @@ async function runPerformance(fixtureRoot, extensionRoot) {
 }
 
 /** Extension Host 시나리오를 실행하고 증거 파일을 기록한다. */
+async function runInteractiveUi(fixtureRoot, extensionRoot) {
+  await activateExtension(extensionRoot);
+  const root = path.join(fixtureRoot, 'parent', 'nested', '.codocs');
+  await writeFile(
+    path.join(root, 'ui-a.yaml'),
+    'id: ui-a\nname: UI 복수\ndefinition: candidate A\n',
+  );
+  await writeFile(
+    path.join(root, 'ui-b.yaml'),
+    'id: ui-b\nname: UI 복수\ndefinition: candidate B\n',
+  );
+  const sourcePath = path.join(root, 'ui-source.yaml');
+  await writeFile(
+    sourcePath,
+    'id: ui-source\nname: UI 검증\ndefinition: |\n  [[예약]]\n  [[UI 복수]]\n',
+  );
+  const doc = await vscode.workspace.openTextDocument(sourcePath);
+  await vscode.window.showTextDocument(doc, { preview: false });
+  const events = [];
+  const editorListener = vscode.window.onDidChangeActiveTextEditor(
+    /** 실제 UI의 탭 전환을 기록한다. */ (editor) => {
+      events.push({
+        at: new Date().toISOString(),
+        kind: 'editor',
+        uri: editor?.document.uri.toString(),
+        selection: editor?.selection,
+        dirty: editor?.document.isDirty,
+      });
+    },
+  );
+  const selectionListener = vscode.window.onDidChangeTextEditorSelection(
+    /** 실제 UI의 선택 위치를 기록한다. */
+    (event) => {
+      events.push({
+        at: new Date().toISOString(),
+        kind: 'selection',
+        uri: event.textEditor.document.uri.toString(),
+        selections: event.selections,
+      });
+    },
+  );
+  await checkpoint('ui:ready', {
+    fixtureRoot,
+    sourcePath,
+    version: vscode.version,
+  });
+  await waitFor(
+    'UI evidence release file',
+    /** UI 관찰 종료 표시를 기다린다. */
+    async () => {
+      try {
+        await access(path.join(fixtureRoot, 'ui-done'));
+        return true;
+      } catch (error) {
+        if (error.code === 'ENOENT') return undefined;
+        throw error;
+      }
+    },
+    900000,
+  );
+  editorListener.dispose();
+  selectionListener.dispose();
+  return {
+    vscodeVersion: vscode.version,
+    method:
+      'interactive UI session; acceptance is recorded separately from editor telemetry',
+    events,
+  };
+}
+
+/** 선택한 검증 모드의 실제 Host 증거를 기록한다. */
 async function run() {
   const fixtureRoot = process.env.COD16_FIXTURE_ROOT;
   const extensionRoot = process.env.COD16_EXTENSION_ROOT;
@@ -802,9 +951,11 @@ async function run() {
   assert.ok(evidencePath, 'COD16_EVIDENCE_PATH is required');
   await checkpoint('run:start', { vscodeVersion: vscode.version });
   const evidence =
-    process.env.COD16_HOVER_PERFORMANCE === '1'
-      ? await runPerformance(fixtureRoot, extensionRoot)
-      : await runFunctional(fixtureRoot, extensionRoot);
+    process.env.COD18_UI === '1'
+      ? await runInteractiveUi(fixtureRoot, extensionRoot)
+      : process.env.COD16_HOVER_PERFORMANCE === '1'
+        ? await runPerformance(fixtureRoot, extensionRoot)
+        : await runFunctional(fixtureRoot, extensionRoot);
   await writeFile(
     evidencePath,
     `${JSON.stringify(evidence, null, 2)}\n`,

@@ -20,6 +20,7 @@ import {
 import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import type { ReferenceOccurrence } from '../references/index.js';
 import { extractReferences } from '../references/index.js';
+import { documentStatuses } from '../validator/domain-values.js';
 import { documentFields, validateDocument } from '../validator/index.js';
 import {
   catalogConfirmations,
@@ -173,6 +174,10 @@ const catalogDiagnosticDefinitions = {
   },
   [catalogDiagnosticCodes.unconfirmedReference]: {
     message: catalogDiagnosticMessages.unconfirmedReference,
+    severity: diagnosticSeverities.warning,
+  },
+  [catalogDiagnosticCodes.deprecatedReference]: {
+    message: catalogDiagnosticMessages.deprecatedReference,
     severity: diagnosticSeverities.warning,
   },
   [catalogDiagnosticCodes.referenceTargetError]: {
@@ -359,63 +364,10 @@ function calculate(
       conflicts(paths, catalogDiagnosticCodes.duplicateName, domain);
   const backlinks = new Map<string, Set<string>>();
   for (const [path, doc] of documents) {
-    const extracted = extractReferences(doc.observation.parsed, path);
-    const diagnostics: Diagnostic[] = [
-      ...doc.documentDiagnostics,
-      ...extracted.diagnostics,
-    ];
-    const links = new Set<string>();
-    const occurrences = extracted.occurrences.map(
-      /** 원문 등장을 해석하며 확정 연결만 별도 집계한다. */ (
-        occurrence,
-      ): CatalogOccurrence => {
-        const resolution: ReferenceResolution =
-          occurrence.syntax === referenceSyntaxStatuses.invalid
-            ? { status: referenceResolutionStatuses.invalid, candidates: [] }
-            : resolveReference(catalog, occurrence, path);
-        const key =
-          resolution.status === referenceResolutionStatuses.missing
-            ? catalogDiagnosticCodes.missingReference
-            : resolution.status === referenceResolutionStatuses.ambiguous
-              ? catalogDiagnosticCodes.ambiguousReference
-              : resolution.status === referenceResolutionStatuses.self
-                ? catalogDiagnosticCodes.selfReference
-                : resolution.status === referenceResolutionStatuses.unconfirmed
-                  ? catalogDiagnosticCodes.unconfirmedReference
-                  : undefined;
-        if (key)
-          diagnostics.push(
-            catalogDiagnostic(doc, key, occurrence.fieldPath, occurrence),
-          );
-        if (
-          resolution.status === referenceResolutionStatuses.resolved &&
-          resolution.target &&
-          doc.confirmation === catalogConfirmations.confirmed
-        ) {
-          links.add(resolution.target.path);
-          addPath(backlinks, resolution.target.path, path);
-          if (resolution.target.errors.length)
-            diagnostics.push(
-              catalogDiagnostic(
-                doc,
-                catalogDiagnosticCodes.referenceTargetError,
-                occurrence.fieldPath,
-                occurrence,
-              ),
-            );
-        }
-        return { occurrence, resolution };
-      },
-    );
-    documents.set(path, {
-      ...doc,
-      diagnostics,
-      occurrences,
-      references: [...links].sort().flatMap((p) => {
-        const d = documents.get(p);
-        return d ? [linkIdentity(d)] : [];
-      }),
-    });
+    const resolved = resolveDocumentReferences(catalog, doc);
+    for (const target of resolved.references)
+      addPath(backlinks, target.path, path);
+    documents.set(path, resolved);
   }
   for (const [path, doc] of documents)
     documents.set(path, {
@@ -427,6 +379,112 @@ function calculate(
     });
   return catalog;
 }
+/** 디스크 색인 또는 임시 출처의 등장·진단·연결을 같은 규칙으로 계산한다. */
+function resolveDocumentReferences(
+  catalog: Catalog,
+  doc: CatalogDocument,
+): CatalogDocument {
+  const path = doc.path;
+  const extracted = extractReferences(doc.observation.parsed, path);
+  const diagnostics: Diagnostic[] = [
+    ...doc.documentDiagnostics,
+    ...extracted.diagnostics,
+  ];
+  const links = new Set<string>();
+  const occurrences = extracted.occurrences.map(
+    /** 원문 등장을 해석하며 확정 연결만 별도 집계한다. */ (
+      occurrence,
+    ): CatalogOccurrence => {
+      const resolution: ReferenceResolution =
+        occurrence.syntax === referenceSyntaxStatuses.invalid
+          ? { status: referenceResolutionStatuses.invalid, candidates: [] }
+          : resolveReference(catalog, occurrence, path);
+      const key =
+        resolution.status === referenceResolutionStatuses.missing
+          ? catalogDiagnosticCodes.missingReference
+          : resolution.status === referenceResolutionStatuses.ambiguous
+            ? catalogDiagnosticCodes.ambiguousReference
+            : resolution.status === referenceResolutionStatuses.self
+              ? catalogDiagnosticCodes.selfReference
+              : resolution.status === referenceResolutionStatuses.unconfirmed
+                ? catalogDiagnosticCodes.unconfirmedReference
+                : undefined;
+      if (key)
+        diagnostics.push(
+          catalogDiagnostic(doc, key, occurrence.fieldPath, occurrence),
+        );
+      if (
+        resolution.status === referenceResolutionStatuses.resolved &&
+        resolution.target &&
+        doc.confirmation === catalogConfirmations.confirmed
+      ) {
+        links.add(resolution.target.path);
+        const target = catalog.documents.get(resolution.target.path);
+        if (
+          target?.observation.parsed.success &&
+          target.observation.parsed.data.status === documentStatuses.deprecated
+        )
+          diagnostics.push(
+            catalogDiagnostic(
+              doc,
+              catalogDiagnosticCodes.deprecatedReference,
+              occurrence.fieldPath,
+              occurrence,
+            ),
+          );
+        if (resolution.target.errors.length)
+          diagnostics.push(
+            catalogDiagnostic(
+              doc,
+              catalogDiagnosticCodes.referenceTargetError,
+              occurrence.fieldPath,
+              occurrence,
+            ),
+          );
+      }
+      return { occurrence, resolution };
+    },
+  );
+  return {
+    ...doc,
+    diagnostics,
+    occurrences,
+    references: [...links].sort().flatMap((p) => {
+      const target = catalog.documents.get(p);
+      return target ? [linkIdentity(target)] : [];
+    }),
+  };
+}
+
+/** live 출처 하나만 해석하며 대상 색인과 역참조를 변경하지 않는다. */
+export function resolveLiveDocument(
+  catalog: Catalog,
+  observation: CatalogObservation,
+): CatalogDocument {
+  const parsed = observation.parsed;
+  const validation = parsed.success
+    ? validateDocument({
+        data: parsed.data,
+        path: observation.path,
+        source: parsed.source,
+        fields: parsed.fields,
+        ...(parsed.rootRange ? { rootRange: parsed.rootRange } : {}),
+      })
+    : undefined;
+  const documentDiagnostics = validation
+    ? [...validation.errors, ...validation.warnings]
+    : [...parsed.diagnostics];
+  return resolveDocumentReferences(catalog, {
+    ...identity(observation, catalogConfirmations.confirmed),
+    observation,
+    documentDiagnostics,
+    diagnostics: [],
+    occurrences: [],
+    references: [],
+    referencedBy: [],
+  });
+}
+
 /** complete만 삭제 근거로 삼아 구축·갱신한다. partial/failed의 미관측 이전 기록은 미확인으로 보존한다. */
 export function buildCatalog(scan: CatalogScan, previous?: Catalog): Catalog {
   const records = new Map<string, CatalogDocument>();

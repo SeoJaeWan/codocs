@@ -1,0 +1,268 @@
+{
+  "kind": "actual-vscode-extension-host",
+  "packageKind": "installed-vsix",
+  "vscode": {
+    "requestedVersion": null,
+    "version": "1.136.1",
+    "architecture": "arm64",
+    "executable": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/installed-ui/Visual Studio Code.app/Contents/MacOS/Code",
+    "runtimeRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/installed-ui/Visual Studio Code.app/Contents/MacOS",
+    "downloadedThisRun": false
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "cpu": "Apple M1 Pro",
+    "cpuCount": 10,
+    "memoryBytes": 17179869184,
+    "runnerNode": "v24.21.0",
+    "fileCache": "OS file cache was not forcibly cleared",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": null,
+  "artifacts": {
+    "sourceCommit": "66686f70c254675e7263912604e90298d556f98d",
+    "productSourceCommit": "66686f70c254675e7263912604e90298d556f98d",
+    "harnessState": "content hashes captured before Host; harness may be uncommitted",
+    "harnessHashes": {
+      "run.mjs": "1baac7c07fec9c24062dba5274ec6a5ca29228bf790236465203d514f1c828cc",
+      "extension-test.cjs": "a16ed9af38b0c0bca717117bb0c797224a7db7f56bcdb74e3145fcbcf46274d2",
+      "cod18.cjs": "1a864299d9cd089d89e8952d2380ca144ed34224e13a40442d851a2b0fd9b79b",
+      "request-outcome.cjs": "495679cedec30d662ac2cb9c701168acfc3e63b56daf469079f1760a801e6a06"
+    },
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/cod18.vsix",
+    "vsixBytes": 1225758,
+    "vsixSha256": "8924a77e7b92f837354d5248580b7bf2e9b89250bfc8401b5ed9921c16803628",
+    "extensionBundleSha256": "a842268fc4b12efdf851f0b65dee0640d5b2c5aa3a6367acd52ab2e7723f0ca6",
+    "serverBundleSha256": "1b0676e32e41b1ee658038b96f1333e0fd5a7ab414c88653305c6e6f6cf5c95d",
+    "vscodeSourceSha256": "f29f2281d86eaca089526891207270b497bfd9d2be4a505707323075fac0d761",
+    "languageServerSourceSha256": "83547fe075fd9dcd5cf22302f0483b48982efe86212093263f537ecf5745cdae"
+  },
+  "install": {
+    "extensionRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.r6jw49q/e/codocs.codocs-0.0.0",
+    "stdout": "Installing extensions...\nExtension 'cod18.vsix' was successfully installed.\n",
+    "stderr": "(node:48425) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code --trace-deprecation ...` to show where the warning was created)\n"
+  },
+  "exitCode": 0,
+  "stdout": "\u001b[90m[main 2026-09-22T01:52:15.197Z]\u001b[0m StorageMainService: creating application shared storage\n\u001b[90m[main 2026-09-22T01:52:15.701Z]\u001b[0m [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)\n\u001b[90m[main 2026-09-22T01:52:15.702Z]\u001b[0m [shared storage] Initializing fallback application storage (path: in-memory)\n\u001b[90m[main 2026-09-22T01:52:15.967Z]\u001b[0m [shared storage] Fallback application storage initialized with 3 items\n\u001b[90m[main 2026-09-22T01:52:16.746Z]\u001b[0m update#setState idle\n[AgentHost:renderer] Acquiring MessagePort to agent host...\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=undefined conversationKey=undefined modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\nLoading development extension at /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.r6jw49q/e/codocs.codocs-0.0.0\n\u001b[90m[main 2026-09-22T01:52:17.432Z]\u001b[0m AgentHostProcessManager: agent host started\n[AgentHost:renderer] MessagePort acquired, creating client...\nStarted local extension host with pid 48739.\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/MDc2NjQ3ODctODEyNS00MmJiLTliZTctYmIzYmJkNTdiMzIz\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n[AgentHost:renderer] Protocol connection established; clientId=f5da99e5-958f-48e5-9cfc-bbc96cd19728\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] Clearing authentication for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] Clearing authentication for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\nSettings Sync: Account status changed from uninitialized to unavailable\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/MDc2NjQ3ODctODEyNS00MmJiLTliZTctYmIzYmJkNTdiMzIz\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n\u001b[90m[main 2026-09-22T01:52:46.749Z]\u001b[0m update#setState checking for updates\n\u001b[90m[main 2026-09-22T01:52:46.767Z]\u001b[0m update#setState downloading\n\u001b[90m[main 2026-09-22T01:54:20.147Z]\u001b[0m Extension host with pid 48739 exited with code: 0, signal: unknown.\n",
+  "stderr": "\u001b[91m[main 2026-09-22T01:52:17.784Z]\u001b[0m [AgentHost:stderr] (node:48719) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code Helper --trace-deprecation ...` to show where the warning was created)\n\n(node:48431) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code --trace-deprecation ...` to show where the warning was created)\nUnknown channel: agentHostClientByokLm\nUnknown channel: agentHostClientProxy\nUnknown channel: agentHostClientProxy\nUnknown channel: agentHostClientProxy\n2026-09-22 10:52:43.113 Code[48431:2034926] TSM AdjustCapsLockLEDForKeyTransitionHandling - _ISSetPhysicalKeyboardCapsLockLED Inhibit\nERROR: Unrecognized attribute string flag '?' in attribute string \"T@\"NSString\",?,R,C\" for property debugDescription\nERROR: Unrecognized attribute string flag '?' in attribute string \"T@\"NSString\",?,R,C\" for property debugDescription\nERROR: Unrecognized attribute string flag '?' in attribute string \"T@\"NSString\",?,R,C\" for property debugDescription\nERROR: Unrecognized attribute string flag '?' in attribute string \"T@\"NSString\",?,R,C\" for property debugDescription\n",
+  "evidence": {
+    "vscodeVersion": "1.136.1",
+    "method": "interactive UI session; acceptance is recorded separately from editor telemetry",
+    "events": [
+      {
+        "at": "2026-09-22T01:52:43.168Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-QfTKTk/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 3,
+              "character": 4
+            },
+            "end": {
+              "line": 3,
+              "character": 4
+            },
+            "active": {
+              "line": 3,
+              "character": 4
+            },
+            "anchor": {
+              "line": 3,
+              "character": 4
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:52:49.413Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:52:49.422Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-QfTKTk/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T01:52:59.749Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:52:59.764Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-QfTKTk/parent/nested/.codocs/ui-source.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T01:52:59.769Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-QfTKTk/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 3,
+              "character": 4
+            },
+            "end": {
+              "line": 3,
+              "character": 4
+            },
+            "active": {
+              "line": 3,
+              "character": 4
+            },
+            "anchor": {
+              "line": 3,
+              "character": 4
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:52:59.795Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-QfTKTk/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 4,
+              "character": 5
+            },
+            "end": {
+              "line": 4,
+              "character": 5
+            },
+            "active": {
+              "line": 4,
+              "character": 5
+            },
+            "anchor": {
+              "line": 4,
+              "character": 5
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:53:19.788Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:53:19.820Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-QfTKTk/parent/nested/source.java",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T01:53:19.905Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-QfTKTk/parent/nested/source.java",
+        "selections": [
+          {
+            "start": {
+              "line": 1,
+              "character": 4
+            },
+            "end": {
+              "line": 1,
+              "character": 4
+            },
+            "active": {
+              "line": 1,
+              "character": 4
+            },
+            "anchor": {
+              "line": 1,
+              "character": 4
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:53:39.720Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:53:39.729Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-QfTKTk/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      }
+    ]
+  }
+}
