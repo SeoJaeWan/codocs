@@ -10,4 +10,6 @@
 
 기능 진입점은 `tools/vscode-tests/run.mjs`, 실제 공식 테스트 호출은 `host.mjs`, 확장 호스트 내부 진입점은 `suite.cjs`다. 새 기능은 독립 `scenarios` 항목과 대응 문서에 추가한다. `context.cjs`의 도우미는 API 준비·반복 조회를 담당하며 핵심 assertion은 사례 본문에 둔다. 성능 실행기는 같은 격리 API로 자기 entrypoint를 실행하고 자신의 측정 시작·완료 경계를 유지한다.
 
+`read-denial.cjs`는 실제 읽기 실패가 필요한 fixture를 준비한다. Windows에서는 전용 자식의 독점 공유 잠금을 사용하고, macOS에서는 시험 파일의 권한을 0으로 낮춘다. 두 경로 모두 실제 `readFile` 실패를 확인한 뒤 준비 완료로 인정하며 해제할 때 자식 또는 원래 권한을 복원한다. macOS GUI 격리 실행은 아직 준비되지 않았으므로 Mac의 실제 VS Code 결과는 별도로 검증해야 한다.
+
 기능 결과 `functional.json`은 실제 VS Code·Node 버전과 각 사례의 성공/실패를 기록한다. 외부 `isolation.json`은 내부 `window.state.focused`와 독립된 관측이다. `result.json`은 HEAD와 tracked diff, 실행·정리 결과를 담는다. 확정 SHA를 검증하려면 clean candidate에서 명령을 실행하고 그 디렉터리 전체를 증거로 전달한다.

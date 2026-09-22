@@ -8,6 +8,8 @@ export function fixtureFiles() {
       'id: zone\nname: Zone\ndefinition: Zone body\ndomains: [test]\n',
     'partial/.codocs/unreadable.yaml':
       'id: locked\nname: Locked\ndefinition: Not readable\ndomains: [test]\n',
+    'partial/.codocs/unconfirmed-source.yaml':
+      'id: partial-source\nname: Partial Source\ndefinition: "[[Locked]]"\n',
     'partial/probe.java': 'zone();\n',
     '.codocs/ready.yaml':
       'id: ready-signal\nname: Ready Signal\ndefinition: UI ready sentinel\ndomains: [test]\n',

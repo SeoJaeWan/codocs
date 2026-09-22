@@ -1,96 +1,12 @@
-const { spawn, execFileSync } = require('node:child_process');
-
-/** 현재 시험 Extension Host의 직접 자식 중 전용 확장의 서버만 찾는다. */
-function ownedServers(c) {
-  const json = execFileSync(
-    c.path.join(
-      process.env.SystemRoot,
-      'System32/WindowsPowerShell/v1.0/powershell.exe',
-    ),
-    [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      `Get-CimInstance Win32_Process -Filter "ParentProcessId = ${process.pid}" | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress`,
-    ],
-    { windowsHide: true, encoding: 'utf8' },
-  );
-  const values = JSON.parse(json || '[]');
-  const serverPath = c.path
-    .join(c.config.temporary, 'extension/dist/server/index.cjs')
-    .toLowerCase();
-  return (Array.isArray(values) ? values : [values])
-    .filter((value) =>
-      String(value.CommandLine).toLowerCase().includes(serverPath),
-    )
-    .map((value) => value.ProcessId);
-}
+const { denyRead } = require('../test-runtime/read-denial.cjs');
+const { ownedServers, killOwnedServer } = require('./processes.cjs');
 
 /** 운영 파일의 실제 읽기 실패를 전용 숨김 자식으로 만들고 명시적으로 해제한다. */
 async function lockFile(c, relative) {
-  const id = String(Date.now());
-  const ready = c.path.join(c.config.temporary, 'diagnostic-lock-' + id);
-  const release = ready + '-release';
-  const child = spawn(
-    c.path.join(
-      process.env.SystemRoot,
-      'System32/WindowsPowerShell/v1.0/powershell.exe',
-    ),
-    [
-      '-NoProfile',
-      '-NonInteractive',
-      '-File',
-      c.path.join(__dirname, 'diagnostic-lock.ps1'),
-      '-Target',
-      c.path.join(c.root, relative),
-      '-Ready',
-      ready,
-      '-Release',
-      release,
-    ],
-    { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
+  return denyRead(
+    c.path.join(c.root, relative),
+    c.path.join(c.config.temporary, 'diagnostic-denied-' + Date.now()),
   );
-  let failure;
-  child.on('error', (error) => {
-    failure = error;
-  });
-  let stderr = '';
-  child.stderr.on('data', (data) => {
-    stderr += data;
-  });
-  const exited = new Promise(
-    /** 실제 입력과 최신 Host 관측을 연결하여 기능 결과를 확인한다. */ (
-      resolve,
-      reject,
-    ) => {
-      child.once('error', reject);
-      child.once('exit', (code) =>
-        code === 0
-          ? resolve()
-          : reject(new Error('진단 잠금 자식 실패: ' + code + ' ' + stderr)),
-      );
-    },
-  );
-  // 준비 실패도 finally에서 해제할 수 있도록 호출 전에 종료 rejection을 관측한다.
-  exited.catch(() => undefined);
-  try {
-    await c.eventually(
-      /** 실제 입력과 최신 Host 관측을 연결하여 기능 결과를 확인한다. */ async () => {
-        if (failure) throw failure;
-        c.assert.equal(child.exitCode, null, stderr);
-        c.assert.equal(await c.fs.readFile(ready, 'utf8'), 'locked');
-      },
-    );
-  } catch (error) {
-    await c.fs.writeFile(release, '');
-    child.kill();
-    await exited.catch(() => undefined);
-    throw error;
-  }
-  return /** 실제 입력과 최신 Host 관측을 연결하여 기능 결과를 확인한다. */ async () => {
-    await c.fs.writeFile(release, '');
-    await exited;
-  };
 }
 
 /** 실제 게시 진단과 사용자 상태 안내를 등록된 명령으로 관측한다. */
@@ -112,7 +28,7 @@ exports.scenarios = [
       );
       const before = ownedServers(c);
       c.assert.equal(before.length, 3, '현재 시험의 세 workspace 서버만 종료');
-      for (const pid of before) process.kill(pid);
+      for (const pid of before) killOwnedServer(c, pid);
       await c.eventually(
         /** 실제 입력과 최신 Host 관측을 연결하여 기능 결과를 확인한다. */ () => {
           const after = ownedServers(c);

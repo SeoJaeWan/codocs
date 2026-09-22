@@ -416,6 +416,21 @@ exports.scenarios = [
     },
   },
   {
+    id: 'unconfirmed-reference',
+    title:
+      '부분 탐색의 미확정 참조에는 폐기 경고나 이동 링크를 제공하지 않는다',
+    /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ async run(c) {
+      const d = await c.open('partial/.codocs/unconfirmed-source.yaml');
+      await c.eventually(
+        /** 미확정 참조 진단과 폐기 경고 부재를 같은 관측에서 확인한다. */ () => {
+          c.assert.equal(c.diagnostics(d, 'unconfirmed_reference').length, 1);
+          c.assert.equal(c.diagnostics(d, 'deprecated_reference').length, 0);
+        },
+      );
+      c.assert.deepEqual(await c.links(d, 0), []);
+    },
+  },
+  {
     id: 'deprecated-link',
     title: '폐기 참조의 실제 경고 진단과 이동 링크를 함께 제공한다',
     /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ async run(c) {

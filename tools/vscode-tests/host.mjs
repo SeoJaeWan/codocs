@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import path from 'node:path';
@@ -6,12 +6,14 @@ import { runTests } from '@vscode/test-electron';
 import { prepareVSCode, vscodeVersion } from '../test-runtime/vscode.mjs';
 import { fixtureFiles } from './fixtures.mjs';
 import { withCacheLock } from '../test-runtime/cache-lock.mjs';
+import readDenial from '../test-runtime/read-denial.cjs';
 
 const config = JSON.parse(await readFile(process.argv[2], 'utf8'));
 const output = config.output;
 const extension = path.join(config.temporary, 'extension');
 const log = createWriteStream(path.join(output, 'process.log'));
 let phase = 'build';
+let releaseUnreadable;
 /** 현재 단계와 성공 여부를 디스크에 즉시 남겨 비정상 종료도 구분한다. */
 async function progress(extra = {}) {
   await writeFile(
@@ -57,45 +59,10 @@ try {
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, content);
   }
-  const lockReady = path.join(config.temporary, 'file-locked');
-  const locker = spawn(
-    path.join(
-      process.env.SystemRoot,
-      'System32/WindowsPowerShell/v1.0/powershell.exe',
-    ),
-    [
-      '-NoProfile',
-      '-NonInteractive',
-      '-File',
-      path.join(config.root, 'tools/test-runtime/locked-file.ps1'),
-      '-Target',
-      path.join(workspace, 'partial/.codocs/unreadable.yaml'),
-      '-Ready',
-      lockReady,
-    ],
-    { windowsHide: true, stdio: 'ignore' },
+  releaseUnreadable = await readDenial.denyRead(
+    path.join(workspace, 'partial/.codocs/unreadable.yaml'),
+    path.join(config.temporary, 'file-denied'),
   );
-  locker.on('error', (error) => log.write(String(error)));
-  const lockDeadline = Date.now() + 15000;
-  while (true) {
-    try {
-      await readFile(lockReady);
-      break;
-    } catch (error) {
-      if (
-        error.code !== 'ENOENT' ||
-        Date.now() > lockDeadline ||
-        locker.exitCode !== null
-      )
-        throw new Error('부분 관측 fixture 잠금 준비 실패');
-      await new Promise(
-        /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ (
-          resolve,
-        ) => setTimeout(resolve, 50),
-      );
-    }
-  }
-  locker.unref();
   const profile = path.join(config.temporary, 'profile');
   await mkdir(path.join(profile, 'User'), { recursive: true });
   await writeFile(
@@ -152,5 +119,13 @@ try {
   await progress({ passed: false, error: error.stack ?? String(error) });
   process.exitCode = 1;
 } finally {
+  if (releaseUnreadable) {
+    try {
+      await releaseUnreadable();
+    } catch (error) {
+      process.exitCode = 1;
+      log.write(`fixture cleanup: ${error}\n`);
+    }
+  }
   log.end();
 }

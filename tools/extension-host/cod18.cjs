@@ -5,9 +5,19 @@ const {
   readFile,
   rename,
   unlink,
-  symlink,
 } = require('node:fs/promises');
 const path = require('node:path');
+const { denyRead } = require('../test-runtime/read-denial.cjs');
+
+/** OS가 같은 파일로 해석하는 경로만 동등하게 비교한다. */
+function sameFilePath(left, right) {
+  /** Windows의 대소문자 없는 경로 비교만 적용한다. */
+  const normalize = (value) =>
+    process.platform === 'win32'
+      ? path.normalize(value).toLowerCase()
+      : path.normalize(value);
+  return normalize(left) === normalize(right);
+}
 
 /** 실제 설치 Host에서 독립 사례를 계속 실행하고 프로토콜 증거를 남긴다. */
 async function runCod18({
@@ -145,7 +155,7 @@ async function runCod18({
       const [link] = await ready(source);
       assert.equal(await open(link), true);
       const editor = vscode.window.activeTextEditor;
-      assert.equal(editor.document.uri.fsPath, target);
+      assert.ok(sameFilePath(editor.document.uri.fsPath, target));
       assert.deepEqual(editor.selection, new vscode.Selection(0, 0, 0, 0));
       const tabs = vscode.window.tabGroups.all.flatMap(
         (group) => group.tabs,
@@ -289,13 +299,18 @@ async function runCod18({
           const fresh = await links(source);
           if (!fresh.length) return undefined;
           if (!(await open(fresh[0]))) return undefined;
-          return vscode.window.activeTextEditor.document.uri.fsPath === moved
+          return sameFilePath(
+            vscode.window.activeTextEditor.document.uri.fsPath,
+            moved,
+          )
             ? true
             : undefined;
         },
       );
       assert.equal(await open(old), true);
-      assert.equal(vscode.window.activeTextEditor.document.uri.fsPath, moved);
+      assert.ok(
+        sameFilePath(vscode.window.activeTextEditor.document.uri.fsPath, moved),
+      );
       return { moved };
     },
   );
@@ -441,37 +456,45 @@ async function runCod18({
     'partial scan preserves confirmed candidate information',
     /** 설치 Host에서 해당 계약의 반환값과 부수 효과를 확인한다. */
     async () => {
-      await symlink(
-        path.join(knowledge, 'not-present.yaml'),
-        path.join(knowledge, 'unreadable.yaml'),
+      const unreadable = await yaml(
+        'unreadable.yaml',
+        'id: unreadable\nname: 읽기 불가\n',
       );
-      const codePath = path.join(root, 'partial.java');
-      await writeFile(codePath, 'cod18Deprecated\n');
-      const doc = await vscode.workspace.openTextDocument(codePath);
-      const markdown = await waitFor('partial hover', async () => {
-        const value = await hover(doc, 'cod18Deprecated');
-        return value.includes('일부 문서') ? value : undefined;
-      });
-      assert.match(markdown, /폐기 대상/u);
-      assert.match(
-        markdown,
-        /command:codocs\.openSource/u,
-        'confirmed candidate link must remain in partial observation',
+      const release = await denyRead(
+        unreadable,
+        path.join(knowledge, 'read-denial'),
       );
-      const opened = await vscode.commands.executeCommand(
-        'codocs.openSource',
-        commandArgument(markdown),
-      );
-      await checkpoint('cod18:partial-open', { markdown, opened });
-      assert.equal(
-        opened,
-        true,
-        'confirmed candidate must remain usable in partial observation',
-      );
-      return { markdown };
+      try {
+        const codePath = path.join(root, 'partial.java');
+        await writeFile(codePath, 'cod18Deprecated\n');
+        const doc = await vscode.workspace.openTextDocument(codePath);
+        const markdown = await waitFor('partial hover', async () => {
+          const value = await hover(doc, 'cod18Deprecated');
+          return value.includes('일부 문서') ? value : undefined;
+        });
+        assert.match(markdown, /폐기 대상/u);
+        assert.match(
+          markdown,
+          /command:codocs\.openSource/u,
+          'confirmed candidate link must remain in partial observation',
+        );
+        const opened = await vscode.commands.executeCommand(
+          'codocs.openSource',
+          commandArgument(markdown),
+        );
+        await checkpoint('cod18:partial-open', { markdown, opened });
+        assert.equal(
+          opened,
+          true,
+          'confirmed candidate must remain usable in partial observation',
+        );
+        return { markdown };
+      } finally {
+        await release();
+        await unlink(unreadable);
+      }
     },
   );
-  await unlink(path.join(knowledge, 'unreadable.yaml'));
   const recovery = await vscode.workspace.openTextDocument(
     path.join(root, 'partial.java'),
   );
@@ -675,9 +698,11 @@ async function runCod18({
         await vscode.commands.executeCommand('codocs.openSource', selection),
         true,
       );
-      assert.equal(
-        vscode.window.activeTextEditor.document.uri.fsPath,
-        referrerPath,
+      assert.ok(
+        sameFilePath(
+          vscode.window.activeTextEditor.document.uri.fsPath,
+          referrerPath,
+        ),
       );
       await writeFile(
         referrerPath,
