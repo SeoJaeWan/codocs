@@ -9,6 +9,11 @@ import {
   projectCatalogGet,
   projectCatalogList,
   projectCatalogPaths,
+  projectLiveReferences,
+  resolveReference,
+  referenceResolutionStatuses,
+  type CatalogIdentity,
+  type CatalogLiveReferenceResult,
   queryDiagnosticCodes,
   queryDiagnosticMessages,
   scanStatuses,
@@ -34,6 +39,9 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { resolveWorkspacePath } from '../paths/index.js';
+import { calculateRevision } from '../revision/index.js';
 import { pathToFileURL } from 'node:url';
 import {
   workspaceDiagnosticCodes,
@@ -62,12 +70,16 @@ const processCursorSecret = randomBytes(32);
 /** 목록 커서가 현재 process 또는 snapshot에서 더 이상 유효하지 않을 때 사용하는 코드다. @domainValues */
 export const workspaceQueryDiagnosticCodes = {
   cursorExpired: 'cursor_expired',
+  /** 닫기·취소·새 문서 버전 때문에 결과를 적용할 수 없다. */
+  requestSuperseded: 'request_superseded',
   /** 요청한 코드 매칭 catalog와 현재 상세 조회 catalog가 다를 때 사용하는 코드다. */
   catalogVersionMismatch: 'catalog_version_mismatch',
 } as const;
 
 /** 커서 오류의 고정 문구다. */
 export const workspaceQueryDiagnosticMessages = {
+  requestSuperseded:
+    '닫히거나 취소되었거나 최신 문서 버전으로 대체된 요청입니다.',
   cursorExpired:
     '목록 커서가 만료되었습니다. 커서 없이 첫 페이지를 다시 조회하세요.',
   catalogVersionMismatch:
@@ -207,6 +219,70 @@ export type WorkspaceRefreshResult =
       diagnostics: readonly WorkspaceScanDiagnostic[];
     }
   | WorkspaceQueryFailure;
+
+/** 완료된 관측의 버전·상태 알림이다. partial/failed도 변경 사실을 알린다. */
+export interface WorkspaceSnapshotChange {
+  catalogVersion: number;
+  scanStatus: ScanStatus;
+}
+
+/** live 출처의 문서 버전은 호출자가 단조 증가시키고 닫을 때 closeDocument를 호출한다. */
+export interface WorkspaceLiveReferenceInput {
+  sourcePath: string;
+  text: string;
+  documentVersion: number;
+  signal?: AbortSignal;
+}
+
+/** 같은 완료 관측의 live 참조와 디스크 대상 내용이다. */
+export interface WorkspaceLiveReferenceSuccess extends Omit<
+  CatalogLiveReferenceResult,
+  'targets' | 'diagnostics'
+> {
+  success: true;
+  documentVersion: number;
+  catalogVersion: number;
+  scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
+  refreshing: boolean;
+  targets: readonly WorkspacePathGetItem[];
+  diagnostics: readonly WorkspaceQueryDiagnostic[];
+}
+
+/** 취소·닫기·실패 결과에는 적용할 참조를 넣지 않는다. */
+export type WorkspaceLiveReferenceResponse =
+  WorkspaceLiveReferenceSuccess | WorkspaceQueryFailure;
+
+/** 선택의 원래 의미를 보존하는 출처다. 이름 참조와 코드 매칭은 별도로 재확인한다. */
+export type WorkspaceCandidateOrigin =
+  | { reference: { name: string; domain?: string }; sourcePath: string }
+  | { text: string };
+
+/** 세션 내부에 보존하는 선택 근거다. revision은 동일성 근거로 사용하지 않는다. */
+interface CandidateSelection {
+  origin: WorkspaceCandidateOrigin;
+  identity: CatalogIdentity;
+  catalogVersion: number;
+  uniqueId: boolean;
+}
+
+/** 최신 관측 및 현재 파일 바이트까지 확인한 후보의 내용이다. */
+export interface WorkspaceConfirmedCandidate {
+  catalogVersion: number;
+  result: WorkspacePathDocumentResult;
+}
+
+/** 적용할 수 없는 비동기 요청의 공통 결과다. */
+function superseded(): WorkspaceQueryFailure {
+  return {
+    success: false,
+    scanStatus: scanStatuses.failed,
+    error: {
+      code: workspaceQueryDiagnosticCodes.requestSuperseded,
+      severity: diagnosticSeverities.warning,
+      message: workspaceQueryDiagnosticMessages.requestSuperseded,
+    },
+  };
+}
 
 interface CursorPayload {
   version: typeof cursorVersion;
@@ -480,6 +556,11 @@ export class WorkspaceQuerySession {
   #watcher: WorkspaceWatcher | undefined;
   #dirty = false;
   #closed = false;
+  readonly #snapshotListeners = new Set<
+    (change: WorkspaceSnapshotChange) => void
+  >();
+  readonly #liveDocuments = new Map<string, WorkspaceLiveReferenceInput>();
+  readonly #selections = new Map<string, CandidateSelection>();
 
   /** 프로젝트 선택의 own data 값만 고정하고 IO는 각 요청 시 수행한다. */
   constructor(input: unknown = {}) {
@@ -505,6 +586,10 @@ export class WorkspaceQuerySession {
         revisions.set(sourcePath, revision);
     if (scan.root && !this.#watcher && !this.#closed) {
       const watcher = await createWorkspaceWatcher(scan.root.projectRoot);
+      if (this.#closed) {
+        await watcher.close();
+        return scan;
+      }
       this.#watcher = watcher;
       watcher.subscribe(() => {
         if (this.#refreshPromise) this.#dirty = true;
@@ -514,6 +599,7 @@ export class WorkspaceQuerySession {
     await this.#watcher?.trackTargets(
       scan.documents.map((document) => document.source.realPath),
     );
+    if (this.#closed) return scan;
     if (scan.status !== scanStatuses.failed) {
       this.#catalog = next;
       this.#revisions = revisions;
@@ -563,7 +649,7 @@ export class WorkspaceQuerySession {
               },
             ],
           };
-          this.#scan = scan;
+          if (!this.#closed) this.#scan = scan;
         }
       } while (this.#dirty && !this.#closed);
       return scan;
@@ -572,7 +658,22 @@ export class WorkspaceQuerySession {
     this.#refreshPromise = operation;
     /** 스캔 완료 뒤 현재 operation 참조를 정리한다. */
     const clear = (): void => {
-      if (this.#refreshPromise === operation) this.#refreshPromise = undefined;
+      if (this.#refreshPromise === operation) {
+        this.#refreshPromise = undefined;
+        if (!this.#closed && this.#scan) {
+          const change = {
+            catalogVersion: this.#catalogVersion,
+            scanStatus: this.#scan.status,
+          };
+          for (const listener of this.#snapshotListeners) {
+            try {
+              listener(change);
+            } catch (error: unknown) {
+              console.error('Snapshot listener failed', error);
+            }
+          }
+        }
+      }
     };
     void operation.then(clear, clear).catch(() => undefined);
     return operation;
@@ -580,6 +681,14 @@ export class WorkspaceQuerySession {
 
   /** 최초 조회만 스캔 완료를 기다리고 이후에는 보유한 단일 snapshot을 읽는다. */
   async #current(): Promise<WorkspaceScanResult> {
+    if (this.#closed)
+      return {
+        status: scanStatuses.failed,
+        documents: [],
+        failures: [],
+        skippedCycles: [],
+        diagnostics: [],
+      };
     if (!this.#scan) return this.#synchronize();
     return this.#scan;
   }
@@ -865,14 +974,250 @@ export class WorkspaceQuerySession {
     };
   }
 
+  /** 관측 게시 이후 알리고 반환한 함수로 구독을 해제한다. listener 오류는 게시를 되돌리지 않는다. */
+  onDidChangeSnapshot(
+    listener: (change: WorkspaceSnapshotChange) => void,
+  ): () => void {
+    if (!this.#closed) this.#snapshotListeners.add(listener);
+    return /** 해당 listener만 해제한다. */ () => {
+      this.#snapshotListeners.delete(listener);
+    };
+  }
+
+  /** 닫힌 출처의 진행 중 조회와 선택 근거를 무효화한다. */
+  closeDocument(sourcePath: string): void {
+    this.#liveDocuments.delete(sourcePath);
+    for (const [token, selection] of this.#selections)
+      if (
+        'sourcePath' in selection.origin &&
+        selection.origin.sourcePath === sourcePath
+      )
+        this.#selections.delete(token);
+  }
+
+  /** live 출처만 계산하며 디스크 대상·revision·진단은 같은 게시 버전에서 가져온다. */
+  async references(
+    input: WorkspaceLiveReferenceInput,
+  ): Promise<WorkspaceLiveReferenceResponse> {
+    const previous = this.#liveDocuments.get(input.sourcePath);
+    if (
+      this.#closed ||
+      input.signal?.aborted ||
+      !Number.isSafeInteger(input.documentVersion) ||
+      (previous &&
+        (previous.documentVersion > input.documentVersion ||
+          (previous.documentVersion === input.documentVersion &&
+            previous.text !== input.text)))
+    )
+      return superseded();
+    if (previous && previous.text !== input.text)
+      this.closeDocument(input.sourcePath);
+    const request = { ...input };
+    this.#liveDocuments.set(request.sourcePath, request);
+    await this.#current();
+    const scan = this.#scan;
+    if (
+      !scan ||
+      this.#closed ||
+      request.signal?.aborted ||
+      this.#liveDocuments.get(request.sourcePath) !== request
+    )
+      return superseded();
+    if (scan.status === scanStatuses.failed || !this.#catalog)
+      return scanFailure(scan);
+    const watchFailure = this.#watchFailure();
+    const catalog = watchFailure
+      ? { ...this.#catalog, status: scanStatuses.partial }
+      : this.#catalog;
+    const projection = projectLiveReferences(
+      catalog,
+      request.sourcePath,
+      request.text,
+      { revisions: this.#revisions },
+    );
+    return {
+      ...projection,
+      success: true,
+      documentVersion: request.documentVersion,
+      catalogVersion: this.#catalogVersion,
+      scanStatus: catalog.status as Exclude<
+        ScanStatus,
+        typeof scanStatuses.failed
+      >,
+      refreshing: !!this.#refreshPromise,
+      diagnostics: watchFailure
+        ? [...projection.diagnostics, watchFailure]
+        : projection.diagnostics,
+      targets: projection.targets.map(
+        /** 감시 실패의 미확인 상태와 URI를 함께 전달한다. */ (result) =>
+          withWorkspaceUris(
+            scan.root.projectRoot,
+            watchFailure && result.found
+              ? withPathConfirmationDiagnostic({
+                  ...result,
+                  confirmation: catalogConfirmations.unconfirmed,
+                })
+              : result,
+          ),
+      ),
+    };
+  }
+
+  /** 원래 조회 의미에서 확인된 후보 경로만 선택 근거로 보관한다. */
+  captureCandidate(
+    origin: WorkspaceCandidateOrigin,
+    selectedPath: string,
+    catalogVersion: number,
+  ): string | undefined {
+    const catalog = this.#catalog;
+    if (
+      this.#closed ||
+      !catalog ||
+      this.#scan?.status !== scanStatuses.complete ||
+      this.#watchFailure() ||
+      catalogVersion !== this.#catalogVersion
+    )
+      return undefined;
+    const paths = this.#candidatePaths(catalog, origin);
+    const identity = catalog.documents.get(selectedPath);
+    if (!paths.includes(selectedPath) || !identity) return undefined;
+    const token = randomBytes(24).toString('base64url');
+    this.#selections.set(token, {
+      origin: structuredClone(origin),
+      uniqueId:
+        identity.id !== undefined &&
+        catalog.idPaths.get(identity.id)?.size === 1,
+      identity: {
+        path: identity.path,
+        ...(identity.id === undefined ? {} : { id: identity.id }),
+        ...(identity.name === undefined ? {} : { name: identity.name }),
+        domains: [...identity.domains],
+        confirmation: identity.confirmation,
+      },
+      catalogVersion,
+    });
+    return token;
+  }
+
+  /** 이름 참조는 유일 연결만, 코드 매칭은 명시적으로 선택할 전체 후보를 반환한다. */
+  #candidatePaths(
+    catalog: Catalog,
+    origin: WorkspaceCandidateOrigin,
+  ): readonly string[] {
+    if ('reference' in origin) {
+      const result = resolveReference(
+        catalog,
+        origin.reference,
+        origin.sourcePath,
+      );
+      return result.status === referenceResolutionStatuses.resolved &&
+        result.target
+        ? [result.target.path]
+        : [];
+    }
+    return matchCode(catalog, origin.text).candidates.map(
+      (candidate) => candidate.path,
+    );
+  }
+
+  /** 더 이상 표시하지 않는 선택 근거를 해제한다. */
+  releaseCandidate(token: string): void {
+    this.#selections.delete(token);
+  }
+
+  /** 최신 관측의 원래 조회와 문서 식별 정보를 재확인하고 현재 파일 바이트를 검사한다. */
+  async confirmCandidate(
+    token: string,
+    signal?: AbortSignal,
+  ): Promise<WorkspaceConfirmedCandidate | undefined> {
+    if (this.#closed || signal?.aborted || !this.#selections.has(token))
+      return undefined;
+    if (this.#refreshPromise) await this.#refreshPromise;
+    await this.#current();
+    const scan = this.#scan;
+    const catalog = this.#catalog;
+    const version = this.#catalogVersion;
+    const selection = this.#selections.get(token);
+    if (
+      this.#closed ||
+      signal?.aborted ||
+      !selection ||
+      !catalog ||
+      !scan ||
+      scan.status !== scanStatuses.complete ||
+      this.#watchFailure()
+    )
+      return undefined;
+    const identity = selection.identity;
+    const candidates = this.#candidatePaths(catalog, selection.origin)
+      .flatMap((candidatePath) => {
+        const candidate = catalog.documents.get(candidatePath);
+        return candidate ? [candidate] : [];
+      })
+      .filter(
+        /** 원래 선택의 식별 정보와 같은 후보만 남긴다. */
+        (candidate) =>
+          (selection.catalogVersion !== version ||
+            candidate.path === identity.path) &&
+          candidate.id === identity.id &&
+          candidate.name === identity.name &&
+          candidate.domains.length === identity.domains.length &&
+          candidate.domains.every((domain) =>
+            identity.domains.includes(domain),
+          ),
+      );
+    if (candidates.length !== 1) return undefined;
+    const candidate = candidates[0]!;
+    // 버전이 달라진 선택은 유효하고 유일한 현재 ID가 있어야 경로 이동을 확인할 수 있다.
+    if (
+      selection.catalogVersion !== version &&
+      (!selection.uniqueId ||
+        !identity.id ||
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(identity.id) ||
+        catalog.idPaths.get(identity.id)?.size !== 1)
+    )
+      return undefined;
+    const projection = projectCatalogPaths(catalog, [candidate.path], {
+      revisions: this.#revisions,
+    });
+    const result = projection.success ? projection.results[0] : undefined;
+    if (!result?.found || !result.revision) return undefined;
+    const checked = await resolveWorkspacePath(scan.root, candidate.path);
+    if (!checked.success || checked.kind !== workspaceTargetKinds.file)
+      return undefined;
+    try {
+      const bytes = await readFile(checked.logicalPath);
+      if (calculateRevision(bytes) !== result.revision) return undefined;
+    } catch {
+      // 삭제·접근 실패는 열기 후보를 확인하지 못한 결과다.
+      return undefined;
+    }
+    if (
+      this.#closed ||
+      signal?.aborted ||
+      scan !== this.#scan ||
+      version !== this.#catalogVersion ||
+      this.#refreshPromise ||
+      this.#watchFailure() ||
+      this.#selections.get(token) !== selection
+    )
+      return undefined;
+    const projected = withWorkspaceUris(scan.root.projectRoot, result);
+    return projected.found
+      ? { catalogVersion: version, result: projected }
+      : undefined;
+  }
+
   /** 명시 refresh는 결과 변화와 무관하게 기존 커서 generation을 만료한다. */
   refresh(): Promise<WorkspaceRefreshResult> {
+    if (this.#closed) return Promise.resolve(superseded());
     if (this.#explicitRefreshPromise) return this.#explicitRefreshPromise;
     /** 수동 재연결과 전체 스캔의 결과를 함께 반환한다. */
     const refreshOperation = async (): Promise<WorkspaceRefreshResult> => {
       if (this.#watcher) await this.#watcher.refresh();
       const generation = this.#generation;
       const scan = await this.#synchronize();
+      if (this.#closed) return superseded();
       const watchFailure = this.#watchFailure();
       if (watchFailure) return this.#watchFailureResult(watchFailure);
       if (scan.status !== scanStatuses.failed)
@@ -914,6 +1259,9 @@ export class WorkspaceQuerySession {
   /** 연결된 파일 감시를 명시적으로 종료한다. */
   async close(): Promise<void> {
     this.#closed = true;
+    this.#snapshotListeners.clear();
+    this.#liveDocuments.clear();
+    this.#selections.clear();
     await this.#watcher?.close();
   }
 }
