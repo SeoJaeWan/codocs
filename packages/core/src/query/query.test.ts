@@ -16,6 +16,7 @@ import {
 import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import { documentKinds, documentStatuses } from '../validator/domain-values.js';
 import {
+  projectLiveReferences,
   projectCatalogGet,
   projectCatalogList,
   projectCatalogPaths,
@@ -1280,5 +1281,147 @@ describe('projectCatalogPaths: 발견 경로별 문서 상세 투영', () => {
     });
     if (!result.success) throw new Error('경로 조회 실패');
     expect(result.results.every((item) => !('id' in item))).toBe(true);
+  });
+});
+
+describe('projectLiveReferences: live YAML와 디스크 색인의 결합', () => {
+  it.each([
+    {
+      label: 'LF와 한글·emoji',
+      text: 'definition: "😀[[A]]"\n',
+      start: 15,
+      end: 20,
+    },
+    {
+      label: 'CRLF',
+      text: '# 😀\r\ndefinition: "[[A]]"\r\n',
+      start: 19,
+      end: 24,
+    },
+    {
+      label: 'escape',
+      text: 'definition: "\\u005b[A]]"\n',
+      start: 13,
+      end: 23,
+    },
+    {
+      label: '작은따옴표',
+      text: "definition: '한글 [[A]]'\n",
+      start: 16,
+      end: 21,
+    },
+    {
+      label: '접힌 문자열',
+      text: 'definition: >\n  [[A]]\n',
+      start: 16,
+      end: 21,
+    },
+  ])(
+    '$label을 조회하면 실제 UTF-16 등장 범위를 반환한다',
+    ({ text, start, end }) => {
+      const catalog: Catalog = {
+        ...catalogBase,
+        documents: new Map([[alpha.path, alpha]]),
+        idPaths: new Map([[alpha.id, new Set([alpha.path])]]),
+        namePaths: new Map([[alpha.name, new Set([alpha.path])]]),
+      };
+      const before = JSON.stringify([...catalog.documents]);
+      const result = projectLiveReferences(
+        catalog,
+        '한글 경로/source.yaml',
+        text,
+        { revisions: new Map([[alpha.path, 'revision']]) },
+      );
+      expect(result.occurrences).toHaveLength(1);
+      expect(result.occurrences[0]?.occurrence.offsetRange).toEqual({
+        start,
+        end,
+      });
+      expect(result.occurrences[0]?.resolution.target?.path).toBe(alpha.path);
+      expect(result.targets[0]).toMatchObject({
+        found: true,
+        revision: 'revision',
+        document: alpha.observation.parsed.data,
+      });
+      expect(JSON.stringify([...catalog.documents])).toBe(before);
+    },
+  );
+
+  it('다른 필드 오류와 examples 비문자열이 있어도 확인한 참조만 순서대로 반환한다', () => {
+    const catalog: Catalog = {
+      ...catalogBase,
+      documents: new Map([[alpha.path, alpha]]),
+      namePaths: new Map([[alpha.name, new Set([alpha.path])]]),
+      domainNamePaths: new Map([
+        ['도메인', new Map([[alpha.name, new Set([alpha.path])]])],
+      ]),
+    };
+    const result = projectLiveReferences(
+      catalog,
+      'source.yaml',
+      'id: 123\nname: "[[무시]]"\ndefinition: "[[A]] [[도메인:A]]"\nexamples: [12, "[[A]]"]\ncustom: "[[무시]]"\n',
+    );
+    expect(result.occurrences.map((item) => item.occurrence.text)).toEqual([
+      '[[A]]',
+      '[[도메인:A]]',
+      '[[A]]',
+    ]);
+    expect(result.targets).toHaveLength(1);
+  });
+
+  it('YAML 파싱에 실패하면 원문에서 참조를 추측하지 않는다', () => {
+    const result = projectLiveReferences(
+      catalogBase,
+      'source.yaml',
+      'definition: "[[A]]',
+    );
+    expect(result.occurrences).toEqual([]);
+    expect(result.targets).toEqual([]);
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'invalid_yaml' }),
+    );
+  });
+
+  it('반복 폐기 참조를 조회하면 경고마다 위치를 유지한다', () => {
+    const target = {
+      ...alpha,
+      observation: {
+        ...alpha.observation,
+        parsed: {
+          ...alpha.observation.parsed,
+          data: {
+            ...alpha.observation.parsed.data,
+            status: documentStatuses.deprecated,
+          },
+        },
+      },
+    };
+    const catalog: Catalog = {
+      ...catalogBase,
+      documents: new Map([[target.path, target]]),
+      idPaths: new Map([[alpha.id, new Set([alpha.path])]]),
+      namePaths: new Map([[alpha.name, new Set([alpha.path])]]),
+    };
+    const result = projectLiveReferences(
+      catalog,
+      'source.yaml',
+      'definition: "[[A]] [[A]]"\n',
+    );
+    expect(
+      result.diagnostics
+        .filter(
+          (item) => item.code === catalogDiagnosticCodes.deprecatedReference,
+        )
+        .map((item) => item.offsetRange),
+    ).toEqual([
+      { start: 13, end: 18 },
+      { start: 19, end: 24 },
+    ]);
+    expect(
+      result.occurrences.every(
+        (item) =>
+          item.resolution.status === referenceResolutionStatuses.resolved,
+      ),
+    ).toBe(true);
   });
 });

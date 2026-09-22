@@ -1,0 +1,6 @@
+{
+  "command": ["pnpm", "build"],
+  "code": 0,
+  "durationMs": 4296,
+  "log": "build-1.log"
+}

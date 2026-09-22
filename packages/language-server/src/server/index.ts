@@ -12,6 +12,10 @@ import {
   type DocumentMatchResponse,
   type WorkspaceRefreshRequest,
 } from '../server-session/index.js';
+import {
+  confirmSourceMethod,
+  snapshotChangedMethod,
+} from '../navigation/index.js';
 
 /** 프로토콜 외 로그를 stdout과 분리하는 최소 로거다. */
 export interface ServerLogger {
@@ -38,6 +42,33 @@ export function bindLanguageServer(
   logger: ServerLogger = stderrLogger,
 ): LanguageServerRuntime {
   let supportsWorkspaceFolderChanges = false;
+  const publications = new Map<string, number>();
+  session.onDidChange(
+    /** 편집·관측 변경 뒤 최신 세대의 진단만 게시한다. */ (changedUri) => {
+      const uris = changedUri
+        ? [changedUri]
+        : session.documents.all().map((document) => document.uri);
+      for (const uri of uris) {
+        const generation = (publications.get(uri) ?? 0) + 1;
+        publications.set(uri, generation);
+        void session
+          .documentDiagnostics(uri)
+          .then(
+            /** 뒤늦은 조회의 진단 게시를 차단한다. */ async (result) => {
+              if (publications.get(uri) !== generation) return;
+              if (result) await connection.sendDiagnostics({ uri, ...result });
+              else if (!session.documents.get(uri))
+                await connection.sendDiagnostics({ uri, diagnostics: [] });
+            },
+          )
+          .catch((error: unknown) => logger.error(String(error)));
+      }
+      if (!changedUri)
+        void connection
+          .sendNotification(snapshotChangedMethod)
+          .catch((error: unknown) => logger.error(String(error)));
+    },
+  );
   /** LSP 초기화 요청을 세션에 적용하고 서버 capability를 반환한다. */
   const initialize: Parameters<Connection['onInitialize']>[0] = async (
     params,
@@ -52,6 +83,7 @@ export function bindLanguageServer(
           change: TextDocumentSyncKind.Full,
         },
         hoverProvider: true,
+        documentLinkProvider: { resolveProvider: true },
         workspace: {
           workspaceFolders: {
             supported: true,
@@ -96,6 +128,13 @@ export function bindLanguageServer(
   const hover: Parameters<Connection['onHover']>[0] = (params, token) =>
     session.hoverDocument(params, token);
   connection.onHover(hover);
+  connection.onDocumentLinks((params, token) =>
+    session.documentLinks(params.textDocument.uri, token),
+  );
+  connection.onDocumentLinkResolve((link) => session.resolveDocumentLink(link));
+  connection.onRequest(confirmSourceMethod, (input: unknown) =>
+    session.confirmSource(input),
+  );
   /** 초기화 완료 뒤 workspace folder 변경 알림을 등록한다. */
   const initialized: Parameters<Connection['onInitialized']>[0] = () => {
     if (!supportsWorkspaceFolderChanges) return;

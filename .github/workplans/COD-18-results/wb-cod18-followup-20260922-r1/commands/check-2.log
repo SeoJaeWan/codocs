@@ -1,0 +1,11 @@
+
+> codocs@0.0.0 check /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+> node tools/check/run.mjs all
+
+
+/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.github/workplans/COD-18-results/wb-cod18-followup-20260922-r1/verify.mjs
+  26:19  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+
+✖ 1 problem (1 error, 0 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.

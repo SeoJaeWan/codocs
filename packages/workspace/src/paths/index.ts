@@ -1,4 +1,4 @@
-import { lstat, realpath, stat } from 'node:fs/promises';
+import { lstat, readlink, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   createWorkspaceDiagnostic,
@@ -44,8 +44,18 @@ export interface WorkspaceDirectoryIdentity {
   inode: bigint;
 }
 
+/** 명시적 링크의 발견 경로와 감시할 대상이다. 미확인 대상은 실경로로 단정하지 않는다. */
+export interface WorkspacePathLink {
+  path: string;
+  logicalPath: string;
+  targetPath: string;
+  realPath?: string;
+  kind?: WorkspaceTargetKind;
+  confirmed: boolean;
+}
+
 /** 경계·대상 확인 결과다. 실패에는 얻지 못한 realPath를 넣지 않는다. */
-export type WorkspacePathResult =
+export type WorkspacePathResult = { links?: readonly WorkspacePathLink[] } & (
   | {
       success: true;
       logicalPath: string;
@@ -64,7 +74,8 @@ export type WorkspacePathResult =
       logicalPath?: string;
       path?: string;
       diagnostics: readonly WorkspaceDiagnostic[];
-    };
+    }
+);
 
 /** 대상 확인에 사용하는 내부 값이다. */
 interface CheckedTarget {
@@ -134,6 +145,43 @@ export async function resolveWorkspacePath(
   root: ProjectRoot,
   input: unknown,
 ): Promise<WorkspacePathResult> {
+  const links: WorkspacePathLink[] = [];
+  const result = await resolvePath(root, input, links);
+  return links.length === 0 ? result : { ...result, links };
+}
+
+/** 링크 자체의 존재와 대상 확인을 분리하고 실패 전 확인한 연결도 보존한다. */
+async function resolvePath(
+  root: ProjectRoot,
+  input: unknown,
+  links: WorkspacePathLink[],
+): Promise<WorkspacePathResult> {
+  /** 대상이 끊어져도 readlink로 확인한 감시 위치를 보존한다. 읽기 권한은 부여하지 않는다. */
+  async function checkLinkedTarget(
+    logicalPath: string,
+  ): Promise<CheckedTarget> {
+    const entry = await lstat(logicalPath);
+    let link: WorkspacePathLink | undefined;
+    if (entry.isSymbolicLink()) {
+      link = {
+        path: path.relative(root.projectRoot, logicalPath),
+        logicalPath,
+        targetPath: path.resolve(
+          path.dirname(logicalPath),
+          await readlink(logicalPath),
+        ),
+        confirmed: false,
+      };
+      links.push(link);
+    }
+    const target = await checkTarget(logicalPath);
+    if (link) {
+      link.realPath = target.realPath;
+      link.kind = target.kind;
+      link.confirmed = true;
+    }
+    return target;
+  }
   if (!isPathString(input)) {
     return failure(
       root,
@@ -143,20 +191,22 @@ export async function resolveWorkspacePath(
     );
   }
   // resolve/join으로 입력 전체를 정규화하면 link/.. 경계를 잃으므로 먼저 원문 성분을 보존한다.
+  // Windows가 허용하는 두 구분자 표기만 통일하고 링크 뒤 ..와 대소문자는 보존한다.
+  const pathInput = path.sep === '\\' ? input.replaceAll('/', path.sep) : input;
   const projectPrefix = root.projectRoot.endsWith(path.sep)
     ? root.projectRoot
     : root.projectRoot + path.sep;
-  let relativeInput = input;
-  if (path.isAbsolute(input)) {
-    if (!input.startsWith(projectPrefix))
+  let relativeInput = pathInput;
+  if (path.isAbsolute(pathInput)) {
+    if (!pathInput.startsWith(projectPrefix))
       return failure(
         root,
         workspacePathFailureStatuses.denied,
         workspaceDiagnosticCodes.pathOutsideWorkspace,
         workspaceDiagnosticMessages.pathOutsideWorkspace,
       );
-    relativeInput = input.slice(projectPrefix.length);
-  } else if (path.parse(input).root !== '') {
+    relativeInput = pathInput.slice(projectPrefix.length);
+  } else if (path.parse(pathInput).root !== '') {
     return failure(
       root,
       workspacePathFailureStatuses.denied,
@@ -207,7 +257,7 @@ export async function resolveWorkspacePath(
     );
   }
   try {
-    current = await checkTarget(codocsPath);
+    current = await checkLinkedTarget(codocsPath);
   } catch (error: unknown) {
     return failure(
       root,
@@ -261,7 +311,22 @@ export async function resolveWorkspacePath(
         ? path.dirname(current.logicalPath)
         : path.join(current.logicalPath, segment);
     try {
-      current = await checkTarget(nextPath);
+      // 존재하는 링크의 대상 실패를 ENOENT 부재로 오인하지 않는다.
+      await lstat(nextPath);
+    } catch (error: unknown) {
+      return failure(
+        root,
+        getIoErrorCode(error) === 'ENOENT'
+          ? workspacePathFailureStatuses.missing
+          : workspacePathFailureStatuses.unavailable,
+        workspaceDiagnosticCodes.pathUnavailable,
+        workspaceDiagnosticMessages.pathUnavailable,
+        nextPath,
+        error,
+      );
+    }
+    try {
+      current = await checkLinkedTarget(nextPath);
     } catch (error: unknown) {
       return failure(
         root,

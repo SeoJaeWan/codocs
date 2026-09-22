@@ -1,0 +1,6 @@
+{
+  "command": ["pnpm", "check:build"],
+  "code": 0,
+  "durationMs": 26731,
+  "log": "consumer-1.log"
+}

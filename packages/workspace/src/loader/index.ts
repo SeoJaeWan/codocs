@@ -29,6 +29,7 @@ import {
   type WorkspaceAccessScope,
   type WorkspacePathResult,
   type WorkspaceTargetKind,
+  type WorkspacePathLink,
 } from '../paths/index.js';
 import {
   codocsDirectoryName,
@@ -36,17 +37,15 @@ import {
   type ProjectRoot,
 } from '../project-root/index.js';
 
-/** 디렉터리 항목의 작업공간 경로 해석 결과를 반환한다. */
-function resolveDirectoryEntry(
-  root: ProjectRoot,
-  directoryPath: string,
-  entry: string,
-): Promise<WorkspacePathResult> {
-  return resolveWorkspacePath(root, path.join(directoryPath, entry));
-}
 import { decodeWorkspaceBytes } from '../revision/index.js';
 import { workspaceDocumentStatuses } from './domain-values.js';
 export * from './domain-values.js';
+export * from './observations.js';
+import {
+  WorkspaceObservationCache,
+  containsWorkspacePath,
+  type WorkspaceDocumentObservation,
+} from './observations.js';
 
 /** 파일이 많은 폴더에서도 파일 시스템 요청을 직렬화하지 않되 과도한 동시 요청은 피한다. */
 const directoryEntryBatchSize = 64;
@@ -224,71 +223,238 @@ function readFailure(
   };
 }
 
+/** 전체 탐색 또는 경로 보정 사이에서 공유할 관측과 연결 등록 처리다. */
+export interface WorkspaceLoadOptions {
+  cache?: WorkspaceObservationCache;
+  /** 연결을 발견한 즉시 호출하며 완료 뒤 내용을 읽는다. 실패한 링크의 대상도 전달한다. */
+  onLink?: (link: WorkspacePathLink) => void | Promise<void>;
+}
+
+/** 직접 확인한 부재다. 깨진 링크·읽기 오류와 구분하며 전체 삭제 판정은 수행하지 않는다. */
+export interface WorkspacePathAbsence {
+  path: string;
+  logicalPath: string;
+}
+
+/** 경로별 결과는 status가 없어 전체 WorkspaceScanResult로 사용할 수 없다. */
+export interface WorkspacePathScanResult extends WorkspaceScanResults {
+  root: ProjectRoot;
+  coverage: { path?: string; logicalPath?: string };
+  generation: number;
+  outcome: ScanStatus;
+  absent: readonly WorkspacePathAbsence[];
+  links: readonly WorkspacePathLink[];
+  observations: readonly WorkspaceDocumentObservation[];
+}
+
+/** 기존 전체 탐색 계약에 읽기 세대와 문서 없는 연결의 관측을 추가한다. */
+export type WorkspaceLoadResult = WorkspaceScanResult & {
+  links: readonly WorkspacePathLink[];
+  observations: readonly WorkspaceDocumentObservation[];
+};
+
 /**
- * 선택한 루트의 .codocs 아래 yaml/yml을 논리 경로마다 읽고 core로 파싱·검증한다.
- * 옵션은 resolveProjectRoot와 같다. 상위 프로젝트를 탐색하지 않는다.
- * .codocs 부재는 complete 0개, 루트·.codocs 접근 실패는 failed, 하위 IO 실패는 partial이다.
- * 읽은 내용 오류는 탐색 누락이 아니다. 순환 연결은 별도로 기록하고 다른 가지는 계속 탐색한다.
- * 접근 정책은 현 시점 연결 범위이며 실제 저장·watcher·색인·잠금은 수행하지 않는다.
+ * 선택한 루트의 .codocs 아래 yaml/yml을 발견 경로마다 읽고 core로 파싱·검증한다.
+ * .codocs 부재는 complete 0개, 루트 접근 실패는 failed, 하위 IO 실패는 partial이다.
+ * 읽은 내용 오류와 순환 건너뜀은 누락 실패가 아니다. 상위 프로젝트는 탐색하지 않는다.
+ * 캐시는 감시 신호로 무효화된 초기화 작업 안에서만 공유한다.
+ * 수동 전체 refresh는 새 캐시를 사용하거나 .codocs 전체를 먼저 무효화한다.
  */
 export async function loadWorkspace(
   input: unknown = {},
-): Promise<WorkspaceScanResult> {
-  const documents: WorkspaceDocumentResult[] = [];
-  const failures: WorkspaceScanFailure[] = [];
-  const skippedCycles: WorkspaceSkippedCycle[] = [];
-  const diagnostics: WorkspaceScanDiagnostic[] = [];
-  const results = { documents, failures, skippedCycles, diagnostics };
+  options: WorkspaceLoadOptions = {},
+): Promise<WorkspaceLoadResult> {
   const selected = await resolveProjectRoot(input);
-  if (!selected.success) {
-    diagnostics.push(...selected.diagnostics);
-    failures.push({
-      kind: workspaceTargetKinds.directory,
-      ...(selected.projectRoot === undefined
-        ? {}
-        : { logicalPath: selected.projectRoot }),
-      diagnostics: selected.diagnostics,
-    });
+  if (!selected.success)
     return {
-      ...results,
+      documents: [],
+      skippedCycles: [],
+      links: [],
+      observations: [],
+      failures: [
+        {
+          kind: workspaceTargetKinds.directory,
+          ...(selected.projectRoot === undefined
+            ? {}
+            : { logicalPath: selected.projectRoot }),
+          diagnostics: selected.diagnostics,
+        },
+      ],
+      diagnostics: selected.diagnostics,
       status: scanStatuses.failed,
       ...(selected.projectRoot === undefined
         ? {}
         : { projectRoot: selected.projectRoot }),
     };
+  const result = await scanPath(
+    selected.root,
+    codocsDirectoryName,
+    options,
+    true,
+  );
+  return {
+    root: selected.root,
+    status: result.outcome,
+    documents: result.documents,
+    failures: result.failures,
+    skippedCycles: result.skippedCycles,
+    diagnostics: result.diagnostics,
+    links: result.links,
+    observations: result.observations,
+  };
+}
+
+/** 같은 프로젝트의 발견 경로만 재확인한다. 외부 이벤트 실경로는 직접 입력할 수 없다. */
+export function loadWorkspacePath(
+  root: ProjectRoot,
+  input: unknown,
+  options: WorkspaceLoadOptions = {},
+): Promise<WorkspacePathScanResult> {
+  return scanPath(root, input, options, false);
+}
+
+/** 외부 감시 신호를 실제 연결이 허용하는 발견 경로별 범위로만 되돌린다. */
+export function workspacePathsForLinkEvent(
+  links: readonly WorkspacePathLink[],
+  eventPath: string,
+): string[] {
+  const paths = new Set<string>();
+  for (const link of links) {
+    for (const target of new Set([
+      link.targetPath,
+      link.realPath ?? link.targetPath,
+    ])) {
+      if (eventPath === target) paths.add(link.logicalPath);
+      else if (
+        link.kind === workspaceTargetKinds.directory &&
+        containsWorkspacePath(target, eventPath)
+      )
+        paths.add(
+          path.join(link.logicalPath, path.relative(target, eventPath)),
+        );
+      // 감시 대상의 부모 삭제·교체는 기존 연결만 재확인한다. 부모 읽기를 허용하지 않는다.
+      else if (containsWorkspacePath(eventPath, target))
+        paths.add(link.logicalPath);
+    }
   }
-  const root = selected.root;
-  const initial = await resolveWorkspacePath(root, codocsDirectoryName);
+  return [...paths];
+}
+
+/** 파일 또는 하위 트리의 확인 범위를 명시하여 전체 순회와 같은 IO 규칙으로 탐색한다. */
+async function scanPath(
+  root: ProjectRoot,
+  input: unknown,
+  options: WorkspaceLoadOptions,
+  full: boolean,
+): Promise<WorkspacePathScanResult> {
+  const documents: WorkspaceDocumentResult[] = [];
+  const observations: WorkspaceDocumentObservation[] = [];
+  const failures: WorkspaceScanFailure[] = [];
+  const skippedCycles: WorkspaceSkippedCycle[] = [];
+  const diagnostics: WorkspaceScanDiagnostic[] = [];
+  const absent: WorkspacePathAbsence[] = [];
+  const links: WorkspacePathLink[] = [];
+  const cache = options.cache ?? new WorkspaceObservationCache();
+  const generation = cache.version;
+  const results = {
+    documents,
+    observations,
+    failures,
+    skippedCycles,
+    diagnostics,
+    absent,
+    links,
+  };
+  /** 접근 경로 확인 때 얻은 연결은 문서 읽기 성공 여부와 무관하게 전달한다. */
+  async function resolveTarget(
+    inputPath: unknown,
+  ): Promise<WorkspacePathResult> {
+    let target = await resolveWorkspacePath(root, inputPath);
+    let registered: boolean;
+    do {
+      registered = false;
+      for (const link of target.links ?? []) {
+        if (
+          links.some(
+            /** 같은 발견 연결의 등록 대기를 한 탐색 안에서 공유한다. */
+            (existing) =>
+              existing.logicalPath === link.logicalPath &&
+              existing.targetPath === link.targetPath &&
+              existing.realPath === link.realPath &&
+              existing.kind === link.kind &&
+              existing.confirmed === link.confirmed,
+          )
+        )
+          continue;
+        links.push(link);
+        if (options.onLink) {
+          await options.onLink(link);
+          registered = true;
+        }
+      }
+      // 등록을 기다리는 동안 바뀐 연결의 이전 실경로를 새 원문과 결합하지 않는다.
+      if (registered) target = await resolveWorkspacePath(root, inputPath);
+    } while (registered);
+    return target;
+  }
+
+  const initial = await resolveTarget(input);
+  const coverage = {
+    ...(initial.path === undefined ? {} : { path: initial.path }),
+    ...(initial.logicalPath === undefined
+      ? {}
+      : { logicalPath: initial.logicalPath }),
+  };
   if (!initial.success) {
-    if (initial.status === workspacePathFailureStatuses.missing)
-      return { ...results, status: scanStatuses.complete, root };
+    if (
+      initial.status === workspacePathFailureStatuses.missing &&
+      initial.path !== undefined &&
+      initial.logicalPath !== undefined
+    ) {
+      absent.push({ path: initial.path, logicalPath: initial.logicalPath });
+      return {
+        ...results,
+        root,
+        coverage,
+        generation,
+        outcome: scanStatuses.complete,
+      };
+    }
     failures.push(pathFailure(initial));
     diagnostics.push(...initial.diagnostics);
-    return { ...results, status: scanStatuses.failed, root };
+    return {
+      ...results,
+      root,
+      coverage,
+      generation,
+      outcome: scanStatuses.failed,
+    };
   }
   // 전역 방문 집합이 아니라 현재 탐색 가지의 실제 폴더만 유지한다.
   const ancestors: ResolvedPath[] = [];
 
+  /** 현재 가지의 실제 경로 또는 유효한 파일 시스템 식별자로 순환을 판정한다. */
+  function isCycle(target: ResolvedPath): boolean {
+    return ancestors.some(
+      /** 실제 경로 또는 확인한 0이 아닌 현재 폴더 식별 정보로만 같은 조상임을 판정한다. */
+      (ancestor) =>
+        ancestor.realPath === target.realPath ||
+        (ancestor.directoryIdentity !== undefined &&
+          target.directoryIdentity !== undefined &&
+          ancestor.directoryIdentity.device > 0n &&
+          ancestor.directoryIdentity.inode > 0n &&
+          target.directoryIdentity.device > 0n &&
+          target.directoryIdentity.inode > 0n &&
+          ancestor.directoryIdentity.device ===
+            target.directoryIdentity.device &&
+          ancestor.directoryIdentity.inode === target.directoryIdentity.inode),
+    );
+  }
+
   /** 폴더 진입 시 조상을 추가하고 돌아올 때 반드시 제거한다. */
   async function visit(target: ResolvedPath): Promise<void> {
     if (target.kind === workspaceTargetKinds.directory) {
-      if (
-        ancestors.some(
-          /** 실제 경로 또는 확인한 0이 아닌 현재 폴더 식별 정보로만 같은 조상임을 판정한다. */
-          (ancestor) =>
-            ancestor.realPath === target.realPath ||
-            (ancestor.directoryIdentity !== undefined &&
-              target.directoryIdentity !== undefined &&
-              ancestor.directoryIdentity.device > 0n &&
-              ancestor.directoryIdentity.inode > 0n &&
-              target.directoryIdentity.device > 0n &&
-              target.directoryIdentity.inode > 0n &&
-              ancestor.directoryIdentity.device ===
-                target.directoryIdentity.device &&
-              ancestor.directoryIdentity.inode ===
-                target.directoryIdentity.inode),
-        )
-      ) {
+      if (isCycle(target)) {
         const diagnostic: WorkspaceDiagnostic = {
           ...createWorkspaceDiagnostic(
             workspaceDiagnosticCodes.circularDirectoryLink,
@@ -329,12 +495,24 @@ export async function loadWorkspace(
             entries
               .slice(offset, offset + directoryEntryBatchSize)
               .map((entry) =>
-                resolveDirectoryEntry(root, target.logicalPath, entry),
+                resolveTarget(path.join(target.logicalPath, entry)),
               ),
           );
           const files: ResolvedPath[] = [];
           for (const child of children) {
             if (!child.success) {
+              // 열거 후 lstat으로 직접 확인한 부재는 실패한 읽기·깨진 링크와 다르다.
+              if (
+                child.status === workspacePathFailureStatuses.missing &&
+                child.path !== undefined &&
+                child.logicalPath !== undefined
+              ) {
+                absent.push({
+                  path: child.path,
+                  logicalPath: child.logicalPath,
+                });
+                continue;
+              }
               failures.push(pathFailure(child));
               diagnostics.push(...child.diagnostics);
               continue;
@@ -355,23 +533,69 @@ export async function loadWorkspace(
       !/\.ya?ml$/u.test(target.logicalPath)
     )
       return;
-    let bytes: Buffer;
+    let observation: WorkspaceDocumentObservation;
     try {
-      bytes = await readFile(target.logicalPath);
+      // 캐시 재사용도 현재 파일의 읽기 권한 재확인을 생략하지 않는다.
+      await access(target.logicalPath, constants.R_OK);
+      observation = await cache.observe(
+        target.logicalPath,
+        target.realPath,
+        async () => parseDocument(target, await readFile(target.logicalPath)),
+      );
     } catch (error: unknown) {
       const failure = readFailure(target, error);
       failures.push(failure);
       diagnostics.push(...failure.diagnostics);
       return;
     }
-    const document = parseDocument(target, bytes);
+    const document = observation.document;
+    observations.push(observation);
     documents.push(document);
     diagnostics.push(...document.diagnostics);
   }
 
+  // 지정 경로의 조상은 열거하지 않고 식별 정보만 확인한다.
+  // 중간 순환 링크 아래를 직접 요청해도 전체 탐색과 같은 위치에서 중단한다.
+  if (!full) {
+    const parents: string[] = [];
+    let parent = path.dirname(initial.logicalPath);
+    while (containsWorkspacePath(root.codocsPath, parent)) {
+      parents.unshift(parent);
+      if (parent === root.codocsPath) break;
+      parent = path.dirname(parent);
+    }
+    for (const parentPath of parents) {
+      const parentTarget = await resolveTarget(parentPath);
+      if (!parentTarget.success) {
+        failures.push(pathFailure(parentTarget));
+        diagnostics.push(...parentTarget.diagnostics);
+        return {
+          ...results,
+          root,
+          coverage,
+          generation,
+          outcome: scanStatuses.failed,
+        };
+      }
+      if (isCycle(parentTarget)) {
+        await visit(parentTarget);
+        return {
+          ...results,
+          root,
+          coverage,
+          generation,
+          outcome: scanStatuses.complete,
+        };
+      }
+      ancestors.push(parentTarget);
+    }
+  }
   await visit(initial);
   documents.sort((left, right) =>
     left.source.path.localeCompare(right.source.path),
+  );
+  observations.sort((left, right) =>
+    left.document.source.path.localeCompare(right.document.source.path),
   );
   const rootReadFailed = failures.some(
     /** 스캔 시작 폴더 자체의 실패는 하위 누락과 다르게 전체 실패다. */
@@ -380,7 +604,9 @@ export async function loadWorkspace(
   return {
     ...results,
     root,
-    status: rootReadFailed
+    coverage,
+    generation,
+    outcome: rootReadFailed
       ? scanStatuses.failed
       : failures.length > 0
         ? scanStatuses.partial

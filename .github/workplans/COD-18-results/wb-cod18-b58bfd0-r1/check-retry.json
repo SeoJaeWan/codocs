@@ -1,0 +1,7 @@
+{
+  "command": ["pnpm", "check"],
+  "startedAt": "2026-09-22T01:38:19.433Z",
+  "durationMilliseconds": 32205,
+  "code": 1,
+  "signal": null
+}

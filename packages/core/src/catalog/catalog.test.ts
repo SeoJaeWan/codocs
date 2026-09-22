@@ -1,3 +1,4 @@
+import { documentStatuses } from '../validator/domain-values.js';
 import { describe, expect, it } from 'vitest';
 import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import {
@@ -2282,5 +2283,246 @@ describe('planRename: 새 이름의 참조 표기', () => {
       plan.changes.find((change) => change.path === sourceRefersToOrder.path)
         ?.newText,
     ).toBe('[[새\\:주문]]');
+  });
+});
+
+describe('폐기 대상의 참조 진단', () => {
+  it('참조 원문을 제거하면 폐기 대상이 남아 있어도 경고와 양방향 연결을 제거한다', () => {
+    const target = {
+      ...orderDocument,
+      parsed: {
+        ...orderDocument.parsed,
+        data: {
+          ...orderDocument.parsed.data,
+          status: documentStatuses.deprecated,
+        },
+      },
+    };
+    const previous = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [target, sourceRefersToOrder],
+    });
+    expect(
+      previous.documents
+        .get(sourceRefersToOrder.path)
+        ?.diagnostics.some(
+          (item) => item.code === catalogDiagnosticCodes.deprecatedReference,
+        ),
+    ).toBe(true);
+    const source = {
+      ...sourceRefersToOrder,
+      parsed: {
+        ...parsedBase,
+        source: '{"id":"s","name":"출처","definition":"참조 제거"}',
+        data: { id: 's', name: '출처', definition: '참조 제거' },
+      },
+    };
+    const catalog = buildCatalog(
+      { status: scanStatuses.complete, observations: [target, source] },
+      previous,
+    );
+    expect(
+      catalog.documents
+        .get(source.path)
+        ?.diagnostics.filter(
+          (item) => item.code === catalogDiagnosticCodes.deprecatedReference,
+        ),
+    ).toEqual([]);
+    expect(catalog.documents.get(source.path)?.references).toEqual([]);
+    expect(catalog.documents.get(target.path)?.referencedBy).toEqual([]);
+  });
+
+  it('폐기 상태로 변경하면 기존 참조의 경고를 재계산한다', () => {
+    const previous = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [orderDocument, sourceRefersToOrder],
+    });
+    const target = {
+      ...orderDocument,
+      parsed: {
+        ...orderDocument.parsed,
+        data: {
+          ...orderDocument.parsed.data,
+          status: documentStatuses.deprecated,
+        },
+      },
+    };
+    const catalog = buildCatalog(
+      {
+        status: scanStatuses.complete,
+        observations: [target, sourceRefersToOrder],
+      },
+      previous,
+    );
+    expect(
+      catalog.documents.get(sourceRefersToOrder.path)?.diagnostics,
+    ).toContainEqual({
+      code: catalogDiagnosticCodes.deprecatedReference,
+      severity: diagnosticSeverities.warning,
+      message: catalogDiagnosticMessages.deprecatedReference,
+      path: sourceRefersToOrder.path,
+      fieldPath: ['definition'],
+      offsetRange: { start: 44, end: 50 },
+      range: {
+        start: { line: 0, character: 44 },
+        end: { line: 0, character: 50 },
+      },
+    });
+  });
+  it('대상이 폐기 상태이면 등장 위치에 경고하고 양방향 연결을 유지한다', () => {
+    const target = {
+      ...orderDocument,
+      parsed: {
+        ...orderDocument.parsed,
+        data: {
+          ...orderDocument.parsed.data,
+          status: documentStatuses.deprecated,
+        },
+      },
+    };
+    const scan = {
+      status: scanStatuses.complete,
+      observations: [target, sourceRefersToOrder],
+    };
+    const before = JSON.stringify(scan);
+    const catalog = buildCatalog(scan);
+    const source = catalog.documents.get(sourceRefersToOrder.path)!;
+    expect(source.diagnostics).toContainEqual({
+      code: 'deprecated_reference',
+      severity: 'warning',
+      message: '폐기 상태의 문서를 참조하고 있습니다.',
+      path: sourceRefersToOrder.path,
+      fieldPath: ['definition'],
+      offsetRange: { start: 44, end: 50 },
+      range: {
+        start: { line: 0, character: 44 },
+        end: { line: 0, character: 50 },
+      },
+    });
+    expect(source.references.map((item) => item.path)).toEqual([target.path]);
+    expect(
+      catalog.documents.get(target.path)?.referencedBy.map((item) => item.path),
+    ).toEqual([source.path]);
+    expect(JSON.stringify(scan)).toBe(before);
+  });
+
+  it.each([
+    {
+      label: '일반 대상',
+      status: documentStatuses.confirmed,
+      scanStatus: scanStatuses.complete,
+      duplicate: false,
+    },
+    {
+      label: '이전 ID만 있는 대상',
+      status: undefined,
+      scanStatus: scanStatuses.complete,
+      duplicate: false,
+    },
+    {
+      label: '부분 탐색',
+      status: documentStatuses.deprecated,
+      scanStatus: scanStatuses.partial,
+      duplicate: false,
+    },
+    {
+      label: '이름이 모호한 대상',
+      status: documentStatuses.deprecated,
+      scanStatus: scanStatuses.complete,
+      duplicate: true,
+    },
+  ])(
+    '$label이면 폐기 경고를 만들지 않는다',
+    ({ status, scanStatus, duplicate }) => {
+      const target = {
+        ...orderDocument,
+        parsed: {
+          ...orderDocument.parsed,
+          data: {
+            ...orderDocument.parsed.data,
+            deprecatedAliases: [{ id: 'old-order' }],
+            ...(status ? { status } : {}),
+          },
+        },
+      };
+      const catalog = buildCatalog({
+        status: scanStatus,
+        observations: [
+          sourceRefersToOrder,
+          target,
+          ...(duplicate ? [{ ...target, path: 'other.yaml' }] : []),
+        ],
+      });
+      expect(
+        catalog.documents
+          .get(sourceRefersToOrder.path)
+          ?.diagnostics.filter(
+            (item) => item.code === catalogDiagnosticCodes.deprecatedReference,
+          ),
+      ).toEqual([]);
+    },
+  );
+
+  it('폐기 상태가 해제되면 기존 경고를 제거한다', () => {
+    const previous = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [
+        sourceRefersToOrder,
+        {
+          ...orderDocument,
+          parsed: {
+            ...orderDocument.parsed,
+            data: {
+              ...orderDocument.parsed.data,
+              status: documentStatuses.deprecated,
+            },
+          },
+        },
+      ],
+    });
+    const catalog = buildCatalog(
+      {
+        status: scanStatuses.complete,
+        observations: [sourceRefersToOrder, orderDocument],
+      },
+      previous,
+    );
+    expect(
+      catalog.documents.get(sourceRefersToOrder.path)?.diagnostics,
+    ).not.toContainEqual(
+      expect.objectContaining({
+        code: catalogDiagnosticCodes.deprecatedReference,
+      }),
+    );
+  });
+
+  it('전체 탐색에 실패하면 이전 폐기 대상의 경고를 확정하지 않는다', () => {
+    const previous = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [
+        sourceRefersToOrder,
+        {
+          ...orderDocument,
+          parsed: {
+            ...orderDocument.parsed,
+            data: {
+              ...orderDocument.parsed.data,
+              status: documentStatuses.deprecated,
+            },
+          },
+        },
+      ],
+    });
+    const catalog = buildCatalog(
+      { status: scanStatuses.failed, observations: [] },
+      previous,
+    );
+    expect(
+      catalog.documents.get(sourceRefersToOrder.path)?.diagnostics,
+    ).not.toContainEqual(
+      expect.objectContaining({
+        code: catalogDiagnosticCodes.deprecatedReference,
+      }),
+    );
   });
 });

@@ -85,6 +85,11 @@ export class SynchronizedDocuments {
     return this.#documents.get(uri);
   }
 
+  /** 열린 문서 목록을 완료 관측 갱신에 사용한다. */
+  all(): readonly TextDocument[] {
+    return [...this.#documents.values()];
+  }
+
   /** 서버 종료 시 모든 편집 중 원문을 제거한다. */
   clear(): void {
     this.#documents.clear();
