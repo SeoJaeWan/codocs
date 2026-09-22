@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { summarizeAcceptance } from './acceptance.cjs';
 import { createHash } from 'node:crypto';
-import { createWriteStream, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import {
   access,
@@ -17,8 +17,14 @@ import {
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
+import {
+  assertSupportedIsolation,
+  runIsolated,
+} from '../test-runtime/isolation.mjs';
+import {
+  prepareVSCodeApplication,
+  vscodeVersion,
+} from '../test-runtime/vscode.mjs';
 import {
   describeProgress,
   readProgress,
@@ -30,16 +36,6 @@ const extensionTestPath = path.join(
   repositoryRoot,
   'tools/extension-host/extension-test.cjs',
 );
-const defaultCodeExecutable =
-  process.platform === 'darwin'
-    ? '/Applications/Visual Studio Code.app/Contents/MacOS/Code'
-    : process.platform === 'win32'
-      ? 'code.cmd'
-      : 'code';
-const defaultCodeCli =
-  process.platform === 'darwin'
-    ? '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code'
-    : defaultCodeExecutable;
 const performanceSeed = 16_018;
 const performanceTargetMilliseconds = 100;
 
@@ -70,6 +66,7 @@ const outputPrefix = optionValue('--output');
 const reportPath = optionValue('--report');
 const hoverPerformance = process.argv.includes('--hover-performance');
 const interactiveUi = process.argv.includes('--ui');
+const help = process.argv.includes('--help');
 const evidenceRunId =
   process.env.COD16_EVIDENCE_RUN_ID ?? `${Date.now()}-${process.pid}`;
 const performanceDocuments = positiveIntegerOption('--documents', 1_000);
@@ -81,7 +78,7 @@ const performanceOptions = {
   targetMilliseconds:
     performanceDocuments === 1_000 ? performanceTargetMilliseconds : null,
 };
-if (!vsixPath && !renderExisting)
+if (!vsixPath && !renderExisting && !help)
   throw new Error('--vsix requires an archive path');
 if (outputPrefix && !hoverPerformance)
   throw new Error('--output requires --hover-performance');
@@ -187,104 +184,29 @@ function runProcess(executable, arguments_, options = {}) {
   return new Promise(execute);
 }
 
-/** URL 응답을 임시 파일에 받은 뒤 원자적으로 배치한다. */
-async function downloadFile(url, destination) {
-  const temporary = `${destination}.partial`;
-  await rm(temporary, { force: true });
-  const response = await fetch(url, { redirect: 'follow' });
-  if (!response.ok || !response.body)
-    throw new Error(`VS Code download failed: ${response.status} ${url}`);
-  await pipeline(Readable.fromWeb(response.body), createWriteStream(temporary));
-  await rename(temporary, destination);
-}
-
-/** macOS application Info.plist에서 실제 GUI executable과 CLI 경로를 찾는다. */
-async function macApplicationRuntime(application) {
-  const info = path.join(application, 'Contents/Info.plist');
-  const resolved = await runProcess(
-    '/usr/bin/plutil',
-    ['-extract', 'CFBundleExecutable', 'raw', '-o', '-', info],
-    { description: 'VS Code application executable lookup' },
-  );
-  assert.equal(resolved.code, 0, resolved.stdout + resolved.stderr);
-  const executable = path.join(
-    application,
-    'Contents/MacOS',
-    resolved.stdout.trim(),
-  );
-  const cli = path.join(application, 'Contents/Resources/app/bin/code');
-  await Promise.all([
-    requireFile(executable, 'VS Code application executable'),
-    requireFile(cli, 'VS Code application CLI'),
-  ]);
-  return { executable, cli };
-}
-
-/** 요청한 macOS VS Code 정식 버전을 task 전용 .workbench에 확보한다. */
-async function ensurePinnedCode(version) {
-  if (process.platform !== 'darwin')
-    throw new Error('--code-version currently requires macOS verification');
-  const platform = process.arch === 'arm64' ? 'darwin-arm64' : 'darwin';
-  const runtimeRoot = path.join(repositoryRoot, '.workbench/vscode', version);
-  const application = path.join(runtimeRoot, 'Visual Studio Code.app');
-  try {
-    await access(application);
-    return {
-      ...(await macApplicationRuntime(application)),
-      runtimeRoot,
-      downloaded: false,
-    };
-  } catch {
-    await rm(runtimeRoot, { recursive: true, force: true });
-  }
-  const downloadRoot = path.join(repositoryRoot, '.workbench/downloads');
-  await mkdir(downloadRoot, { recursive: true });
-  const archive = path.join(downloadRoot, `vscode-${version}-${platform}.zip`);
-  try {
-    await access(archive);
-  } catch {
-    await downloadFile(
-      `https://update.code.visualstudio.com/${version}/${platform}/stable`,
-      archive,
-    );
-  }
-  const extractionRoot = `${runtimeRoot}.extracting`;
-  await rm(extractionRoot, { recursive: true, force: true });
-  await mkdir(extractionRoot, { recursive: true });
-  const extracted = await runProcess(
-    '/usr/bin/ditto',
-    ['-x', '-k', archive, extractionRoot],
-    { description: `VS Code ${version} extraction` },
-  );
-  assert.equal(extracted.code, 0, extracted.stdout + extracted.stderr);
-  await mkdir(path.dirname(runtimeRoot), { recursive: true });
-  await rename(extractionRoot, runtimeRoot);
-  await runProcess('/usr/bin/xattr', [
-    '-dr',
-    'com.apple.quarantine',
-    application,
-  ]);
-  return {
-    ...(await macApplicationRuntime(application)),
-    runtimeRoot,
-    downloaded: true,
-  };
-}
-
 /** 현재 설치 또는 버전 고정 VS Code 실행 경로를 결정한다. */
 async function resolveCodeRuntime() {
-  if (requestedCodeVersion) return ensurePinnedCode(requestedCodeVersion);
-  const executable = process.env.COD16_CODE_EXECUTABLE ?? defaultCodeExecutable;
-  const cli = process.env.COD16_CODE_CLI ?? defaultCodeCli;
+  const runtime = await prepareVSCodeApplication({
+    cacheRoot: path.join(repositoryRoot, '.workbench/vscode-cache'),
+    version: requestedCodeVersion ?? vscodeVersion,
+  });
+  const executable = runtime.executable;
+  const cli = runtime.cli;
   await Promise.all([
     requireFile(executable, 'Visual Studio Code executable'),
     requireFile(cli, 'Visual Studio Code CLI'),
+    ...runtime.cliPrefix.map((target) =>
+      requireFile(target, 'Visual Studio Code CLI entrypoint'),
+    ),
   ]);
   return {
     executable,
     cli,
-    runtimeRoot: path.dirname(executable),
-    downloaded: false,
+    cliPrefix: runtime.cliPrefix,
+    cliAsNode: runtime.cliAsNode,
+    runtimeRoot: runtime.runtimeRoot,
+    packageJson: runtime.packageJson,
+    downloaded: null,
   };
 }
 
@@ -585,6 +507,7 @@ async function writePerformanceReport(prefix, report) {
     `- 소스 커밋: ${report.artifacts?.sourceCommit ?? '미확인'}; VSIX SHA-256: ${report.artifacts?.vsixSha256 ?? '미확인'}`,
     `- 확장 번들 SHA-256: ${report.artifacts?.extensionBundleSha256 ?? '미확인'}; 서버 번들 SHA-256: ${report.artifacts?.serverBundleSha256 ?? '미확인'}`,
     `- 운영체제: ${report.environment?.platform ?? process.platform} ${report.environment?.release ?? os.release()} ${report.environment?.architecture ?? process.arch}`,
+    `- 장비: CPU ${report.environment?.cpu ?? '미확인'} (${report.environment?.cpuCount ?? '미확인'}개), 메모리 ${report.environment?.memoryBytes ?? '미확인'} B; 파일 캐시: ${report.environment?.fileCache ?? '미확인'}`,
     `- 데이터: seed ${fixture.seed ?? performanceSeed}, 문서 ${fixture.projectDocumentCount ?? performanceOptions.documents}개, 정상 조회 가능 ${fixture.queryableDocumentCount ?? '미확인'}개, 무효 ${fixture.invalidDocumentCount ?? '미확인'}개, 충돌 ${fixture.collisionDocumentCount ?? '미확인'}개`,
     `- 실행 회차: 준비 확인 시도 ${p.attemptedReadiness ?? p.readinessAttempts ?? '미확인'}회/완료 ${p.completedReadiness ?? p.readiness?.length ?? '미확인'}회; 워밍업 요청 ${p.warmupRuns}회/시도 ${p.attemptedWarmupRuns ?? warmups.length}회/완료 ${p.completedWarmupRuns ?? warmups.length}회; 측정 요청 ${p.queryRuns}회/시도 ${p.attemptedMeasuredRuns ?? samples.length}회/완료 ${p.completedMeasuredRuns ?? samples.length}회`,
     `- 정확성 실패: ${p.accuracyFailureCount ?? 0}개; 정확한 완료 측정 표본: ${p.successfulLatencySampleCount ?? samples.filter((sample) => sample.success).length}개`,
@@ -740,7 +663,11 @@ async function writePerformanceFailureReport(prefix, details) {
       platform: process.platform,
       release: os.release(),
       architecture: process.arch,
+      cpu: os.cpus()[0]?.model ?? 'unknown',
+      cpuCount: os.cpus().length,
+      memoryBytes: os.totalmem(),
       runnerNode: process.version,
+      fileCache: 'OS file cache was not forcibly cleared',
       profileIsolation: 'new user-data and extensions directories for this run',
     },
     fixture: details.fixtureMetadata,
@@ -832,7 +759,22 @@ async function preserveHostFailure({
   return destination;
 }
 
-if (renderExisting) {
+if (help) {
+  process.stdout.write(
+    [
+      'Usage: node tools/extension-host/run.mjs --vsix <archive> [options]',
+      '  --hover-performance          실제 설치된 VS Code Hover 측정',
+      '  --documents <count>           기본 1000',
+      '  --warmup-runs <count>         기본 100',
+      '  --query-runs <count>          기본 1000',
+      '  --code-version <x.y.z>        기본 공유 런타임 버전 1.100.0',
+      '  --output <prefix>             Hover JSON·한국어 Markdown·진행 기록',
+      '  --report <path>               기능 실행 JSON',
+      '  --render-existing-performance <json>  기존 Hover JSON 재렌더',
+      '',
+    ].join('\n'),
+  );
+} else if (renderExisting) {
   const resolved = path.resolve(repositoryRoot, renderExisting);
   if (!resolved.endsWith('.json'))
     throw new Error('--render-existing-performance requires a JSON report');
@@ -840,6 +782,80 @@ if (renderExisting) {
     resolved.slice(0, -'.json'.length),
     JSON.parse(await readFile(resolved, 'utf8')),
   );
+} else if (process.env.COD19_ISOLATED_RUN !== '1') {
+  const output = path.join(
+    repositoryRoot,
+    '.workbench/extension-host-isolation',
+    `${Date.now()}-${process.pid}`,
+  );
+  const controller = new AbortController();
+  /** 사용자 중단을 격리 감독기에 전달한다. */
+  const cancel = () => controller.abort();
+  process.on('SIGINT', cancel);
+  process.on('SIGTERM', cancel);
+  let isolation;
+  let isolationError;
+  try {
+    assertSupportedIsolation();
+    process.env.COD19_ISOLATED_RUN = '1';
+    isolation = await runIsolated({
+      executable: process.execPath,
+      args: [
+        path.join(repositoryRoot, 'tools/extension-host/run.mjs'),
+        ...process.argv.slice(2),
+      ],
+      cwd: repositoryRoot,
+      output,
+      timeout: 86_400_000,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    isolationError = error;
+  } finally {
+    delete process.env.COD19_ISOLATED_RUN;
+    process.off('SIGINT', cancel);
+    process.off('SIGTERM', cancel);
+  }
+  if (hoverPerformance && outputPrefix) {
+    const prefix = path.resolve(repositoryRoot, outputPrefix);
+    let reportExists = false;
+    try {
+      await access(`${prefix}.json`);
+      reportExists = true;
+    } catch {
+      // 준비 또는 자식 종료 시 내부 실행기가 보고서를 남기지 못할 수 있다.
+    }
+    if (!reportExists)
+      await writePerformanceFailureReport(outputPrefix, {
+        actualCodeVersion: requestedCodeVersion ?? vscodeVersion,
+        failureIdentity:
+          isolationError?.stack ??
+          `격리 실행 ${isolation?.reason ?? 'unknown'} (${isolation?.exitCode ?? 'unknown'})`,
+        interrupted:
+          isolation?.reason === 'cancelled' || controller.signal.aborted,
+        fixtureMetadata: null,
+        progress: await readProgress(`${prefix}.progress.jsonl`),
+        sourceCommit: (
+          await runProcess('git', ['rev-parse', 'HEAD']).catch(() => ({
+            stdout: 'unknown',
+          }))
+        ).stdout.trim(),
+        vsixSha256: await fileSha256(vsixPath).catch(() => null),
+        extensionBundleSha256: null,
+        serverBundleSha256: null,
+      });
+  }
+  process.stdout.write(`격리 결과: ${output}\n`);
+  if (
+    isolationError ||
+    isolation?.reason !== 'exit' ||
+    isolation.exitCode !== 0
+  ) {
+    process.stderr.write(
+      `${isolationError?.stack ?? `격리 실행 ${isolation?.reason ?? 'unknown'} (${isolation?.exitCode ?? 'unknown'}), 기록: ${output}`}\n`,
+    );
+    process.exitCode = 1;
+  }
 } else {
   await mkdir(path.join(repositoryRoot, '.workbench/fixtures'), {
     recursive: true,
@@ -852,17 +868,15 @@ if (renderExisting) {
   let performanceReportWritten = false;
   try {
     const runtime = await resolveCodeRuntime();
-    const versionResult = await runProcess(runtime.cli, ['--version'], {
-      description: 'VS Code version query',
-    });
-    assert.equal(versionResult.code, 0, versionResult.stderr);
-    const [actualCodeVersion, , architecture = process.arch] =
-      versionResult.stdout.trim().split(/\r?\n/u);
+    const actualCodeVersion = JSON.parse(
+      await readFile(runtime.packageJson, 'utf8'),
+    ).version;
+    const architecture = process.arch;
     if (requestedCodeVersion)
       assert.equal(
         actualCodeVersion,
         requestedCodeVersion,
-        versionResult.stdout,
+        runtime.packageJson,
       );
 
     const fixture = await createFixture(temporaryRoot);
@@ -889,6 +903,7 @@ if (renderExisting) {
     const installResult = await runProcess(
       runtime.cli,
       [
+        ...runtime.cliPrefix,
         '--install-extension',
         path.resolve(vsixPath),
         '--force',
@@ -897,7 +912,12 @@ if (renderExisting) {
         '--extensions-dir',
         extensions,
       ],
-      { description: 'VSIX installation' },
+      {
+        description: 'VSIX installation',
+        environment: runtime.cliAsNode
+          ? { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+          : process.env,
+      },
     );
     assert.equal(
       installResult.code,

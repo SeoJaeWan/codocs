@@ -14,6 +14,62 @@ import { withCacheLock } from './cache-lock.mjs';
 
 export const vscodeVersion = '1.100.0';
 
+/** 공식 다운로드 실행 파일에서 OS별 CLI와 설치 루트를 결정한다. */
+export function vscodeApplicationPaths(
+  executable,
+  platform = process.platform,
+) {
+  const paths = platform === 'win32' ? path.win32 : path.posix;
+  if (platform === 'win32')
+    return {
+      executable,
+      cli: executable,
+      cliPrefix: [
+        paths.join(paths.dirname(executable), 'resources/app/out/cli.js'),
+      ],
+      cliAsNode: true,
+      runtimeRoot: paths.dirname(executable),
+      packageJson: paths.join(
+        paths.dirname(executable),
+        'resources/app/package.json',
+      ),
+    };
+  if (platform === 'darwin') {
+    const contents = paths.resolve(paths.dirname(executable), '..');
+    return {
+      executable,
+      cli: paths.join(contents, 'Resources/app/bin/code'),
+      cliPrefix: [],
+      cliAsNode: false,
+      runtimeRoot: paths.dirname(contents),
+      packageJson: paths.join(contents, 'Resources/app/package.json'),
+    };
+  }
+  if (platform === 'linux')
+    return {
+      executable,
+      cli: executable,
+      cliPrefix: [
+        paths.join(paths.dirname(executable), 'resources/app/out/cli.js'),
+      ],
+      cliAsNode: true,
+      runtimeRoot: paths.dirname(executable),
+      packageJson: paths.join(
+        paths.dirname(executable),
+        'resources/app/package.json',
+      ),
+    };
+  throw new Error(`지원하지 않는 VS Code 운영체제: ${platform}`);
+}
+
+/** 기능·성능 실행기에 같은 무결성 검증 VS Code 설치를 제공한다. */
+export async function prepareVSCodeApplication(options) {
+  return vscodeApplicationPaths(
+    await prepareVSCode(options),
+    options.platform ?? process.platform,
+  );
+}
+
 /** 다운로드 완료 후 실행 파일·라이브러리 전체의 내용을 해시한다. 프로필은 캐시에 만들지 않는다. */
 async function fingerprint(directory) {
   const hash = createHash('sha256');

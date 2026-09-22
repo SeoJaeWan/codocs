@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { execFileSync } = require('node:child_process');
+const { serverProcesses } = require('./processes.cjs');
 const {
   access,
   appendFile,
@@ -29,20 +29,6 @@ async function checkpoint(phase, detail = {}) {
     `${JSON.stringify(progress.at(-1))}\n`,
     'utf8',
   );
-}
-
-/** 실행 중인 language server 프로세스의 PID를 찾는다. */
-function serverProcesses(serverPath) {
-  const output = execFileSync('/bin/ps', ['-axo', 'pid=,command='], {
-    encoding: 'utf8',
-  });
-  return output
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.includes(serverPath) && line.includes('--node-ipc'))
-    .map((line) => Number.parseInt(line.split(/\s+/u)[0], 10))
-    .filter(Number.isInteger)
-    .sort((left, right) => left - right);
 }
 
 /** 조건이 충족될 때까지 Extension Host 상태를 기다린다. */
