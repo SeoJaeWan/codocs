@@ -169,6 +169,20 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
     );
   });
 
+  it('논리 절대 경로를 슬래시 구분자로 요청하면 같은 발견 파일을 반환한다', async () => {
+    const file = path.join(project, '.codocs', 'slash.yaml');
+    await writeFile(file, 'id: slash\nname: slash\ndefinition: slash\n');
+    const result = await resolveWorkspacePath(
+      selectedRoot,
+      file.split(path.sep).join('/'),
+    );
+    expect(result).toMatchObject({
+      success: true,
+      logicalPath: file,
+      path: path.join('.codocs', 'slash.yaml'),
+    });
+  });
+
   describe('경로 정규화와 연결 루트 이탈 판정', () => {
     it('일반 .codocs 파일을 상대와 논리 절대 경로로 요청하면 같은 확인 대상을 반환한다', /** 일반 .codocs 파일을 상대와 논리 절대 경로로 요청하면 같은 확인 대상을 반환한다. */ async () => {
       const logicalPath = path.join(project, '.codocs', '한글 Case.yaml');
@@ -469,6 +483,14 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
           '.codocs/broken.yaml',
         );
         expect(result).toEqual({
+          links: [
+            {
+              path: path.join('.codocs', 'broken.yaml'),
+              logicalPath: path.join(project, '.codocs', 'broken.yaml'),
+              targetPath: path.join(outside, 'missing.yaml'),
+              confirmed: false,
+            },
+          ],
           success: false,
           status: 'unavailable',
           logicalPath: path.join(project, '.codocs', 'broken.yaml'),
