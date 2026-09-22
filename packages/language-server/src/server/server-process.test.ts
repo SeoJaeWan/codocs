@@ -16,6 +16,7 @@ interface JsonRpcResponse {
 }
 
 class StdioProtocolClient {
+  readonly notifications: { method: string; params: unknown }[] = [];
   readonly #child: ChildProcessWithoutNullStreams;
   readonly #pending = new Map<
     number,
@@ -103,6 +104,15 @@ class StdioProtocolClient {
       this.#buffer = this.#buffer.subarray(frameEnd);
       try {
         const response = JSON.parse(body) as JsonRpcResponse;
+        if (
+          'method' in response &&
+          typeof response.method === 'string' &&
+          'params' in response
+        )
+          this.notifications.push({
+            method: response.method,
+            params: response.params,
+          });
         const pending = this.#pending.get(response.id);
         if (pending) {
           this.#pending.delete(response.id);
@@ -123,6 +133,144 @@ class StdioProtocolClient {
 }
 
 describe('language server stdio 프로세스', () => {
+  it.each([false, true])(
+    '복수 후보 %s인 YAML의 링크·resolve·진단을 실제 프로세스에서 최신 버전으로 갱신한다',
+    async (ambiguous) => {
+      await mkdir('.workbench/fixtures', { recursive: true });
+      const root = await mkdtemp(
+        path.resolve('.workbench/fixtures/protocol-links-'),
+      );
+      await mkdir(path.join(root, '.codocs'));
+      const target =
+        'id: target\nname: 대상\ndefinition: 설명\nstatus: deprecated\n';
+      await writeFile(path.join(root, '.codocs/target.yaml'), target);
+      if (ambiguous)
+        await writeFile(
+          path.join(root, '.codocs/other.yaml'),
+          target.replace('id: target', 'id: other'),
+        );
+      const output = path.join(root, 'server.cjs');
+      await build({
+        entryPoints: [fileURLToPath(new URL('../index.ts', import.meta.url))],
+        outfile: output,
+        bundle: true,
+        platform: 'node',
+        format: 'cjs',
+        target: 'node20.19',
+      });
+      const child = spawn(process.execPath, [output, '--stdio'], {
+        cwd: root,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const client = new StdioProtocolClient(child);
+      const uri = pathToFileURL(path.join(root, '.codocs/live.yaml')).href;
+      try {
+        const initialized = await client.request(1, 'initialize', {
+          processId: null,
+          rootUri: pathToFileURL(root).href,
+          capabilities: {},
+        });
+        expect(initialized.result).toMatchObject({
+          capabilities: { documentLinkProvider: { resolveProvider: true } },
+        });
+        client.send('initialized', {});
+        await client.request(2, workspaceRefreshRequestMethod, {});
+        client.send('textDocument/didOpen', {
+          textDocument: {
+            uri,
+            version: 1,
+            languageId: 'yaml',
+            text: 'id: source\nname: 출처\ndefinition: "[[대상]]"\n',
+          },
+        });
+        const response = await client.request(3, 'textDocument/documentLink', {
+          textDocument: { uri },
+        });
+        const links = response.result as { range: unknown; target: string }[];
+        expect(links).toHaveLength(ambiguous ? 0 : 1);
+        const hovered = await client.request(4, 'textDocument/hover', {
+          textDocument: { uri },
+          position: { line: 2, character: 15 },
+        });
+        expect(
+          JSON.stringify(hovered.result).match(/command:codocs.openSource/gu),
+        ).toHaveLength(ambiguous ? 2 : 1);
+        if (!ambiguous) {
+          expect(
+            (await client.request(5, 'documentLink/resolve', links[0])).result,
+          ).toEqual(links[0]);
+          const selected = (
+            JSON.parse(
+              decodeURIComponent(links[0]!.target.split('?')[1]!),
+            ) as unknown[]
+          )[0];
+          expect(
+            (await client.request(6, 'codocs/confirmSource', selected)).result,
+          ).toEqual({
+            uri: pathToFileURL(path.join(root, '.codocs/target.yaml')).href,
+          });
+        }
+        await vi.waitFor(() =>
+          expect(
+            client.notifications
+              .filter(
+                (item) => item.method === 'textDocument/publishDiagnostics',
+              )
+              .at(-1)?.params,
+          ).toMatchObject({
+            uri,
+            version: 1,
+            diagnostics: expect.arrayContaining([
+              expect.objectContaining({
+                code: ambiguous
+                  ? 'reference_ambiguous'
+                  : 'deprecated_reference',
+                severity: ambiguous ? 1 : 2,
+              }),
+            ]) as unknown,
+          }),
+        );
+        client.send('textDocument/didChange', {
+          textDocument: { uri, version: 2 },
+          contentChanges: [
+            {
+              text: 'id: source\nname: 출처\ndefinition: 삭제\ndomains: [업무]\n',
+            },
+          ],
+        });
+        expect(
+          (
+            await client.request(7, 'textDocument/documentLink', {
+              textDocument: { uri },
+            })
+          ).result,
+        ).toEqual([]);
+        await vi.waitFor(() =>
+          expect(
+            client.notifications
+              .filter(
+                (item) => item.method === 'textDocument/publishDiagnostics',
+              )
+              .at(-1)?.params,
+          ).toMatchObject({ uri, version: 2, diagnostics: [] }),
+        );
+        client.send('textDocument/didClose', { textDocument: { uri } });
+        expect(
+          (
+            await client.request(8, 'textDocument/documentLink', {
+              textDocument: { uri },
+            })
+          ).result,
+        ).toEqual([]);
+        await client.request(9, 'shutdown', null);
+        client.send('exit');
+      } finally {
+        if (child.exitCode === null) child.kill();
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
   it('initialize·전체 문서 변경·현재 매칭·shutdown을 실제 LSP 프레임으로 처리한다', async () => {
     const fixtureParent = path.resolve('.workbench/fixtures');
     await mkdir(fixtureParent, { recursive: true });

@@ -5,6 +5,8 @@ import {
   LanguageClient,
   State,
   TransportKind,
+  HoverRequest,
+  DocumentLinkRequest,
   type ErrorHandler,
   type LanguageClientOptions,
   type Middleware,
@@ -21,6 +23,9 @@ import {
 import {
   openSource,
   openSourceCommand,
+  confirmSourceMethod,
+  snapshotChangedMethod,
+  type OpenSourceCommandArgument,
   trustGeneratedOpenSourceHoverContents,
   type OpenSourceDocument,
   type OpenSourceHost,
@@ -29,7 +34,6 @@ import {
 import { bundledServerPath } from '../package-assembly/index.js';
 import {
   isOwnedByWorkspaceRoot,
-  routeOwnedRequest,
   type WorkspaceRoot,
 } from '../workspace-routing/index.js';
 
@@ -41,6 +45,7 @@ export class VscodeExtensionRuntime {
   readonly #output: vscode.OutputChannel;
   readonly #manager: WorkspaceClientManager;
   readonly #disposables: vscode.Disposable[] = [];
+  readonly #clients = new Map<string, VscodeFolderClient>();
 
   /** 확장 context에서 서버 경로와 VS Code host adapter를 구성한다. */
   constructor(context: vscode.ExtensionContext) {
@@ -60,8 +65,27 @@ export class VscodeExtensionRuntime {
         'codocs.restartLanguageServers',
         async () => this.#manager.restartAll(),
       ),
-      vscode.commands.registerCommand(openSourceCommand, async (argument) =>
-        openSource(argument, vscodeOpenSourceHost()),
+      vscode.commands.registerCommand(
+        openSourceCommand,
+        /** 검증한 선택을 탭 열기로 연결한다. */ async (argument) =>
+          openSource(
+            argument,
+            vscodeOpenSourceHost(
+              /** 출처 문서의 가장 가까운 client에 선택을 확인한다. */ async (
+                selection,
+              ) => {
+                const folder = vscode.workspace.getWorkspaceFolder(
+                  vscode.Uri.parse(selection.sourceUri),
+                );
+                return folder
+                  ? this.#clients
+                      .get(folder.uri.toString())
+                      ?.confirmSource(selection)
+                  : null;
+              },
+              (error) => this.#output.appendLine(errorMessage(error)),
+            ),
+          ),
       ),
     );
     await this.#manager.activate();
@@ -110,11 +134,13 @@ export class VscodeExtensionRuntime {
     const vscodeFolder = workspaceFolder(folder.uri);
     if (!vscodeFolder)
       throw new Error(`Workspace folder를 찾을 수 없습니다: ${folder.uri}`);
-    return new VscodeFolderClient(
+    const client = new VscodeFolderClient(
       vscodeFolder,
       bundledServerPath(this.#context.extensionPath),
       this.#output,
     );
+    this.#clients.set(folder.uri, client);
+    return client;
   }
 }
 
@@ -127,6 +153,100 @@ class VscodeFolderClient implements FolderClientBoundary {
   readonly #disposables: vscode.Disposable[] = [];
   #client: LanguageClient | undefined;
   #stopping = false;
+  #providers: vscode.Disposable[] = [];
+  #providerGeneration = 0;
+
+  /** 대상 URI가 아니라 출처 문서의 소유 client에서 선택을 확인한다. */
+  async confirmSource(argument: OpenSourceCommandArgument): Promise<unknown> {
+    const client = this.#client;
+    const generation = this.#providerGeneration;
+    if (
+      !client?.isRunning() ||
+      vscode.workspace
+        .getWorkspaceFolder(vscode.Uri.parse(argument.sourceUri))
+        ?.uri.toString() !== this.#folder.uri.toString()
+    )
+      return null;
+    const result: unknown = await client.sendRequest(
+      confirmSourceMethod,
+      argument,
+    );
+    return this.#client === client &&
+      client.isRunning() &&
+      generation === this.#providerGeneration
+      ? result
+      : null;
+  }
+
+  /** 완료 snapshot 게시 때 provider를 재등록해 Host의 이전 링크 캐시를 무효화한다. */
+  #registerProviders(client: LanguageClient): void {
+    const generation = ++this.#providerGeneration;
+    for (const provider of this.#providers.splice(0)) provider.dispose();
+    if (this.#client !== client || !client.isRunning()) return;
+    /** 중첩 workspace에서는 가장 가까운 출처 소유권을 확인한다. */
+    const owns = (document: vscode.TextDocument): boolean =>
+      document.uri.scheme === 'file' &&
+      vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() ===
+        this.#folder.uri.toString();
+    this.#providers.push(
+      vscode.languages.registerHoverProvider(
+        { scheme: 'file' },
+        {
+          /** 최신 서버 Hover만 Host Markdown으로 변환한다. */
+          provideHover: async (document, position, token) => {
+            if (!owns(document)) return undefined;
+            const version = document.version;
+            const result = await client.sendRequest(
+              HoverRequest.type,
+              { textDocument: { uri: document.uri.toString() }, position },
+              token,
+            );
+            if (
+              token.isCancellationRequested ||
+              document.isClosed ||
+              document.version !== version ||
+              !owns(document) ||
+              generation !== this.#providerGeneration ||
+              this.#client !== client
+            )
+              return undefined;
+            const hover = client.protocol2CodeConverter.asHover(result);
+            if (hover) trustGeneratedOpenSourceHoverContents(hover.contents);
+            return hover;
+          },
+        },
+      ),
+      vscode.languages.registerDocumentLinkProvider(
+        { scheme: 'file' },
+        {
+          /** 본문은 서버가 제공한 단일 확인 command만 표시한다. */
+          provideDocumentLinks: async (document, token) => {
+            if (!owns(document)) return [];
+            const version = document.version;
+            const result = await client.sendRequest(
+              DocumentLinkRequest.type,
+              { textDocument: { uri: document.uri.toString() } },
+              token,
+            );
+            const links = await client.protocol2CodeConverter.asDocumentLinks(
+              result,
+              token,
+            );
+            if (
+              token.isCancellationRequested ||
+              document.isClosed ||
+              document.version !== version ||
+              !owns(document) ||
+              generation !== this.#providerGeneration ||
+              this.#client !== client
+            )
+              return [];
+            return links;
+          },
+        },
+      ),
+    );
+  }
 
   /** 실제 workspace folder와 서버 경로를 관리하는 client를 만든다. */
   constructor(
@@ -176,14 +296,21 @@ class VscodeFolderClient implements FolderClientBoundary {
       clientOptions,
     );
     this.#client = client;
+    this.#disposables.push(
+      client.onNotification(snapshotChangedMethod, () =>
+        this.#registerProviders(client),
+      ),
+    );
     /** knowledge 파일 변경 뒤 해당 작업 공간의 catalog를 갱신한다. */
     const refresh = () => this.#refresh();
     /** 실행 상태가 되면 연결 사실을 output channel에 기록한다. */
     const reportRunning = (event: { newState: State }): void => {
-      if (event.newState === State.Running)
+      if (event.newState === State.Running) {
+        this.#registerProviders(client);
         this.#output.appendLine(
           `Codocs language server가 연결되었습니다: ${this.#folder.name}`,
         );
+      }
     };
     this.#disposables.push(
       directoryWatcher,
@@ -197,6 +324,7 @@ class VscodeFolderClient implements FolderClientBoundary {
       client.onDidChangeState(reportRunning),
     );
     await client.start();
+    this.#registerProviders(client);
   }
 
   /** 시작 중인 client를 정리하고 현재 열린 문서를 다시 동기화한다. */
@@ -211,6 +339,8 @@ class VscodeFolderClient implements FolderClientBoundary {
   /** watcher·listener·language client와 서버 프로세스를 종료한다. */
   async stop(): Promise<void> {
     this.#stopping = true;
+    this.#providerGeneration += 1;
+    for (const provider of this.#providers.splice(0)) provider.dispose();
     for (const disposable of this.#disposables.splice(0)) disposable.dispose();
     const client = this.#client;
     this.#client = undefined;
@@ -254,16 +384,16 @@ class VscodeFolderClient implements FolderClientBoundary {
         await next(document);
       },
       /** Hover도 가장 가까운 workspace folder의 client에만 요청한다. */
-      provideHover: async (document, position, token, next) => {
-        if (document.uri.scheme !== 'file') return undefined;
-        const hover = await routeOwnedRequest(
-          document.uri.fsPath,
-          root(),
-          roots(),
-          async () => next(document, position, token),
-        );
-        if (hover) trustGeneratedOpenSourceHoverContents(hover.contents);
-        return hover;
+      provideHover: () => undefined,
+      /** 완료 관측마다 재등록하는 provider가 본문 링크를 담당한다. */
+      provideDocumentLinks: () => [],
+      /** 진단도 출처를 소유한 client의 게시만 반영한다. */
+      handleDiagnostics: (uri, diagnostics, next) => {
+        if (
+          uri.scheme === 'file' &&
+          isOwnedByWorkspaceRoot(uri.fsPath, root(), roots())
+        )
+          next(uri, diagnostics);
       },
     };
   }
@@ -392,8 +522,13 @@ function existingTextTabColumn(uri: string): vscode.ViewColumn | undefined {
 }
 
 /** 원문 열기 순수 경계를 VS Code의 문서·탭 API에 연결한다. */
-function vscodeOpenSourceHost(): OpenSourceHost<VscodeOpenSourceDocument> {
+function vscodeOpenSourceHost(
+  confirmSource: OpenSourceHost['confirmSource'],
+  reportError: OpenSourceHost['reportError'],
+): OpenSourceHost<VscodeOpenSourceDocument> {
   return {
+    confirmSource,
+    reportError,
     /** 이미 열린 dirty 문서를 포함해 URI가 같은 현재 buffer를 찾는다. */
     findOpenDocument: (uri) => {
       const document = vscode.workspace.textDocuments.find(
