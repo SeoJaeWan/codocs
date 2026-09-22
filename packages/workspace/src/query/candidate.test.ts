@@ -121,7 +121,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
       session.catalogVersion,
     );
     expect(await session.confirmCandidate(token!)).toMatchObject({
-      result: { path: '.codocs/target.yaml' },
+      result: { path: path.join('.codocs', 'target.yaml') },
     });
   });
 
@@ -150,7 +150,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
     )!;
     origin.text = 'unrelated';
     expect(await session.confirmCandidate(token)).toMatchObject({
-      result: { path: '.codocs/target.yaml' },
+      result: { path: path.join('.codocs', 'target.yaml') },
     });
   });
 
@@ -291,7 +291,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
     await refresh;
     expect(await pending).toMatchObject({
       catalogVersion: session.catalogVersion,
-      result: { path: '.codocs/target.yaml' },
+      result: { path: path.join('.codocs', 'target.yaml') },
     });
   });
 
@@ -350,7 +350,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
         failures: [
           {
             kind: workspaceTargetKinds.file,
-            path: '.codocs/target.yaml',
+            path: path.join('.codocs', 'target.yaml'),
             diagnostics: [],
           },
         ],
@@ -405,7 +405,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
       else
         expect(result).toMatchObject({
           catalogVersion: session.catalogVersion,
-          result: { path: '.codocs/target.yaml' },
+          result: { path: path.join('.codocs', 'target.yaml') },
         });
     },
   );
@@ -421,7 +421,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
         failures: [
           {
             kind: workspaceTargetKinds.file,
-            path: '.codocs/unread.yaml',
+            path: path.join('.codocs', 'unread.yaml'),
             diagnostics: [],
           },
         ],
@@ -439,7 +439,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
       session.catalogVersion,
     );
     expect(await session.confirmCandidate(token!)).toMatchObject({
-      result: { path: '.codocs/target.yaml' },
+      result: { path: path.join('.codocs', 'target.yaml') },
     });
     expect(
       session.captureCandidate(
@@ -488,7 +488,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
         session.catalogVersion,
       )!;
       expect(await session.confirmCandidate(token)).toMatchObject({
-        result: { path: '.codocs/related.yaml' },
+        result: { path: path.join('.codocs', 'related.yaml') },
       });
       await writeFile(
         path.join(

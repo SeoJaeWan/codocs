@@ -1,3 +1,9 @@
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { createFileSystemBoundary } =
+    await import('../test-support/file-system.js');
+  return createFileSystemBoundary(actual);
+});
 import {
   chmod,
   mkdir,
@@ -9,18 +15,12 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
 } from '../diagnostics/index.js';
 import { resolveProjectRoot } from '../index.js';
-import { detectFileSystemTestCapabilities } from '../test-support/file-system.js';
-
-const {
-  symlink: symlinkSupported,
-  permissionDenial: permissionDenialSupported,
-} = await detectFileSystemTestCapabilities();
 
 let fixture: string;
 beforeEach(
@@ -188,50 +188,44 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
         root: { startCwd: child, projectRoot: fixture },
       });
     });
-    it.skipIf(!symlinkSupported)(
-      '루트가 폴더 링크이면 논리 선택 경로와 확인한 실제 경로를 구분한다',
-      /** 루트가 폴더 링크이면 논리 선택 경로와 확인한 실제 경로를 구분한다. */ async () => {
-        const alias = path.join(fixture, '별칭');
-        const target = path.join(fixture, '실제');
-        await mkdir(target);
-        await symlink(target, alias, 'dir');
-        const input = { cwd: fixture, project: alias };
-        expect(await resolveProjectRoot(input)).toMatchObject({
-          success: true,
-          root: {
-            projectRoot: alias,
-            realPath: await realpath(target),
-            codocsPath: path.join(alias, '.codocs'),
-          },
+    it('루트가 폴더 링크이면 논리 선택 경로와 확인한 실제 경로를 구분한다', /** 루트가 폴더 링크이면 논리 선택 경로와 확인한 실제 경로를 구분한다. */ async () => {
+      const alias = path.join(fixture, '별칭');
+      const target = path.join(fixture, '실제');
+      await mkdir(target);
+      await symlink(target, alias, 'dir');
+      const input = { cwd: fixture, project: alias };
+      expect(await resolveProjectRoot(input)).toMatchObject({
+        success: true,
+        root: {
+          projectRoot: alias,
+          realPath: await realpath(target),
+          codocsPath: path.join(alias, '.codocs'),
+        },
+      });
+    });
+    it('루트 읽기와 탐색 권한이 없으면 빈 프로젝트가 아닌 실제 접근 실패를 반환한다', /** 루트 읽기와 탐색 권한이 없으면 빈 프로젝트가 아닌 실제 접근 실패를 반환한다. */ async () => {
+      const restricted = path.join(fixture, 'restricted');
+      await mkdir(restricted);
+      await chmod(restricted, 0);
+      const input = { cwd: restricted };
+      try {
+        expect(await resolveProjectRoot(input)).toEqual({
+          success: false,
+          projectRoot: restricted,
+          diagnostics: [
+            {
+              code: workspaceDiagnosticCodes.projectRootUnavailable,
+              severity: 'error',
+              message: workspaceDiagnosticMessages.rootUnavailable,
+              path: restricted,
+              ioCode: 'EACCES',
+            },
+          ],
         });
-      },
-    );
-    it.skipIf(!permissionDenialSupported)(
-      '루트 읽기와 탐색 권한이 없으면 빈 프로젝트가 아닌 실제 접근 실패를 반환한다',
-      /** 루트 읽기와 탐색 권한이 없으면 빈 프로젝트가 아닌 실제 접근 실패를 반환한다. */ async () => {
-        const restricted = path.join(fixture, 'restricted');
-        await mkdir(restricted);
-        await chmod(restricted, 0);
-        const input = { cwd: restricted };
-        try {
-          expect(await resolveProjectRoot(input)).toEqual({
-            success: false,
-            projectRoot: restricted,
-            diagnostics: [
-              {
-                code: workspaceDiagnosticCodes.projectRootUnavailable,
-                severity: 'error',
-                message: workspaceDiagnosticMessages.rootUnavailable,
-                path: restricted,
-                ioCode: 'EACCES',
-              },
-            ],
-          });
-        } finally {
-          await chmod(restricted, 0o700);
-        }
-      },
-    );
+      } finally {
+        await chmod(restricted, 0o700);
+      }
+    });
     it('공백과 한글이 있는 루트를 선택하면 입력 이름을 trim하거나 변환하지 않는다', /** 공백과 한글이 있는 루트를 선택하면 입력 이름을 trim하거나 변환하지 않는다. */ async () => {
       const selected = path.join(fixture, ' 한글 Case ');
       await mkdir(selected);

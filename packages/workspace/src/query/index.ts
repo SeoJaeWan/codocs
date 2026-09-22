@@ -1,3 +1,4 @@
+import { discoveryPath } from './discovery-path.js';
 import {
   catalogConfirmations,
   catalogDiagnosticCodes,
@@ -1052,9 +1053,13 @@ export class WorkspaceQuerySession {
     const catalogVersion = watchFailure
       ? this.#completed!.version
       : this.#catalogVersion;
-    const projection = projectCatalogPaths(catalog, paths, {
-      revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
-    });
+    const projection = projectCatalogPaths(
+      catalog,
+      paths.map((input) => discoveryPath(input)),
+      {
+        revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
+      },
+    );
     if (!projection.success)
       return {
         success: false,
@@ -1148,6 +1153,7 @@ export class WorkspaceQuerySession {
 
   /** 닫힌 출처의 진행 중 조회와 선택 근거를 무효화한다. */
   closeDocument(sourcePath: string): void {
+    sourcePath = discoveryPath(sourcePath);
     this.#liveDocuments.delete(sourcePath);
     for (const [token, selection] of this.#selections)
       if (
@@ -1161,6 +1167,7 @@ export class WorkspaceQuerySession {
   async references(
     input: WorkspaceLiveReferenceInput,
   ): Promise<WorkspaceLiveReferenceResponse> {
+    input = { ...input, sourcePath: discoveryPath(input.sourcePath) };
     const previous = this.#liveDocuments.get(input.sourcePath);
     if (
       this.#closed ||
@@ -1241,7 +1248,9 @@ export class WorkspaceQuerySession {
       catalogVersion !== this.#catalogVersion
     )
       return undefined;
+    origin = discoveryOrigin(origin);
     const paths = this.#candidatePaths(catalog, origin);
+    selectedPath = discoveryPath(selectedPath);
     const identity = catalog.documents.get(selectedPath);
     if (
       !paths.includes(selectedPath) ||
@@ -1569,4 +1578,21 @@ export function createWorkspaceQuerySession(
   input: unknown = {},
 ): WorkspaceQuerySession {
   return new WorkspaceQuerySession(input);
+}
+
+/** 후보 출처의 경로도 저장된 발견 경로와 같은 표기로 비교한다. */
+function discoveryOrigin(
+  origin: WorkspaceCandidateOrigin,
+): WorkspaceCandidateOrigin {
+  if ('sourcePath' in origin)
+    return { ...origin, sourcePath: discoveryPath(origin.sourcePath) };
+  return origin.relationship
+    ? {
+        ...origin,
+        relationship: {
+          ...origin.relationship,
+          path: discoveryPath(origin.relationship.path),
+        },
+      }
+    : origin;
 }

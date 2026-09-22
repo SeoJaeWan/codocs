@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { globSync } from 'node:fs';
 import path from 'node:path';
 import { assertNodeVersion, resolvePnpm, root } from './runtime.mjs';
 
@@ -12,6 +13,15 @@ function run(args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
+/** node:test 도구 회귀는 Vitest와 구분하며 실제 환경 계약은 수집하지 않는다. */
+function runToolTests() {
+  const tests = globSync('tools/**/*.test.mjs', {
+    cwd: root,
+    exclude: ['tools/environment-tests/**'],
+  }).sort();
+  if (tests.length) run(['--test', ...tests]);
+}
+
 try {
   assertNodeVersion();
   const mode = process.argv[2];
@@ -22,6 +32,9 @@ try {
       mode === 'test' ? '--watch' : 'run',
       ...process.argv.slice(3),
     ]);
+    if (mode === 'test:run') runToolTests();
+  } else if (mode === 'test:tools') {
+    runToolTests();
   } else {
     resolvePnpm();
     if (mode === 'all') {
@@ -30,6 +43,7 @@ try {
       run(['node_modules/prettier/bin/prettier.cjs', '.', '--check']);
       run(['tools/build/build.mjs', 'build']);
       run([vitest, 'run']);
+      runToolTests();
     }
     if (mode === 'all' || mode === 'development')
       run([

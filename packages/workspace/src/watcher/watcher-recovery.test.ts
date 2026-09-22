@@ -6,7 +6,9 @@ import { workspaceLifecycleStates } from '../lifecycle/index.js';
 
 // OS 감지의 신뢰성이 아닌 오류 알림 이후의 공개 상태와 배치 계약을 격리한다.
 const fake = vi.hoisted(() => ({
-  watchers: [] as (EventEmitter & { close: ReturnType<typeof vi.fn> })[],
+  watchers: [] as (EventEmitter & {
+    close: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  })[],
   failNext: false,
   manualReady: false,
   contentIdentity: undefined as { dev: number; ino: number } | undefined,
@@ -424,5 +426,31 @@ describe('동적 대상 준비의 실패와 종료', () => {
       state: workspaceLifecycleStates.closed,
       ready: false,
     });
+  });
+});
+
+describe('교체 감시의 종료 완료', () => {
+  it('이전 내용 감시의 close가 지연되면 전체 종료도 기다리고 새 감시를 만들지 않는다', async () => {
+    fake.contentIdentity = { dev: 1, ino: 1 };
+    watcher = await createWorkspaceWatcher(project);
+    const previous = fake.watchers[1]!;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    previous.close.mockImplementationOnce(() => gate);
+    fake.contentIdentity = { dev: 1, ino: 2 };
+    fake.watchers[0]!.emit('all', 'addDir', path.join(project, '.codocs'));
+    await vi.waitFor(() => expect(previous.close).toHaveBeenCalledOnce());
+    let complete = false;
+    const closing = watcher.close().then(() => {
+      complete = true;
+    });
+    await Promise.resolve();
+    expect(complete).toBe(false);
+    release();
+    await closing;
+    expect(fake.watchers).toHaveLength(2);
+    expect(complete).toBe(true);
   });
 });

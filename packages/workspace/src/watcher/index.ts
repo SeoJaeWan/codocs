@@ -51,6 +51,8 @@ export class WorkspaceWatcher {
   #reopenRequested = false;
   #reopening: Promise<void> | undefined;
   #contentIdentity: ContentIdentity | undefined;
+  readonly #retiring = new Set<Promise<void>>();
+  #closing: Promise<void> | undefined;
 
   /** 선택한 프로젝트 경로를 고정하며 시작 전에 구독을 허용한다. */
   constructor(projectRoot: string) {
@@ -326,7 +328,17 @@ export class WorkspaceWatcher {
           if (!prepared) {
             const connection = this.#connect(
               parent,
-              { depth: 0, usePolling: true, interval: 100 },
+              {
+                depth: 0,
+                usePolling: true,
+                interval: 100,
+                followSymlinks: false,
+                /** 대상의 조상만 metadata 확인하고 무관한 형제 폴더에는 접근하지 않는다. */
+                ignored: (candidate) =>
+                  ![...this.#targets].some((registered) =>
+                    containsWorkspacePath(path.resolve(candidate), registered),
+                  ),
+              },
               epoch,
               /** 수집한 변경과 연결 상태를 현재 작업에 반영한다. */ (
                 _event,
@@ -450,20 +462,38 @@ export class WorkspaceWatcher {
   async #retire(watcher: FSWatcher): Promise<void> {
     this.#waiters.get(watcher)?.();
     this.#connections.delete(watcher);
-    await watcher.close();
+    const closing = watcher.close();
+    this.#retiring.add(closing);
+    try {
+      await closing;
+    } finally {
+      this.#retiring.delete(closing);
+    }
   }
 
   /** 모든 연결과 준비 대기를 정리한다. 등록 대상 목록은 복구에 재사용한다. */
   async #disconnect(): Promise<void> {
     for (const cancel of this.#waiters.values()) cancel();
-    this.#entryWatcher?.close();
+    const entry = this.#entryWatcher;
     this.#entryWatcher = undefined;
+    const entryClosed = entry
+      ? new Promise<void>(
+          /** OS 감시 close 이벤트까지 정리를 기다린다. */ (resolve) => {
+            entry.once('close', resolve);
+            entry.close();
+          },
+        )
+      : Promise.resolve();
     this.#directoryRegistrations.clear();
     const connections = [...this.#connections];
     this.#connections.clear();
     this.#registrations.clear();
     this.#parentRegistrations.clear();
-    await Promise.all(connections.map((watcher) => watcher.close()));
+    await Promise.all([
+      entryClosed,
+      ...connections.map((watcher) => watcher.close()),
+      ...this.#retiring,
+    ]);
   }
   /** 처음 한 번 시작하며 종료된 신호원은 다시 열지 않는다. */
   start(): Promise<void> {
@@ -544,14 +574,19 @@ export class WorkspaceWatcher {
     return this.readiness;
   }
   /** 준비 대기·타이머·구독·모든 OS 연결을 종료한다. */
-  async close(): Promise<void> {
+  close(): Promise<void> {
+    if (this.#closing) return this.#closing;
     this.#closed = true;
     this.#epoch++;
     this.#state = { state: workspaceLifecycleStates.closed, ready: false };
     if (this.#timer) clearTimeout(this.#timer);
     this.#pending.clear();
     this.#listeners.clear();
-    await this.#disconnect();
+    this.#closing = this.#disconnect().then(async () => {
+      await Promise.all([this.#starting, this.#reconnecting, this.#reopening]);
+      await Promise.all([...this.#retiring]);
+    });
+    return this.#closing;
   }
 }
 /** 독립 신호원이 필요한 소비자를 위해 시작과 준비까지 완료한다. */

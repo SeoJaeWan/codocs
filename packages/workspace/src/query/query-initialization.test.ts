@@ -21,7 +21,10 @@ const boundary = vi.hoisted(() => ({
   afterDirectory: undefined as undefined | ((file: string) => Promise<void>),
 }));
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const native = await importOriginal<typeof import('node:fs/promises')>();
+  const { createFileSystemBoundary } =
+    await import('../test-support/file-system.js');
+  const actual = createFileSystemBoundary(native);
   return {
     ...actual,
     readdir: async (...args: Parameters<typeof actual.readdir>) => {
@@ -38,31 +41,6 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     },
   };
 });
-/** 실제 fixture로 심볼릭 링크 제공 여부를 확인하며 OS 이름으로 성공 조건을 나누지 않는다. */
-async function supportsSymbolicLinks(): Promise<boolean> {
-  const parent = path.resolve('.workbench/fixtures');
-  await mkdir(parent, { recursive: true });
-  const fixture = await mkdtemp(path.join(parent, 'link-capability-'));
-  try {
-    await symlink(
-      path.join(fixture, 'target'),
-      path.join(fixture, 'link'),
-      'dir',
-    );
-    return true;
-  } catch (error: unknown) {
-    if (
-      ['EACCES', 'EINVAL', 'ENOTSUP', 'EPERM'].includes(
-        (error as NodeJS.ErrnoException).code ?? '',
-      )
-    )
-      return false;
-    throw error;
-  } finally {
-    await rm(fixture, { recursive: true, force: true });
-  }
-}
-const symlinkSupported = await supportsSymbolicLinks();
 
 let project: string;
 let session: WorkspaceQuerySession | undefined;
@@ -140,7 +118,7 @@ describe('최초 조회와 실제 파일 감시 연결', () => {
         targets: [
           {
             found: true,
-            path: '.codocs/alpha.yaml',
+            path: path.join('.codocs', 'alpha.yaml'),
             document: { definition: '최신' },
             revision: createHash('sha256')
               .update(
@@ -263,82 +241,76 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
     );
   });
 
-  it.skipIf(!symlinkSupported)(
-    '외부 대상 등록이 준비되는 동안 원문이 바뀌면 준비 뒤 읽은 revision을 게시한다',
-    async () => {
-      const external = path.join(project, 'external.yaml');
-      const logical = path.join(project, '.codocs', 'linked.yaml');
-      const latest =
-        'id: linked\nname: linked\ndomains: [업무]\ndefinition: 최신\n';
-      await writeFile(
-        external,
-        'id: linked\nname: linked\ndomains: [업무]\ndefinition: 이전\n',
-      );
-      await symlink(external, logical, 'file');
-      const track = Object.getOwnPropertyDescriptor(
-        WorkspaceWatcher.prototype,
-        'trackTargets',
-      )!.value as WorkspaceWatcher['trackTargets'];
-      let changed = false;
-      vi.spyOn(WorkspaceWatcher.prototype, 'trackTargets').mockImplementation(
-        async function (this: WorkspaceWatcher, targets) {
-          await track.call(this, targets);
-          if (targets.includes(external) && !changed) {
-            changed = true;
-            await writeFile(external, latest);
-          }
+  it('외부 대상 등록이 준비되는 동안 원문이 바뀌면 준비 뒤 읽은 revision을 게시한다', async () => {
+    const external = path.join(project, 'external.yaml');
+    const logical = path.join(project, '.codocs', 'linked.yaml');
+    const latest =
+      'id: linked\nname: linked\ndomains: [업무]\ndefinition: 최신\n';
+    await writeFile(
+      external,
+      'id: linked\nname: linked\ndomains: [업무]\ndefinition: 이전\n',
+    );
+    await symlink(external, logical, 'file');
+    const track = Object.getOwnPropertyDescriptor(
+      WorkspaceWatcher.prototype,
+      'trackTargets',
+    )!.value as WorkspaceWatcher['trackTargets'];
+    let changed = false;
+    vi.spyOn(WorkspaceWatcher.prototype, 'trackTargets').mockImplementation(
+      async function (this: WorkspaceWatcher, targets) {
+        await track.call(this, targets);
+        if (targets.includes(external) && !changed) {
+          changed = true;
+          await writeFile(external, latest);
+        }
+      },
+    );
+    session = createWorkspaceQuerySession({ cwd: project });
+    const result = await session.get(['linked']);
+    expect(changed).toBe(true);
+    expect(result).toMatchObject({
+      success: true,
+      results: [
+        {
+          found: true,
+          document: { definition: '최신' },
+          revision: createHash('sha256').update(latest).digest('hex'),
         },
-      );
-      session = createWorkspaceQuerySession({ cwd: project });
-      const result = await session.get(['linked']);
-      expect(changed).toBe(true);
-      expect(result).toMatchObject({
-        success: true,
-        results: [
-          {
-            found: true,
-            document: { definition: '최신' },
-            revision: createHash('sha256').update(latest).digest('hex'),
-          },
-        ],
-      });
-    },
-  );
+      ],
+    });
+  });
 
-  it.skipIf(!symlinkSupported)(
-    '빈 외부 폴더의 두 발견 경로에 파일이 생기면 별칭을 합치지 않고 두 경로를 게시한다',
-    async () => {
-      const external = path.join(project, 'external');
-      await mkdir(external);
-      await symlink(external, path.join(project, '.codocs', 'first'), 'dir');
-      await symlink(external, path.join(project, '.codocs', 'second'), 'dir');
-      session = createWorkspaceQuerySession({ cwd: project });
-      expect(await session.list()).toMatchObject({
-        success: true,
-        totalCount: 0,
-      });
-      await writeFile(
-        path.join(external, 'shared.yaml'),
-        'id: shared\nname: shared\ndomains: [업무]\ndefinition: 외부\n',
-      );
-      await vi.waitFor(
-        async () => {
-          const result = await session!.getByPaths(
-            [
-              path.join('.codocs', 'first', 'shared.yaml'),
-              path.join('.codocs', 'second', 'shared.yaml'),
-            ],
-            session!.catalogVersion,
-          );
-          expect(result).toMatchObject({
-            success: true,
-            results: [{ found: true }, { found: true }],
-          });
-        },
-        { timeout: 5_000 },
-      );
-    },
-  );
+  it('빈 외부 폴더의 두 발견 경로에 파일이 생기면 별칭을 합치지 않고 두 경로를 게시한다', async () => {
+    const external = path.join(project, 'external');
+    await mkdir(external);
+    await symlink(external, path.join(project, '.codocs', 'first'), 'dir');
+    await symlink(external, path.join(project, '.codocs', 'second'), 'dir');
+    session = createWorkspaceQuerySession({ cwd: project });
+    expect(await session.list()).toMatchObject({
+      success: true,
+      totalCount: 0,
+    });
+    await writeFile(
+      path.join(external, 'shared.yaml'),
+      'id: shared\nname: shared\ndomains: [업무]\ndefinition: 외부\n',
+    );
+    await vi.waitFor(
+      async () => {
+        const result = await session!.getByPaths(
+          [
+            path.join('.codocs', 'first', 'shared.yaml'),
+            path.join('.codocs', 'second', 'shared.yaml'),
+          ],
+          session!.catalogVersion,
+        );
+        expect(result).toMatchObject({
+          success: true,
+          results: [{ found: true }, { found: true }],
+        });
+      },
+      { timeout: 5_000 },
+    );
+  });
 });
 
 describe('최초 읽기 중 감시 실패 상태의 전달', () => {
