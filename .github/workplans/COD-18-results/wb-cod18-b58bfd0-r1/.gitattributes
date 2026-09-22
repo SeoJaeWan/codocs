@@ -1,0 +1,2 @@
+# Preserve exact captured console whitespace; source files retain normal checks.
+*.log -whitespace

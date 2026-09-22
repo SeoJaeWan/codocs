@@ -1,0 +1,20 @@
+
+> codocs@0.0.0 check /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003
+> node tools/check/run.mjs all
+
+Checking formatting...
+All matched files use Prettier code style!
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003
+
+ ❯ packages/workspace/src/watcher/watcher.test.ts (14 tests | 1 failed) 6779ms
+   ❯ createWorkspaceWatcher 파일 변화 신호 (14)
+     ❯ 내부 문서의 생성·수정·삭제 신호 (5)
+       × 문서를 다른 이름으로 이동하면 이전 경로와 새 경로를 전달한다 5022ms
+
+ Test Files  1 failed | 30 passed (31)
+      Tests  1 failed | 752 passed (753)
+   Start at  11:02:17
+   Duration  7.22s (tests 72%, import 14%, transform 13%, worker 1%)
+
+ ELIFECYCLE  Command failed with exit code 1.

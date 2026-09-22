@@ -31,7 +31,8 @@ import {
 } from '../validator/domain-values.js';
 import type { JsonValue } from '../validator/index.js';
 import { documentFields, type DocumentField } from '../validator/index.js';
-import { offsetToPosition } from '../parser/index.js';
+import { offsetToPosition, parseYaml } from '../parser/index.js';
+import { resolveLiveDocument } from '../catalog/index.js';
 import {
   referenceIdFailureReasons,
   type ReferenceIdFailureReason,
@@ -899,4 +900,41 @@ export function projectCatalogPaths(
     },
   );
   return { success: true, results };
+}
+
+/** live 출처의 등장과 디스크 대상 내용을 같은 색인에서 계산한 결과다. */
+export interface CatalogLiveReferenceResult {
+  sourcePath: string;
+  occurrences: readonly CatalogOccurrence[];
+  diagnostics: readonly CatalogQueryDiagnostic[];
+  targets: readonly CatalogPathResult[];
+}
+
+/** 열린 YAML 하나만 파싱하고 기존 디스크 색인으로 이름 참조를 투영한다. */
+export function projectLiveReferences(
+  catalog: Catalog,
+  sourcePath: string,
+  text: string,
+  options: CatalogPathProjectionOptions = {},
+): CatalogLiveReferenceResult {
+  const document = resolveLiveDocument(catalog, {
+    path: sourcePath,
+    parsed: parseYaml(text),
+  });
+  const paths = [
+    ...new Set(
+      document.occurrences.flatMap((item) =>
+        item.resolution.candidates.map((candidate) => candidate.path),
+      ),
+    ),
+  ];
+  const projection = paths.length
+    ? projectCatalogPaths(catalog, paths, options)
+    : undefined;
+  return {
+    sourcePath,
+    occurrences: document.occurrences,
+    diagnostics: queryDiagnostics(catalog, document),
+    targets: projection?.success ? projection.results : [],
+  };
 }

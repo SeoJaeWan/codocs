@@ -5,6 +5,7 @@ import {
   matcherEvidenceKinds,
   scanStatuses,
   schemaDiagnosticCodes,
+  schemaDiagnosticMessages,
 } from '@codocs/core';
 import {
   workspaceDiagnosticCodes,
@@ -405,7 +406,113 @@ describe('createHover: 대표 본문과 같은 식별자 보조 링크', () => {
 });
 
 describe('createHover: 이전 ID와 문서 오류 표현', () => {
-  it('유효한 이전 ID message가 있으면 기본 안내 대신 표시한다', () => {
+  it('현재 ID 전체가 충돌해도 정상 보조 후보의 링크를 표시한다', () => {
+    const source = document('reservationReturnZones');
+    const a = candidate({
+      path: '.codocs/a.yaml',
+      id: 'reservation',
+      evidence: [evidence({ start: 0, end: 11, sourceId: 'reservation' })],
+    });
+    const b = candidate({
+      path: '.codocs/b.yaml',
+      id: 'reservation',
+      evidence: [evidence({ start: 0, end: 11, sourceId: 'reservation' })],
+    });
+    const helper = candidate({
+      path: '.codocs/zone.yaml',
+      id: 'return-zone',
+      evidence: [evidence({ start: 11, end: 22, sourceId: 'return-zone' })],
+    });
+    const match = snapshot([a, b, helper]);
+    const selected = selectHover(source, match, { line: 0, character: 1 });
+    const projected = details([
+      detail({ path: a.path, name: '예약', conflictPaths: [a.path, b.path] }),
+      detail({ path: b.path, name: '예약', conflictPaths: [a.path, b.path] }),
+      detail({ path: helper.path, name: '반납 구역' }),
+    ]);
+    const value = markdown(createHover(selected!, match, projected));
+    expect(value).toContain('함께 매칭된 용어');
+    expect(value).toContain('[반납 구역](command:');
+    expect(value).toContain('a\\.yaml');
+    expect(value).toContain('b\\.yaml');
+  });
+
+  it.each([false, true])(
+    '다른 위치 previous-only가 %s이면 그 근거만 보존한다',
+    (otherPosition) => {
+      const source = document('fooFoo');
+      const current = evidence({ start: 0, end: 3, sourceId: 'foo' });
+      const previous = evidence({
+        start: otherPosition ? 3 : 0,
+        end: otherPosition ? 6 : 3,
+        sourceId: 'foo',
+        kind: matcherEvidenceKinds.previous,
+      });
+      const matched = candidate({
+        path: '.codocs/foo.yaml',
+        id: 'foo',
+        evidence: [previous, current],
+      });
+      const selected = selectHover(source, snapshot([matched]), {
+        line: 0,
+        character: 1,
+      });
+      expect(selected!.groupedCandidates[0]!.evidence).toEqual(
+        otherPosition ? [previous, current] : [current],
+      );
+      const rendered = markdown(
+        createHover(
+          selected!,
+          snapshot([matched]),
+          details([
+            detail({
+              path: matched.path,
+              id: 'foo',
+              name: '문서',
+              definition: '본문',
+            }),
+          ]),
+        ),
+      );
+      if (otherPosition) {
+        expect(rendered).toContain('같은 식별자의 다른 위치');
+        expect(rendered).toContain('이전 ID입니다');
+      } else expect(rendered).not.toContain('이전 ID입니다');
+    },
+  );
+
+  it('현재 ID 별칭중복 원인만 숨기고 다른 invalid_field_value 진단은 보존한다', () => {
+    const source = document('foo');
+    const matched = candidate({
+      path: '.codocs/foo.yaml',
+      id: 'foo',
+      evidence: [evidence({ start: 0, end: 3, sourceId: 'foo' })],
+    });
+    const match = snapshot([matched]);
+    const selected = selectHover(source, match, { line: 0, character: 1 });
+    const projected = details([
+      detail({
+        path: matched.path,
+        name: '문서',
+        diagnostics: [
+          {
+            code: schemaDiagnosticCodes.invalidFieldValue,
+            severity: diagnosticSeverities.error,
+            message: schemaDiagnosticMessages.deprecatedAliasMatchesCurrentId,
+          },
+          {
+            code: schemaDiagnosticCodes.invalidFieldValue,
+            severity: diagnosticSeverities.error,
+            message: schemaDiagnosticMessages.blankString,
+          },
+        ],
+      }),
+    ]);
+    const value = markdown(createHover(selected!, match, projected));
+    expect(value).not.toContain('이전 ID가 현재 ID와 같습니다');
+    expect(value).toContain('빈 문자열이나 공백뿐인 문자열');
+  });
+  it('유효한 이전 ID message가 있으면 현재 ID와 함께 표시한다', () => {
     const source = document('oldZone');
     const previous = candidate({
       path: '.codocs/new-zone.yaml',
@@ -432,7 +539,7 @@ describe('createHover: 이전 ID와 문서 오류 표현', () => {
 
     const value = markdown(createHover(selected!, match, projected));
     expect(value).toContain('newZone을 사용하세요');
-    expect(value).not.toContain('이전 ID입니다');
+    expect(value).toContain('현재 ID: new\\-zone');
   });
 
   it('이전 ID message가 없으면 확인한 현재 ID를 기본 안내에 표시한다', () => {
