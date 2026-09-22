@@ -1,0 +1,35 @@
+id: tool-result
+name: '도구 결과'
+domains:
+  - 'MCP'
+definition: |
+  Codocs 도구 요청의 처리 결과이며 SDK의 MCP 메시지 래퍼와 구분한다.
+  최상위 success는 요청 처리 여부다. 문서의 유효성·존재·파일 반영 여부를 모두 대신하지 않는다.
+
+  ## 요청과 개별 항목
+
+  입력·커서·탐색 등의 문제로 요청을 처리할 수 없으면 success:false와 공통 error를 반환한다.
+  요청을 처리했다면 빈 목록과 개별 ID의 부재·충돌·문서 오류도 success:true이며 개별 항목에서 문제를 표시한다.
+  validate가 문서 오류를 정상 보고하거나 refresh가 오류 문서를 포함해 재구성을 완료한 경우도 요청 처리 성공이다.
+
+  ## 탐색 상태의 응답
+
+  list/get의 scanStatus는 [[탐색 상태]]의 값을 전달한다.
+  complete이고 파일 감시가 정상일 때만 없는 ID를 found:false와 not_found로 확정한다.
+  partial이면 success:true로 보유 결과를 반환하되 문서별 confirmation과 미확인 진단을 제공한다.
+  색인 밖 ID는 not_found로 확정하지 않고 확인 불가로 반환한다. totalCount는 보유 목록의 필터 결과 수이며 실제 전체 문서 수를 보장하지 않는다.
+  전체 탐색이 failed이면 원인과 함께 요청을 실패 처리하고 내부에 보존한 이전 자료를 최신 조회 결과로 노출하지 않는다.
+  감시만 끊겼을 때 마지막 완료 색인의 제한적 조회와 write·validate 차단, 부분 완료 refresh의 결과는 [[색인 갱신]]에서 확인한다.
+
+  문서별 confirmation과 원문·revision의 의미는 [[미확인 문서]], 이전 관측의 유지 조건은 [[불완전한 탐색에서 색인과 연결을 유지하는 절차]]에서 확인한다.
+
+  ## 파일 반영 결과
+
+  저장 도구는 [[저장]]의 saved·changed를 전달한다.
+  파일 반영 후 조회 가능 상태는 [[저장 후 색인 갱신 실패를 복구하는 절차]]의 indexUpdated로 구분한다.
+  오류 코드나 success 하나로 저장 여부를 추정하지 않는다. 구체 도구의 입력과 결과를 찾는 출발점은 [[MCP 도구 호출]]이다.
+
+  ## 코드와 검증 위치
+
+  목록·상세 요청의 결과 연결은 [조회 어댑터](../../packages/mcp/src/query/index.ts)와 [조회 테스트](../../packages/mcp/src/query/query.test.ts)에서 확인한다.
+  이 연결은 목록·상세 결과의 검증 범위이며 모든 도구의 파일 반영·복구 검증을 대신하지 않는다.

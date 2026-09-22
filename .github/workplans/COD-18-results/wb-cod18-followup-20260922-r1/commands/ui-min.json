@@ -1,0 +1,16 @@
+{
+  "command": [
+    "node",
+    "tools/extension-host/run.mjs",
+    "--vsix",
+    ".workbench/cod18-followup-final.vsix",
+    "--code-version",
+    "1.95.0",
+    "--ui",
+    "--report",
+    ".workbench/followup-evidence/ui-min-report.json"
+  ],
+  "code": 0,
+  "durationMs": 135196,
+  "log": "ui-min.log"
+}

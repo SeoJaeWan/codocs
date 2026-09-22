@@ -1,0 +1,15 @@
+{
+  "command": [
+    "pnpm",
+    "test:run",
+    "packages/workspace/src/query",
+    "packages/language-server",
+    "packages/vscode",
+    "packages/core/src/catalog",
+    "packages/core/src/query",
+    "--reporter=default"
+  ],
+  "code": 0,
+  "durationMs": 3943,
+  "log": "focused-3.log"
+}

@@ -1,0 +1,13 @@
+
+> codocs@0.0.0 check:build /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+> node tools/check/run.mjs build
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+
+
+ Test Files  1 passed (1)
+      Tests  32 passed (32)
+   Start at  12:07:46
+   Duration  25.50s (tests 100%)
+
