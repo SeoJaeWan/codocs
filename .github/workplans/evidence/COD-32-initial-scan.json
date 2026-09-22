@@ -1,0 +1,233 @@
+[
+  {
+    "case": "unchanged-initial-read",
+    "result": {
+      "success": true,
+      "scanStatus": "complete",
+      "results": [
+        {
+          "id": "alpha",
+          "found": true,
+          "conflict": false,
+          "source": {
+            "path": ".codocs/alpha.yaml"
+          },
+          "confirmation": "confirmed",
+          "document": {
+            "id": "alpha",
+            "name": "alpha",
+            "domains": ["업무"],
+            "definition": "변경 전"
+          },
+          "revision": "e88a94e060c2c74d87d64b06441a813d83c8cee9ecbbe7685586e1f4d03038ad",
+          "references": [],
+          "referencedBy": [],
+          "diagnostics": []
+        }
+      ]
+    },
+    "starts": 1,
+    "loads": 1
+  },
+  {
+    "case": "edit-during-first-read",
+    "startsAtMutation": 0,
+    "loadsAfterInitial": 1,
+    "initial": {
+      "success": true,
+      "scanStatus": "complete",
+      "results": [
+        {
+          "id": "alpha",
+          "found": true,
+          "conflict": false,
+          "source": {
+            "path": ".codocs/alpha.yaml"
+          },
+          "confirmation": "confirmed",
+          "document": {
+            "id": "alpha",
+            "name": "alpha",
+            "domains": ["업무"],
+            "definition": "변경 전"
+          },
+          "revision": "e88a94e060c2c74d87d64b06441a813d83c8cee9ecbbe7685586e1f4d03038ad",
+          "references": [],
+          "referencedBy": [],
+          "diagnostics": []
+        }
+      ]
+    },
+    "afterWait": {
+      "success": true,
+      "scanStatus": "complete",
+      "results": [
+        {
+          "id": "alpha",
+          "found": true,
+          "conflict": false,
+          "source": {
+            "path": ".codocs/alpha.yaml"
+          },
+          "confirmation": "confirmed",
+          "document": {
+            "id": "alpha",
+            "name": "alpha",
+            "domains": ["업무"],
+            "definition": "변경 전"
+          },
+          "revision": "e88a94e060c2c74d87d64b06441a813d83c8cee9ecbbe7685586e1f4d03038ad",
+          "references": [],
+          "referencedBy": [],
+          "diagnostics": []
+        }
+      ]
+    },
+    "disk": "id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 변경 후\n",
+    "beforeRefresh": {
+      "loads": 1,
+      "readiness": {
+        "state": "ready",
+        "ready": true
+      }
+    },
+    "afterRefresh": {
+      "success": true,
+      "scanStatus": "complete",
+      "results": [
+        {
+          "id": "alpha",
+          "found": true,
+          "conflict": false,
+          "source": {
+            "path": ".codocs/alpha.yaml"
+          },
+          "confirmation": "confirmed",
+          "document": {
+            "id": "alpha",
+            "name": "alpha",
+            "domains": ["업무"],
+            "definition": "변경 후"
+          },
+          "revision": "99239efd9f20a51c89ef79661352efc91041c41988fd1764eb611ca591e7b062",
+          "references": [],
+          "referencedBy": [],
+          "diagnostics": []
+        }
+      ]
+    }
+  },
+  {
+    "case": "create-during-first-directory-read",
+    "startsAtMutation": 0,
+    "initial": {
+      "success": true,
+      "scanStatus": "complete",
+      "items": [
+        {
+          "id": "alpha",
+          "name": "alpha",
+          "source": {
+            "path": ".codocs/alpha.yaml"
+          },
+          "confirmation": "confirmed",
+          "domains": ["업무"],
+          "hasErrors": false,
+          "conflict": false
+        }
+      ],
+      "totalCount": 1,
+      "returnedCount": 1,
+      "nextCursor": null
+    },
+    "afterWait": {
+      "success": true,
+      "scanStatus": "complete",
+      "items": [
+        {
+          "id": "alpha",
+          "name": "alpha",
+          "source": {
+            "path": ".codocs/alpha.yaml"
+          },
+          "confirmation": "confirmed",
+          "domains": ["업무"],
+          "hasErrors": false,
+          "conflict": false
+        }
+      ],
+      "totalCount": 1,
+      "returnedCount": 1,
+      "nextCursor": null
+    },
+    "disk": ["alpha.yaml", "beta.yaml"],
+    "beforeRefresh": {
+      "loads": 1,
+      "readiness": {
+        "state": "ready",
+        "ready": true
+      }
+    },
+    "afterRefresh": {
+      "success": true,
+      "scanStatus": "complete",
+      "items": [
+        {
+          "id": "alpha",
+          "name": "alpha",
+          "source": {
+            "path": ".codocs/alpha.yaml"
+          },
+          "confirmation": "confirmed",
+          "domains": ["업무"],
+          "hasErrors": false,
+          "conflict": false
+        },
+        {
+          "id": "beta",
+          "name": "beta",
+          "source": {
+            "path": ".codocs/beta.yaml"
+          },
+          "confirmation": "confirmed",
+          "domains": ["업무"],
+          "hasErrors": false,
+          "conflict": false
+        }
+      ],
+      "totalCount": 2,
+      "returnedCount": 2,
+      "nextCursor": null
+    }
+  },
+  {
+    "case": "edit-after-initialization",
+    "result": {
+      "success": true,
+      "scanStatus": "complete",
+      "results": [
+        {
+          "id": "alpha",
+          "found": true,
+          "conflict": false,
+          "source": {
+            "path": ".codocs/alpha.yaml"
+          },
+          "confirmation": "confirmed",
+          "document": {
+            "id": "alpha",
+            "name": "alpha",
+            "domains": ["업무"],
+            "definition": "감시 후 변경"
+          },
+          "revision": "73e1e9a95cee93547d273085a7c6800421f244f5958d8f0971a8e1fd5ad3b7ec",
+          "references": [],
+          "referencedBy": [],
+          "diagnostics": []
+        }
+      ]
+    },
+    "starts": 1,
+    "loads": 2
+  }
+]
