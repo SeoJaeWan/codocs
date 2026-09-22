@@ -369,7 +369,20 @@ async function runCod18({
         assert.equal(warning.message, '폐기 상태의 문서를 참조하고 있습니다.');
         assert.equal(doc.getText(warning.range), '[[폐기 대상]]');
       }
-      assert.equal(await open((await links(doc))[0]), true);
+      const currentLinks = await waitFor(
+        'deprecated links used for opening',
+        /** 실제 열기에 사용할 두 출현의 링크 자체를 확인한다. */ async () => {
+          const values = await links(doc);
+          return values.length === 2 &&
+            values.every(
+              (value) =>
+                value.target && doc.getText(value.range) === '[[폐기 대상]]',
+            )
+            ? values
+            : undefined;
+        },
+      );
+      assert.equal(await open(currentLinks[0]), true);
       await writeFile(
         deprecated,
         'id: cod18-deprecated\nname: 폐기 대상\ndefinition: active body\n',
@@ -510,7 +523,7 @@ async function runCod18({
       const codePath = path.join(root, 'aliases.java');
       await writeFile(
         codePath,
-        'current\nprevious\nauxiliaryCurrent\nauxiliaryPrevious\n',
+        'current\nprevious\nauxiliaryCurrent\nauxiliaryPrevious\ncurrentPrevious\n',
       );
       const doc = await vscode.workspace.openTextDocument(codePath);
       await waitFor('current hover', async () =>
@@ -520,11 +533,14 @@ async function runCod18({
       const previous = await hover(doc, 'previous');
       const auxiliaryCurrent = await hover(doc, 'auxiliaryCurrent');
       const auxiliaryPrevious = await hover(doc, 'auxiliaryPrevious');
+      const mixed = await hover(doc, 'currentPrevious');
       assert.doesNotMatch(current, /이전 ID입니다/u);
       assert.match(previous, /이전 ID입니다/u);
       assert.doesNotMatch(auxiliaryCurrent, /이전 ID입니다/u);
       assert.match(auxiliaryPrevious, /이전 ID/u);
-      return { current, previous, auxiliaryCurrent, auxiliaryPrevious };
+      assert.match(mixed, /같은 식별자의 다른 위치/u);
+      assert.match(mixed, /이전 ID입니다/u);
+      return { current, previous, auxiliaryCurrent, auxiliaryPrevious, mixed };
     },
   );
   await scenario(
@@ -635,6 +651,67 @@ async function runCod18({
       return values;
     },
   );
+  await scenario(
+    'AC-003',
+    'reverse relationship selection expires when the relation disappears',
+    /** 역참조만으로 노출된 선택과 관계 삭제 뒤의 거부를 확인한다. */ async () => {
+      const targetPath = await yaml(
+        'reverse-target.yaml',
+        'id: reverse-target\nname: 역참조 대상\ndefinition: first body\n',
+      );
+      const referrerPath = await yaml(
+        'reverse-source.yaml',
+        'id: reverse-source\nname: 역참조 출처\ndefinition: "[[역참조 대상]]"\n',
+      );
+      const codePath = path.join(root, 'reverse.java');
+      await writeFile(codePath, 'reverseTarget\n');
+      const doc = await vscode.workspace.openTextDocument(codePath);
+      const markdown = await waitFor('reverse relation hover', async () => {
+        const value = await hover(doc, 'reverseTarget');
+        return value.includes('이 문서를 참조') ? value : undefined;
+      });
+      const selection = commandArgument(markdown.split('이 문서를 참조')[1]);
+      assert.equal(
+        await vscode.commands.executeCommand('codocs.openSource', selection),
+        true,
+      );
+      assert.equal(
+        vscode.window.activeTextEditor.document.uri.fsPath,
+        referrerPath,
+      );
+      await writeFile(
+        referrerPath,
+        'id: reverse-source\nname: 역참조 출처\ndefinition: removed\n',
+      );
+      await waitFor(
+        'reverse relation removed',
+        /** 새 관측에서 역참조가 사라졌는지 확인한다. */ async () => {
+          const value = await hover(doc, 'reverseTarget');
+          return value.includes('first body') &&
+            !value.includes('이 문서를 참조')
+            ? value
+            : undefined;
+        },
+      );
+      assert.equal(
+        await vscode.commands.executeCommand('codocs.openSource', selection),
+        false,
+      );
+      await writeFile(
+        targetPath,
+        'id: reverse-target\nname: 역참조 대상\ndefinition: newest body\n',
+      );
+      const newest = await waitFor(
+        'next hover newest content',
+        /** 다음 조회에서 새 본문을 기다린다. */ async () => {
+          const value = await hover(doc, 'reverseTarget');
+          return value.includes('newest body') ? value : undefined;
+        },
+      );
+      assert.doesNotMatch(newest, /first body/u);
+      return { markdown, newest, staleRelationRejected: true };
+    },
+  );
   for (const [ac, reason] of [
     [
       'AC-001',
@@ -650,7 +727,7 @@ async function runCod18({
     ],
     [
       'AC-004',
-      'visible cached Hover/DocumentLink refresh requires UI evidence',
+      'next query and click checked; already-visible Hover immediate refresh excluded by approved follow-up',
     ],
     [
       'AC-005',
@@ -663,7 +740,7 @@ async function runCod18({
     ],
     [
       'AC-008',
-      'same-identifier different-position mixed current/previous combination not exercised',
+      'mixed current/previous occurrences checked programmatically; rendered UI matrix not exhaustive',
     ],
     [
       'AC-009',

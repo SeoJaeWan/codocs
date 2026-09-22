@@ -1,0 +1,6 @@
+{
+  "command": ["pnpm", "check"],
+  "code": 0,
+  "durationMs": 82707,
+  "log": "check-final.log"
+}

@@ -460,6 +460,24 @@ describe('createHover: 이전 ID와 문서 오류 표현', () => {
       expect(selected!.groupedCandidates[0]!.evidence).toEqual(
         otherPosition ? [previous, current] : [current],
       );
+      const rendered = markdown(
+        createHover(
+          selected!,
+          snapshot([matched]),
+          details([
+            detail({
+              path: matched.path,
+              id: 'foo',
+              name: '문서',
+              definition: '본문',
+            }),
+          ]),
+        ),
+      );
+      if (otherPosition) {
+        expect(rendered).toContain('같은 식별자의 다른 위치');
+        expect(rendered).toContain('이전 ID입니다');
+      } else expect(rendered).not.toContain('이전 ID입니다');
     },
   );
 

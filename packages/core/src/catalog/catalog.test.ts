@@ -2287,6 +2287,88 @@ describe('planRename: 새 이름의 참조 표기', () => {
 });
 
 describe('폐기 대상의 참조 진단', () => {
+  it('참조 원문을 제거하면 폐기 대상이 남아 있어도 경고와 양방향 연결을 제거한다', () => {
+    const target = {
+      ...orderDocument,
+      parsed: {
+        ...orderDocument.parsed,
+        data: {
+          ...orderDocument.parsed.data,
+          status: documentStatuses.deprecated,
+        },
+      },
+    };
+    const previous = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [target, sourceRefersToOrder],
+    });
+    expect(
+      previous.documents
+        .get(sourceRefersToOrder.path)
+        ?.diagnostics.some(
+          (item) => item.code === catalogDiagnosticCodes.deprecatedReference,
+        ),
+    ).toBe(true);
+    const source = {
+      ...sourceRefersToOrder,
+      parsed: {
+        ...parsedBase,
+        source: '{"id":"s","name":"출처","definition":"참조 제거"}',
+        data: { id: 's', name: '출처', definition: '참조 제거' },
+      },
+    };
+    const catalog = buildCatalog(
+      { status: scanStatuses.complete, observations: [target, source] },
+      previous,
+    );
+    expect(
+      catalog.documents
+        .get(source.path)
+        ?.diagnostics.filter(
+          (item) => item.code === catalogDiagnosticCodes.deprecatedReference,
+        ),
+    ).toEqual([]);
+    expect(catalog.documents.get(source.path)?.references).toEqual([]);
+    expect(catalog.documents.get(target.path)?.referencedBy).toEqual([]);
+  });
+
+  it('폐기 상태로 변경하면 기존 참조의 경고를 재계산한다', () => {
+    const previous = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [orderDocument, sourceRefersToOrder],
+    });
+    const target = {
+      ...orderDocument,
+      parsed: {
+        ...orderDocument.parsed,
+        data: {
+          ...orderDocument.parsed.data,
+          status: documentStatuses.deprecated,
+        },
+      },
+    };
+    const catalog = buildCatalog(
+      {
+        status: scanStatuses.complete,
+        observations: [target, sourceRefersToOrder],
+      },
+      previous,
+    );
+    expect(
+      catalog.documents.get(sourceRefersToOrder.path)?.diagnostics,
+    ).toContainEqual({
+      code: catalogDiagnosticCodes.deprecatedReference,
+      severity: diagnosticSeverities.warning,
+      message: catalogDiagnosticMessages.deprecatedReference,
+      path: sourceRefersToOrder.path,
+      fieldPath: ['definition'],
+      offsetRange: { start: 44, end: 50 },
+      range: {
+        start: { line: 0, character: 44 },
+        end: { line: 0, character: 50 },
+      },
+    });
+  });
   it('대상이 폐기 상태이면 등장 위치에 경고하고 양방향 연결을 유지한다', () => {
     const target = {
       ...orderDocument,

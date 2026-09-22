@@ -31,6 +31,47 @@ afterEach(async () => {
 });
 
 describe('live YAML과 디스크 대상의 연결', () => {
+  it('같은 대상을 가리키는 다른 매칭 문서가 남아도 선택한 관계가 사라지면 이전 링크를 거부한다', async () => {
+    await writeFile(
+      path.join(root, '.codocs/alpha.yaml'),
+      'id: alpha\nname: 알파\ndefinition: "[[관계 대상]]"\n',
+    );
+    const betaPath = path.join(root, '.codocs/beta.yaml');
+    await writeFile(
+      betaPath,
+      'id: beta\nname: 베타\ndefinition: "[[관계 대상]]"\n',
+    );
+    const relatedPath = path.join(root, '.codocs/related.yaml');
+    await writeFile(
+      relatedPath,
+      'id: related\nname: 관계 대상\ndefinition: 관계 본문\n',
+    );
+    await session.refreshWorkspaces();
+    const uri = pathToFileURL(path.join(root, 'source.ts')).href;
+    session.openDocument({
+      textDocument: {
+        uri,
+        languageId: 'typescript',
+        version: 1,
+        text: 'alphaBeta',
+      },
+    });
+    const hover = await session.hoverDocument({
+      textDocument: { uri },
+      position: { line: 0, character: 6 },
+    });
+    const markdown = (hover!.contents as { value: string }).value;
+    const query = /command:codocs.openSource\?([^)]*)/u.exec(
+      markdown.split('이 문서가 참조')[1]!,
+    )![1]!;
+    const selection = (JSON.parse(decodeURIComponent(query)) as unknown[])[0];
+    expect(await session.confirmSource(selection)).toEqual({
+      uri: pathToFileURL(relatedPath).href,
+    });
+    await writeFile(betaPath, 'id: beta\nname: 베타\ndefinition: 관계 제거\n');
+    await session.refreshWorkspaces();
+    expect(await session.confirmSource(selection)).toBeNull();
+  });
   it('감시가 상태 변경을 게시하면 수동 refresh 없이 폐기 경고를 갱신한다', async () => {
     session.openDocument({
       textDocument: {
@@ -171,14 +212,20 @@ describe('live YAML과 디스크 대상의 연결', () => {
         (item) => item.code === 'deprecated_reference',
       ),
     ).toBe(false);
-    // 공개 Workspace API가 ambiguous 선택을 확인하지 못하므로 오대상을 열지 않는다.
+    // 본문은 이동하지 않고 각 Hover 후보는 선택한 발견 경로로 확인한다.
     const value = (hover!.contents as { value: string }).value;
-    const query = /command:codocs.openSource\?([^)]*)/u.exec(value)![1]!;
-    expect(
-      await session.confirmSource(
-        (JSON.parse(decodeURIComponent(query)) as unknown[])[0],
+    const queries = [...value.matchAll(/command:codocs.openSource\?([^)]*)/gu)];
+    const targets = await Promise.all(
+      queries.map((query) =>
+        session.confirmSource(
+          (JSON.parse(decodeURIComponent(query[1]!)) as unknown[])[0],
+        ),
       ),
-    ).toBeNull();
+    );
+    expect(targets).toEqual([
+      { uri: pathToFileURL(path.join(root, '.codocs/other.yaml')).href },
+      { uri: pathToFileURL(path.join(root, '.codocs/대상 문서.yaml')).href },
+    ]);
   });
 
   it.each(['edit', 'close', 'cancel'])(

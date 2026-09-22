@@ -42,7 +42,7 @@ export class SourceSelections {
     );
   }
 
-  /** 표시 후보는 보존하되 Workspace가 확인하지 못한 선택은 열지 않는다. */
+  /** Workspace가 출처를 확인한 후보에만 실행 가능한 선택을 발급한다. */
   capture(
     sourceUri: string,
     version: number,
@@ -50,7 +50,7 @@ export class SourceSelections {
     origin: WorkspaceCandidateOrigin | undefined,
     target: WorkspacePathDocumentResult,
     catalogVersion: number,
-  ): SourceSelection {
+  ): SourceSelection | undefined {
     const key = JSON.stringify([
       sourceUri,
       version,
@@ -65,6 +65,7 @@ export class SourceSelections {
     const candidateToken = origin
       ? session.captureCandidate(origin, target.path, catalogVersion)
       : undefined;
+    if (!candidateToken) return undefined;
     this.#selections.set(token, {
       key,
       sourceUri,

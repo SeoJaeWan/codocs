@@ -298,6 +298,7 @@ async function verifyHoverAndOpenSource(fixtureRoot) {
   assert.equal(argument.sourceUri, document.uri.toString());
   assert.match(argument.token, /^[\w-]{32}$/u);
   const beforeOpenTabs = tabsForUri(sourceUri);
+  const expectedOpenTabs = beforeOpenTabs === 0 ? 1 : beforeOpenTabs;
   assert.equal(
     await vscode.commands.executeCommand(openSourceCommand, argument),
     true,
@@ -305,13 +306,13 @@ async function verifyHoverAndOpenSource(fixtureRoot) {
   const openedEditor = vscode.window.activeTextEditor;
   assert.equal(openedEditor.document.uri.toString(), sourceUri.toString());
   assert.deepEqual(openedEditor.selection, new vscode.Selection(0, 0, 0, 0));
-  assert.equal(tabsForUri(sourceUri), beforeOpenTabs + 1);
+  assert.equal(tabsForUri(sourceUri), expectedOpenTabs);
   await checkpoint('functional:open-source-saved');
   assert.equal(
     await vscode.commands.executeCommand(openSourceCommand, argument),
     true,
   );
-  assert.equal(tabsForUri(sourceUri), beforeOpenTabs + 1);
+  assert.equal(tabsForUri(sourceUri), expectedOpenTabs);
 
   const diskYaml = await readFile(sourceUri.fsPath, 'utf8');
   const dirtyYaml = `${diskYaml}# unsaved fixture edit\r\n`;
@@ -328,7 +329,7 @@ async function verifyHoverAndOpenSource(fixtureRoot) {
   assert.equal(reopenedEditor.document.isDirty, true);
   assert.equal(await readFile(sourceUri.fsPath, 'utf8'), diskYaml);
   assert.deepEqual(reopenedEditor.selection, new vscode.Selection(0, 0, 0, 0));
-  assert.equal(tabsForUri(sourceUri), beforeOpenTabs + 1);
+  assert.equal(tabsForUri(sourceUri), expectedOpenTabs);
   await vscode.commands.executeCommand('workbench.action.files.revert');
   assert.equal(reopenedEditor.document.isDirty, false);
   await checkpoint('functional:open-source-dirty-preserved');

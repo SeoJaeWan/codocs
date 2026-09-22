@@ -308,6 +308,8 @@ export class LanguageServerSession {
     catalogVersion: number,
     occurrence?: CatalogOccurrence,
     codeCandidate = true,
+    relationship?: { path: string; reverse: boolean },
+    explicit = false,
   ): string | undefined {
     const document = this.documents.get(uri);
     const session = workspace.session;
@@ -329,22 +331,25 @@ export class LanguageServerSession {
                 : {}),
             },
             sourcePath: this.#sourcePath(uri, workspace),
+            explicit,
           }
         : occurrence
           ? undefined
-          : codeCandidate
-            ? { text: document.getText() }
+          : codeCandidate || relationship
+            ? {
+                text: document.getText(),
+                ...(relationship ? { relationship } : {}),
+              }
             : undefined;
-    return selectionTarget(
-      this.#selections.capture(
-        uri,
-        document.version,
-        session as CandidateSession,
-        origin,
-        detail,
-        catalogVersion,
-      ),
+    const selection = this.#selections.capture(
+      uri,
+      document.version,
+      session as CandidateSession,
+      origin,
+      detail,
+      catalogVersion,
     );
+    return selection ? selectionTarget(selection) : undefined;
   }
 
   /** 단일 확정 YAML 참조에만 본문 링크를 제공한다. */
@@ -546,6 +551,9 @@ export class LanguageServerSession {
             detail,
             references.catalogVersion,
             item,
+            false,
+            undefined,
+            true,
           );
           const label = escapeMarkdown(detailLabel(detail, targets));
           return target ? `- [${label}](${target})` : `- ${label}`;
@@ -643,13 +651,17 @@ export class LanguageServerSession {
           query: string,
         ) => {
           const argument = (
-            JSON.parse(decodeURIComponent(query)) as { uri: string }[]
+            JSON.parse(decodeURIComponent(query)) as {
+              uri: string;
+              relationship?: { path: string; reverse: boolean };
+            }[]
           )[0];
           const detail = details.success
             ? details.results.find(
                 (item) => item.found && item.source.uri === argument?.uri,
               )
             : undefined;
+          const relationship = argument?.relationship;
           return detail?.found
             ? (this.#target(
                 uri,
@@ -657,7 +669,8 @@ export class LanguageServerSession {
                 detail,
                 match.catalogVersion,
                 undefined,
-                candidatePaths.includes(detail.path),
+                !relationship && candidatePaths.includes(detail.path),
+                relationship,
               ) ?? '')
             : '';
         },

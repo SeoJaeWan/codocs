@@ -77,7 +77,7 @@ describe('SourceSelections', () => {
     expect(session.releaseCandidate).toHaveBeenCalledWith('workspace-token');
   });
 
-  it('관계 출처를 확인할 API가 없으면 링크 토큰은 보존하지만 후보를 열지 않는다', async () => {
+  it('관계 출처를 확인할 API가 없으면 실행 불가능한 링크 토큰을 발급하지 않는다', async () => {
     const session: CandidateSession = {
       captureCandidate: vi.fn(),
       confirmCandidate: vi.fn(),
@@ -92,7 +92,8 @@ describe('SourceSelections', () => {
       target,
       1,
     );
-    expect(selections.has(selected)).toBe(true);
+    expect(selected).toBeUndefined();
+    expect(selections.has(selected)).toBe(false);
     expect(await selections.confirm(selected, () => true)).toBeNull();
     expect(session.confirmCandidate).not.toHaveBeenCalled();
   });

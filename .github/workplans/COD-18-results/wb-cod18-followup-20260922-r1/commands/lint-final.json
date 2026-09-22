@@ -1,0 +1,6 @@
+{
+  "command": ["pnpm", "lint"],
+  "code": 0,
+  "durationMs": 7958,
+  "log": "lint-final.log"
+}

@@ -878,7 +878,9 @@ if (renderExisting) {
     performanceProgressPath = progressPath;
     await mkdir(path.dirname(progressPath), { recursive: true });
     await writeFile(progressPath, '');
-    runtimeTemporaryRoot = await mkdtemp(path.join(repositoryRoot, '.r'));
+    runtimeTemporaryRoot = await mkdtemp(
+      path.join(os.tmpdir(), 'codocs-host-'),
+    );
     const userData = path.join(runtimeTemporaryRoot, 'u');
     const extensions = path.join(runtimeTemporaryRoot, 'e');
     await Promise.all([mkdir(userData), mkdir(extensions)]);
@@ -1106,6 +1108,14 @@ if (renderExisting) {
         provenance,
         sourceCommit: sourceCommitResult.stdout.trim(),
         productSourceCommit: sourceCommitResult.stdout.trim(),
+        productSourceCommitMeaning:
+          'checkout base; precommit product bytes identified by bundle and working diff hashes',
+        workingDiffSha256: createHash('sha256')
+          .update(
+            (await runProcess('git', ['diff', '--binary', 'HEAD'])).stdout,
+          )
+          .digest('hex'),
+        vscodeExecutableSha256: await fileSha256(runtime.executable),
         harnessState:
           'content hashes captured before Host; harness may be uncommitted',
         harnessHashes,

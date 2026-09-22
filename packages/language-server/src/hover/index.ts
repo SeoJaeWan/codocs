@@ -333,12 +333,16 @@ function sourceLink(
   result: WorkspacePathDocumentResult,
   catalogVersion: number,
   label: string,
+  relationship?: { path: string; reverse: boolean },
 ): string | undefined {
-  const argument: OpenSourceCommandArgument = {
+  const argument: OpenSourceCommandArgument & {
+    relationship?: { path: string; reverse: boolean };
+  } = {
     uri: result.source.uri,
     ...(result.source.range ? { range: result.source.range } : {}),
     catalogVersion,
     ...(result.revision ? { revision: result.revision } : {}),
+    ...(relationship ? { relationship } : {}),
   };
   if (!isOpenSourceCommandArgument(argument)) return undefined;
   const query = encodeURIComponent(JSON.stringify([argument]));
@@ -403,6 +407,7 @@ function relatedLinks(
   links: readonly WorkspacePathGetLink[] | undefined,
   byPath: ReadonlyMap<string, WorkspacePathDocumentResult>,
   catalogVersion: number,
+  relationship: { path: string; reverse: boolean },
 ): readonly string[] {
   const markdown = new Map<string, string>();
   for (const link of links ?? []) {
@@ -412,6 +417,7 @@ function relatedLinks(
       detail,
       catalogVersion,
       detailLabel(detail, [...byPath.values()]),
+      relationship,
     );
     if (value) markdown.set(link.path, value);
   }
@@ -463,6 +469,22 @@ function candidateMarkdown(
   if (source) parts.push(source);
   const previous = previousEvidenceMarkdown(selected.evidence, detail.id);
   if (previous) parts.push(previous);
+  const otherPrevious = selected.candidate.evidence
+    .filter(
+      (evidence) =>
+        evidence.kind === matcherEvidenceKinds.previous &&
+        (evidence.offsetRange.start !== selected.evidence.offsetRange.start ||
+          evidence.offsetRange.end !== selected.evidence.offsetRange.end),
+    )
+    .flatMap((evidence) => {
+      const notice = previousEvidenceMarkdown(evidence, detail.id);
+      return notice ? [notice] : [];
+    });
+  if (otherPrevious.length)
+    parts.push(
+      '**같은 식별자의 다른 위치:**\n\n' +
+        [...new Set(otherPrevious)].join('\n\n'),
+    );
   const topPaths = new Set(selection.top.map((item) => item.candidate.path));
   const together = selection.groupedCandidates
     .filter(
@@ -498,12 +520,18 @@ function candidateMarkdown(
   if (togetherSection) parts.push(togetherSection);
   const references = linkSection(
     '이 문서가 참조',
-    relatedLinks(detail.references, byPath, catalogVersion),
+    relatedLinks(detail.references, byPath, catalogVersion, {
+      path: detail.path,
+      reverse: false,
+    }),
   );
   if (references) parts.push(references);
   const referencedBy = linkSection(
     '이 문서를 참조',
-    relatedLinks(detail.referencedBy, byPath, catalogVersion),
+    relatedLinks(detail.referencedBy, byPath, catalogVersion, {
+      path: detail.path,
+      reverse: true,
+    }),
   );
   if (referencedBy) parts.push(referencedBy);
   parts.push(...diagnosticMarkdown(detail.diagnostics));

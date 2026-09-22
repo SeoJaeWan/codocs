@@ -145,7 +145,7 @@ export class VscodeExtensionRuntime {
 }
 
 /** folder마다 Node IPC 프로세스 하나와 watcher를 관리한다. */
-class VscodeFolderClient implements FolderClientBoundary {
+export class VscodeFolderClient implements FolderClientBoundary {
   readonly #folder: vscode.WorkspaceFolder;
   readonly #serverPath: string;
   readonly #output: vscode.OutputChannel;
@@ -155,13 +155,20 @@ class VscodeFolderClient implements FolderClientBoundary {
   #stopping = false;
   #providers: vscode.Disposable[] = [];
   #providerGeneration = 0;
+  #sessionGeneration = 0;
 
   /** 대상 URI가 아니라 출처 문서의 소유 client에서 선택을 확인한다. */
   async confirmSource(argument: OpenSourceCommandArgument): Promise<unknown> {
     const client = this.#client;
-    const generation = this.#providerGeneration;
+    const generation = this.#sessionGeneration;
+    const document = vscode.workspace.textDocuments.find(
+      (item) => item.uri.toString() === argument.sourceUri,
+    );
+    const version = document?.version;
     if (
       !client?.isRunning() ||
+      !document ||
+      document.isClosed ||
       vscode.workspace
         .getWorkspaceFolder(vscode.Uri.parse(argument.sourceUri))
         ?.uri.toString() !== this.#folder.uri.toString()
@@ -173,14 +180,18 @@ class VscodeFolderClient implements FolderClientBoundary {
     );
     return this.#client === client &&
       client.isRunning() &&
-      generation === this.#providerGeneration
+      generation === this.#sessionGeneration &&
+      !document.isClosed &&
+      document.version === version &&
+      vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() ===
+        this.#folder.uri.toString()
       ? result
       : null;
   }
 
   /** 완료 snapshot 게시 때 provider를 재등록해 Host의 이전 링크 캐시를 무효화한다. */
   #registerProviders(client: LanguageClient): void {
-    const generation = ++this.#providerGeneration;
+    ++this.#providerGeneration;
     for (const provider of this.#providers.splice(0)) provider.dispose();
     if (this.#client !== client || !client.isRunning()) return;
     /** 중첩 workspace에서는 가장 가까운 출처 소유권을 확인한다. */
@@ -195,22 +206,23 @@ class VscodeFolderClient implements FolderClientBoundary {
           /** 최신 서버 Hover만 Host Markdown으로 변환한다. */
           provideHover: async (document, position, token) => {
             if (!owns(document)) return undefined;
-            const version = document.version;
-            const result = await client.sendRequest(
-              HoverRequest.type,
-              { textDocument: { uri: document.uri.toString() }, position },
+            const hover = await this.#latestQuery(
+              client,
+              document,
               token,
+              owns,
+              /** 새 관측에서 Hover를 다시 요청한다. */ async () =>
+                client.protocol2CodeConverter.asHover(
+                  await client.sendRequest(
+                    HoverRequest.type,
+                    {
+                      textDocument: { uri: document.uri.toString() },
+                      position,
+                    },
+                    token,
+                  ),
+                ),
             );
-            if (
-              token.isCancellationRequested ||
-              document.isClosed ||
-              document.version !== version ||
-              !owns(document) ||
-              generation !== this.#providerGeneration ||
-              this.#client !== client
-            )
-              return undefined;
-            const hover = client.protocol2CodeConverter.asHover(result);
             if (hover) trustGeneratedOpenSourceHoverContents(hover.contents);
             return hover;
           },
@@ -222,30 +234,65 @@ class VscodeFolderClient implements FolderClientBoundary {
           /** 본문은 서버가 제공한 단일 확인 command만 표시한다. */
           provideDocumentLinks: async (document, token) => {
             if (!owns(document)) return [];
-            const version = document.version;
-            const result = await client.sendRequest(
-              DocumentLinkRequest.type,
-              { textDocument: { uri: document.uri.toString() } },
-              token,
+            return (
+              (await this.#latestQuery(
+                client,
+                document,
+                token,
+                owns,
+                /** 새 관측에서 본문 링크를 다시 요청한다. */ async () =>
+                  client.protocol2CodeConverter.asDocumentLinks(
+                    await client.sendRequest(
+                      DocumentLinkRequest.type,
+                      { textDocument: { uri: document.uri.toString() } },
+                      token,
+                    ),
+                    token,
+                  ),
+              )) ?? []
             );
-            const links = await client.protocol2CodeConverter.asDocumentLinks(
-              result,
-              token,
-            );
-            if (
-              token.isCancellationRequested ||
-              document.isClosed ||
-              document.version !== version ||
-              !owns(document) ||
-              generation !== this.#providerGeneration ||
-              this.#client !== client
-            )
-              return [];
-            return links;
           },
         },
       ),
     );
+  }
+
+  /** 표시 관측만 교체되면 재조회하고 출처·서버가 무효해지면 즉시 폐기한다. */
+  async #latestQuery<T>(
+    client: LanguageClient,
+    document: vscode.TextDocument,
+    token: vscode.CancellationToken,
+    owns: (document: vscode.TextDocument) => boolean,
+    query: () => Promise<T>,
+  ): Promise<T | undefined> {
+    const version = document.version;
+    const session = this.#sessionGeneration;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (
+        token.isCancellationRequested ||
+        document.isClosed ||
+        document.version !== version ||
+        !owns(document) ||
+        this.#client !== client ||
+        !client.isRunning() ||
+        session !== this.#sessionGeneration
+      )
+        return undefined;
+      const epoch = this.#providerGeneration;
+      const result = await query();
+      if (
+        token.isCancellationRequested ||
+        document.isClosed ||
+        document.version !== version ||
+        !owns(document) ||
+        this.#client !== client ||
+        !client.isRunning() ||
+        session !== this.#sessionGeneration
+      )
+        return undefined;
+      if (epoch === this.#providerGeneration) return result;
+    }
+    return undefined;
   }
 
   /** 실제 workspace folder와 서버 경로를 관리하는 client를 만든다. */
@@ -305,6 +352,7 @@ class VscodeFolderClient implements FolderClientBoundary {
     const refresh = () => this.#refresh();
     /** 실행 상태가 되면 연결 사실을 output channel에 기록한다. */
     const reportRunning = (event: { newState: State }): void => {
+      this.#sessionGeneration++;
       if (event.newState === State.Running) {
         this.#registerProviders(client);
         this.#output.appendLine(
@@ -339,6 +387,7 @@ class VscodeFolderClient implements FolderClientBoundary {
   /** watcher·listener·language client와 서버 프로세스를 종료한다. */
   async stop(): Promise<void> {
     this.#stopping = true;
+    this.#sessionGeneration++;
     this.#providerGeneration += 1;
     for (const provider of this.#providers.splice(0)) provider.dispose();
     for (const disposable of this.#disposables.splice(0)) disposable.dispose();
