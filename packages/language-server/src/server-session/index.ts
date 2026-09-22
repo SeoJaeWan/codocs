@@ -1,6 +1,5 @@
 import {
   referenceResolutionStatuses,
-  diagnosticSeverities,
   scanStatuses,
   type CatalogOccurrence,
   type CodeMatchCandidate,
@@ -17,6 +16,7 @@ import {
   type WorkspacePathGetResponse,
   type WorkspaceRefreshResult,
   type WorkspaceReadiness,
+  type WorkspaceDiagnosticsSnapshot,
 } from '@codocs/workspace';
 import type {
   CancellationToken,
@@ -33,6 +33,11 @@ import type {
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
+import {
+  toLspDiagnostics,
+  type DiagnosticFailure,
+  type WorkspaceDiagnosticStatus,
+} from '../diagnostics/index.js';
 import {
   SynchronizedDocuments,
   utf16OffsetsToRange,
@@ -135,6 +140,7 @@ export interface WorkspaceSessionBoundary extends Partial<
     | 'confirmCandidate'
     | 'releaseCandidate'
     | 'closeDocument'
+    | 'diagnostics'
   >
 > {
   readonly readiness: WorkspaceReadiness;
@@ -176,6 +182,15 @@ export class LanguageServerSession {
   >();
   readonly #referenceFailures = new Map<string, WorkspaceQueryDiagnostic>();
   #closed = false;
+  #diagnosticEpoch = 0;
+  readonly #diagnosticHistory = new Map<
+    string,
+    {
+      session: WorkspaceSessionBoundary;
+      text: string | undefined;
+      diagnostics: Diagnostic[];
+    }
+  >();
 
   /** 테스트 대체가 없으면 실제 workspace 조회 세션을 사용한다. */
   constructor(sessionFactory: WorkspaceSessionFactory = defaultSessionFactory) {
@@ -239,6 +254,7 @@ export class LanguageServerSession {
 
   /** 편집 출처에 묶인 조회·선택을 무효화한다. */
   #documentChanged(uri: string): void {
+    this.#diagnosticEpoch++;
     this.#live.delete(uri);
     this.#referenceFailures.delete(uri);
     this.#selections.release(uri);
@@ -265,7 +281,7 @@ export class LanguageServerSession {
     if (
       !document ||
       !workspace?.session.references ||
-      !/\.ya?ml$/iu.test(fileURLToPath(uri))
+      !this.#isKnowledgeDocument(uri, workspace)
     )
       return undefined;
     const existing = this.#live.get(uri);
@@ -401,22 +417,164 @@ export class LanguageServerSession {
       return undefined;
     return {
       version: result.documentVersion,
-      diagnostics: result.diagnostics.flatMap(
-        /** 출처의 확인 가능한 진단 위치를 전달한다. */ (item) =>
-          item.range && (!item.path || item.path === result.sourcePath)
-            ? [
-                {
-                  range: item.range,
-                  message: item.message,
-                  code: item.code,
-                  source: 'codocs',
-                  severity:
-                    item.severity === diagnosticSeverities.error ? 1 : 2,
-                },
-              ]
-            : [],
-      ),
+      diagnostics: toLspDiagnostics(result.diagnostics, result.sourcePath),
     };
+  }
+
+  /** 열린 원문을 우선하여 모든 저장 지식 문서를 진단하고 실패 관측을 분리한다. */
+  async diagnostics(): Promise<
+    | {
+        documents: {
+          uri: string;
+          version?: number;
+          diagnostics: Diagnostic[];
+        }[];
+        statuses: WorkspaceDiagnosticStatus[];
+      }
+    | undefined
+  > {
+    const epoch = this.#diagnosticEpoch;
+    const documents: {
+      uri: string;
+      version?: number;
+      diagnostics: Diagnostic[];
+    }[] = [];
+    const statuses: WorkspaceDiagnosticStatus[] = [];
+    const history = new Map(this.#diagnosticHistory);
+    const retained = new Set<string>();
+    for (const workspace of this.#workspaces.values()) {
+      const snapshot: WorkspaceDiagnosticsSnapshot | undefined =
+        await workspace.session.diagnostics?.();
+      if (epoch !== this.#diagnosticEpoch || this.#closed) return undefined;
+      const failures: DiagnosticFailure[] = (snapshot?.failures ?? []).map(
+        /** 같은 관측의 문서·진단을 게시 경계로 변환한다. */ (failure) => ({
+          ...(failure.path
+            ? {
+                uri: pathToFileURL(
+                  path.resolve(workspace.rootPath, failure.path),
+                ).href,
+              }
+            : {}),
+          reason: failure.message,
+          previousDiagnostics: [],
+        }),
+      );
+      const saved = new Map(
+        (snapshot?.documents ?? []).map((document) => [document.uri, document]),
+      );
+      const failureSummary = failures
+        .map((failure) => failure.reason)
+        .join('; ');
+      const uris = new Set([
+        ...saved.keys(),
+        ...this.documents
+          .all()
+          .filter(
+            (document) =>
+              this.#workspaceForDocument(document.uri) === workspace &&
+              this.#isKnowledgeDocument(document.uri, workspace),
+          )
+          .map((document) => normalizeWorkspaceUri(document.uri)),
+        ...(snapshot && snapshot.scanStatus !== scanStatuses.complete
+          ? [...history]
+              .filter(([, value]) => value.session === workspace.session)
+              .map(([uri]) => uri)
+          : []),
+      ]);
+      for (const uri of uris) {
+        if (this.#workspaceForDocument(uri) !== workspace) continue;
+        retained.add(uri);
+        const open = this.documents
+          .all()
+          .find(
+            (document) =>
+              this.#workspaceForDocument(document.uri) === workspace &&
+              normalizeWorkspaceUri(document.uri) === uri,
+          );
+        const disk = saved.get(uri);
+        const previous =
+          history.get(uri)?.session === workspace.session
+            ? history.get(uri)
+            : undefined;
+        let diagnostics: Diagnostic[];
+        let reason: string | undefined;
+        let text: string | undefined;
+        if (open) {
+          text = open.getText();
+          const live = await this.#references(open.uri);
+          if (epoch !== this.#diagnosticEpoch || this.#closed) return undefined;
+          if (live) {
+            diagnostics = toLspDiagnostics(live.diagnostics, live.sourcePath);
+            if (live.scanStatus !== scanStatuses.complete)
+              reason = failureSummary || '색인을 일부 확인하지 못했습니다.';
+          } else {
+            diagnostics = previous?.text === text ? previous.diagnostics : [];
+            reason =
+              this.#referenceFailures.get(open.uri)?.message ??
+              '현재 문서의 진단을 확인하지 못했습니다.';
+          }
+        } else {
+          text = disk?.text;
+          diagnostics = disk?.confirmed
+            ? toLspDiagnostics(disk.diagnostics, disk.path)
+            : [];
+          if (!disk?.confirmed)
+            reason = failureSummary || '현재 저장 원문을 확인하지 못했습니다.';
+        }
+        documents.push({
+          uri,
+          ...(open ? { version: open.version } : {}),
+          diagnostics,
+        });
+        if (reason)
+          failures.push({
+            uri,
+            reason,
+            previousDiagnostics: (
+              previous?.diagnostics ??
+              (disk ? toLspDiagnostics(disk.diagnostics, disk.path) : [])
+            ).map((diagnostic) => diagnostic.message),
+          });
+        else
+          history.set(uri, { session: workspace.session, text, diagnostics });
+      }
+      const grouped = new Map<string | undefined, DiagnosticFailure>();
+      for (const failure of failures) {
+        const previous = grouped.get(failure.uri);
+        grouped.set(
+          failure.uri,
+          previous
+            ? {
+                ...failure,
+                reason: [...new Set([previous.reason, failure.reason])].join(
+                  '; ',
+                ),
+                previousDiagnostics: [
+                  ...new Set([
+                    ...previous.previousDiagnostics,
+                    ...failure.previousDiagnostics,
+                  ]),
+                ],
+              }
+            : failure,
+        );
+      }
+      statuses.push({
+        workspaceUri: workspace.uri,
+        failures: [...grouped.values()],
+      });
+    }
+    if (epoch !== this.#diagnosticEpoch || this.#closed) return undefined;
+    this.#diagnosticHistory.clear();
+    for (const [uri, value] of history)
+      if (retained.has(uri)) this.#diagnosticHistory.set(uri, value);
+    return { documents, statuses };
+  }
+
+  /** 프로젝트 지식 폴더 안의 YAML만 편집 중 지식 문서로 취급한다. */
+  #isKnowledgeDocument(uri: string, workspace: WorkspaceBinding): boolean {
+    const relative = this.#sourcePath(uri, workspace);
+    return relative.startsWith('.codocs/') && /\.ya?ml$/iu.test(relative);
   }
 
   /** 최신 출처 소유권·버전·선택 근거를 확인하고 file URI만 반환한다. */
@@ -723,6 +881,8 @@ export class LanguageServerSession {
   async close(): Promise<void> {
     if (this.#closed) return;
     this.#closed = true;
+    this.#diagnosticEpoch++;
+    this.#diagnosticHistory.clear();
     this.#selections.release();
     this.#live.clear();
     this.#referenceFailures.clear();
@@ -737,6 +897,7 @@ export class LanguageServerSession {
 
   /** 초기화 목록 전체를 새 세션 집합으로 교체한다. */
   async #replaceWorkspaces(folders: readonly WorkspaceFolder[]): Promise<void> {
+    this.#diagnosticEpoch++;
     const previous = [...this.#workspaces.values()];
     this.#workspaces.clear();
     await Promise.all(previous.map((workspace) => workspace.session.close()));
@@ -749,6 +910,7 @@ export class LanguageServerSession {
     if (this.#workspaces.has(uri)) return;
     const rootPath = fileURLToPath(uri);
     const session = this.#sessionFactory(rootPath);
+    this.#diagnosticEpoch++;
     this.#workspaces.set(uri, {
       uri,
       rootPath,
@@ -757,6 +919,7 @@ export class LanguageServerSession {
     session.onDidChangeSnapshot?.(
       /** 게시 완료된 관측만 캐시와 진단을 갱신한다. */ () => {
         if (this.#workspaces.get(uri)?.session !== session) return;
+        this.#diagnosticEpoch++;
         this.#live.clear();
         this.#referenceFailures.clear();
         for (const listener of this.#changes) listener();
@@ -775,6 +938,7 @@ export class LanguageServerSession {
     const workspace = this.#workspaces.get(normalized);
     if (!workspace) return;
     this.#workspaces.delete(normalized);
+    this.#diagnosticEpoch++;
     await workspace.session.close();
   }
 

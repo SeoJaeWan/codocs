@@ -13,7 +13,7 @@ describe('VS Code 확장 패키지 조립', () => {
 
     expect(manifest).toMatchObject({
       main: './dist/index.cjs',
-      engines: { vscode: '^1.95.0' },
+      engines: { vscode: '^1.100.0' },
       extensionKind: ['workspace'],
       activationEvents: [
         'onStartupFinished',

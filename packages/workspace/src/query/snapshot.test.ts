@@ -176,6 +176,8 @@ describe('조회 세션 완료 관측 게시: 로더·감시를 격리한 경합
       text: 'definition: 추가',
       documentVersion: 2,
     });
+    await session.diagnostics();
+    await session.diagnostics();
     expect(loadWorkspace).toHaveBeenCalledTimes(1);
   });
 });

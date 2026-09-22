@@ -41,3 +41,16 @@
 화면 렌더링, 물리적 hover/수정 키 클릭/F12, 알림 토스트·Quick Pick·Problems 패널의 픽셀/DOM은 검사하지 않는다. 예를 들어 링크 부재는 직접 이동 대상이 제공되지 않음을 입증하며 임의 클릭 후 팝업이 없다는 화면 증거를 만들지는 않는다. Markdown은 원문과 표시용 텍스트를 구분하고 URI 토큰은 원형 그대로 사용한다. 변경 직후 사례는 실제 변경과 명령의 순서를 검사하지만 제품 내부 경합 구간 도달을 강제했다고 주장하지 않는다.
 
 각 사례는 실제 편집기에서 이전 dirty 문서를 되돌리고 fixture를 복원한 뒤 서버를 재시작한다. 준비 sentinel의 실제 Hover를 확인한 다음 사례를 시작한다. Windows 부분 관측은 자신이 만든 파일의 독점 공유 잠금을 사용하며 관리자·symlink 권한이 필요하지 않다. 현재 macOS 실행은 격리 준비에서 실패하므로 이 fixture도 Mac 검증 완료로 간주하지 않는다.
+
+## 진단과 재검사 상태
+
+`diagnostics.cjs`는 실제 `languages.getDiagnostics`와 등록된 `codocs.showDiagnosticStatus` 명령을 사용한다.
+
+- `diagnostics-closed-catalog`: 한 번도 열지 않은 파일의 저장 진단과 UTF-16 위치.
+- `diagnostics-live-create`, `diagnostics-live-resolve`: 미저장 중복 생성·해소와 다른 문서의 저장 색인 보존.
+- `diagnostics-save`, `diagnostics-delete`: 저장 후 다른 문서의 진단 갱신과 확인된 삭제의 진단 제거. 닫힌 탭이 문서 모델의 종료를 보장하지 않으므로 삭제 사례는 한 번도 열지 않은 파일임을 확인한다.
+- `diagnostics-recheck-recovery`: 전용 파일을 실제 잠근 뒤 실패·파일·이유·과거 결과·현재 확인 불가 안내, 편집 후 이전 밑줄 제거, 잠금 해제 후 복구, 다른 workspace 실패의 독립 유지.
+- `rapid-edit-restart-diagnostics`: 연속 편집 직후 수동 재시작의 최신 원문·위치.
+- `unexpected-server-exit`: 시험 Extension Host의 직접 자식이며 전용 확장 경로를 실행하는 서버만 종료한 뒤 새 PID·자동 복구·미저장 진단·실제 Hover를 확인한다.
+
+상태 표시줄의 실제 Host 객체에 설정된 텍스트와 상세 명령의 안내를 검사하며 픽셀 렌더링 검사로 보고하지 않는다. EACCES·EPERM, 전체 읽기 실패, 늦은 편집·색인·세션 응답은 인접 기능 테스트에서 결정적으로 재현한다.

@@ -38,6 +38,11 @@ import {
 } from '../workspace-routing/index.js';
 
 const refreshMethod = 'codocs/refresh';
+import {
+  DiagnosticStatus,
+  diagnosticStatusCommand,
+  diagnosticStatusMethod,
+} from '../diagnostic-status/index.js';
 
 /** 실제 VS Code API와 language client SDK를 소유하는 확장 runtime이다. */
 export class VscodeExtensionRuntime {
@@ -61,6 +66,19 @@ export class VscodeExtensionRuntime {
   /** 명령과 workspace 연결을 활성화한다. */
   async activate(): Promise<void> {
     this.#disposables.push(
+      vscode.commands.registerCommand(
+        diagnosticStatusCommand,
+        /** 같은 관측의 문서·진단을 게시 경계로 변환한다. */ (
+          workspaceUri?: string,
+        ) => {
+          const details = [...this.#clients]
+            .filter(([uri]) => !workspaceUri || uri === workspaceUri)
+            .map(([, client]) => client.diagnosticDetails());
+          for (const detail of details) this.#output.appendLine(detail.text);
+          this.#output.show(true);
+          return details;
+        },
+      ),
       vscode.commands.registerCommand(
         'codocs.restartLanguageServers',
         async () => this.#manager.restartAll(),
@@ -156,6 +174,19 @@ export class VscodeFolderClient implements FolderClientBoundary {
   #providers: vscode.Disposable[] = [];
   #providerGeneration = 0;
   #sessionGeneration = 0;
+  #diagnosticStatus: DiagnosticStatus | undefined;
+
+  /** 현재 작업 공간의 실패 상세와 상태 표시줄 관측을 반환한다. */
+  diagnosticDetails(): ReturnType<DiagnosticStatus['details']> {
+    return (
+      this.#diagnosticStatus?.details() ?? {
+        workspaceUri: this.#folder.uri.toString(),
+        text: '서버 연결을 기다리고 있습니다.',
+        statusText: '',
+        failures: [],
+      }
+    );
+  }
 
   /** 대상 URI가 아니라 출처 문서의 소유 client에서 선택을 확인한다. */
   async confirmSource(argument: OpenSourceCommandArgument): Promise<unknown> {
@@ -310,6 +341,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
   async start(): Promise<void> {
     if (this.#client) return;
     this.#stopping = false;
+    this.#diagnosticStatus = new DiagnosticStatus(this.#folder);
     const directoryWatcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(this.#folder, '.codocs'),
     );
@@ -334,7 +366,6 @@ export class VscodeFolderClient implements FolderClientBoundary {
         return restart;
       },
       outputChannel: this.#output,
-      synchronize: { fileEvents: [directoryWatcher, contentsWatcher] },
     };
     const client = new LanguageClient(
       `codocs-${this.#folder.index}`,
@@ -344,6 +375,10 @@ export class VscodeFolderClient implements FolderClientBoundary {
     );
     this.#client = client;
     this.#disposables.push(
+      client.onNotification(diagnosticStatusMethod, (input: unknown) => {
+        if (this.#client === client && client.isRunning())
+          this.#diagnosticStatus?.update(input);
+      }),
       client.onNotification(snapshotChangedMethod, () =>
         this.#registerProviders(client),
       ),
@@ -353,6 +388,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
     /** 실행 상태가 되면 연결 사실을 output channel에 기록한다. */
     const reportRunning = (event: { newState: State }): void => {
       this.#sessionGeneration++;
+      if (event.newState !== State.Running) this.#diagnosticStatus?.clear();
       if (event.newState === State.Running) {
         this.#registerProviders(client);
         this.#output.appendLine(
@@ -387,6 +423,8 @@ export class VscodeFolderClient implements FolderClientBoundary {
   /** watcher·listener·language client와 서버 프로세스를 종료한다. */
   async stop(): Promise<void> {
     this.#stopping = true;
+    this.#diagnosticStatus?.dispose();
+    this.#diagnosticStatus = undefined;
     this.#sessionGeneration++;
     this.#providerGeneration += 1;
     for (const provider of this.#providers.splice(0)) provider.dispose();
@@ -423,9 +461,19 @@ export class VscodeFolderClient implements FolderClientBoundary {
         await next(document);
       },
       /** 이미 동기화한 문서의 변경 이벤트를 LSP client에 전달한다. */
-      didChange: async (event, next) => {
+      didChange: async (event) => {
         if (!synchronized.has(event.document.uri.toString())) return;
-        await next(event);
+        // SDK 9의 full-sync Delayer는 종료 중 재진입하면 task를 지운다.
+        // 전체 원문 알림을 직접 보내 지연 큐 없이 최신 버전을 순서대로 전달한다.
+        const client = this.#client;
+        if (!client?.isRunning()) return;
+        await client.sendNotification('textDocument/didChange', {
+          textDocument: {
+            uri: event.document.uri.toString(),
+            version: event.document.version,
+          },
+          contentChanges: [{ text: event.document.getText() }],
+        });
       },
       /** 닫힌 문서를 동기화 집합에서 제거하고 LSP client에 전달한다. */
       didClose: async (document, next) => {
@@ -480,10 +528,8 @@ export class VscodeFolderClient implements FolderClientBoundary {
   /** 예기치 않은 연결 오류의 재시작·중단 정책을 반환한다. */
   #errorHandler(): ErrorHandler {
     return {
-      /** 오류 횟수에 따라 연결을 계속하거나 종료한다. */
-      error: (_error, _message, count) => ({
-        action: (count ?? 0) < 3 ? ErrorAction.Continue : ErrorAction.Shutdown,
-      }),
+      /** 전송 오류로 SDK stop을 호출하면 closed의 재시작이 억제되므로 종료 판정은 closed에 맡긴다. */
+      error: () => ({ action: ErrorAction.Continue }),
       /** 종료 원인에 따라 자동 재시작 또는 사용자 안내를 선택한다. */
       closed: () => {
         if (this.#stopping) return { action: CloseAction.DoNotRestart };

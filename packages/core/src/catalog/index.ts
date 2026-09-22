@@ -471,10 +471,10 @@ export function resolveLiveDocument(
         ...(parsed.rootRange ? { rootRange: parsed.rootRange } : {}),
       })
     : undefined;
-  const documentDiagnostics = validation
+  const documentDiagnostics: Diagnostic[] = validation
     ? [...validation.errors, ...validation.warnings]
     : [...parsed.diagnostics];
-  return resolveDocumentReferences(catalog, {
+  const document: CatalogDocument = {
     ...identity(observation, catalogConfirmations.confirmed),
     observation,
     documentDiagnostics,
@@ -482,7 +482,26 @@ export function resolveLiveDocument(
     occurrences: [],
     references: [],
     referencedBy: [],
-  });
+  };
+  const conflicts =
+    document.id === undefined
+      ? []
+      : [...(catalog.idPaths.get(document.id) ?? [])].filter(
+          (path) => path !== observation.path,
+        );
+  if (conflicts.length)
+    documentDiagnostics.push(
+      catalogDiagnostic(
+        document,
+        catalogDiagnosticCodes.duplicateId,
+        [documentFields.id],
+        undefined,
+        {
+          relatedPaths: [observation.path, ...conflicts].sort(),
+        },
+      ),
+    );
+  return resolveDocumentReferences(catalog, document);
 }
 
 /** complete만 삭제 근거로 삼아 구축·갱신한다. partial/failed의 미관측 이전 기록은 미확인으로 보존한다. */

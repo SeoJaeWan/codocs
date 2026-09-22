@@ -2,7 +2,9 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const vscode = require('vscode');
 const { context } = require('./context.cjs');
-const { scenarios } = require('./navigation.cjs');
+const { scenarios: navigation } = require('./navigation.cjs');
+const { scenarios: diagnostics } = require('./diagnostics.cjs');
+const scenarios = [...navigation, ...diagnostics];
 
 /** 공식 Extension Host의 실행 진입점에서 독립 기능 사례와 관측을 기록한다. */
 exports.run =

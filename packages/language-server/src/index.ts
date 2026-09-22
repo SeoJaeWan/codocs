@@ -1,4 +1,5 @@
 export * from './document-sync/index.js';
+export * from './diagnostics/index.js';
 export * from './hover/index.js';
 export * from './server-session/index.js';
 export * from './server/index.js';
