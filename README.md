@@ -4,7 +4,7 @@ Codocs는 `.codocs` YAML에 프로젝트의 용어·동작·정책을 기록하�
 
 문서를 처음 작성한다면 [작성 가이드](docs/guide/README.md)와 [가상 프로젝트 예시](examples/.codocs)부터 확인한다.
 
-현재 이 저장소는 파싱·검증·파일 탐색·색인·코드 매칭, 변경 후보 계산과 MCP 조회 handler를 제공한다. 실행 가능한 MCP stdio 서버, LSP·VS Code 연동, 파일 감시와 저장 기능은 아직 제공하지 않는다.
+현재 이 저장소는 파싱·검증·파일 탐색·색인·코드 매칭, 변경 후보 계산과 MCP 조회 handler를 제공한다. MCP stdio 서버와 LSP·VS Code 확장을 로컬 빌드로 실행할 수 있다. 공개 게시 및 지원 OS 전체의 검증은 별도 단계다.
 
 ## 시작하기
 
@@ -38,6 +38,8 @@ pnpm build
 ```sh
 pnpm test              # 기능 테스트 watch
 pnpm test:run          # 기능 테스트 단일 실행
+pnpm test:vscode       # 현재 빌드의 실제 VS Code API 기능 검사
+pnpm test:ui           # test:vscode로 위임 (화면 입력 검사는 아님)
 pnpm check:development # 개발 규칙·설치 계약 검사
 pnpm check:build       # 빌드·배포 패키지 소비 검사
 pnpm check             # 전체 검사
@@ -46,3 +48,13 @@ pnpm check             # 전체 검사
 기능 테스트는 빌드 없이 소스를 직접 검사한다. `check:build`는 필요한 빌드와 패키징을 수행한다. 설치 검사는 임시 프로젝트와 store를 사용하며 첫 설치에 네트워크가 필요하다. 별도 프로젝트 환경변수나 미리 채운 store는 필요하지 않다.
 
 개발할 기능의 계약은 [프로젝트 지식 읽기 안내](.codocs/index.yaml)에서 찾는다. 패키지 간 책임은 [실행 구조](.codocs/development/runtime-architecture.yaml), 코드·테스트·문서 작성 기준은 [개발 안내](.codocs/development/development.yaml), 도구와 빌드 기준은 [개발 환경](.codocs/development/development-environment.yaml)에서 확인한다.
+
+## 실제 VS Code 검사
+
+`pnpm test:vscode`는 현재 소스를 빌드하고 `@vscode/test-electron` 3.1.0으로 VS Code 1.100.0을 자동 준비한다. VSIX나 설치 경로 옵션이 필요하지 않다. 첫 다운로드는 네트워크를 사용하며 `.workbench/vscode-cache`의 버전·OS·아키텍처별 잠금과 파일 내용 해시로 캐시를 재사용한다. 프로필·확장·작업 공간은 실행마다 분리하고 종료 후 삭제한다.
+
+Windows는 별도 데스크톱에서 준비·실행하고 Job Object로 모든 시험 자식을 종료한다. 사용자 창을 숨기거나 포커스를 복원하지 않는다. 외부 foreground/input desktop 표본, 정리 결과, 기능별 결과와 VS Code 로그는 `.workbench/vscode-tests/<실행 ID>`에 남긴다. 빌드·다운로드·fixture·Extension Host·정리 실패는 단계와 함께 비정상 종료한다.
+
+`node tools/vscode-tests/lifecycle.mjs`는 실제 VS Code의 시작 실패·기능 실패·시간 제한·준비 후 취소 경로와 자식 정리를 별도로 검사한다. 기능 검사의 대응 범위와 API/화면 관측 구분은 [이전 대응표](tools/vscode-tests/coverage.md), 공유 실행 계약은 [실행기 안내](tools/test-runtime/README.md)에 있다.
+
+**macOS 격리 실행은 아직 구현·검증되지 않았다.** 현재 Mac에서 명령을 실행하면 창을 열기 전에 준비 실패와 증거 경로를 반환한다. [macOS 검토와 필요한 환경 결정](tools/test-runtime/macos-isolation.md)을 확인한다. Mac 로컬 기능·포커스 수락은 같은 최종 후보 SHA에서 안전한 어댑터 구현 후 사용자 Mac 결과를 받아야 완료된다. Windows 통과나 준비 실패를 Mac 통과로 집계하지 않는다.

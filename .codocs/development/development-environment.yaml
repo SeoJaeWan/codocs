@@ -12,6 +12,8 @@ definition: |
   실제 VS Code 기능 검사는 공식 @vscode/test-electron 기반으로 실행한다. 로컬 Vitest·실제 Extension Host·CI 환경 계약 검사의 책임과 포커스 격리 기준은 [[테스트 컨벤션]]에서 정한다.
   VS Code와 테스트 도구의 버전을 고정하고 지원 조합을 실제 실행으로 확인한다. 다운로드 결과는 버전별로 재사용하되 현재 변경본의 빌드와 검사를 생략하지 않는다.
   정확한 설치 버전은 현재 manifest·lockfile·.node-version에서 확인한다.
+  pnpm test:vscode는 현재 빌드와 고정 VS Code를 자동 준비하고 pnpm test:ui도 같은 기능 검사로 위임한다. provider·명령 API의 결과를 검사하며 화면 렌더링이나 클릭 제스처 통과로 보고하지 않는다.
+  Windows는 별도 Win32 데스크톱과 Job Object에서 준비부터 종료까지 격리하고 외부 전경·입력 데스크톱과 잔여 프로세스를 관측한다. macOS에는 현재 검증된 무노출 실행 어댑터가 없으므로 창을 열기 전에 준비 실패를 반환한다. macOS 수락 조건은 유지하며 안전한 어댑터와 동일 후보 SHA의 사용자 Mac 결과를 받은 후에만 충족으로 판정한다.
   로컬 빌드를 편집기에서 직접 사용하는 절차는 [[VS Code에서 직접 실행하기]]에서 확인한다.
 
   pnpm test는 기능 watch, pnpm test:run은 기능 단일 실행이다.

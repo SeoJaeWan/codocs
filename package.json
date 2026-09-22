@@ -20,7 +20,8 @@
     "performance:cod14": "node tools/performance/runner.mjs",
     "check": "node tools/check/run.mjs all",
     "test:environment": "node tools/environment-tests/run.mjs",
-    "test:tools": "node tools/check/run.mjs test:tools"
+    "test:tools": "node tools/check/run.mjs test:tools",
+    "test:vscode": "node tools/vscode-tests/run.mjs"
   },
   "lint-staged": {
     "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}": [
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@types/node": "22.19.3",
+    "@vscode/test-electron": "3.1.0",
     "esbuild": "0.28.2",
     "eslint": "10.10.0",
     "eslint-plugin-check-file": "3.3.2",
