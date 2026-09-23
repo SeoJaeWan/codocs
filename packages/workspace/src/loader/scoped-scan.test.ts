@@ -1,7 +1,7 @@
 import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures } from '../test-support/file-system.js';
 import { parseYaml } from '@codocs/core';
 import {
-  chmod,
   mkdir,
   mkdtemp,
   readFile,
@@ -21,7 +21,9 @@ import {
 import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const original = await importOriginal<typeof import('node:fs/promises')>();
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  const original = withIoFailures(actual);
   return {
     ...original,
     readFile: vi.fn(original.readFile),
@@ -64,6 +66,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
 });
 afterEach(async () => {
+  ioFailures.clear();
   vi.mocked(readFile).mockReset();
   vi.mocked(readdir).mockReset();
   await rm(fixture, { recursive: true, force: true });
@@ -293,23 +296,19 @@ describe('loadWorkspacePath: 부재와 접근 실패', () => {
     ]);
   });
 
-  it('캐시에 있는 파일의 읽기 권한을 제거하면 이전 문서 대신 실패를 반환한다', async () => {
+  it('캐시에 있는 파일의 읽기 접근 확인이 EACCES로 거부되면 이전 문서 대신 실패를 반환한다', async () => {
     const a = path.join(codocs, 'a.yaml');
     await writeFile(a, rawA);
     const cache = new WorkspaceObservationCache();
     await loadWorkspacePath(root, a, { cache });
-    await chmod(a, 0);
-    try {
-      const result = await loadWorkspacePath(root, a, { cache });
-      expect(result.outcome).toBe('failed');
-      expect(result.documents).toEqual([]);
-      expect(result.absent).toEqual([]);
-      expect(result.failures).toMatchObject([
-        { logicalPath: a, diagnostics: [{ ioCode: 'EACCES' }] },
-      ]);
-    } finally {
-      await chmod(a, 0o600);
-    }
+    ioFailures.set(a, { operations: ['access'], code: 'EACCES' });
+    const result = await loadWorkspacePath(root, a, { cache });
+    expect(result.outcome).toBe('failed');
+    expect(result.documents).toEqual([]);
+    expect(result.absent).toEqual([]);
+    expect(result.failures).toMatchObject([
+      { logicalPath: a, diagnostics: [{ ioCode: 'EACCES' }] },
+    ]);
   });
 
   it('경로 확인 후 파일 읽기에서 ENOENT가 나면 확정 부재 대신 실패를 반환한다', async () => {
