@@ -107,6 +107,8 @@ export function renderMarkdown(report) {
     `- 정확성: ${report.correctness.status === 'passed' ? '통과' : report.correctness.status === 'failed' ? '실패' : '미확인'}`,
     `- 실패 관측: ${report.correctness.failureCount}개; 실행 오류: ${report.errors.length}개`,
     `- Node: ${report.environment.nodeVersion}; 운영체제: ${report.environment.platform} ${report.environment.arch}`,
+    `- 장비: CPU ${report.environment.cpu ?? '미확인'} (${report.environment.cpuCount ?? '미확인'}개), 메모리 ${report.environment.memoryBytes ?? '미확인'} B; OS ${report.environment.release ?? '미확인'}`,
+    `- 변경본: ${report.environment.sourceCommit ?? '미확인'}; 파일 캐시: ${report.environment.fileCache ?? '미확인'}`,
     `- 재현 설정: seed ${report.configuration.seed}, 문서 ${report.configuration.documentCounts.join(', ')}, 프로세스 ${report.configuration.startupRuns}회, 유형별 워밍업 ${report.configuration.warmupRuns}회, 측정 ${report.configuration.queryRuns}회, 외부 변경 ${report.configuration.propagationRuns}회`,
     `- 데이터 경로: ${report.configuration.fixtureRoot}; 결과 경로: ${report.configuration.output}`,
     '',

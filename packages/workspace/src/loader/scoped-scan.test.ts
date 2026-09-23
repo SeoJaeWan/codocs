@@ -1,13 +1,13 @@
+import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures } from '../test-support/file-system.js';
 import { parseYaml } from '@codocs/core';
 import {
-  chmod,
   mkdir,
   mkdtemp,
   readFile,
   readdir,
   rename,
   rm,
-  symlink,
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
@@ -19,10 +19,11 @@ import {
   workspacePathsForLinkEvent,
 } from './index.js';
 import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
-import { detectFileSystemTestCapabilities } from '../test-support/file-system.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const original = await importOriginal<typeof import('node:fs/promises')>();
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  const original = withIoFailures(actual);
   return {
     ...original,
     readFile: vi.fn(original.readFile),
@@ -42,7 +43,6 @@ function barrier(): { promise: Promise<void>; resolve: () => void } {
   return { promise, resolve };
 }
 
-const capability = await detectFileSystemTestCapabilities();
 let fixture: string;
 let root: ProjectRoot;
 let codocs: string;
@@ -66,12 +66,9 @@ beforeEach(async () => {
   vi.clearAllMocks();
 });
 afterEach(async () => {
-  const original =
-    await vi.importActual<typeof import('node:fs/promises')>(
-      'node:fs/promises',
-    );
-  vi.mocked(readFile).mockImplementation(original.readFile);
-  vi.mocked(readdir).mockImplementation(original.readdir);
+  ioFailures.clear();
+  vi.mocked(readFile).mockReset();
+  vi.mocked(readdir).mockReset();
   await rm(fixture, { recursive: true, force: true });
 });
 
@@ -299,27 +296,20 @@ describe('loadWorkspacePath: 부재와 접근 실패', () => {
     ]);
   });
 
-  it.skipIf(!capability.permissionDenial)(
-    '캐시에 있는 파일의 읽기 권한을 제거하면 이전 문서 대신 실패를 반환한다',
-    async () => {
-      const a = path.join(codocs, 'a.yaml');
-      await writeFile(a, rawA);
-      const cache = new WorkspaceObservationCache();
-      await loadWorkspacePath(root, a, { cache });
-      await chmod(a, 0);
-      try {
-        const result = await loadWorkspacePath(root, a, { cache });
-        expect(result.outcome).toBe('failed');
-        expect(result.documents).toEqual([]);
-        expect(result.absent).toEqual([]);
-        expect(result.failures).toMatchObject([
-          { logicalPath: a, diagnostics: [{ ioCode: 'EACCES' }] },
-        ]);
-      } finally {
-        await chmod(a, 0o600);
-      }
-    },
-  );
+  it('캐시에 있는 파일의 읽기 접근 확인이 EACCES로 거부되면 이전 문서 대신 실패를 반환한다', async () => {
+    const a = path.join(codocs, 'a.yaml');
+    await writeFile(a, rawA);
+    const cache = new WorkspaceObservationCache();
+    await loadWorkspacePath(root, a, { cache });
+    ioFailures.set(a, { operations: ['access'], code: 'EACCES' });
+    const result = await loadWorkspacePath(root, a, { cache });
+    expect(result.outcome).toBe('failed');
+    expect(result.documents).toEqual([]);
+    expect(result.absent).toEqual([]);
+    expect(result.failures).toMatchObject([
+      { logicalPath: a, diagnostics: [{ ioCode: 'EACCES' }] },
+    ]);
+  });
 
   it('경로 확인 후 파일 읽기에서 ENOENT가 나면 확정 부재 대신 실패를 반환한다', async () => {
     const a = path.join(codocs, 'a.yaml');
@@ -373,188 +363,164 @@ describe('loadWorkspacePath: 부재와 접근 실패', () => {
 });
 
 describe('loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상', () => {
-  it.skipIf(!capability.symlink)(
-    '빈 외부 폴더 링크를 발견하면 열거 전에 대상 등록 완료를 기다린다',
-    async () => {
-      const linked = path.join(codocs, 'linked');
-      await symlink(outside, linked, 'dir');
-      const started = barrier();
-      const release = barrier();
-      const operation = loadWorkspacePath(root, linked, {
-        onLink: async () => {
-          started.resolve();
-          await release.promise;
-        },
-      });
-      try {
-        await started.promise;
-        expect(readdir).not.toHaveBeenCalled();
-        release.resolve();
-        const result = await operation;
-        expect(result.documents).toEqual([]);
-        expect(result.links).toMatchObject([
-          {
-            logicalPath: linked,
-            targetPath: outside,
-            kind: 'directory',
-            confirmed: true,
-          },
-        ]);
-      } finally {
-        release.resolve();
-        await operation;
-      }
-    },
-  );
-
-  it.skipIf(!capability.symlink)(
-    '깨진 외부 파일 링크를 확인하면 대상 위치를 등록하고 실패로 남긴다',
-    async () => {
-      const linked = path.join(codocs, 'broken.yaml');
-      const target = path.join(outside, 'missing.yaml');
-      await symlink(target, linked, 'file');
-      const onLink = vi.fn();
-      const result = await loadWorkspacePath(root, linked, { onLink });
-      expect(result.outcome).toBe('failed');
-      expect(result.absent).toEqual([]);
-      expect(result.links).toEqual([
-        {
-          path: path.join('.codocs', 'broken.yaml'),
-          logicalPath: linked,
-          targetPath: target,
-          confirmed: false,
-        },
-      ]);
-      expect(onLink).toHaveBeenCalledWith(result.links[0]);
-      expect(result.failures).toMatchObject([
-        { logicalPath: linked, diagnostics: [{ ioCode: 'ENOENT' }] },
-      ]);
-      expect(result.failures[0]).not.toHaveProperty('realPath');
-    },
-  );
-
-  it.skipIf(!capability.symlink)(
-    '외부 폴더 열거가 실패해도 확인한 연결을 반환한다',
-    async () => {
-      const linked = path.join(codocs, 'linked');
-      await symlink(outside, linked, 'dir');
-      vi.mocked(readdir).mockRejectedValueOnce(
-        Object.assign(new Error('fixture I/O'), { code: 'EIO' }),
-      );
-      const result = await loadWorkspacePath(root, linked);
-      expect(result.outcome).toBe('failed');
-      expect(result.links).toMatchObject([
-        { logicalPath: linked, targetPath: outside, confirmed: true },
-      ]);
-      expect(result.failures).toMatchObject([
-        { logicalPath: linked, realPath: outside },
-      ]);
-    },
-  );
-
-  it.skipIf(!capability.symlink)(
-    '같은 외부 폴더의 두 별칭을 탐색하면 문서와 이벤트 대응을 발견 경로별로 보존한다',
-    async () => {
-      await writeFile(path.join(outside, 'a.yaml'), rawA);
-      const left = path.join(codocs, 'left');
-      const right = path.join(codocs, 'right');
-      await symlink(outside, left, 'dir');
-      await symlink(outside, right, 'dir');
-      const result = await loadWorkspace({ cwd: fixture });
-      expect(
-        result.documents.map((document) => document.source.logicalPath),
-      ).toEqual([path.join(left, 'a.yaml'), path.join(right, 'a.yaml')]);
-      expect(
-        workspacePathsForLinkEvent(
-          result.links,
-          path.join(outside, 'a.yaml'),
-        ).sort(),
-      ).toEqual([path.join(left, 'a.yaml'), path.join(right, 'a.yaml')]);
-    },
-  );
-
-  it.skipIf(!capability.symlink)(
-    '등록 대기 중 링크 대상이 바뀌면 새 실제 경로와 새 원문을 함께 반환한다',
-    async () => {
-      const oldTarget = path.join(outside, 'old.yaml');
-      const newTarget = path.join(outside, 'new.yaml');
-      const linked = path.join(codocs, 'a.yaml');
-      await writeFile(oldTarget, rawA);
-      await writeFile(newTarget, rawB);
-      await symlink(oldTarget, linked, 'file');
-      const result = await loadWorkspacePath(root, linked, {
-        onLink: async (link) => {
-          if (link.targetPath === oldTarget) {
-            await rm(linked);
-            await symlink(newTarget, linked, 'file');
-          }
-        },
-      });
-      expect(result.documents[0]?.source.realPath).toBe(newTarget);
-      expect(result.documents[0]?.raw).toBe(rawB);
-      expect(result.links.map((link) => link.targetPath)).toEqual([
-        oldTarget,
-        newTarget,
-      ]);
-    },
-  );
-
-  it.skipIf(!capability.symlink)(
-    '파일 링크의 실대상이 바뀌면 같은 캐시에서도 새 원문을 읽는다',
-    async () => {
-      const oldTarget = path.join(outside, 'old.yaml');
-      const newTarget = path.join(outside, 'new.yaml');
-      const linked = path.join(codocs, 'a.yaml');
-      await writeFile(oldTarget, rawA);
-      await writeFile(newTarget, rawB);
-      await symlink(oldTarget, linked, 'file');
-      const cache = new WorkspaceObservationCache();
-      const first = await loadWorkspacePath(root, linked, { cache });
-      await rm(linked);
-      await symlink(newTarget, linked, 'file');
-      const next = await loadWorkspacePath(root, linked, { cache });
-      expect(next.documents[0]?.source.realPath).toBe(newTarget);
-      expect(next.documents[0]?.raw).toBe(rawB);
-      expect(cache.isCurrent(first.observations[0]!)).toBe(false);
-    },
-  );
-
-  it.skipIf(!capability.symlink)(
-    '파일 링크의 형제 외부 신호를 받으면 읽기 범위를 확장하지 않는다',
-    async () => {
-      const target = path.join(outside, 'a.yaml');
-      const linked = path.join(codocs, 'a.yaml');
-      await writeFile(target, rawA);
-      await symlink(target, linked, 'file');
-      const initial = await loadWorkspace({ cwd: fixture });
-      expect(
-        workspacePathsForLinkEvent(initial.links, path.join(outside, 'b.yaml')),
-      ).toEqual([]);
-      expect(workspacePathsForLinkEvent(initial.links, outside)).toEqual([
-        linked,
-      ]);
-      const denied = await loadWorkspacePath(root, target);
-      expect(denied.outcome).toBe('failed');
-      expect(denied.documents).toEqual([]);
-      expect(denied.failures[0]?.diagnostics[0]?.code).toBe(
-        'path_outside_workspace',
-      );
-    },
-  );
-
-  it.skipIf(!capability.symlink)(
-    '범위의 조상으로 되돌아가는 링크를 직접 확인하면 순환을 건너뛴다',
-    async () => {
-      const back = path.join(codocs, 'back');
-      await writeFile(path.join(codocs, 'a.yaml'), rawA);
-      await symlink(codocs, back, 'dir');
-      const result = await loadWorkspacePath(root, path.join(back, 'a.yaml'));
-      expect(result.outcome).toBe('complete');
+  it('빈 외부 폴더 링크를 발견하면 열거 전에 대상 등록 완료를 기다린다', async () => {
+    const linked = path.join(codocs, 'linked');
+    await symlink(outside, linked, 'dir');
+    const started = barrier();
+    const release = barrier();
+    const operation = loadWorkspacePath(root, linked, {
+      onLink: async () => {
+        started.resolve();
+        await release.promise;
+      },
+    });
+    try {
+      await started.promise;
+      expect(readdir).not.toHaveBeenCalled();
+      release.resolve();
+      const result = await operation;
       expect(result.documents).toEqual([]);
-      expect(result.skippedCycles).toMatchObject([{ logicalPath: back }]);
-      expect(readFile).not.toHaveBeenCalled();
-    },
-  );
+      expect(result.links).toMatchObject([
+        {
+          logicalPath: linked,
+          targetPath: outside,
+          kind: 'directory',
+          confirmed: true,
+        },
+      ]);
+    } finally {
+      release.resolve();
+      await operation;
+    }
+  });
+
+  it('깨진 외부 파일 링크를 확인하면 대상 위치를 등록하고 실패로 남긴다', async () => {
+    const linked = path.join(codocs, 'broken.yaml');
+    const target = path.join(outside, 'missing.yaml');
+    await symlink(target, linked, 'file');
+    const onLink = vi.fn();
+    const result = await loadWorkspacePath(root, linked, { onLink });
+    expect(result.outcome).toBe('failed');
+    expect(result.absent).toEqual([]);
+    expect(result.links).toEqual([
+      {
+        path: path.join('.codocs', 'broken.yaml'),
+        logicalPath: linked,
+        targetPath: target,
+        confirmed: false,
+      },
+    ]);
+    expect(onLink).toHaveBeenCalledWith(result.links[0]);
+    expect(result.failures).toMatchObject([
+      { logicalPath: linked, diagnostics: [{ ioCode: 'ENOENT' }] },
+    ]);
+    expect(result.failures[0]).not.toHaveProperty('realPath');
+  });
+
+  it('외부 폴더 열거가 실패해도 확인한 연결을 반환한다', async () => {
+    const linked = path.join(codocs, 'linked');
+    await symlink(outside, linked, 'dir');
+    vi.mocked(readdir).mockRejectedValueOnce(
+      Object.assign(new Error('fixture I/O'), { code: 'EIO' }),
+    );
+    const result = await loadWorkspacePath(root, linked);
+    expect(result.outcome).toBe('failed');
+    expect(result.links).toMatchObject([
+      { logicalPath: linked, targetPath: outside, confirmed: true },
+    ]);
+    expect(result.failures).toMatchObject([
+      { logicalPath: linked, realPath: outside },
+    ]);
+  });
+
+  it('같은 외부 폴더의 두 별칭을 탐색하면 문서와 이벤트 대응을 발견 경로별로 보존한다', async () => {
+    await writeFile(path.join(outside, 'a.yaml'), rawA);
+    const left = path.join(codocs, 'left');
+    const right = path.join(codocs, 'right');
+    await symlink(outside, left, 'dir');
+    await symlink(outside, right, 'dir');
+    const result = await loadWorkspace({ cwd: fixture });
+    expect(
+      result.documents.map((document) => document.source.logicalPath),
+    ).toEqual([path.join(left, 'a.yaml'), path.join(right, 'a.yaml')]);
+    expect(
+      workspacePathsForLinkEvent(
+        result.links,
+        path.join(outside, 'a.yaml'),
+      ).sort(),
+    ).toEqual([path.join(left, 'a.yaml'), path.join(right, 'a.yaml')]);
+  });
+
+  it('등록 대기 중 링크 대상이 바뀌면 새 실제 경로와 새 원문을 함께 반환한다', async () => {
+    const oldTarget = path.join(outside, 'old.yaml');
+    const newTarget = path.join(outside, 'new.yaml');
+    const linked = path.join(codocs, 'a.yaml');
+    await writeFile(oldTarget, rawA);
+    await writeFile(newTarget, rawB);
+    await symlink(oldTarget, linked, 'file');
+    const result = await loadWorkspacePath(root, linked, {
+      onLink: async (link) => {
+        if (link.targetPath === oldTarget) {
+          await rm(linked);
+          await symlink(newTarget, linked, 'file');
+        }
+      },
+    });
+    expect(result.documents[0]?.source.realPath).toBe(newTarget);
+    expect(result.documents[0]?.raw).toBe(rawB);
+    expect(result.links.map((link) => link.targetPath)).toEqual([
+      oldTarget,
+      newTarget,
+    ]);
+  });
+
+  it('파일 링크의 실대상이 바뀌면 같은 캐시에서도 새 원문을 읽는다', async () => {
+    const oldTarget = path.join(outside, 'old.yaml');
+    const newTarget = path.join(outside, 'new.yaml');
+    const linked = path.join(codocs, 'a.yaml');
+    await writeFile(oldTarget, rawA);
+    await writeFile(newTarget, rawB);
+    await symlink(oldTarget, linked, 'file');
+    const cache = new WorkspaceObservationCache();
+    const first = await loadWorkspacePath(root, linked, { cache });
+    await rm(linked);
+    await symlink(newTarget, linked, 'file');
+    const next = await loadWorkspacePath(root, linked, { cache });
+    expect(next.documents[0]?.source.realPath).toBe(newTarget);
+    expect(next.documents[0]?.raw).toBe(rawB);
+    expect(cache.isCurrent(first.observations[0]!)).toBe(false);
+  });
+
+  it('파일 링크의 형제 외부 신호를 받으면 읽기 범위를 확장하지 않는다', async () => {
+    const target = path.join(outside, 'a.yaml');
+    const linked = path.join(codocs, 'a.yaml');
+    await writeFile(target, rawA);
+    await symlink(target, linked, 'file');
+    const initial = await loadWorkspace({ cwd: fixture });
+    expect(
+      workspacePathsForLinkEvent(initial.links, path.join(outside, 'b.yaml')),
+    ).toEqual([]);
+    expect(workspacePathsForLinkEvent(initial.links, outside)).toEqual([
+      linked,
+    ]);
+    const denied = await loadWorkspacePath(root, target);
+    expect(denied.outcome).toBe('failed');
+    expect(denied.documents).toEqual([]);
+    expect(denied.failures[0]?.diagnostics[0]?.code).toBe(
+      'path_outside_workspace',
+    );
+  });
+
+  it('범위의 조상으로 되돌아가는 링크를 직접 확인하면 순환을 건너뛴다', async () => {
+    const back = path.join(codocs, 'back');
+    await writeFile(path.join(codocs, 'a.yaml'), rawA);
+    await symlink(codocs, back, 'dir');
+    const result = await loadWorkspacePath(root, path.join(back, 'a.yaml'));
+    expect(result.outcome).toBe('complete');
+    expect(result.documents).toEqual([]);
+    expect(result.skippedCycles).toMatchObject([{ logicalPath: back }]);
+    expect(readFile).not.toHaveBeenCalled();
+  });
 });
 
 describe('열거 뒤 항목 부재의 직접 확인', () => {

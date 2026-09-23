@@ -1,1 +1,2 @@
-pnpm check:staged
+#!/bin/sh
+node tools/git/pre-commit.mjs

@@ -1,5 +1,6 @@
 import { ESLint } from 'eslint';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import {
   copyFileSync,
   cpSync,
@@ -14,7 +15,8 @@ import tseslint from 'typescript-eslint';
 import { afterAll, describe, expect, it } from 'vitest';
 import codocs from './eslint-rules.mjs';
 
-import { resolvePnpm } from '../check/runtime.mjs';
+import { resolvePnpm } from '../toolchain.mjs';
+import { createFixtureEslint } from '../test/support/eslint.js';
 
 const root = process.cwd();
 mkdirSync(path.join(root, '.workbench/fixtures'), { recursive: true });
@@ -26,7 +28,7 @@ afterAll(
     rmSync(suiteFixture, { recursive: true, force: true, maxRetries: 3 });
   },
 );
-const eslint = new ESLint({ cwd: root });
+const eslint = createFixtureEslint({ cwd: root });
 
 /** 외부 JSON 값이 문자열 키를 가진 객체인지 확인한다. */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -251,6 +253,81 @@ describe('개발 규칙의 실제 성공과 실패', /** 규칙별 실패와 정
       ),
     ).toContain('codocs/korean-jsdoc');
   });
+});
+
+describe('실제 파일의 ESLint CLI 검사', () => {
+  it.each(['false', 'true'])(
+    'CI=%s에서도 타입 기반 위반과 정상 코드를 구분한다',
+    (ci) => {
+      const fixture = path.join(
+        root,
+        `packages/workspace/src/lint-fixture-${randomUUID()}`,
+      );
+      mkdirSync(fixture);
+      try {
+        writeFileSync(
+          path.join(fixture, 'invalid.ts'),
+          `import type { ReferenceResolutionStatus } from '@codocs/core';
+const status: ReferenceResolutionStatus = 'ambiguous';
+console.log(status);
+Promise.resolve(1);
+`,
+        );
+        writeFileSync(
+          path.join(fixture, 'valid.ts'),
+          `import { referenceResolutionStatuses, type ReferenceResolutionStatus } from '@codocs/core';
+const status: ReferenceResolutionStatus = referenceResolutionStatuses.ambiguous;
+console.log(status);
+await Promise.resolve(1);
+`,
+        );
+        const env = { ...process.env };
+        Reflect.set(env, 'CI', ci);
+        Reflect.deleteProperty(env, 'TSESTREE_SINGLE_RUN');
+        const result = spawnSync(
+          process.execPath,
+          [
+            path.join(root, 'node_modules/eslint/bin/eslint.js'),
+            fixture,
+            '--format',
+            'json',
+          ],
+          {
+            cwd: root,
+            encoding: 'utf8',
+            env,
+            timeout: 60_000,
+          },
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.status, result.stderr).toBe(1);
+        const reports: unknown = JSON.parse(result.stdout);
+        if (!Array.isArray(reports))
+          throw new Error('ESLint 결과가 배열이 아니다');
+        const invalid = reports.find(
+          (report: unknown) =>
+            isRecord(report) &&
+            report.filePath === path.join(fixture, 'invalid.ts'),
+        ) as unknown;
+        const valid = reports.find(
+          (report: unknown) =>
+            isRecord(report) &&
+            report.filePath === path.join(fixture, 'valid.ts'),
+        ) as unknown;
+        expect(valid).toMatchObject({ errorCount: 0, warningCount: 0 });
+        expect(invalid).toMatchObject({
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              ruleId: '@typescript-eslint/no-floating-promises',
+            }),
+            expect.objectContaining({ ruleId: 'codocs/no-raw-domain-value' }),
+          ]) as unknown,
+        });
+      } finally {
+        rmSync(fixture, { recursive: true, force: true });
+      }
+    },
+  );
 });
 
 describe('파일과 폴더 이름', /** 실제 ESLint 설정으로 경로 규칙을 확인한다. */ () => {

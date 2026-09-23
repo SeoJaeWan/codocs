@@ -1,4 +1,5 @@
 import { build } from 'esbuild';
+import { trackChildClosure } from '../../../../tools/test/support/child-process.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -8,6 +9,17 @@ import {
   documentMatchRequestMethod,
   workspaceRefreshRequestMethod,
 } from '../server-session/index.js';
+
+const childClosures = new WeakMap<
+  ChildProcessWithoutNullStreams,
+  ReturnType<typeof trackChildClosure>
+>();
+/** spawn 직후 등록한 close 관측이 끝나야 실행 폴더를 지운다. */
+async function stopChild(child: ChildProcessWithoutNullStreams): Promise<void> {
+  const lifecycle = childClosures.get(child);
+  if (!lifecycle) throw new Error('자식 close 관측이 등록되지 않았습니다.');
+  await lifecycle.stop();
+}
 
 interface JsonRpcResponse {
   id: number;
@@ -28,6 +40,7 @@ class StdioProtocolClient {
 
   constructor(child: ChildProcessWithoutNullStreams) {
     this.#child = child;
+    childClosures.set(child, trackChildClosure(child));
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk: string) => {
       this.#stderr += chunk;
@@ -157,10 +170,15 @@ describe('language server stdio 프로세스', () => {
         platform: 'node',
         format: 'cjs',
         target: 'node20.19',
+        alias: {
+          '@codocs/core': path.resolve('packages/core/src/index.ts'),
+          '@codocs/workspace': path.resolve('packages/workspace/src/index.ts'),
+        },
       });
       const child = spawn(process.execPath, [output, '--stdio'], {
         cwd: root,
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
       });
       const client = new StdioProtocolClient(child);
       const uri = pathToFileURL(path.join(root, '.codocs/live.yaml')).href;
@@ -265,7 +283,7 @@ describe('language server stdio 프로세스', () => {
         await client.request(9, 'shutdown', null);
         client.send('exit');
       } finally {
-        if (child.exitCode === null) child.kill();
+        await stopChild(child);
         await rm(root, { recursive: true, force: true });
       }
     },
@@ -289,10 +307,15 @@ describe('language server stdio 프로세스', () => {
       platform: 'node',
       format: 'cjs',
       target: 'node20.19',
+      alias: {
+        '@codocs/core': path.resolve('packages/core/src/index.ts'),
+        '@codocs/workspace': path.resolve('packages/workspace/src/index.ts'),
+      },
     });
     const child = spawn(process.execPath, [output, '--stdio'], {
       cwd: root,
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     const client = new StdioProtocolClient(child);
     try {
@@ -376,7 +399,7 @@ describe('language server stdio 프로세스', () => {
       expect(client.stderr).toBe('');
       expect(client.unframedStdout).toHaveLength(0);
     } finally {
-      if (child.exitCode === null) child.kill();
+      await stopChild(child);
       await rm(root, { recursive: true, force: true });
     }
   });
@@ -422,6 +445,10 @@ describe('language server stdio 프로세스', () => {
       platform: 'node',
       format: 'cjs',
       target: 'node20.19',
+      alias: {
+        '@codocs/core': path.resolve('packages/core/src/index.ts'),
+        '@codocs/workspace': path.resolve('packages/workspace/src/index.ts'),
+      },
     });
 
     const workspaceFolders = [parent, nested, sibling, missing].map(
@@ -436,6 +463,7 @@ describe('language server stdio 프로세스', () => {
     const firstChild = spawn(process.execPath, [output, '--stdio'], {
       cwd: root,
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     const firstClient = new StdioProtocolClient(firstChild);
     try {
@@ -627,6 +655,7 @@ describe('language server stdio 프로세스', () => {
       const restartedChild = spawn(process.execPath, [output, '--stdio'], {
         cwd: root,
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
       });
       const restartedClient = new StdioProtocolClient(restartedChild);
       try {
@@ -675,10 +704,10 @@ describe('language server stdio 프로세스', () => {
         expect(restartedClient.stderr).toBe('');
         expect(restartedClient.unframedStdout).toHaveLength(0);
       } finally {
-        if (restartedChild.exitCode === null) restartedChild.kill();
+        await stopChild(restartedChild);
       }
     } finally {
-      if (firstChild.exitCode === null) firstChild.kill();
+      await stopChild(firstChild);
       await rm(root, { recursive: true, force: true });
     }
   });

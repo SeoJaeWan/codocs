@@ -1,3 +1,4 @@
+import { discoveryPath } from './discovery-path.js';
 import {
   catalogConfirmations,
   catalogDiagnosticCodes,
@@ -578,6 +579,23 @@ function withWorkspaceUris(
   };
 }
 
+/** 저장된 문서의 진단과 원문 확인 여부를 함께 전달한다. */
+export interface WorkspaceDiagnosticDocument {
+  path: string;
+  uri: string;
+  text: string | undefined;
+  confirmed: boolean;
+  diagnostics: readonly Diagnostic[];
+}
+
+/** 빈 성공과 읽기 실패를 구분하는 저장 진단 관측이다. */
+export interface WorkspaceDiagnosticsSnapshot {
+  catalogVersion: number;
+  scanStatus: ScanStatus;
+  documents: readonly WorkspaceDiagnosticDocument[];
+  failures: readonly { path?: string; message: string }[];
+}
+
 /** 실제 scan과 이전 Catalog를 직렬로 연결하는 process 범위 조회 세션이다. */
 export class WorkspaceQuerySession {
   readonly #input: unknown;
@@ -1052,9 +1070,13 @@ export class WorkspaceQuerySession {
     const catalogVersion = watchFailure
       ? this.#completed!.version
       : this.#catalogVersion;
-    const projection = projectCatalogPaths(catalog, paths, {
-      revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
-    });
+    const projection = projectCatalogPaths(
+      catalog,
+      paths.map((input) => discoveryPath(input)),
+      {
+        revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
+      },
+    );
     if (!projection.success)
       return {
         success: false,
@@ -1099,6 +1121,61 @@ export class WorkspaceQuerySession {
       catalogVersion,
       results,
       ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
+    };
+  }
+
+  /** 기존 색인의 파싱·진단을 재사용하며 파일을 다시 읽지 않는다. */
+  async diagnostics(): Promise<WorkspaceDiagnosticsSnapshot> {
+    const scan = await this.#current();
+    const watchFailure = this.#watchFailure();
+    const unavailable = scan.status === scanStatuses.failed || !!watchFailure;
+    const root = this.#root?.projectRoot;
+    return {
+      catalogVersion: this.#catalogVersion,
+      scanStatus: watchFailure ? scanStatuses.partial : scan.status,
+      documents: root
+        ? [...(this.#catalog?.documents.values() ?? [])].map(
+            /** 같은 관측의 문서·진단을 게시 경계로 변환한다. */ (
+              document,
+            ) => ({
+              path: document.path,
+              uri: pathToFileURL(path.resolve(root, document.path)).href,
+              text: document.observation.parsed.source,
+              confirmed:
+                !unavailable &&
+                document.confirmation === catalogConfirmations.confirmed,
+              diagnostics: document.diagnostics,
+            }),
+          )
+        : [],
+      failures: [
+        ...scan.failures.flatMap(
+          /** 같은 관측의 문서·진단을 게시 경계로 변환한다. */ (failure) =>
+            failure.diagnostics.length
+              ? failure.diagnostics.map(
+                  /** 같은 관측의 문서·진단을 게시 경계로 변환한다. */ (
+                    diagnostic,
+                  ) => ({
+                    path: failure.path,
+                    message: diagnostic.ioCode
+                      ? `${diagnostic.message} (${diagnostic.ioCode})`
+                      : diagnostic.message,
+                  }),
+                )
+              : [
+                  {
+                    path: failure.path,
+                    message: workspaceDiagnosticMessages.readFailed,
+                  },
+                ],
+        ),
+        ...(scan.status === scanStatuses.failed && !scan.failures.length
+          ? scan.diagnostics.map((diagnostic) => ({
+              message: diagnostic.message,
+            }))
+          : []),
+        ...(watchFailure ? [{ message: watchFailure.message }] : []),
+      ],
     };
   }
 
@@ -1148,6 +1225,7 @@ export class WorkspaceQuerySession {
 
   /** 닫힌 출처의 진행 중 조회와 선택 근거를 무효화한다. */
   closeDocument(sourcePath: string): void {
+    sourcePath = discoveryPath(sourcePath);
     this.#liveDocuments.delete(sourcePath);
     for (const [token, selection] of this.#selections)
       if (
@@ -1161,6 +1239,7 @@ export class WorkspaceQuerySession {
   async references(
     input: WorkspaceLiveReferenceInput,
   ): Promise<WorkspaceLiveReferenceResponse> {
+    input = { ...input, sourcePath: discoveryPath(input.sourcePath) };
     const previous = this.#liveDocuments.get(input.sourcePath);
     if (
       this.#closed ||
@@ -1241,7 +1320,9 @@ export class WorkspaceQuerySession {
       catalogVersion !== this.#catalogVersion
     )
       return undefined;
+    origin = discoveryOrigin(origin);
     const paths = this.#candidatePaths(catalog, origin);
+    selectedPath = discoveryPath(selectedPath);
     const identity = catalog.documents.get(selectedPath);
     if (
       !paths.includes(selectedPath) ||
@@ -1569,4 +1650,21 @@ export function createWorkspaceQuerySession(
   input: unknown = {},
 ): WorkspaceQuerySession {
   return new WorkspaceQuerySession(input);
+}
+
+/** 후보 출처의 경로도 저장된 발견 경로와 같은 표기로 비교한다. */
+function discoveryOrigin(
+  origin: WorkspaceCandidateOrigin,
+): WorkspaceCandidateOrigin {
+  if ('sourcePath' in origin)
+    return { ...origin, sourcePath: discoveryPath(origin.sourcePath) };
+  return origin.relationship
+    ? {
+        ...origin,
+        relationship: {
+          ...origin.relationship,
+          path: discoveryPath(origin.relationship.path),
+        },
+      }
+    : origin;
 }

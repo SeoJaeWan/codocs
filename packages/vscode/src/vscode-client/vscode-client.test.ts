@@ -1,14 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LanguageClientOptions } from 'vscode-languageclient/node.js';
 
 const boundary = vi.hoisted(() => {
   const disposable = { dispose: vi.fn() };
   const folder = {
-    uri: { toString: () => 'file:///fixture' },
+    uri: { fsPath: '/fixture', toString: () => 'file:///fixture' },
     name: 'fixture',
     index: 0,
   };
   const document = {
-    uri: { scheme: 'file', toString: () => 'file:///fixture/source.yaml' },
+    uri: {
+      scheme: 'file',
+      fsPath: '/fixture/source.yaml',
+      toString: () => 'file:///fixture/source.yaml',
+    },
+    text: 'first',
+    getText() {
+      return this.text;
+    },
     version: 1,
     isClosed: false,
   };
@@ -17,8 +26,12 @@ const boundary = vi.hoisted(() => {
     folder,
     document,
     owner: folder,
-    notifications: new Map<string, () => void>(),
+    notifications: new Map<string, (input?: unknown) => void>(),
     send: vi.fn(),
+    notify: vi.fn().mockResolvedValue(undefined),
+    start: vi.fn().mockResolvedValue(undefined),
+    dispose: vi.fn().mockResolvedValue(undefined),
+    options: undefined as LanguageClientOptions | undefined,
     state: undefined as ((event: { newState: number }) => void) | undefined,
     links: undefined as
       ((document: unknown, token: unknown) => Promise<unknown>) | undefined,
@@ -32,7 +45,19 @@ const boundary = vi.hoisted(() => {
   };
 });
 vi.mock('vscode', () => ({
+  ['StatusBarAlignment']: { ['Left']: 1 },
+  window: {
+    createStatusBarItem: () => ({
+      name: '',
+      text: '',
+      tooltip: '',
+      show: vi.fn(),
+      hide: vi.fn(),
+      dispose: vi.fn(),
+    }),
+  },
   workspace: {
+    workspaceFolders: [boundary.folder],
     textDocuments: [boundary.document],
     getWorkspaceFolder: () => boundary.owner,
     createFileSystemWatcher: () => ({
@@ -64,11 +89,21 @@ vi.mock('vscode', () => ({
 vi.mock('vscode-languageclient/node.js', () => ({
   ['CloseAction']: {},
   ['ErrorAction']: {},
-  ['State']: { ['Running']: 2 },
+  ['State']: { ['Running']: 2, ['Starting']: 1 },
   ['TransportKind']: { ipc: 1 },
   ['HoverRequest']: { type: 'hover' },
   ['DocumentLinkRequest']: { type: 'links' },
   ['LanguageClient']: class {
+    state = 2;
+    /** SDK에 전달한 동기화 경계를 테스트에 노출한다. */
+    constructor(
+      _id: string,
+      _name: string,
+      _server: unknown,
+      options: LanguageClientOptions,
+    ) {
+      boundary.options = options;
+    }
     protocol2CodeConverter = {
       asDocumentLinks: (value: unknown) => Promise.resolve(value),
       asHover: (value: unknown) => value,
@@ -77,8 +112,12 @@ vi.mock('vscode-languageclient/node.js', () => ({
     sendRequest(...args: unknown[]) {
       return boundary.send(...args) as Promise<unknown>;
     }
+    /** 실제 전송 직전의 알림 입력을 관측한다. */
+    sendNotification(...args: unknown[]) {
+      return boundary.notify(...args) as Promise<void>;
+    }
     /** 완료 알림을 결정적으로 전달한다. */
-    onNotification(name: string, callback: () => void) {
+    onNotification(name: string, callback: (input?: unknown) => void) {
       boundary.notifications.set(name, callback);
       return boundary.disposable;
     }
@@ -92,9 +131,13 @@ vi.mock('vscode-languageclient/node.js', () => ({
       return true;
     }
     /** 외부 서버를 만들지 않는다. */
-    async start() {}
+    async start() {
+      await boundary.start();
+    }
     /** 외부 자원을 만들지 않았으므로 정리만 완료한다. */
-    async dispose() {}
+    async dispose() {
+      await boundary.dispose();
+    }
   },
 }));
 import { VscodeFolderClient } from './index.js';
@@ -105,9 +148,156 @@ beforeEach(() => {
   boundary.owner = boundary.folder;
   boundary.document.version = 1;
   boundary.document.isClosed = false;
+  boundary.notify.mockReset().mockResolvedValue(undefined);
+  boundary.start.mockReset().mockResolvedValue(undefined);
+  boundary.dispose.mockReset().mockResolvedValue(undefined);
 });
 
 describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
+  it('이전 서버 종료가 시간 초과되어도 수동 재시작은 새 세션을 시작한다', async () => {
+    const appendLine = vi.fn();
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    const previous = boundary.notifications.get('codocs/diagnosticStatus')!;
+    boundary.dispose.mockRejectedValueOnce(
+      new Error('Stopping the server timed out'),
+    );
+    await client.restart();
+    expect(boundary.start).toHaveBeenCalledTimes(2);
+    expect(appendLine).toHaveBeenCalledWith(
+      expect.stringContaining('새 세션으로 복구'),
+    );
+    previous([
+      {
+        workspaceUri: boundary.folder.uri.toString(),
+        failures: [{ reason: 'old', previousDiagnostics: [] }],
+      },
+    ]);
+    expect(client.diagnosticDetails().failures).toEqual([]);
+    await client.stop();
+    expect(boundary.dispose).toHaveBeenCalledTimes(2);
+  });
+
+  it('종료 오류 뒤 새 서버의 시작도 실패하면 호출자에게 실패를 전달한다', async () => {
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    boundary.dispose.mockRejectedValueOnce(
+      new Error('Stopping the server timed out'),
+    );
+    boundary.start.mockRejectedValueOnce(new Error('new server failed'));
+    await expect(client.restart()).rejects.toThrow('new server failed');
+    await client.stop();
+  });
+
+  it('진단 관측을 아직 받지 않았으면 빈 성공으로 안내하지 않는다', async () => {
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    expect(client.diagnosticDetails().text).toContain('관측을 기다리고');
+    boundary.notifications.get('codocs/diagnosticStatus')!([
+      { workspaceUri: boundary.folder.uri.toString(), failures: [] },
+    ]);
+    expect(client.diagnosticDetails().text).toContain('재검사 성공');
+    await client.stop();
+  });
+
+  it('이전 client 세션의 늦은 실패 알림은 새 상태 항목에 게시하지 않는다', async () => {
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    const previous = boundary.notifications.get('codocs/diagnosticStatus')!;
+    await client.restart();
+    previous([
+      {
+        workspaceUri: boundary.folder.uri.toString(),
+        failures: [{ reason: 'old session failure', previousDiagnostics: [] }],
+      },
+    ]);
+    expect(client.diagnosticDetails().failures).toEqual([]);
+    expect(client.diagnosticDetails().text).toContain('관측을 기다리고');
+    await client.stop();
+  });
+  it('연속 전체 편집은 버전별 원문을 한 번씩 전송하고 SDK 지연 큐에 중복 등록하지 않는다', async () => {
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    const document = boundary.document as unknown as vscode.TextDocument;
+    const next = vi.fn();
+    await boundary.options!.middleware!.didOpen!(document, next);
+    next.mockClear();
+    const pending: unknown[] = [];
+    for (const [version, text] of [
+      [2, 'second'],
+      [3, 'third'],
+    ] as const) {
+      boundary.document.version = version;
+      boundary.document.text = text;
+      pending.push(
+        boundary.options!.middleware!.didChange!(
+          { document } as vscode.TextDocumentChangeEvent,
+          next,
+        ),
+      );
+    }
+    await Promise.all(pending);
+    expect(boundary.notify.mock.calls).toEqual([
+      [
+        'textDocument/didChange',
+        {
+          textDocument: { uri: document.uri.toString(), version: 2 },
+          contentChanges: [{ text: 'second' }],
+        },
+      ],
+      [
+        'textDocument/didChange',
+        {
+          textDocument: { uri: document.uri.toString(), version: 3 },
+          contentChanges: [{ text: 'third' }],
+        },
+      ],
+    ]);
+    expect(next).not.toHaveBeenCalled();
+    expect(boundary.options!.synchronize).toBeUndefined();
+    await client.stop();
+  });
+
+  it('편집 전송 실패는 미관측 rejection을 만들지 않고 SDK 호출자에게 반환한다', async () => {
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    const document = boundary.document as unknown as vscode.TextDocument;
+    await boundary.options!.middleware!.didOpen!(document, vi.fn());
+    const failure = new Error('Channel closed');
+    boundary.notify.mockRejectedValueOnce(failure);
+    await expect(
+      boundary.options!.middleware!.didChange!(
+        { document } as vscode.TextDocumentChangeEvent,
+        vi.fn(),
+      ),
+    ).rejects.toBe(failure);
+    expect(boundary.notify).toHaveBeenCalledTimes(1);
+    await client.stop();
+  });
   it.each(['편집', '닫기', '취소', '소유권 변경', '서버 재시작'])(
     '%s 뒤 도착한 본문 링크를 최신 재조회로 되살리지 않는다',
     async (change) => {
@@ -133,7 +323,7 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
       if (change === '소유권 변경')
         boundary.owner = {
           ...boundary.folder,
-          uri: { toString: () => 'file:///other' },
+          uri: { fsPath: '/other', toString: () => 'file:///other' },
         };
       if (change === '서버 재시작') boundary.state!({ newState: 2 });
       finish([{ target: 'stale' }]);
@@ -224,7 +414,7 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
       if (change === '소유권 변경')
         boundary.owner = {
           ...boundary.folder,
-          uri: { toString: () => 'file:///other' },
+          uri: { fsPath: '/other', toString: () => 'file:///other' },
         };
       if (change === '서버 재시작') boundary.state!({ newState: 2 });
       if (change === '서버 중지') await client.stop();

@@ -1,5 +1,6 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -26,7 +27,7 @@ const defaults = {
 /** 명령 사용법을 출력한다. */
 function usage() {
   return [
-    'Usage: pnpm performance:cod14 -- [options]',
+    'Usage: pnpm bench -- [options]',
     '',
     `  --documents <${supportedDocumentCounts.join('|')}|comma-list>`,
     '  --seed <value>',
@@ -467,6 +468,11 @@ async function runScale(configuration, documentCount) {
 async function main() {
   const configuration = parseArguments(process.argv.slice(2));
   await mkdir(configuration.output, { recursive: true });
+  const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: repository,
+    encoding: 'utf8',
+    windowsHide: true,
+  }).trim();
   const scales = [];
   const errors = [];
   for (const documentCount of configuration.documentCounts) {
@@ -545,6 +551,13 @@ async function main() {
         nodeVersion: process.version,
         platform: process.platform,
         arch: process.arch,
+        release: os.release(),
+        cpu: os.cpus()[0]?.model ?? 'unknown',
+        cpuCount: os.cpus().length,
+        memoryBytes: os.totalmem(),
+        fileCache: 'OS file cache was not forcibly cleared',
+        sourceCommit,
+        processIsolation: 'fresh Node worker per startup run',
       },
       scales,
       correctness: {

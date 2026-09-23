@@ -1,66 +1,43 @@
-import {
-  chmod,
-  lstat,
-  mkdir,
-  mkdtemp,
-  readdir,
-  rm,
-  symlink,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
+import type * as FileSystem from 'node:fs/promises';
 
-export interface FileSystemTestCapabilities {
-  symlink: boolean;
-  permissionDenial: boolean;
-}
+/** 테스트가 지정한 경로·호출의 오류만 주입하고 나머지는 실제 OS에서 실행한다. */
+export const ioFailures = new Map<
+  string,
+  { operations: readonly string[]; code: string }
+>();
 
-/** 파일 시스템 기능을 제공하지 않는 오류 코드인지 판별한다. */
-function isUnsupportedFileSystemCapability(error: unknown): boolean {
-  const code = (error as NodeJS.ErrnoException).code;
-  return (
-    code === 'EACCES' ||
-    code === 'EINVAL' ||
-    code === 'ENOTSUP' ||
-    code === 'EPERM'
-  );
-}
-
-/** 현재 실행 환경에서 심볼릭 링크와 권한 거부 fixture를 만들 수 있는지 확인한다. */
-export async function detectFileSystemTestCapabilities(): Promise<FileSystemTestCapabilities> {
-  const fixture = await mkdtemp(path.join(tmpdir(), 'codocs-test-capability-'));
-  const target = path.join(fixture, 'target');
-  const link = path.join(fixture, 'link');
-  const restricted = path.join(fixture, 'restricted');
-  let symlinkSupported = false;
-  let permissionDenialSupported = false;
-
-  try {
-    await mkdir(restricted);
-    try {
-      await symlink(target, link, 'file');
-      symlinkSupported = (await lstat(link)).isSymbolicLink();
-    } catch (error: unknown) {
-      if (!isUnsupportedFileSystemCapability(error)) throw error;
-    }
-    try {
-      await chmod(restricted, 0);
-      try {
-        await readdir(restricted);
-      } catch (error: unknown) {
-        if (!isUnsupportedFileSystemCapability(error)) throw error;
-        permissionDenialSupported = true;
-      }
-    } catch (error: unknown) {
-      if (!isUnsupportedFileSystemCapability(error)) throw error;
-    }
-  } finally {
-    await chmod(restricted, 0o700).catch(() => undefined);
-    await rm(fixture, { recursive: true, force: true });
+/** 링크·권한 규칙을 재현하지 않고 선택한 syscall의 실패 응답만 대체한다. */
+export function withIoFailures(actual: typeof FileSystem): typeof FileSystem {
+  const wrapped = { ...actual };
+  for (const operation of [
+    'access',
+    'stat',
+    'lstat',
+    'realpath',
+    'readlink',
+    'readFile',
+    'readdir',
+  ] as const) {
+    Reflect.set(
+      wrapped,
+      operation,
+      /** 지정 오류 외의 호출은 실제 IO에 전달한다. */ async (
+        ...args: unknown[]
+      ) => {
+        const failure =
+          typeof args[0] === 'string' ? ioFailures.get(args[0]) : undefined;
+        if (failure?.operations.includes(operation))
+          throw Object.assign(new Error(failure.code), {
+            code: failure.code,
+            path: args[0],
+          });
+        return await (Reflect.apply(
+          actual[operation],
+          actual,
+          args,
+        ) as Promise<unknown>);
+      },
+    );
   }
-
-  return {
-    symlink: symlinkSupported,
-    permissionDenial: permissionDenialSupported,
-  };
+  return wrapped;
 }
