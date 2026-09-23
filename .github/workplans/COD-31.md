@@ -39,8 +39,16 @@
 ## 완료 기준과 산출물
 
 - watcher 단일화 구현, 재현 가능한 회귀 테스트, 최종 query 상태 검증과 설정 선정 근거가 있다.
-- 현재 `.codocs` 계약과 관련 README·공개 함수 JSDoc를 최종 구현에 맞춰 갱신한다.
+- 현재 `.codocs` 계약을 기준으로 구현·테스트·공개 함수 JSDoc와 해당 기능의 `.codocs` 담당 문서를 함께 갱신한다.
 - typecheck, lint, format:check, 관련 테스트 및 전체 pnpm check 결과를 기록한다.
 - 검증되지 않은 환경과 남은 제약을 명시하며 반복 테스트 통과를 모든 이벤트 전달의 보장으로 표현하지 않는다.
 
 2026-09-18 사용자 합의에 따른 후속 작업 계획이다. 이 PR은 계획만 추가하며 단일 watcher 제품 구현은 아직 완료하지 않았다.
+
+## 문서 기준
+
+현재 계약의 기준 원문은 로컬 `.codocs`다. 문서 역할과 갱신은 [문서 컨벤션](https://github.com/SeoJaeWan/codocs/blob/main/.codocs/development/documentation-convention.yaml)을 따른다.
+
+구현·테스트·공개 함수 JSDoc와 해당 기능의 `.codocs` 담당 문서를 함께 갱신한다. 내부 패키지·기능별 README는 만들지 않으며, 루트 README와 사용자 가이드는 사용자 안내에 영향이 있을 때 갱신한다.
+
+과거 Wiki revision은 당시 결정·계획의 참고 근거이며 현재 계약을 소유하지 않는다. 구현 범위·진행·검증 증거는 이슈와 PR에서 추적한다.
