@@ -51,21 +51,29 @@ h2. 검증 시나리오와 기대 결과
 h2. 완료 기준과 산출물
 
 - VSIX 실행 증거·기능 결과·성능 기록이 있고 미검증 환경을 지원 완료로 표시하지 않는다.
-- 구현·테스트·공개 함수 JSDoc·해당 패키지 README를 함께 갱신한다.
+- 구현·테스트·공개 함수 JSDoc·해당 기능의 `.codocs` 담당 문서를 함께 갱신한다.
 - typecheck/lint/format:check 및 관련 Vitest·빌드 결과를 기록한다. 실제 IO·프로세스·IDE 시나리오를 mock만으로 통과 처리하지 않는다.
 
 h2. 구현 중 확인할 사항
 
 - 전체 의존성 요구가 후보보다 높으면 근거와 함께 하한을 조정한다.
 
-h2. 기준 Wiki와 추적 근거
+## 문서 기준
+
+현재 계약의 기준 원문은 로컬 `.codocs`다. 문서 역할과 갱신은 [문서 컨벤션](https://github.com/SeoJaeWan/codocs/blob/main/.codocs/development/documentation-convention.yaml)을 따른다.
+
+구현·테스트·공개 함수 JSDoc와 해당 기능의 `.codocs` 담당 문서를 함께 갱신한다. 내부 패키지·기능별 README는 만들지 않으며, 루트 README와 사용자 가이드는 사용자 안내에 영향이 있을 때 갱신한다.
+
+과거 Wiki revision은 당시 결정·계획의 참고 근거이며 현재 계약을 소유하지 않는다. 구현 범위·진행·검증 증거는 이슈와 PR에서 추적한다.
+
+### 과거 Wiki와 추적 근거
 
 - Codocs 배포와 지원 환경 검증 (codocs-release-support)
   ** 조회 참조: {{{"type":"wiki","project_id":"seojaewan/codosc","wiki_id":"01a09980-9851-7a49-abd4-0c44fb8a51a5","revision":"01a09980-9851-7e92-b590-297955d7ce38"}}}
 - Codocs 구현 순서와 성능·완료 기준 (codocs-delivery-plan)
   ** 조회 참조: {{{"type":"wiki","project_id":"seojaewan/codosc","wiki_id":"01a09980-a00c-7263-977a-c0ef6c2b5eda","revision":"01a09980-a00c-777e-936d-bf6a5de49d88"}}}
 
-2026-09-13 확정 명세의 실행 작업이다. Wiki는 현재 계약을 소유하며 이슈는 구현 범위·검증·증거를 추적한다. 아직 구현·성능·호환성 검증을 완료한 상태가 아니다.
+2026-09-13 최초 계획을 바탕으로 현재 로컬 `.codocs` 계약에 따라 진행하는 실행 작업이다. 아직 구현·성능·호환성 검증을 완료한 상태가 아니다.
 
 ## Jira
 
