@@ -29,6 +29,8 @@ const boundary = vi.hoisted(() => {
     notifications: new Map<string, (input?: unknown) => void>(),
     send: vi.fn(),
     notify: vi.fn().mockResolvedValue(undefined),
+    start: vi.fn().mockResolvedValue(undefined),
+    dispose: vi.fn().mockResolvedValue(undefined),
     options: undefined as LanguageClientOptions | undefined,
     state: undefined as ((event: { newState: number }) => void) | undefined,
     links: undefined as
@@ -129,9 +131,13 @@ vi.mock('vscode-languageclient/node.js', () => ({
       return true;
     }
     /** 외부 서버를 만들지 않는다. */
-    async start() {}
+    async start() {
+      await boundary.start();
+    }
     /** 외부 자원을 만들지 않았으므로 정리만 완료한다. */
-    async dispose() {}
+    async dispose() {
+      await boundary.dispose();
+    }
   },
 }));
 import { VscodeFolderClient } from './index.js';
@@ -143,9 +149,54 @@ beforeEach(() => {
   boundary.document.version = 1;
   boundary.document.isClosed = false;
   boundary.notify.mockReset().mockResolvedValue(undefined);
+  boundary.start.mockReset().mockResolvedValue(undefined);
+  boundary.dispose.mockReset().mockResolvedValue(undefined);
 });
 
 describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
+  it('이전 서버 종료가 시간 초과되어도 수동 재시작은 새 세션을 시작한다', async () => {
+    const appendLine = vi.fn();
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    const previous = boundary.notifications.get('codocs/diagnosticStatus')!;
+    boundary.dispose.mockRejectedValueOnce(
+      new Error('Stopping the server timed out'),
+    );
+    await client.restart();
+    expect(boundary.start).toHaveBeenCalledTimes(2);
+    expect(appendLine).toHaveBeenCalledWith(
+      expect.stringContaining('새 세션으로 복구'),
+    );
+    previous([
+      {
+        workspaceUri: boundary.folder.uri.toString(),
+        failures: [{ reason: 'old', previousDiagnostics: [] }],
+      },
+    ]);
+    expect(client.diagnosticDetails().failures).toEqual([]);
+    await client.stop();
+    expect(boundary.dispose).toHaveBeenCalledTimes(2);
+  });
+
+  it('종료 오류 뒤 새 서버의 시작도 실패하면 호출자에게 실패를 전달한다', async () => {
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    boundary.dispose.mockRejectedValueOnce(
+      new Error('Stopping the server timed out'),
+    );
+    boundary.start.mockRejectedValueOnce(new Error('new server failed'));
+    await expect(client.restart()).rejects.toThrow('new server failed');
+    await client.stop();
+  });
+
   it('진단 관측을 아직 받지 않았으면 빈 성공으로 안내하지 않는다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,

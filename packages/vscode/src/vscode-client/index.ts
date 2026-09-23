@@ -415,7 +415,16 @@ export class VscodeFolderClient implements FolderClientBoundary {
   async restart(): Promise<void> {
     if (this.#client?.state === State.Starting)
       await this.#waitForStartTransition(this.#client);
-    await this.stop();
+    try {
+      await this.stop();
+    } catch (error: unknown) {
+      if (this.#client) throw error;
+      // SDK는 dispose 실패에도 이전 프로세스 종료를 예약한다. 분리한 세션의
+      // 종료 오류 때문에 사용자가 요청한 새 세션의 시작까지 중단하지 않는다.
+      this.#output.appendLine(
+        `Codocs 이전 language server의 정상 종료에 실패해 새 세션으로 복구합니다 (${this.#folder.name}): ${errorMessage(error)}`,
+      );
+    }
     this.#budget.reset();
     await this.start();
   }
