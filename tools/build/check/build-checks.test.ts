@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -36,7 +37,10 @@ import {
 import { resolvePnpm } from '../../toolchain.mjs';
 
 const root = process.cwd();
-const fixture = mkdtempSync(path.join(tmpdir(), 'codocs build consumer-'));
+// Windows TEMP의 8.3 별칭과 모듈 해석의 실제 경로를 같은 기준으로 비교한다.
+const fixture = realpathSync.native(
+  mkdtempSync(path.join(tmpdir(), 'codocs build consumer-')),
+);
 afterAll(
   /** 실행별 소비자와 설치 store를 정리한다. */ () => {
     rmSync(fixture, { recursive: true, force: true, maxRetries: 3 });

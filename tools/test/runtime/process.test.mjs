@@ -61,7 +61,12 @@ for (const mode of ['success', 'failure', 'timeout', 'cancelled']) {
     } finally {
       controller.abort();
       await pending?.catch(() => {});
-      await rm(root, { recursive: true, force: true });
+      await rm(root, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
     }
   });
 }
