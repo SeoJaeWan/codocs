@@ -5,9 +5,18 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { runSupervised } from '../../../tools/test/runtime/process.mjs';
 import { prepareVSCode } from '../../../tools/test/runtime/vscode.mjs';
+import { vscodeVersion } from '../../../tools/test/runtime/vscode.mjs';
 
 /** 실제 VS Code 시작 실패·기능 실패·취소·시간 제한에서도 자식 정리를 확인한다. */
-async function main() {
+async function main(args = process.argv.slice(2)) {
+  if (
+    args.length !== 0 &&
+    (args.length !== 2 ||
+      args[0] !== '--vscode-version' ||
+      !/^\d+\.\d+\.\d+$/u.test(args[1]))
+  )
+    throw new Error('사용법: lifecycle.mjs [--vscode-version exact-x.y.z]');
+  const version = args.length ? args[1] : vscodeVersion;
   const root = path.resolve(import.meta.dirname, '../../..');
   const output = path.join(
     root,
@@ -23,6 +32,7 @@ async function main() {
   assert.equal(build.status, 0);
   const executable = await prepareVSCode({
     cacheRoot: path.join(root, '.workbench/vscode-cache'),
+    version,
   });
   const results = [];
   for (const mode of ['startup-failure', 'failure', 'timeout', 'cancelled']) {
@@ -113,7 +123,7 @@ async function main() {
     }
     await writeFile(
       path.join(output, 'result.json'),
-      JSON.stringify({ platform: process.platform, results }, null, 2),
+      JSON.stringify({ platform: process.platform, version, results }, null, 2),
     );
   }
   console.log(`VS Code lifecycle: ${output}`);

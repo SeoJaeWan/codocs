@@ -7,19 +7,32 @@ import { promisify } from 'node:util';
 const execute = promisify(execFile);
 
 /** 종료된 부모의 PID도 기준으로 삼아 관측된 자손만 반환한다. */
-export function processTreePids(rows, roots) {
+export function processTreePids(rows, roots, startedAt) {
   const owned = new Set(roots);
   let changed;
   do {
     changed = false;
     for (const row of rows) {
+      // 종료된 부모의 PID를 오래된 무관한 프로세스가 참조할 수 있다.
+      if (
+        startedAt !== undefined &&
+        (!Number.isFinite(row.createdAt) || row.createdAt < startedAt)
+      )
+        continue;
       if (owned.has(row.parentPid) && !owned.has(row.pid)) {
         owned.add(row.pid);
         changed = true;
       }
     }
   } while (changed);
-  return rows.filter((row) => owned.has(row.pid)).map((row) => row.pid);
+  return rows
+    .filter(
+      (row) =>
+        owned.has(row.pid) &&
+        (startedAt === undefined ||
+          (Number.isFinite(row.createdAt) && row.createdAt >= startedAt)),
+    )
+    .map((row) => row.pid);
 }
 
 /** Windows 프로세스의 PID와 부모 관계를 실제 OS에서 조회한다. */
@@ -33,15 +46,18 @@ async function windowsProcesses() {
       '-NoProfile',
       '-NonInteractive',
       '-Command',
-      'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress',
+      'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,@{Name="CreatedAt";Expression={if ($_.CreationDate) {$_.CreationDate.ToUniversalTime().ToString("o")}}} | ConvertTo-Json -Compress',
     ],
     { encoding: 'utf8', windowsHide: true, timeout: 10000 },
   );
   const parsed = JSON.parse(result.stdout.replace(/^\uFEFF/u, '') || '[]');
-  return (Array.isArray(parsed) ? parsed : [parsed]).map((row) => ({
-    pid: Number(row.ProcessId),
-    parentPid: Number(row.ParentProcessId),
-  }));
+  return (Array.isArray(parsed) ? parsed : [parsed]).map(
+    /** 조회 시각과 생성 시각을 분리해 PID 재사용을 판별한다. */ (row) => ({
+      pid: Number(row.ProcessId),
+      parentPid: Number(row.ParentProcessId),
+      createdAt: Date.parse(row.CreatedAt),
+    }),
+  );
 }
 
 /** 현재 OS에서 창을 허용하고 실행별 자식 트리를 정상·실패·취소 시 정리한다. */
@@ -54,6 +70,7 @@ export async function runSupervised({
   signal,
 }) {
   await mkdir(output, { recursive: true });
+  const startedAt = Date.now();
   const child = spawn(
     executable,
     [path.join(import.meta.dirname, 'process-worker.mjs'), ...args],
@@ -100,10 +117,16 @@ export async function runSupervised({
           resolve({ reason: 'cancelled', exitCode: null });
         signal?.addEventListener('abort', cancel, { once: true });
         if (signal?.aborted) cancel();
-        timer = setTimeout(
-          () => resolve({ reason: 'timeout', exitCode: null }),
-          timeout,
-        );
+        if (timeout !== null && timeout !== undefined) {
+          if (!Number.isFinite(timeout) || timeout < 0)
+            throw new Error(
+              '감독기 제한은 0 이상의 유한 밀리초 또는 null이어야 합니다',
+            );
+          timer = setTimeout(
+            () => resolve({ reason: 'timeout', exitCode: null }),
+            timeout,
+          );
+        }
       },
     );
   } finally {
@@ -116,7 +139,11 @@ export async function runSupervised({
         if (process.platform === 'win32') {
           windowsOwned = new Set([
             child.pid,
-            ...processTreePids(await windowsProcesses(), [child.pid]),
+            ...processTreePids(
+              await windowsProcesses(),
+              [child.pid],
+              startedAt,
+            ),
           ]);
           // worker는 완료 뒤에도 살아 있으므로 taskkill이 모든 자식을 찾을 수 있다.
           killResult = spawnSync(
@@ -144,6 +171,7 @@ export async function runSupervised({
             const remaining = processTreePids(
               await windowsProcesses(),
               windowsOwned,
+              startedAt,
             );
             if (!remaining.length) break;
             for (const pid of remaining) windowsOwned.add(pid);

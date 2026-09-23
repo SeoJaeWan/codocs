@@ -12,6 +12,7 @@ definition: |
   실제 VS Code 기능 검사는 공식 @vscode/test-electron 기반으로 실행한다. 로컬과 CI의 실행 범위는 [[테스트 컨벤션]]에서 정한다.
   pnpm test는 로직·도구 검사를 한 번 실행하며 pnpm test --watch는 로직 변경 감지 모드다. pnpm check는 타입·린트·서식·빌드·일반 테스트·개발 규칙·패키지 소비 검사를 수행한다. pnpm format은 서식을 수정한다.
   pnpm test:vscode는 packages/vscode/test-runner/run.mjs를 통해 현재 소스의 VSIX 패키징·설치와 고정 VS Code를 준비하고 설치된 확장에서 전체 기능 사례를 한 번 실행한다. 기능 사례의 배치는 [[폴더 컨벤션]]을 따른다.
+  IDE 성능은 같은 실행기의 --mode performance와 --scenario 옵션으로 명시적으로 선택한다. --vscode-version에는 검증할 정확한 x.y.z를 주고 --resolve-version stable로 받은 버전을 고정할 수 있다. 성능 실행의 결과와 기준은 [[배포]]가 소유하며 기본 pnpm test:vscode와 일반 CI에는 성능 측정을 포함하지 않는다.
   실제 창 사용과 격리·종료 기준은 [[테스트 컨벤션]]을 적용한다.
   CI는 Windows·macOS에서 로컬과 같은 pnpm check와 pnpm test:vscode 및 실행기 정리 검사를 실행한다. 실행기 정리 검사의 진입점은 packages/vscode/test-runner/lifecycle.mjs다.
 

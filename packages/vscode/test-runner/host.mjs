@@ -1,5 +1,5 @@
 import { execFile, spawnSync } from 'node:child_process';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { finished } from 'node:stream/promises';
@@ -14,6 +14,16 @@ import {
 import { fixtureFiles } from '../src/integration/test-support/fixtures.mjs';
 import { withCacheLock } from '../../../tools/test/runtime/cache-lock.mjs';
 import readDenial from '../../../tools/test/runtime/read-denial.cjs';
+import { scenarioNames } from '../../../tools/test/runtime/performance-contract.mjs';
+import {
+  corpusSettings,
+  createCorpus,
+  writeCorpus,
+} from '../src/integration/test-support/performance/corpus.mjs';
+import {
+  persistPerformanceReport,
+  recordPerformanceSample,
+} from '../../../tools/test/runtime/performance-report.mjs';
 
 const config = JSON.parse(await readFile(process.argv[2], 'utf8'));
 const output = config.output;
@@ -140,6 +150,17 @@ try {
       2,
     ),
   );
+  let performanceReport;
+  if (config.mode === 'performance') {
+    performanceReport = JSON.parse(
+      await readFile(path.join(output, 'performance.json'), 'utf8'),
+    );
+    performanceReport.hashes.vsix = createHash('sha256')
+      .update(await readFile(archive))
+      .digest('hex');
+    performanceReport.hashes.source = config.sourceHash;
+    await persistPerformanceReport(performanceReport, output);
+  }
   // 테스트 Host를 여는 빈 확장만 개발 모드로 등록한다. 제품은 설치된 VSIX에서 로드한다.
   const harness = path.join(config.temporary, 'test-harness');
   await mkdir(harness);
@@ -163,29 +184,174 @@ try {
       ],
     }),
   );
-  phase = 'extension-host';
-  await progress({ executable: runtime.executable });
-  await runTests({
-    vscodeExecutablePath: runtime.executable,
-    extensionDevelopmentPath: harness,
-    extensionTestsPath: path.join(
-      config.root,
-      'packages/vscode/src/integration/index.cjs',
-    ),
-    extensionTestsEnv: { CODOCS_VSCODE_CONFIG: process.argv[2] },
-    stdout: log,
-    stderr: log,
-    launchArgs: [
-      workspaceFile,
-      '--user-data-dir',
-      profile,
-      '--extensions-dir',
-      extensions,
-      '--disable-telemetry',
-      '--disable-experiments',
-      '--new-window',
-    ],
-  });
+  if (config.mode === 'performance') {
+    const selected =
+      config.scenario === 'all' ? scenarioNames : [config.scenario];
+    let failures = 0;
+    for (const scenario of selected) {
+      let heartbeat;
+      let heartbeatWrites = Promise.resolve();
+      let heartbeatError;
+      let scenarioStarted;
+      let scenarioStatus = 'complete';
+      const progressFile = path.join(output, 'performance-progress.json');
+      /** 보고서의 표본 기록과 충돌하지 않는 별도 진행 파일을 원자적으로 갱신한다. */
+      const saveScenarioProgress = (state) => {
+        heartbeatWrites = heartbeatWrites
+          .then(
+            /** 직전 기록과 순서가 뒤바뀌지 않게 저장한다. */ async () => {
+              const temporaryProgress = `${progressFile}.${process.pid}.tmp`;
+              await writeFile(
+                temporaryProgress,
+                JSON.stringify({
+                  scenario,
+                  state,
+                  phase,
+                  startedAt: new Date(scenarioStarted).toISOString(),
+                  observedAt: new Date().toISOString(),
+                  elapsedMs: Date.now() - scenarioStarted,
+                  pid: process.pid,
+                }),
+              );
+              await rename(temporaryProgress, progressFile);
+            },
+          )
+          .catch((error) => {
+            heartbeatError ??= error;
+          });
+      };
+      try {
+        performanceReport = JSON.parse(
+          await readFile(path.join(output, 'performance.json'), 'utf8'),
+        );
+        phase = `performance-${scenario}`;
+        await progress({ executable: runtime.executable, scenario });
+        const scenarioRoot = path.join(config.temporary, 'scenarios', scenario);
+        const scenarioWorkspace = path.join(scenarioRoot, 'workspace');
+        const scenarioProfile = path.join(scenarioRoot, 'profile');
+        const corpus = createCorpus(
+          { ...corpusSettings, seed: config.settings.seed },
+          `project-${scenario.replaceAll('-', '')}`,
+        );
+        await writeCorpus(scenarioWorkspace, corpus);
+        await mkdir(path.join(scenarioProfile, 'User'), { recursive: true });
+        await writeFile(
+          path.join(scenarioProfile, 'User/settings.json'),
+          JSON.stringify({
+            'files.autoSave': 'off',
+            'telemetry.telemetryLevel': 'off',
+            'update.mode': 'none',
+            'extensions.autoUpdate': false,
+            'security.workspace.trust.enabled': false,
+            'workbench.startupEditor': 'none',
+            'window.restoreWindows': 'none',
+          }),
+        );
+        config.performanceSession = {
+          scenario,
+          workspace: scenarioWorkspace,
+          profile: scenarioProfile,
+          corpusManifest: path.join(scenarioWorkspace, 'corpus-manifest.json'),
+          corpusHash: corpus.sha256,
+        };
+        performanceReport.hashes.corpora ??= {};
+        performanceReport.hashes.corpora[scenario] = corpus.sha256;
+        performanceReport.hashes.data ??= corpus.sha256;
+        performanceReport.events.push({
+          kind: 'scenario-prepared',
+          scenario,
+          corpusHash: corpus.sha256,
+          at: new Date().toISOString(),
+        });
+        await persistPerformanceReport(performanceReport, output);
+        await writeFile(process.argv[2], JSON.stringify(config));
+        scenarioStarted = Date.now();
+        saveScenarioProgress('running');
+        heartbeat = setInterval(() => saveScenarioProgress('running'), 5000);
+        await runTests({
+          vscodeExecutablePath: runtime.executable,
+          extensionDevelopmentPath: harness,
+          extensionTestsPath: path.join(
+            config.root,
+            'packages/vscode/src/integration/test-support/performance/index.cjs',
+          ),
+          extensionTestsEnv: { CODOCS_VSCODE_CONFIG: process.argv[2] },
+          stdout: log,
+          stderr: log,
+          launchArgs: [
+            scenarioWorkspace,
+            '--user-data-dir',
+            scenarioProfile,
+            '--extensions-dir',
+            extensions,
+            '--disable-telemetry',
+            '--disable-experiments',
+            '--new-window',
+          ],
+        });
+        if (heartbeatError) throw heartbeatError;
+      } catch (error) {
+        failures++;
+        scenarioStatus = 'failed';
+        let scenarioError = String(error?.stack ?? error);
+        try {
+          const detail = JSON.parse(
+            await readFile(
+              path.join(output, `scenario-error-${scenario}.json`),
+              'utf8',
+            ),
+          );
+          if (detail.scenario === scenario && detail.error)
+            scenarioError = `${detail.error}\n${scenarioError}`;
+        } catch (detailError) {
+          if (detailError.code !== 'ENOENT') throw detailError;
+        }
+        // 확장 Host가 먼저 저장한 원시 표본을 보존한다.
+        performanceReport = JSON.parse(
+          await readFile(path.join(output, 'performance.json'), 'utf8'),
+        );
+        recordPerformanceSample(performanceReport, scenario, {
+          status: 'failed',
+          error: scenarioError,
+        });
+        performanceReport.errors.push(`${scenario}: ${scenarioError}`);
+        await persistPerformanceReport(performanceReport, output);
+      } finally {
+        clearInterval(heartbeat);
+        if (scenarioStarted) {
+          await heartbeatWrites;
+          saveScenarioProgress(scenarioStatus);
+          await heartbeatWrites;
+        }
+      }
+    }
+    if (failures)
+      throw new Error(`${failures}/${selected.length} IDE 성능 시나리오 실패`);
+  } else {
+    phase = 'extension-host';
+    await progress({ executable: runtime.executable });
+    await runTests({
+      vscodeExecutablePath: runtime.executable,
+      extensionDevelopmentPath: harness,
+      extensionTestsPath: path.join(
+        config.root,
+        'packages/vscode/src/integration/index.cjs',
+      ),
+      extensionTestsEnv: { CODOCS_VSCODE_CONFIG: process.argv[2] },
+      stdout: log,
+      stderr: log,
+      launchArgs: [
+        workspaceFile,
+        '--user-data-dir',
+        profile,
+        '--extensions-dir',
+        extensions,
+        '--disable-telemetry',
+        '--disable-experiments',
+        '--new-window',
+      ],
+    });
+  }
   phase = 'complete';
   await progress({ passed: true });
 } catch (error) {
