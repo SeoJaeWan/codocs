@@ -3,6 +3,46 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
+/** 종료된 부모의 PID도 기준으로 삼아 관측된 자손만 반환한다. */
+export function processTreePids(rows, roots) {
+  const owned = new Set(roots);
+  let changed;
+  do {
+    changed = false;
+    for (const row of rows) {
+      if (owned.has(row.parentPid) && !owned.has(row.pid)) {
+        owned.add(row.pid);
+        changed = true;
+      }
+    }
+  } while (changed);
+  return rows.filter((row) => owned.has(row.pid)).map((row) => row.pid);
+}
+
+/** Windows 프로세스의 PID와 부모 관계를 실제 OS에서 조회한다. */
+function windowsProcesses() {
+  const result = spawnSync(
+    path.join(
+      process.env.SystemRoot,
+      'System32/WindowsPowerShell/v1.0/powershell.exe',
+    ),
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress',
+    ],
+    { encoding: 'utf8', windowsHide: true, timeout: 10000 },
+  );
+  if (result.error || result.status !== 0)
+    throw result.error ?? new Error(`프로세스 조회 실패: ${result.stderr}`);
+  const parsed = JSON.parse(result.stdout.replace(/^\uFEFF/u, '') || '[]');
+  return (Array.isArray(parsed) ? parsed : [parsed]).map((row) => ({
+    pid: Number(row.ProcessId),
+    parentPid: Number(row.ParentProcessId),
+  }));
+}
+
 /** 현재 OS에서 창을 허용하고 실행별 자식 트리를 정상·실패·취소 시 정리한다. */
 export async function runSupervised({
   executable,
@@ -70,18 +110,20 @@ export async function runSupervised({
     signal?.removeEventListener('abort', cancel);
     try {
       if (child.pid) {
+        let windowsOwned;
+        let killResult;
         if (process.platform === 'win32') {
+          windowsOwned = new Set([
+            child.pid,
+            ...processTreePids(windowsProcesses(), [child.pid]),
+          ]);
           // worker는 완료 뒤에도 살아 있으므로 taskkill이 모든 자식을 찾을 수 있다.
-          const result = spawnSync(
+          killResult = spawnSync(
             'taskkill',
             ['/PID', String(child.pid), '/T', '/F'],
             { encoding: 'utf8', windowsHide: true },
           );
-          if (result.error || (result.status !== 0 && !closeResult))
-            throw (
-              result.error ??
-              new Error(`프로세스 트리 정리 실패: ${result.stderr}`)
-            );
+          if (killResult.error) throw killResult.error;
         } else {
           try {
             process.kill(-child.pid, 'SIGKILL');
@@ -95,7 +137,19 @@ export async function runSupervised({
             throw new Error('시험 프로세스 종료 시간 초과');
           }),
         ]);
-        if (process.platform !== 'win32') {
+        if (process.platform === 'win32') {
+          const deadline = Date.now() + 5000;
+          while (true) {
+            const remaining = processTreePids(windowsProcesses(), windowsOwned);
+            if (!remaining.length) break;
+            for (const pid of remaining) windowsOwned.add(pid);
+            if (Date.now() >= deadline)
+              throw new Error(
+                `시험 프로세스 트리가 남았습니다: ${remaining.join(', ')}. ${killResult.stderr}`,
+              );
+            await delay(50);
+          }
+        } else {
           const deadline = Date.now() + 5000;
           while (true) {
             try {

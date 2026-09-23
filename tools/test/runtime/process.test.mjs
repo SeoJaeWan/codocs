@@ -4,7 +4,21 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { runSupervised } from './process.mjs';
+import { processTreePids, runSupervised } from './process.mjs';
+
+test('부모 종료 뒤에도 남은 자손을 찾고 무관한 프로세스는 제외한다', /** 순서가 뒤섞이고 부모가 사라진 실제 조회 형태를 검사한다. */ () => {
+  const rows = [
+    { pid: 30, parentPid: 20 },
+    { pid: 20, parentPid: 10 },
+    { pid: 40, parentPid: 1 },
+  ];
+  assert.deepEqual(processTreePids(rows, [10]), [30, 20]);
+  assert.deepEqual(processTreePids([rows[0], rows[2]], [10, 20]), [30]);
+  assert.deepEqual(
+    processTreePids([{ pid: 40, parentPid: 1 }], [10, 20, 30]),
+    [],
+  );
+});
 
 for (const mode of ['success', 'failure', 'timeout', 'cancelled']) {
   test(`${mode} 이후 시험 자식 프로세스를 종료한다`, /** 실제 자식을 만들어 종료 여부를 확인한다. */ async () => {
