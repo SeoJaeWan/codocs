@@ -1,9 +1,10 @@
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { watcherBoundary as boundary } from '../test-support/watcher.js';
+import { stat } from 'node:fs/promises';
 
 vi.mock('node:fs/promises', () => ({
-  stat: () => Promise.resolve({ dev: 1, ino: 1 }),
+  stat: vi.fn(() => Promise.resolve({ dev: 1, ino: 1 })),
 }));
 vi.mock('node:fs', async () =>
   (await import('../test-support/watcher.js')).directoryMock(),
@@ -20,6 +21,7 @@ const contract = {
   child: path.join(target, '한글.yaml'),
 };
 afterEach(() => {
+  vi.clearAllMocks();
   boundary.connections.length = 0;
   boundary.directory = undefined;
   boundary.closeGate = undefined;
@@ -32,20 +34,19 @@ describe('현재 OS 경로와 watcher 이벤트·종료 처리', () => {
     const watcher = await createWorkspaceWatcher(contract.root);
     try {
       await watcher.trackTargets([contract.child]);
-      const parents = boundary.connections.filter(
-        (entry) => entry.options.depth === 0,
-      );
-      expect(parents.length).toBeGreaterThan(0);
+      const parents = vi
+        .mocked(stat)
+        .mock.calls.map(([candidate]) => candidate);
+      expect(parents).toContain(contract.target);
       const protectedPath = path.join(
         path.parse(contract.root).root,
         'unrelated',
       );
-      for (const parent of parents) {
-        expect(parent.options.followSymlinks).toBe(false);
-        expect(parent.options.ignored?.(protectedPath)).toBe(true);
-        expect(parent.options.ignored?.(contract.target)).toBe(false);
-        expect(parent.options.ignored?.(contract.target + '-형제')).toBe(true);
-      }
+      expect(parents).not.toContain(protectedPath);
+      expect(parents).not.toContain(contract.target + '-형제');
+      expect(boundary.connections.map((entry) => entry.paths)).not.toContain(
+        contract.target,
+      );
     } finally {
       await watcher.close();
     }

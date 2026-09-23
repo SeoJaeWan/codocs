@@ -34,6 +34,8 @@ export class WorkspaceWatcher {
   readonly #targets = new Set<string>();
   readonly #registrations = new Map<string, Promise<void>>();
   readonly #parentRegistrations = new Map<string, Promise<void>>();
+  readonly #parentTimers = new Set<ReturnType<typeof setInterval>>();
+  readonly #parentChecks = new Set<Promise<void>>();
   #entryWatcher: DirectoryWatcher | undefined;
   #contentWatcher: FSWatcher | undefined;
   #pending = new Set<string>();
@@ -301,6 +303,58 @@ export class WorkspaceWatcher {
     }
     await this.trackTargets([...this.#targets]);
   }
+  /** 조상 자체의 상태만 확인하고 보호된 형제 파일을 열거하지 않는다. */
+  async #watchParent(parent: string, epoch: number): Promise<void> {
+    /** 무관한 형제 변경을 제외하고 조상 자체의 삭제·교체를 구분한다. */
+    const identity = async (): Promise<string | null> => {
+      try {
+        const value = await stat(parent);
+        return JSON.stringify([value.dev, value.ino, value.birthtimeMs]);
+      } catch (error: unknown) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      }
+    };
+    let previous = await identity();
+    if (!this.#active(epoch)) return;
+    let checking = false;
+    const timer = setInterval(
+      /** 이전 확인이 끝난 뒤 현재 세대의 조상만 확인한다. */ () => {
+        if (checking || !this.#active(epoch)) return;
+        checking = true;
+        const check = identity()
+          .then(
+            /** 조상 식별자가 달라진 경우에만 재확인을 요청한다. */ (
+              current,
+            ) => {
+              if (this.#active(epoch) && current !== previous)
+                this.#signal(parent);
+              previous = current;
+            },
+          )
+          .catch(
+            /** 현재 세대의 실제 접근 실패는 기존 자동 복구에 전달한다. */ (
+              error: unknown,
+            ) => {
+              if (this.#active(epoch))
+                void this.#recover(error).catch((failure: unknown) =>
+                  this.#fail(failure),
+                );
+            },
+          )
+          .finally(
+            /** 종료 대기 목록에서 완료한 확인을 제거한다. */ () => {
+              checking = false;
+              this.#parentChecks.delete(check);
+            },
+          );
+        this.#parentChecks.add(check);
+      },
+      100,
+    );
+    this.#parentTimers.add(timer);
+  }
+
   /** 외부 대상과 그 조상만 감시하며 등록별 독립 ready를 공유한다. */
   async trackTargets(realPaths: readonly string[]): Promise<void> {
     if (this.#closed) return;
@@ -326,35 +380,7 @@ export class WorkspaceWatcher {
         for (const parent of ancestors) {
           let prepared = this.#parentRegistrations.get(parent);
           if (!prepared) {
-            const connection = this.#connect(
-              parent,
-              {
-                depth: 0,
-                usePolling: true,
-                interval: 100,
-                followSymlinks: false,
-                /** 대상의 조상만 metadata 확인하고 무관한 형제 폴더에는 접근하지 않는다. */
-                ignored: (candidate) =>
-                  ![...this.#targets].some((registered) =>
-                    containsWorkspacePath(path.resolve(candidate), registered),
-                  ),
-              },
-              epoch,
-              /** 수집한 변경과 연결 상태를 현재 작업에 반영한다. */ (
-                _event,
-                changed,
-              ) => {
-                if (
-                  [...this.#targets].some(
-                    (registered) =>
-                      containsWorkspacePath(changed, registered) ||
-                      containsWorkspacePath(registered, changed),
-                  )
-                )
-                  this.#signal(changed);
-              },
-            );
-            prepared = connection.ready;
+            prepared = this.#watchParent(parent, epoch);
             this.#parentRegistrations.set(parent, prepared);
           }
           parentReady.push(prepared);
@@ -473,6 +499,9 @@ export class WorkspaceWatcher {
 
   /** 모든 연결과 준비 대기를 정리한다. 등록 대상 목록은 복구에 재사용한다. */
   async #disconnect(): Promise<void> {
+    const parentRegistrations = [...this.#parentRegistrations.values()];
+    for (const timer of this.#parentTimers) clearInterval(timer);
+    this.#parentTimers.clear();
     for (const cancel of this.#waiters.values()) cancel();
     const entry = this.#entryWatcher;
     this.#entryWatcher = undefined;
@@ -490,6 +519,8 @@ export class WorkspaceWatcher {
     this.#registrations.clear();
     this.#parentRegistrations.clear();
     await Promise.all([
+      ...this.#parentChecks,
+      Promise.allSettled(parentRegistrations),
       entryClosed,
       ...connections.map((watcher) => watcher.close()),
       ...this.#retiring,
