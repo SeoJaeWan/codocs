@@ -58,7 +58,7 @@ for (const mode of ['success', 'failure', 'timeout', 'cancelled']) {
         } catch (error) {
           if (error.code !== 'ENOENT') throw error;
         }
-        if (Date.now() > deadline) throw new Error('fixture 준비 실패');
+        if (!pid && Date.now() > deadline) throw new Error('fixture 준비 실패');
         if (!pid) await delay(20);
       }
       if (mode === 'cancelled') controller.abort();

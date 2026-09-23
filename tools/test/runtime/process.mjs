@@ -1,7 +1,10 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { promisify } from 'node:util';
+
+const execute = promisify(execFile);
 
 /** 종료된 부모의 PID도 기준으로 삼아 관측된 자손만 반환한다. */
 export function processTreePids(rows, roots) {
@@ -20,8 +23,8 @@ export function processTreePids(rows, roots) {
 }
 
 /** Windows 프로세스의 PID와 부모 관계를 실제 OS에서 조회한다. */
-function windowsProcesses() {
-  const result = spawnSync(
+async function windowsProcesses() {
+  const result = await execute(
     path.join(
       process.env.SystemRoot,
       'System32/WindowsPowerShell/v1.0/powershell.exe',
@@ -34,8 +37,6 @@ function windowsProcesses() {
     ],
     { encoding: 'utf8', windowsHide: true, timeout: 10000 },
   );
-  if (result.error || result.status !== 0)
-    throw result.error ?? new Error(`프로세스 조회 실패: ${result.stderr}`);
   const parsed = JSON.parse(result.stdout.replace(/^\uFEFF/u, '') || '[]');
   return (Array.isArray(parsed) ? parsed : [parsed]).map((row) => ({
     pid: Number(row.ProcessId),
@@ -115,7 +116,7 @@ export async function runSupervised({
         if (process.platform === 'win32') {
           windowsOwned = new Set([
             child.pid,
-            ...processTreePids(windowsProcesses(), [child.pid]),
+            ...processTreePids(await windowsProcesses(), [child.pid]),
           ]);
           // worker는 완료 뒤에도 살아 있으므로 taskkill이 모든 자식을 찾을 수 있다.
           killResult = spawnSync(
@@ -140,7 +141,10 @@ export async function runSupervised({
         if (process.platform === 'win32') {
           const deadline = Date.now() + 5000;
           while (true) {
-            const remaining = processTreePids(windowsProcesses(), windowsOwned);
+            const remaining = processTreePids(
+              await windowsProcesses(),
+              windowsOwned,
+            );
             if (!remaining.length) break;
             for (const pid of remaining) windowsOwned.add(pid);
             if (Date.now() >= deadline)
