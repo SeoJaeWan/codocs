@@ -1,9 +1,4 @@
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
-  const { createFileSystemBoundary } =
-    await import('../test-support/file-system.js');
-  return createFileSystemBoundary(actual);
-});
+import { createLink as symlink } from '../test-support/links.js';
 import {
   catalogDiagnosticCodes,
   diagnosticSeverities,
@@ -14,14 +9,7 @@ import {
 } from '@codocs/core';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import {
-  mkdir,
-  mkdtemp,
-  rename,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';

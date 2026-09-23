@@ -27,7 +27,7 @@ const defaults = {
 /** 명령 사용법을 출력한다. */
 function usage() {
   return [
-    'Usage: pnpm performance:cod14 -- [options]',
+    'Usage: pnpm bench -- [options]',
     '',
     `  --documents <${supportedDocumentCounts.join('|')}|comma-list>`,
     '  --seed <value>',

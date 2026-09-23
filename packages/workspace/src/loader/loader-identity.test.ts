@@ -1,9 +1,3 @@
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
-  const { createFileSystemBoundary } =
-    await import('../test-support/file-system.js');
-  return createFileSystemBoundary(actual);
-});
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';

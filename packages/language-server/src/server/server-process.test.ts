@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { trackChildClosure } from '../../../../tools/test-support/child-process.js';
+import { trackChildClosure } from '../../../../tools/test/support/child-process.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';

@@ -1,3 +1,4 @@
+import { createLink as symlink } from '../test-support/links.js';
 import { parseYaml } from '@codocs/core';
 import {
   chmod,
@@ -7,7 +8,6 @@ import {
   readdir,
   rename,
   rm,
-  symlink,
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
@@ -21,10 +21,7 @@ import {
 import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const native = await importOriginal<typeof import('node:fs/promises')>();
-  const { createFileSystemBoundary } =
-    await import('../test-support/file-system.js');
-  const original = createFileSystemBoundary(native);
+  const original = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...original,
     readFile: vi.fn(original.readFile),

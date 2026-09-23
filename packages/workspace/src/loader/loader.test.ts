@@ -1,8 +1,9 @@
+import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures } from '../test-support/file-system.js';
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
-  const { createFileSystemBoundary } =
-    await import('../test-support/file-system.js');
-  return createFileSystemBoundary(actual);
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
 });
 import {
   scanStatuses,
@@ -11,13 +12,11 @@ import {
 } from '@codocs/core';
 import { createHash } from 'node:crypto';
 import {
-  chmod,
   link,
   mkdir,
   mkdtemp,
   realpath,
   rm,
-  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -45,7 +44,8 @@ beforeEach(
   },
 );
 afterEach(
-  /** 각 테스트에서 만든 fixture만 정리한다. */ async () => {
+  /** 오류 주입과 각 테스트의 fixture를 정리한다. */ async () => {
+    ioFailures.clear();
     await rm(fixture, { recursive: true, force: true });
   },
 );
@@ -407,11 +407,14 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     expect(result.failures[0]).not.toHaveProperty('realPath');
     expect(result.failures[0]).not.toHaveProperty('id');
   });
-  it('하위 파일을 실제로 읽을 수 없으면 확인한 실제 경로와 IO 실패를 보관한다', /** chmod 권한 실패를 실제 readFile로 확인한다. */ async () => {
+  it('하위 파일의 읽기 오류를 받으면 확인한 실제 경로와 IO 실패를 보관한다', /** readFile 오류 응답의 보존을 확인한다. */ async () => {
     await document('restricted.yaml', raw);
     await document('ok.yaml', raw);
     const target = path.join(codocs, 'restricted.yaml');
-    await chmod(target, 0);
+    ioFailures.set(target, {
+      operations: ['access', 'readFile', 'readdir'],
+      code: 'EACCES',
+    });
     try {
       const result = await loadWorkspace({ cwd: project });
       expect(result).toMatchObject({
@@ -430,14 +433,14 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       expect(result.documents).toHaveLength(1);
       expect(result.failures[0]).not.toHaveProperty('raw');
     } finally {
-      await chmod(target, 0o600);
+      ioFailures.clear();
     }
   });
-  it('하위 폴더 열거를 실제로 실패하면 누락 범위와 정상 파일을 함께 반환한다', /** execute만 있는 폴더에서 readdir 실패를 확인한다. */ async () => {
+  it('하위 폴더 열거가 실패하면 누락 범위와 정상 파일을 함께 반환한다', /** 폴더 열거의 EACCES 응답을 주입한다. */ async () => {
     await document('restricted/hidden.yaml', raw);
     await document('ok.yaml', raw);
     const folder = path.join(codocs, 'restricted');
-    await chmod(folder, 0o100);
+    ioFailures.set(folder, { operations: ['readdir'], code: 'EACCES' });
     try {
       const result = await loadWorkspace({ cwd: project });
       expect(result).toMatchObject({
@@ -454,7 +457,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       });
       expect(result.documents).toHaveLength(1);
     } finally {
-      await chmod(folder, 0o700);
+      ioFailures.clear();
     }
   });
   describe('스캔 시작 경로 실패', () => {
@@ -462,14 +465,17 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       '%s 디렉터리의 탐색 권한이 없으면 전체 실패를 반환한다',
       async (kind) => {
         const target = kind === 'project' ? project : codocs;
-        await chmod(target, 0);
+        ioFailures.set(target, {
+          operations: ['access', 'readFile', 'readdir'],
+          code: 'EACCES',
+        });
         try {
           const result = await loadWorkspace({ cwd: project });
           expect(result.status).toBe(scanStatuses.failed);
           expect(result.documents).toEqual([]);
           expect(result.diagnostics[0]).toMatchObject({ ioCode: 'EACCES' });
         } finally {
-          await chmod(target, 0o700);
+          ioFailures.clear();
         }
       },
     );

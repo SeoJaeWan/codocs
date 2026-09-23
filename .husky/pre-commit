@@ -1,2 +1,2 @@
 #!/bin/sh
-pnpm check:commit
+node tools/git/pre-commit.mjs

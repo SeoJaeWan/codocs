@@ -33,36 +33,31 @@ pnpm build
 
 커밋할 때 lint-staged가 스테이징된 코드에 ESLint 자동 수정과 Prettier를 적용한다. 오류·경고 또는 서식 처리 실패가 남으면 커밋을 중단한다. 부분 스테이징의 미스테이징 변경은 복원하며, 자동 수정 단계 실패·취소에는 원래 상태를 복원한다.
 
-이후 자동 수정된 인덱스를 독립 복사본으로 만들고 frozen install, 기능 단일 실행, 실제 VS Code 검사를 순서대로 실행한다. 모든 검사가 성공하고 검사 중 인덱스·HEAD가 바뀌지 않아야 커밋을 허용한다. 기능 검사 실패 시 성공한 자동 수정은 인덱스에 남고 사용자 미스테이징·미추적 파일은 유지한다. 취소는 실행 중인 단계의 복원·정리가 끝난 뒤 실패로 처리하므로 즉시 끝나지 않을 수 있다.
-
-`pnpm check:commit`은 훅 전체를, `pnpm check:staged`는 자동 수정만 실행한다. 복사본은 Windows 경로 길이 제한을 피하는 고유 OS 임시 경로에 만든다. 검사 트리 해시·VS Code 로그는 `.workbench/commit-check/<실행 ID>`에 보존하고 성공한 복사본은 정리한다. 실패한 복사본 경로는 결과 JSON에 남긴다. CI 환경 계약과 성능은 훅에서 실행하지 않는다. 전체 타입·설치·패키지 소비 검사는 `pnpm check`로 별도 실행한다. Mac은 GUI 격리 어댑터가 미구현이므로 실제 VS Code 검사와 새 커밋 훅이 준비 실패한다.
+이후 자동 수정된 인덱스를 독립 복사본으로 만들고 frozen install, 타입·린트·로직 검사를 실행한다. 검사 중 인덱스·HEAD가 바뀌면 커밋을 중단한다. 미스테이징·미추적 파일은 유지하고 성공한 복사본은 정리한다. 실패한 복사본과 트리 해시는 `.workbench/commit-check`의 결과에서 확인한다. 실제 VS Code 검사와 성능 검사는 커밋 훅에서 실행하지 않는다.
 
 ```sh
-pnpm test              # 기능 테스트 watch
-pnpm test:run          # 기능 테스트 단일 실행
-pnpm test:vscode       # 현재 빌드의 실제 VS Code API 기능 검사
-pnpm test:ui           # test:vscode로 위임 (화면 입력 검사는 아님)
-pnpm check:development # 개발 규칙·설치 계약 검사
-pnpm check:build       # 빌드·배포 패키지 소비 검사
-pnpm check             # 전체 검사
+pnpm test             # 로직·실행 도구 테스트 단일 실행
+pnpm test --watch     # 로직 테스트 변경 감지
+pnpm test:vscode      # 현재 OS의 실제 VS Code 기능 검사 (창 표시)
+pnpm check            # 타입·린트·서식·빌드·테스트·패키지 소비 검사
+pnpm format           # 서식 자동 수정
+pnpm bench --help     # 성능 측정 옵션
 ```
 
-기능 테스트는 빌드 없이 소스를 직접 검사한다. `check:build`는 필요한 빌드와 패키징을 수행한다. 설치 검사는 임시 프로젝트와 store를 사용하며 첫 설치에 네트워크가 필요하다. 별도 프로젝트 환경변수나 미리 채운 store는 필요하지 않다.
+로직 테스트는 소스를 직접 사용한다. 일반 파일·링크·감시는 현재 OS의 실제 임시 파일 시스템으로 확인한다. EACCES/EPERM, 이벤트 순서, 종료 지연처럼 재현 제어가 필요한 경우만 test-support의 mock을 사용한다. Windows에서 실제 파일 symlink를 만드는 검사는 해당 권한 또는 개발자 모드가 필요하며, 준비 실패를 mock이나 skip으로 숨기지 않는다. `pnpm check`의 설치·패키지 소비 검사는 임시 프로젝트와 store를 사용하며 첫 설치에 네트워크가 필요하다.
 
 개발할 기능의 계약은 [프로젝트 지식 읽기 안내](.codocs/index.yaml)에서 찾는다. 패키지 간 책임은 [실행 구조](.codocs/development/runtime-architecture.yaml), 코드·테스트·문서 작성 기준은 [개발 안내](.codocs/development/development.yaml), 도구와 빌드 기준은 [개발 환경](.codocs/development/development-environment.yaml)에서 확인한다.
 
 ## 실제 VS Code 검사
 
-`pnpm test:vscode`는 현재 소스를 빌드하고 `@vscode/test-electron` 3.1.0으로 VS Code 1.100.0을 자동 준비한다. VSIX나 설치 경로 옵션이 필요하지 않다. 첫 다운로드는 네트워크를 사용하며 `.workbench/vscode-cache`의 버전·OS·아키텍처별 잠금과 파일 내용 해시로 캐시를 재사용한다. 프로필·확장·작업 공간은 실행마다 분리하고 종료 후 삭제한다.
+기능 시나리오는 [extension.test.cjs](packages/vscode/src/integration/extension.test.cjs) 한 파일에 있다. [index.cjs](packages/vscode/src/integration/index.cjs)가 실제 Extension Host에서 사례별 작업 공간을 복원하고 결과를 기록한다. 일반 Vitest 단위 테스트와는 별도 실행 환경이다.
 
-Windows는 별도 데스크톱에서 준비·실행하고 Job Object로 모든 시험 자식을 종료한다. 사용자 창을 숨기거나 포커스를 복원하지 않는다. 외부 foreground/input desktop 표본, 정리 결과, 기능별 결과와 VS Code 로그는 `.workbench/vscode-tests/<실행 ID>`에 남긴다. 빌드·다운로드·fixture·Extension Host·정리 실패는 단계와 함께 비정상 종료한다.
+`pnpm test:vscode`는 현재 소스를 빌드하고 `@vscode/vsce`로 VSIX를 생성·설치한 뒤, `@vscode/test-electron`의 고정 버전 VS Code에서 전체 기능 사례를 한 번 실행한다. 패키징·설치·활성화 검증과 반복 장애 후 수동 복구 검사를 같은 명령에서 수행한다. Windows·Mac 모두 실제 창이 표시될 수 있으며 포커스 이동을 차단하지 않는다. 개인 VS Code와 분리한 프로필·확장·작업 공간을 사용하고 종료 후 정리한다. 다운로드 캐시는 `.workbench/vscode-cache`, 실행별 결과와 로그는 `.workbench/vscode-tests`에 보관한다. 실제 provider·명령 API를 검사하며 픽셀·마우스 자동화 검사는 아니다.
 
-`node tools/vscode-tests/lifecycle.mjs`는 실제 VS Code의 시작 실패·기능 실패·시간 제한·준비 후 취소 경로와 자식 정리를 별도로 검사한다. 기능 검사의 대응 범위와 API/화면 관측 구분은 [이전 대응표](tools/vscode-tests/coverage.md), 공유 실행 계약은 [실행기 안내](tools/test-runtime/README.md)에 있다.
+도구의 위치와 역할은 [tools 구조 안내](tools/README.md)에 정리한다. `pnpm check`는 package.json에서 검사 순서를 조합하고, 테스트 실행·커밋·빌드 도구는 각각 `tools/test`, `tools/git`, `tools/build`에 둔다.
 
-**macOS 격리 실행은 아직 구현·검증되지 않았다.** 현재 Mac에서 명령을 실행하면 창을 열기 전에 준비 실패와 증거 경로를 반환한다. [macOS 검토와 필요한 환경 결정](tools/test-runtime/macos-isolation.md)을 확인한다. Mac 로컬 기능·포커스 수락은 같은 최종 후보 SHA에서 안전한 어댑터 구현 후 사용자 Mac 결과를 받아야 완료된다. Windows 통과나 준비 실패를 Mac 통과로 집계하지 않는다.
+`node packages/vscode/test-runner/lifecycle.mjs`는 시작 실패·기능 실패·시간 제한·취소 시 프로세스 정리를 확인한다. 시나리오 대응은 [기능 대응표](packages/vscode/src/integration/coverage.md), 실행 방법은 [검증 안내](packages/vscode/src/integration/verification.md)에 있다.
 
-## OS 환경 계약과 Mac 인수
+## CI
 
-CI는 동일 이벤트 SHA를 Windows와 macOS native runner에서 체크아웃하여 `pnpm test:environment`만 실행한다. 필수 링크·권한 준비 실패는 실패로 기록하며 로컬 기능·VS Code·성능 검사는 중복 실행하지 않는다. 두 OS의 같은 SHA가 모두 통과해야 OS 환경 검증 완료다.
-
-[Mac 실행 명령과 결과 수집](tools/ui-tests/verification.md)을 따라 전달된 정확한 SHA에서 로컬 기능과 코어 성능을 확인한다. Windows 결과·사용자 Mac 결과·CI 결과는 각각 기록하며, Mac GUI 격리 미구현과 기존 화면 인수 미검증을 통과로 처리하지 않는다.
+[Tests workflow](.github/workflows/test.yml)는 Windows와 Mac에서 로컬과 동일한 `pnpm check`, `pnpm test:vscode` 및 실행기 정리 검사를 수행한다. CI 전용 기능 테스트나 환경별 mock 전환은 없다. 실제 OS 전용 기능 사례만 해당 OS에서 실행하며, 오류 주입 사례는 양쪽에서 동일하게 실행한다. 각 OS의 VS Code 결과·로그를 artifact로 보관한다. 한 OS의 통과를 다른 OS의 통과로 대신하지 않는다.

@@ -501,6 +501,25 @@ export function resolveLiveDocument(
         },
       ),
     );
+  if (document.name !== undefined)
+    for (const domain of document.domains) {
+      const nameConflicts = [
+        ...(catalog.domainNamePaths.get(domain)?.get(document.name) ?? []),
+      ].filter((path) => path !== observation.path);
+      if (nameConflicts.length)
+        documentDiagnostics.push(
+          catalogDiagnostic(
+            document,
+            catalogDiagnosticCodes.duplicateName,
+            [documentFields.name],
+            undefined,
+            {
+              relatedPaths: [observation.path, ...nameConflicts].sort(),
+              domain,
+            },
+          ),
+        );
+    }
   return resolveDocumentReferences(catalog, document);
 }
 

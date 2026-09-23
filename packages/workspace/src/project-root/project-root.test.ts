@@ -1,18 +1,11 @@
+import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures } from '../test-support/file-system.js';
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
-  const { createFileSystemBoundary } =
-    await import('../test-support/file-system.js');
-  return createFileSystemBoundary(actual);
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
 });
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  realpath,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,6 +22,7 @@ beforeEach(
   },
 );
 afterEach(async () => {
+  ioFailures.clear();
   await rm(fixture, { recursive: true, force: true });
 });
 
@@ -206,7 +200,7 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
     it('루트 읽기와 탐색 권한이 없으면 빈 프로젝트가 아닌 실제 접근 실패를 반환한다', /** 루트 읽기와 탐색 권한이 없으면 빈 프로젝트가 아닌 실제 접근 실패를 반환한다. */ async () => {
       const restricted = path.join(fixture, 'restricted');
       await mkdir(restricted);
-      await chmod(restricted, 0);
+      ioFailures.set(restricted, { operations: ['access'], code: 'EACCES' });
       const input = { cwd: restricted };
       try {
         expect(await resolveProjectRoot(input)).toEqual({
@@ -223,7 +217,7 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
           ],
         });
       } finally {
-        await chmod(restricted, 0o700);
+        ioFailures.clear();
       }
     });
     it('공백과 한글이 있는 루트를 선택하면 입력 이름을 trim하거나 변환하지 않는다', /** 공백과 한글이 있는 루트를 선택하면 입력 이름을 trim하거나 변환하지 않는다. */ async () => {

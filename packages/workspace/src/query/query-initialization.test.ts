@@ -1,11 +1,5 @@
-import {
-  mkdir,
-  mkdtemp,
-  rename,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
+import { createLink as symlink } from '../test-support/links.js';
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,10 +15,7 @@ const boundary = vi.hoisted(() => ({
   afterDirectory: undefined as undefined | ((file: string) => Promise<void>),
 }));
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const native = await importOriginal<typeof import('node:fs/promises')>();
-  const { createFileSystemBoundary } =
-    await import('../test-support/file-system.js');
-  const actual = createFileSystemBoundary(native);
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...actual,
     readdir: async (...args: Parameters<typeof actual.readdir>) => {

@@ -1,18 +1,11 @@
+import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures } from '../test-support/file-system.js';
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
-  const { createFileSystemBoundary } =
-    await import('../test-support/file-system.js');
-  return createFileSystemBoundary(actual);
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
 });
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  realpath,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -45,6 +38,7 @@ beforeEach(
   },
 );
 afterEach(async () => {
+  ioFailures.clear();
   await rm(fixture, { recursive: true, force: true });
 });
 
@@ -542,11 +536,14 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         });
       },
     );
-    it('하위 폴더 탐색 권한이 없으면 실제 EACCES와 실패 경로만 반환한다', /** 권한이 없는 실제 임시 폴더에서 파일 조회 실패를 확인하고 권한을 복구한다. */ async () => {
+    it('하위 폴더 탐색 권한이 없으면 EACCES와 실패 경로만 반환한다', /** 파일 조회의 접근 오류를 주입하고 테스트 뒤 해제한다. */ async () => {
       const folder = path.join(project, '.codocs', 'restricted');
       await mkdir(folder);
       await writeFile(path.join(folder, 'file.yaml'), '원문');
-      await chmod(folder, 0);
+      ioFailures.set(path.join(folder, 'file.yaml'), {
+        operations: ['lstat', 'stat', 'realpath'],
+        code: 'EACCES',
+      });
       try {
         const result = await resolveWorkspacePath(
           selectedRoot,
@@ -566,12 +563,12 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
         });
         expect(result).not.toHaveProperty('realPath');
       } finally {
-        await chmod(folder, 0o700);
+        ioFailures.clear();
       }
     });
     it('연결 파일에 OS 쓰기 권한이 없어도 정책 범위는 읽기와 쓰기를 허용한다', /** 실제 쓰기는 하지 않고 연결 범위 정책과 OS 파일 권한이 별개임을 확인한다. */ async () => {
       const target = path.join(outside, 'target.yaml');
-      await chmod(target, 0o400);
+      ioFailures.set(target, { operations: ['access'], code: 'EACCES' });
       await symlink(
         target,
         path.join(project, '.codocs', 'readonly.yaml'),
@@ -586,7 +583,7 @@ describe('resolveWorkspacePath: 프로젝트 파일 접근 범위', () => {
           scope: { kind: 'linkedFile' },
         });
       } finally {
-        await chmod(target, 0o600);
+        ioFailures.clear();
       }
     });
   });

@@ -1,87 +1,33 @@
-import type { EventEmitter } from 'node:events';
-import { describe, expect, it, vi } from 'vitest';
-import { osContracts } from '../../../../tools/test-support/os-contracts.js';
+import path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { watcherBoundary as boundary } from '../test-support/watcher.js';
 
-const boundary = vi.hoisted(() => ({
-  platform: 'win32',
-  connections: [] as {
-    paths: string;
-    options: {
-      depth?: number;
-      followSymlinks?: boolean;
-      ignored?: (path: string) => boolean;
-    };
-    emitter: EventEmitter;
-    close: ReturnType<typeof vi.fn>;
-  }[],
-  directory: undefined as
-    | (EventEmitter & { notify: (event: string, name: string | null) => void })
-    | undefined,
-  closeGate: undefined as Promise<void> | undefined,
-}));
-vi.mock('node:path', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:path')>();
-  return {
-    ...actual,
-    default: new Proxy(actual.posix, {
-      get(_target, key): unknown {
-        return Reflect.get(
-          boundary.platform === 'win32' ? actual.win32 : actual.posix,
-          key,
-        ) as unknown;
-      },
-    }),
-  };
-});
 vi.mock('node:fs/promises', () => ({
   stat: () => Promise.resolve({ dev: 1, ino: 1 }),
 }));
-vi.mock('node:fs', async () => {
-  const events = await import('node:events');
-  return {
-    watch: (
-      _path: string,
-      notify: (event: string, name: string | null) => void,
-    ) => {
-      const emitter = Object.assign(new events.EventEmitter(), {
-        notify,
-        close: () => queueMicrotask(() => emitter.emit('close')),
-      });
-      boundary.directory = emitter;
-      return emitter;
-    },
-  };
-});
-vi.mock('chokidar', async () => {
-  const events = await import('node:events');
-  return {
-    default: {
-      watch: (
-        paths: string,
-        options: { ignored?: (path: string) => boolean },
-      ) => {
-        const emitter = Object.assign(new events.EventEmitter(), {
-          close: vi.fn(async () => {
-            await boundary.closeGate;
-          }),
-        });
-        boundary.connections.push({
-          paths,
-          options,
-          emitter,
-          close: emitter.close,
-        });
-        queueMicrotask(() => emitter.emit('ready'));
-        return emitter;
-      },
-    },
-  };
+vi.mock('node:fs', async () =>
+  (await import('../test-support/watcher.js')).directoryMock(),
+);
+vi.mock('chokidar', async () =>
+  (await import('../test-support/watcher.js')).chokidarMock(),
+);
+const root = path.resolve('자료 공간');
+const target = path.resolve('외부 자료');
+const contract = {
+  root,
+  target,
+  codocs: path.join(root, '.codocs'),
+  child: path.join(target, '한글.yaml'),
+};
+afterEach(() => {
+  boundary.connections.length = 0;
+  boundary.directory = undefined;
+  boundary.closeGate = undefined;
 });
 import { createWorkspaceWatcher } from './index.js';
 
-describe.each(osContracts)('$platform 감시 syscall 경계', (contract) => {
+describe('현재 OS 경로와 watcher 이벤트·종료 처리', () => {
   it('외부 대상 조상을 등록하면 무관한 보호 폴더를 metadata 탐색에서도 제외한다', async () => {
-    boundary.platform = contract.platform;
     boundary.connections.length = 0;
     const watcher = await createWorkspaceWatcher(contract.root);
     try {
@@ -90,10 +36,10 @@ describe.each(osContracts)('$platform 감시 syscall 경계', (contract) => {
         (entry) => entry.options.depth === 0,
       );
       expect(parents.length).toBeGreaterThan(0);
-      const protectedPath =
-        contract.platform === 'win32'
-          ? 'C:\\System Volume Information'
-          : '/System';
+      const protectedPath = path.join(
+        path.parse(contract.root).root,
+        'unrelated',
+      );
       for (const parent of parents) {
         expect(parent.options.followSymlinks).toBe(false);
         expect(parent.options.ignored?.(protectedPath)).toBe(true);
@@ -106,38 +52,26 @@ describe.each(osContracts)('$platform 감시 syscall 경계', (contract) => {
   });
 
   it('OS별 이벤트 표기와 중복 신호를 받으면 실제 경로 계산 뒤 한 배치로 알린다', async () => {
-    boundary.platform = contract.platform;
     boundary.connections.length = 0;
     const watcher = await createWorkspaceWatcher(contract.root);
     const received: string[][] = [];
     watcher.subscribe((batch) => received.push([...batch.paths]));
     try {
       const content = boundary.connections[1]!;
-      const target =
-        contract.platform === 'win32'
-          ? 'C:/자료 공간/.codocs/한글.yaml'
-          : '/자료 공간/.codocs/한글.yaml';
-      content.emitter.emit(
-        'all',
-        contract.platform === 'win32' ? 'add' : 'change',
-        target,
-      );
+      const target = path
+        .join(contract.codocs, '한글.yaml')
+        .split(path.sep)
+        .join('/');
+      content.emitter.emit('all', 'add', target);
       content.emitter.emit('all', 'change', target);
       watcher.drain();
-      expect(received).toEqual([
-        [
-          contract.platform === 'win32'
-            ? 'C:\\자료 공간\\.codocs\\한글.yaml'
-            : '/자료 공간/.codocs/한글.yaml',
-        ],
-      ]);
+      expect(received).toEqual([[path.join(contract.codocs, '한글.yaml')]]);
     } finally {
       await watcher.close();
     }
   });
 
   it('OS 연결 close가 지연되면 반복 종료 요청도 완료를 기다리고 늦은 신호를 버린다', async () => {
-    boundary.platform = contract.platform;
     boundary.connections.length = 0;
     const watcher = await createWorkspaceWatcher(contract.root);
     let release!: () => void;

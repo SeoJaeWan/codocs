@@ -116,3 +116,90 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
     expect(duplicate).not.toHaveProperty('range');
   });
 });
+
+describe('저장 이름·도메인 색인과 현재 편집 진단', () => {
+  const source = {
+    path: 'source.yaml',
+    parsed: parseYaml(
+      'id: source\nname: Same\ndefinition: 설명\ndomains: [shared]\n',
+    ),
+  };
+  const target = {
+    path: 'target.yaml',
+    parsed: parseYaml(
+      'id: target\nname: Same\ndefinition: 설명\ndomains: [shared, other]\n',
+    ),
+  };
+
+  it('저장된 이름 중복 문서를 그대로 열면 동일한 진단과 위치를 유지한다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [source, target],
+    });
+    const result = resolveLiveDocument(catalog, source);
+    expect(result.documentDiagnostics).toEqual(
+      catalog.documents.get(source.path)?.documentDiagnostics,
+    );
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: catalogDiagnosticCodes.duplicateName,
+        domain: 'shared',
+        relatedPaths: ['source.yaml', 'target.yaml'],
+        range: {
+          start: { line: 1, character: 6 },
+          end: { line: 1, character: 10 },
+        },
+      }),
+    );
+  });
+
+  it.each([
+    ['이름', 'name: Unique\ndomains: [shared]'],
+    ['도메인', 'name: Same\ndomains: [different]'],
+  ])('%s 편집으로 충돌을 해소하면 현재 진단만 제거한다', (_label, fields) => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [source, target],
+    });
+    const result = resolveLiveDocument(catalog, {
+      path: source.path,
+      parsed: parseYaml('id: source\ndefinition: 설명\n' + fields + '\n'),
+    });
+    expect(result.diagnostics).toEqual([]);
+    expect(catalog.documents.get(target.path)?.diagnostics).toContainEqual(
+      expect.objectContaining({ code: catalogDiagnosticCodes.duplicateName }),
+    );
+    expect(catalog.domainNamePaths.get('shared')?.get('Same')).toEqual(
+      new Set([source.path, target.path]),
+    );
+  });
+
+  it('미저장 이름이 여러 도메인에서 충돌하면 각 도메인을 현재 원문 위치에 진단한다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [target],
+    });
+    const result = resolveLiveDocument(catalog, {
+      path: source.path,
+      parsed: parseYaml(
+        '# 😀\r\nid: source\r\nname: Same\r\ndefinition: 설명\r\ndomains: [shared, other, shared]\r\n',
+      ),
+    });
+    const diagnostics = result.documentDiagnostics.filter(
+      (item) => item.code === catalogDiagnosticCodes.duplicateName,
+    );
+    expect(diagnostics).toHaveLength(2);
+    for (const domain of ['shared', 'other'])
+      expect(diagnostics).toContainEqual(
+        expect.objectContaining({
+          domain,
+          relatedPaths: [source.path, target.path],
+          range: {
+            start: { line: 2, character: 6 },
+            end: { line: 2, character: 10 },
+          },
+        }),
+      );
+    expect(catalog.documents.has(source.path)).toBe(false);
+  });
+});

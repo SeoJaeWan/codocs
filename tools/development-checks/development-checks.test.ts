@@ -14,7 +14,7 @@ import tseslint from 'typescript-eslint';
 import { afterAll, describe, expect, it } from 'vitest';
 import codocs from './eslint-rules.mjs';
 
-import { resolvePnpm } from '../check/runtime.mjs';
+import { resolvePnpm } from '../toolchain.mjs';
 
 const root = process.cwd();
 mkdirSync(path.join(root, '.workbench/fixtures'), { recursive: true });
