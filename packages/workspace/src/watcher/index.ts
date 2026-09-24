@@ -23,6 +23,8 @@ export const watcherRecoveryGuidance =
 
 /** YAML이나 snapshot 없이 경로 신호·대상별 준비·배치 수명만 관리한다. */
 export class WorkspaceWatcher {
+  readonly #observe:
+    ((kind: string, detail: Record<string, unknown>) => void) | undefined;
   readonly #root: string;
   readonly #listeners = new Set<(batch: WorkspaceChangeBatch) => void>();
   readonly #connections = new Set<FSWatcher>();
@@ -57,7 +59,11 @@ export class WorkspaceWatcher {
   #closing: Promise<void> | undefined;
 
   /** 선택한 프로젝트 경로를 고정하며 시작 전에 구독을 허용한다. */
-  constructor(projectRoot: string) {
+  constructor(
+    projectRoot: string,
+    observe?: (kind: string, detail: Record<string, unknown>) => void,
+  ) {
+    this.#observe = observe;
     this.#root = path.resolve(projectRoot);
   }
   /** 원인과 수동 복구 안내를 포함한 현재 준비 상태다. */
@@ -130,6 +136,7 @@ export class WorkspaceWatcher {
       ) => {
         /** 종료·연결 교체는 ready 이벤트가 없어도 대기를 끝낸다. */
         const cancel = (): void => {
+          this.#observe?.('watcher-cancelled', { folder: this.#root });
           cleanup();
           resolve();
         };
@@ -141,12 +148,17 @@ export class WorkspaceWatcher {
         };
         /** 등록 이후의 실제 이벤트만 소비자에게 전달한다. */
         const success = (): void => {
+          this.#observe?.('watcher-connection-ready', { folder: this.#root });
           prepared = true;
           cleanup();
           resolve();
         };
         /** 등록 오류를 무한 대기로 남기지 않는다. */
         const failure = (error: unknown): void => {
+          this.#observe?.('watcher-error', {
+            folder: this.#root,
+            error: String(error),
+          });
           cleanup();
           reject(error instanceof Error ? error : new Error(String(error)));
         };
@@ -535,11 +547,13 @@ export class WorkspaceWatcher {
           if (
             !this.#closed &&
             this.#state.state === workspaceLifecycleStates.starting
-          )
+          ) {
             this.#state = {
               state: workspaceLifecycleStates.ready,
               ready: true,
             };
+            this.#observe?.('watcher-ready', { folder: this.#root });
+          }
         },
       )
       .catch((error: unknown) => this.#recover(error));
@@ -583,6 +597,11 @@ export class WorkspaceWatcher {
               state: workspaceLifecycleStates.ready,
               ready: true,
             };
+          if (this.#state.ready)
+            this.#observe?.('watcher-ready', {
+              folder: this.#root,
+              recovery: true,
+            });
         } catch (error: unknown) {
           this.#fail(error);
         }

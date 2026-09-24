@@ -1,5 +1,6 @@
-import type * as vscode from 'vscode';
+import * as vscode from 'vscode';
 import { VscodeExtensionRuntime } from './vscode-client/index.js';
+import { observePerformanceEvent } from './performance-observation/index.js';
 
 export * from './open-source/index.js';
 
@@ -9,6 +10,11 @@ let runtime: VscodeExtensionRuntime | undefined;
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
+  observePerformanceEvent('extension-activate', {
+    folders: vscode.workspace.workspaceFolders?.map(
+      (folder) => folder.uri.fsPath,
+    ),
+  });
   const active = new VscodeExtensionRuntime(context);
   runtime = active;
   await active.activate();

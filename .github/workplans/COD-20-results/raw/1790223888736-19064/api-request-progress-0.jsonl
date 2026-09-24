@@ -1,0 +1,2 @@
+{"sessionId":"1790223888736-19064/api/0","phase":"measured","iteration":0,"request":{"id":"normal0068","line":0,"category":"normal"},"event":"started","start":{"wallTime":"2026-09-24T04:26:13.731Z","monotonicMs":3272.2205,"timeOrigin":1790223970458.411,"pid":10724}}
+{"sessionId":"1790223888736-19064/api/0","phase":"measured","iteration":0,"request":{"id":"normal0068","line":0,"category":"normal"},"event":"returned","status":"returned","end":{"wallTime":"2026-09-24T04:26:25.241Z","monotonicMs":14782.2226,"timeOrigin":1790223970458.411,"pid":10724}}

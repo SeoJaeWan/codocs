@@ -1,0 +1,22 @@
+{
+  "platform": "win32",
+  "arch": "x64",
+  "version": "1.139.0",
+  "mode": "functional",
+  "scenario": "all",
+  "phase": "extension-host",
+  "passed": false,
+  "output": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\.workbench\\vscode-tests\\1790219067924-10968",
+  "visualInteraction": false,
+  "packageKind": "installed-vsix",
+  "head": "e720db92b4430f3d6fee59bfbf8555c8cd445ef9",
+  "trackedDiff": "",
+  "process": {
+    "reason": "exit",
+    "exitCode": 1,
+    "cleanup": "taskkill-tree",
+    "residualProcesses": 0
+  },
+  "error": "Error: Error: Test run failed with code 1\n    at ChildProcess.onProcessClosed (C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\node_modules\\.pnpm\\@vscode+test-electron@3.1.0\\node_modules\\@vscode\\test-electron\\out\\runTest.js:125:24)\n    at ChildProcess.emit (node:events:514:28)\n    at ChildProcess._handle.onexit (node:internal/child_process:295:12)\n    at main (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/packages/vscode/test-runner/run.mjs:177:13)\n    at async file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/packages/vscode/test-runner/run.mjs:274:3",
+  "cleaned": true
+}

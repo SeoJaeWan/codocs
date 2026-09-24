@@ -18,6 +18,17 @@ test('부모 종료 뒤에도 남은 자손을 찾고 무관한 프로세스는 
     processTreePids([{ pid: 40, parentPid: 1 }], [10, 20, 30]),
     [],
   );
+  assert.deepEqual(
+    processTreePids(
+      [
+        { pid: 50, parentPid: 10, createdAt: 100 },
+        { pid: 60, parentPid: 10, createdAt: 300 },
+      ],
+      [10],
+      200,
+    ),
+    [60],
+  );
 });
 
 for (const mode of ['success', 'failure', 'timeout', 'cancelled']) {
@@ -84,3 +95,26 @@ for (const mode of ['success', 'failure', 'timeout', 'cancelled']) {
     }
   });
 }
+
+test('제품 대기 제한을 끄면 느린 정상 응답을 보존하고 자식도 정리한다', /** 제한 없이 완료한 자식의 원래 결과를 검사한다. */ async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'codocs-unbounded-'));
+  const script = path.join(root, 'slow.mjs');
+  try {
+    await writeFile(
+      script,
+      'await new Promise((resolve) => setTimeout(resolve, 1500));\n',
+    );
+    const report = await runSupervised({
+      executable: process.execPath,
+      args: [script],
+      cwd: root,
+      output: root,
+      timeout: null,
+    });
+    assert.equal(report.reason, 'exit');
+    assert.equal(report.exitCode, 0);
+    assert.equal(report.residualProcesses, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
