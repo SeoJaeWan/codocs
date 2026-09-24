@@ -1,5 +1,5 @@
-import { createLink, fileSymlinksSupported } from '../test-support/links.js';
-import { ioFailures } from '../test-support/file-system.js';
+import { createLink } from '../test-support/links.js';
+import { ioFailures, simulatedFileLinks } from '../test-support/file-system.js';
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   const { withIoFailures } = await import('../test-support/file-system.js');
@@ -35,6 +35,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   ioFailures.clear();
+  simulatedFileLinks.clear();
   await rm(fixture, { recursive: true, force: true });
 });
 
@@ -135,40 +136,32 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
     }
   });
 
-  it.skipIf(!fileSymlinksSupported)(
-    '파일 연결과 깨진 연결은 모두 미지원이며 부재가 아니다',
-    async () => {
-      const target = path.join(project, '.codocs', 'target.yaml');
-      await writeFile(target, '원문');
-      await createLink(
-        target,
-        path.join(project, '.codocs', 'linked.yaml'),
-        'file',
+  it('파일 연결과 깨진 연결은 모두 미지원이며 부재가 아니다', async () => {
+    const target = path.join(project, '.codocs', 'target.yaml');
+    await writeFile(target, '원문');
+    for (const name of ['linked.yaml', 'broken.yaml']) {
+      const linked = path.join(project, '.codocs', name);
+      await writeFile(linked, '파일 연결을 대신하는 열거 항목');
+      simulatedFileLinks.add(linked);
+    }
+    for (const input of ['linked.yaml', 'broken.yaml']) {
+      const result = await resolveWorkspacePath(
+        selectedRoot,
+        path.join('.codocs', input),
       );
-      await createLink(
-        'missing.yaml',
-        path.join(project, '.codocs', 'broken.yaml'),
-        'file',
-      );
-      for (const input of ['linked.yaml', 'broken.yaml']) {
-        const result = await resolveWorkspacePath(
-          selectedRoot,
-          path.join('.codocs', input),
-        );
-        expect(result).toMatchObject({
-          success: false,
-          status: 'denied',
-          diagnostics: [
-            {
-              code: workspaceDiagnosticCodes.unsupportedWorkspaceLink,
-              path: path.join('.codocs', input),
-            },
-          ],
-        });
-        expect(result).not.toHaveProperty('realPath');
-      }
-    },
-  );
+      expect(result).toMatchObject({
+        success: false,
+        status: 'denied',
+        diagnostics: [
+          {
+            code: workspaceDiagnosticCodes.unsupportedWorkspaceLink,
+            path: path.join('.codocs', input),
+          },
+        ],
+      });
+      expect(result).not.toHaveProperty('realPath');
+    }
+  });
 
   it('파일 뒤의 구분자는 디렉터리로 성공시키지 않는다', async () => {
     await writeFile(path.join(project, '.codocs', 'file.yaml'), '원문');

@@ -1,8 +1,5 @@
-import {
-  createLink as symlink,
-  fileSymlinksSupported,
-} from '../test-support/links.js';
-import { ioFailures } from '../test-support/file-system.js';
+import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures, simulatedFileLinks } from '../test-support/file-system.js';
 import { parseYaml } from '@codocs/core';
 import {
   mkdir,
@@ -69,6 +66,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   ioFailures.clear();
+  simulatedFileLinks.clear();
   vi.mocked(readFile).mockReset();
   vi.mocked(readdir).mockReset();
   await rm(fixture, { recursive: true, force: true });
@@ -397,22 +395,20 @@ describe('loadWorkspacePath: 미지원 연결', () => {
     ]);
   });
 
-  it.skipIf(!fileSymlinksSupported)(
-    '깨진 파일 연결을 직접 요청해도 missing으로 바꾸지 않는다',
-    async () => {
-      const linked = path.join(codocs, 'broken.yaml');
-      await symlink(path.join(outside, 'missing.yaml'), linked, 'file');
-      const result = await loadWorkspacePath(root, linked);
-      expect(result.outcome).toBe('failed');
-      expect(result.absent).toEqual([]);
-      expect(result.failures).toMatchObject([
-        {
-          logicalPath: linked,
-          diagnostics: [{ code: 'unsupported_workspace_link' }],
-        },
-      ]);
-    },
-  );
+  it('깨진 파일 연결을 직접 요청해도 missing으로 바꾸지 않는다', async () => {
+    const linked = path.join(codocs, 'broken.yaml');
+    await writeFile(linked, '파일 연결을 대신하는 열거 항목');
+    simulatedFileLinks.add(linked);
+    const result = await loadWorkspacePath(root, linked);
+    expect(result.outcome).toBe('failed');
+    expect(result.absent).toEqual([]);
+    expect(result.failures).toMatchObject([
+      {
+        logicalPath: linked,
+        diagnostics: [{ code: 'unsupported_workspace_link' }],
+      },
+    ]);
+  });
 });
 
 describe('열거 뒤 항목 부재의 직접 확인', () => {

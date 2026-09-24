@@ -4,7 +4,12 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 import { processTreePids, runSupervised } from './process.mjs';
+
+const childFixture = fileURLToPath(
+  new URL('../fixtures/process-child.mjs', import.meta.url),
+);
 
 test('부모 종료 뒤에도 남은 자손을 찾고 무관한 프로세스는 제외한다', /** 순서가 뒤섞이고 부모가 사라진 실제 조회 형태를 검사한다. */ () => {
   const rows = [
@@ -35,26 +40,12 @@ for (const mode of ['success', 'failure', 'timeout', 'cancelled']) {
   test(`${mode} 이후 시험 자식 프로세스를 종료한다`, /** 실제 자식을 만들어 종료 여부를 확인한다. */ async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'codocs-process-'));
     const controller = new AbortController();
-    const script = path.join(root, 'fixture.mjs');
     const marker = path.join(root, 'child.json');
-    await writeFile(
-      script,
-      `
-      import { spawn } from 'node:child_process';
-      import { writeFile } from 'node:fs/promises';
-      import { once } from 'node:events';
-      const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
-      await once(child, 'spawn');
-      await writeFile(${JSON.stringify(marker)}, JSON.stringify(child.pid));
-      ${mode === 'failure' ? "throw new Error('expected failure');" : ''}
-      ${['timeout', 'cancelled'].includes(mode) ? 'await new Promise(() => {});' : ''}
-    `,
-    );
     let pending;
     try {
       pending = runSupervised({
         executable: process.execPath,
-        args: [script],
+        args: [childFixture, mode, marker],
         cwd: root,
         output: root,
         timeout: 2500,

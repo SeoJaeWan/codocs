@@ -11,7 +11,7 @@ import {
   prepareVSCodeApplication,
   vscodeVersion,
 } from '../../../tools/test/runtime/vscode.mjs';
-import { fixtureFiles } from '../src/integration/test-support/fixtures.mjs';
+import { createWorkspaceFixture } from '../src/integration/test-support/workspace-fixture.mjs';
 import { withCacheLock } from '../../../tools/test/runtime/cache-lock.mjs';
 import readDenial from '../../../tools/test/runtime/read-denial.cjs';
 import {
@@ -374,12 +374,7 @@ try {
   phase = 'fixture';
   await progress();
   const workspace = path.join(config.temporary, 'workspace');
-  const files = fixtureFiles();
-  for (const [relative, content] of Object.entries(files)) {
-    const target = path.join(workspace, relative);
-    await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, content);
-  }
+  await createWorkspaceFixture(workspace);
   releaseUnreadable = await readDenial.denyRead(
     path.join(workspace, 'partial/.codocs/unreadable.yaml'),
     path.join(config.temporary, 'file-denied'),

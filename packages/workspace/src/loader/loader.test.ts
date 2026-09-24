@@ -1,8 +1,5 @@
-import {
-  createLink as symlink,
-  fileSymlinksSupported,
-} from '../test-support/links.js';
-import { ioFailures } from '../test-support/file-system.js';
+import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures, simulatedFileLinks } from '../test-support/file-system.js';
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   const { withIoFailures } = await import('../test-support/file-system.js');
@@ -48,6 +45,7 @@ beforeEach(
 afterEach(
   /** 오류 주입과 각 테스트의 fixture를 정리한다. */ async () => {
     ioFailures.clear();
+    simulatedFileLinks.clear();
     await rm(fixture, { recursive: true, force: true });
   },
 );
@@ -309,27 +307,22 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       ],
     });
   });
-  it.skipIf(!fileSymlinksSupported)(
-    '깨진 파일 연결도 부재로 바꾸지 않고 경고 후 제외한다',
-    async () => {
-      await document('ok.yaml', raw);
-      await symlink(
-        path.join(outside, 'missing.yaml'),
-        path.join(codocs, 'broken.yml'),
-        'file',
-      );
-      const result = await loadWorkspace({ cwd: project });
-      expect(result.status).toBe('complete');
-      expect(result.documents).toHaveLength(1);
-      expect(result.failures).toEqual([]);
-      expect(result.skippedLinks).toMatchObject([
-        {
-          code: workspaceDiagnosticCodes.unsupportedWorkspaceLink,
-          severity: 'warning',
-        },
-      ]);
-    },
-  );
+  it('깨진 파일 연결도 부재로 바꾸지 않고 경고 후 제외한다', async () => {
+    await document('ok.yaml', raw);
+    const linked = path.join(codocs, 'broken.yml');
+    await writeFile(linked, '파일 연결을 대신하는 열거 항목');
+    simulatedFileLinks.add(linked);
+    const result = await loadWorkspace({ cwd: project });
+    expect(result.status).toBe('complete');
+    expect(result.documents).toHaveLength(1);
+    expect(result.failures).toEqual([]);
+    expect(result.skippedLinks).toMatchObject([
+      {
+        code: workspaceDiagnosticCodes.unsupportedWorkspaceLink,
+        severity: 'warning',
+      },
+    ]);
+  });
   it('하위 파일의 읽기 오류를 받으면 확인한 실제 경로와 IO 실패를 보관한다', /** readFile 오류 응답의 보존을 확인한다. */ async () => {
     await document('restricted.yaml', raw);
     await document('ok.yaml', raw);
