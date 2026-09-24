@@ -1,0 +1,149 @@
+{
+  "environment": {
+    "node": "v24.21.0",
+    "pnpm": "10.34.5",
+    "platform": "macOS Darwin 25.5.0 arm64"
+  },
+  "checks": [
+    {
+      "name": "typecheck",
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "durationSeconds": 7.749,
+      "startedAt": "2026-09-21T11:23:51Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/typecheck.log"
+    },
+    {
+      "name": "lint",
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "durationSeconds": 7.235,
+      "startedAt": "2026-09-21T11:23:59Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/lint.log"
+    },
+    {
+      "name": "format-check",
+      "command": "pnpm format:check",
+      "exitCode": 1,
+      "durationSeconds": 17.012,
+      "startedAt": "2026-09-21T11:24:06Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/format-check.log"
+    },
+    {
+      "name": "build",
+      "command": "pnpm build",
+      "exitCode": 0,
+      "durationSeconds": 3.554,
+      "startedAt": "2026-09-21T11:24:23Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/build.log"
+    },
+    {
+      "name": "test-run",
+      "command": "pnpm test:run",
+      "exitCode": 0,
+      "durationSeconds": 4.76,
+      "startedAt": "2026-09-21T11:24:27Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/test-run.log"
+    },
+    {
+      "name": "check-development",
+      "command": "pnpm check:development",
+      "exitCode": 0,
+      "durationSeconds": 17.199,
+      "startedAt": "2026-09-21T11:24:32Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/check-development.log"
+    },
+    {
+      "name": "check-build",
+      "command": "pnpm check:build",
+      "exitCode": 0,
+      "durationSeconds": 26.291,
+      "startedAt": "2026-09-21T11:24:49Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/check-build.log"
+    },
+    {
+      "name": "focused-final",
+      "command": "node --test tools/performance/progress.test.mjs tools/performance/reporter.test.mjs tools/extension-host/progress.test.mjs tools/extension-host/report.test.mjs tools/extension-host/request-outcome.test.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.383,
+      "startedAt": "2026-09-21T11:26:22Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/focused-final.log"
+    },
+    {
+      "name": "lint-after-format",
+      "command": "pnpm lint",
+      "exitCode": 1,
+      "durationSeconds": 7.04,
+      "startedAt": "2026-09-21T11:26:23Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/lint-after-format.log"
+    },
+    {
+      "name": "format-check-after-format",
+      "command": "pnpm format:check",
+      "exitCode": 0,
+      "durationSeconds": 17.295,
+      "startedAt": "2026-09-21T11:26:30Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/format-check-after-format.log"
+    },
+    {
+      "name": "lint-final",
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "durationSeconds": 7.016,
+      "startedAt": "2026-09-21T11:28:39Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/lint-final.log"
+    },
+    {
+      "name": "format-check-final",
+      "command": "pnpm format:check",
+      "exitCode": 0,
+      "durationSeconds": 17.596,
+      "startedAt": "2026-09-21T11:28:46Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/format-check-final.log"
+    },
+    {
+      "name": "node-check-final",
+      "command": "bash -c for file in tools/performance/{runner,worker,reporter,progress,progress.test,reporter.test}.mjs tools/extension-host/{run,progress,progress.test,report.test,request-outcome.test}.mjs tools/extension-host/{extension-test,request-outcome}.cjs; do node --check \"$file\" || exit 1; done",
+      "exitCode": 0,
+      "durationSeconds": 0.444,
+      "startedAt": "2026-09-21T11:29:03Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/node-check-final.log"
+    },
+    {
+      "name": "git-diff-check",
+      "command": "git diff --check",
+      "exitCode": 0,
+      "durationSeconds": 0.024,
+      "startedAt": "2026-09-21T11:29:04Z",
+      "nodeVersion": "v24.21.0",
+      "pnpmVersion": "10.34.5",
+      "log": "checks/git-diff-check.log"
+    }
+  ]
+}

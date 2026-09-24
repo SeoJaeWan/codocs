@@ -1,0 +1,14 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "prettier",
+    "tools/extension-host",
+    ".github/workplans/COD-18-results/wb-cod18-b58bfd0-r1",
+    "--check"
+  ],
+  "startedAt": "2026-09-22T02:05:05.887Z",
+  "durationMilliseconds": 1102,
+  "code": 0,
+  "signal": null
+}

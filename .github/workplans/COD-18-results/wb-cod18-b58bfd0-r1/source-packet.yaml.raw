@@ -1,0 +1,97 @@
+  - task_id: "TASK-003"
+    run_id: "wb-cod18-b58bfd0-r1"
+    execution_plan_id: "wb-cod18-b58bfd0-r1/plan/1"
+    task_packet_digest: "f24548b3aa4075e5d5b4795c6999b286b1027bc7cba02d3793feac4ea3e92112"
+    kind: "implementation"
+    title: "설치 VSIX 검증 시나리오·증거"
+    objective: "실제 지원 VS Code에서 새 UX와 회귀를 검증하고 커밋별 실행 증거를 남긴다."
+    depends_on: ["TASK-002"]
+    wave: 3
+    parallel_group: null
+    assigned_worktree: "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003"
+    branch: "codex/wb-cod18-b58bfd0-r1/task-003"
+    base_selector:
+      kind: "task_result"
+      value: "TASK-002"
+    inputs:
+      - {"path":"/Users/seojaewan/Desktop/dev/codocs/.codocs/development/code-convention.yaml","sha256":"26070401b99b277e37cde912257b394e8f554cfe2601f0bf9cc9e212d8cc5da5"}
+      - {"path":"/Users/seojaewan/Desktop/dev/codocs/.codocs/development/test-convention.yaml","sha256":"2a72bd94de08275d2df87e7b86a3d3ec36f1353243a2a03badd3d6d3b8f3a81e"}
+      - {"constraints":"공개 진입점만 import; core 순수 계산/workspace IO/LS 프로토콜/VS Code 호스트 분리. 한국어 JSDoc·도메인 상수·독립 인접 테스트. .codocs가 계약, README·새 watcher·#32 초기 스캔 수정 제외."}
+      - {"path":"/Users/seojaewan/Desktop/dev/codocs/.codocs/language-server/ide-support.yaml","sha256":"3d79e35269c24e88a1d8afb1843c171db1337fc1b53666dc8019e541cfba3644"}
+      - {"path":"/Users/seojaewan/Desktop/dev/codocs/.codocs/vscode/open-source.yaml","sha256":"573a3665e38ba04cb987c215e573bb489a135e96aa5efdcca51fcb1ede403307"}
+    requirement_ids: ["REQ-002","REQ-004","REQ-008","REQ-009","NFR-003","NFR-004"]
+    acceptance_ids: ["AC-001","AC-002","AC-003","AC-004","AC-005","AC-006","AC-007","AC-008","AC-009","AC-010","AC-011","AC-012"]
+    invariant_ids: ["INV-001","INV-002","INV-003","INV-004","INV-005","INV-006","INV-007"]
+    decision_ids: ["DEC-003","DEC-004","DEC-006","DEC-007"]
+    requirement_contract:
+      - "REQ-002: 단일 본문 DocumentLink; 복수는 본문 이동/선택창 없음, 호버 개별 링크만."
+      - "REQ-004: 내용/확인가능 이동 자동갱신; 삭제 설명/링크 제거; stale 클릭 최신 확인; 오대상/팝업 없음."
+      - "REQ-008: 모든 원문 (0,0) 빈 선택·기존 탭/dirty 보존·저장/재로드 없음."
+      - "REQ-009: 확정 deprecated target만 등장별 warning; 링크/관계 유지; 상태/참조 변화 갱신."
+      - "NFR-003: VS Code 하한·다중/중첩 workspace·native definition 유지."
+      - "NFR-004: 외부 입력 escape; 생성한 제한 명령만 신뢰."
+    acceptance_contract:
+      - "AC-001: 지정 필드·이름/도메인·반복/누락/자기/오문법·인용/escape/접힘·한글/공백경로·UTF-16·LF/CRLF 위치."
+      - "AC-002: 미저장 수정/삽입/삭제·닫기·취소·비동기 경합에서 최신 결과만 반영."
+      - "AC-003: single 본문 열기; multiple 본문 무동작/선택창 없음; Hover 각 링크로 해당 후보 열기."
+      - "AC-004: 내용/revision 변경·확인가능 move 자동갱신, 링크 재선택 요구 없음."
+      - "AC-005: delete·옛 경로 다른 문서 재사용·표시 후 변경 시 오열기 없음; 확인 불가 무동작."
+      - "AC-006: 완전 관측의 무매칭 Hover 제거; YAML 참조 텍스트/끊어진 참조 진단 유지; 팝업 없음."
+      - "AC-007: top 전체 중복에도 보조 링크; 동명 domain없음/같음도 path로 구분."
+      - "AC-008: 동일 후보/range current+previous 우선순위와 다른 위치 previous-only 보존; top/보조 양쪽."
+      - "AC-009: YAML 별칭중복 진단 유지; 코드 Hover 해당 원인만 제외, 다른 invalid_field_value 유지."
+      - "AC-010: 새/기존/dirty 탭 (0,0) 빈 선택·내용/탭 보존; 코드/YAML 양쪽."
+      - "AC-011: deprecated_reference 코드/warning/문구/위치 및 링크/관계 유지·상태전환 갱신; 일반/previous-only/ambiguous/unconfirmed 오경고 없음."
+      - "AC-012: partial/preparing/failed/empty/ID오류 보존; multi/nested 라우팅·native definition 및 실제 VSIX."
+    invariant_contract:
+      - "INV-001: 코드 ID 매칭과 YAML 이름 참조는 별도 의미 체계다."
+      - "INV-002: 복수/미확정 후보에서 임의 대표와 단일 연결을 만들지 않는다."
+      - "INV-003: partial·preparing·failed는 확인된 부재나 유일성을 의미하지 않는다."
+      - "INV-004: 문서 내용·참조·진단·revision은 같은 완료 snapshot으로 전달한다."
+      - "INV-005: 경로 존재나 hash/revision만으로 문서 동일성을 확정하지 않는다."
+      - "INV-006: 원문 열기는 파일을 수정·저장·재로드하거나 전체 YAML을 선택하지 않는다."
+      - "INV-007: deprecatedAliases의 이전 ID와 status: deprecated 문서 상태를 혼동하지 않는다."
+    decision_contract:
+      - "DEC-003: proposed: 원본 참조/매칭·선택후보 provenance로 최신 확인 후 open; 증명 불가 무동작; 영구 동일성 추적 아님."
+      - "DEC-004: proposed: 완료 snapshot 게시로 링크/진단 갱신; provider 재등록 등은 실제 최소지원 Host 검증; 새 watcher 없음."
+      - "DEC-006: accepted: multiple 본문 무동작, Hover 개별 선택; 동명만 domain/path."
+      - "DEC-007: accepted: 모든 탭 (0,0) 빈 선택·dirty 보존; rootRange 이동 안 함."
+    owned_paths:
+      - "tools/extension-host/**"
+      - ".github/workplans/COD-18.md"
+      - ".github/workplans/COD-18-results/wb-cod18-b58bfd0-r1/**"
+    forbidden_paths:
+      - "명시한 owned_paths 밖의 모든 추적 경로"
+      - "**/README.md"
+      - "pnpm-lock.yaml"
+      - "packages/workspace/src/watcher/**"
+      - "#32의 감시 준비·최초 스캔 순서 로직"
+    shared_surfaces:
+      - "공개 타입·진단 코드·snapshot 버전은 생산/소비 순서로 통합"
+      - "다른 task의 worktree/node_modules/dist를 사용하거나 수정하지 않는다"
+    runtime_resources:
+      - "Node 24.21.0; pnpm 10.34.5; task-local node_modules/.workbench/store/dist"
+      - "fixture·사용자 프로필은 실행별 임시 디렉터리; 고정 포트·공유 프로필 금지"
+    implementation_notes:
+      - "기존 actual VSIX runner에 COD-18 시나리오/보고 추가; 기본 CLI 유지, 과거 증거 덮어쓰기 금지."
+      - "실제 본문 이동/호버 링크 클릭 및 화면 캐시 갱신을 확인한다. provider 조회/명령 직접 호출만으로 대체하지 않으며 필요하면 실제 UI 조작 증거 보완."
+      - "1.95.0/1.136.1 버전 확인, 독립 profile/extensions/fixture. 전 AC를 행별 pass/fail/skip 기록; 미실행/skip은 통과 아님."
+      - "source/harness 선커밋 후 VSIX 생성·검증; SHA/VSIX/bundle hash·환경/raw 결과 기록 후 증거 커밋. 제품 코드 실패는 범위 밖 수정 대신 보고/재계획."
+      - "증거의 비밀값 검사. 진행 기록은 workplan/results에만 저장. PR15는 main 통합 계획 유지, 원격 충돌은 수동 전달에서 처리."
+    focused_checks:
+      - "검증 runner 단위 테스트와 실제 installed VSIX 전체 수용 매트릭스"
+    broader_checks:
+      - "패키징 source 누락/번들 로드·기존 언어 정의 이동·격리 프로필"
+    verification_commands:
+      - "pnpm build"
+      - "pnpm --dir packages/vscode dlx @vscode/vsce@3.6.2 package --no-dependencies --skip-license --out ../../.workbench/cod18.vsix"
+      - "node --test tools/extension-host/progress.test.mjs tools/extension-host/report.test.mjs tools/extension-host/request-outcome.test.mjs"
+      - "node tools/extension-host/run.mjs --vsix .workbench/cod18.vsix --code-version 1.95.0 --report .workbench/cod18-host-1.95.0.json"
+      - "node tools/extension-host/run.mjs --vsix .workbench/cod18.vsix --report .workbench/cod18-host-1.136.1.json"
+      - "pnpm check"
+      - "git diff --check"
+    expected_failure_before_implementation: "기존 runner는 COD-18 본문 링크·복수 클릭·deprecated 진단 수용 조건을 아직 검증하지 않는다. 미실행을 pass로 기록하지 않는다."
+    commit_policy: "task_local_required"
+    completion_contract:
+      clean_worktree: true
+      result_sha_required: true

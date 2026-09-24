@@ -1,0 +1,12 @@
+id: vscode
+name: 'VS Code'
+domains:
+  - 'VS Code'
+kind: procedure
+definition: |
+  VS Code 호스트의 확장 실행·언어 서버 연결·명령과 원문 탭을 담당하는 패키지의 계약이다.
+
+  ## 용어와 계약
+
+  - [[원문 열기]]: 링크의 YAML 원문 이동과 기존 탭 재사용을 확인한다.
+  - [[언어 서버 연결]]: 확장과 서버 사이의 실행·전송·클라이언트 책임을 확인한다.

@@ -1,0 +1,15 @@
+
+> codocs@0.0.0 test:run /Users/seojaewan/Desktop/dev/codocs-worktrees/pr13-delivery-20260921/delivery
+> node tools/check/run.mjs test:run --no-file-parallelism
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/pr13-delivery-20260921/delivery
+
+
+ Test Files  27 passed (27)
+      Tests  675 passed (675)
+   Start at  21:40:20
+   Duration  9.90s (tests 73%, import 19%, transform 7%, worker 1%)
+
+    Isolate  27 workers spawned · ~73ms startup each (spawn + environment, per file)
+             at least ~1.89s faster with isolate: false — reuses workers across files instead of one per file
