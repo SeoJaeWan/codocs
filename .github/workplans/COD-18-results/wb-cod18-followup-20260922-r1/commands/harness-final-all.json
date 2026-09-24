@@ -1,0 +1,13 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "tools/extension-host/acceptance.test.mjs",
+    "tools/extension-host/progress.test.mjs",
+    "tools/extension-host/report.test.mjs",
+    "tools/extension-host/request-outcome.test.mjs"
+  ],
+  "code": 0,
+  "durationMs": 271,
+  "log": "harness-final-all.log"
+}

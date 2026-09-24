@@ -1,0 +1,8 @@
+{
+  "resolvedAt": "2026-09-24T10:23:32.7802894+09:00",
+  "source": "https://update.code.visualstudio.com/api/releases/stable?released=true",
+  "command": "pnpm --silent test:vscode --resolve-version stable",
+  "version": "1.139.0",
+  "node": "v24.21.0",
+  "pnpm": "10.34.5"
+}

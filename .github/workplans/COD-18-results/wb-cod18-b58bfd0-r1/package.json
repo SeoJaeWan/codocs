@@ -1,0 +1,20 @@
+{
+  "command": [
+    "pnpm",
+    "--dir",
+    "packages/vscode",
+    "dlx",
+    "--store-dir",
+    "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/pnpm-store",
+    "@vscode/vsce@3.6.2",
+    "package",
+    "--no-dependencies",
+    "--skip-license",
+    "--out",
+    "../../.workbench/cod18.vsix"
+  ],
+  "startedAt": "2026-09-22T01:36:37.138Z",
+  "durationMilliseconds": 348,
+  "code": 1,
+  "signal": null
+}

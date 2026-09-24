@@ -1,0 +1,318 @@
+{
+  "kind": "actual-vscode-extension-host",
+  "packageKind": "installed-vsix",
+  "vscode": {
+    "requestedVersion": null,
+    "version": "1.136.1",
+    "architecture": "arm64",
+    "executable": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/vscode-ui-default/Visual Studio Code.app/Contents/MacOS/Code",
+    "runtimeRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/vscode-ui-default/Visual Studio Code.app/Contents/MacOS",
+    "downloadedThisRun": false
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "cpu": "Apple M1 Pro",
+    "cpuCount": 10,
+    "memoryBytes": 17179869184,
+    "runnerNode": "v24.21.0",
+    "fileCache": "OS file cache was not forcibly cleared",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": null,
+  "artifacts": {
+    "provenance": {
+      "productSourceCommit": "4a74700a8e36debf572042e53839ccd369fa2c0f",
+      "harnessHashes": {
+        "run.mjs": "4be8033718b79456f54dcfcdbdfadd954682a22271168aa5bdd4685baf117759",
+        "extension-test.cjs": "949003ca4c31e0ef8fb70207c7997a0310b5816b4191ed13d5bc6185a9ae62a2",
+        "cod18.cjs": "c19d6d0e0de409fd2c65e535286f1cb7f274d74a4a05770b38dd05636963fd0f",
+        "acceptance.cjs": "a7bc34d003bbe7e7586cde1ff656df03a6f55b49c6d2b78d7de547736ad34927",
+        "request-outcome.cjs": "495679cedec30d662ac2cb9c701168acfc3e63b56daf469079f1760a801e6a06"
+      },
+      "vsixSha256": "7984667d377cc5d69bc76397227d94c8009ce2586556beaeb721c586d163b654",
+      "extensionBundleSha256": "c69420206698bb4a131e774831e5a05806c51f95d597c422efa6fee4ed316bda",
+      "serverBundleSha256": "15a97e6a308885a9410cd2f14ef2e0ac70d0880a6c30fd66815a493b074f8afb",
+      "workspaceFixtureSha256": "6519451a689dd9d61d3b2fa35b7e197d498296c6bc71104c936ceb642cc46edc",
+      "vscodeVersion": "1.136.1",
+      "runtimeTemporaryRoot": "/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/codocs-host-qkJval",
+      "fixtureRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi",
+      "capturedBeforeHost": true
+    },
+    "sourceCommit": "4a74700a8e36debf572042e53839ccd369fa2c0f",
+    "productSourceCommit": "4a74700a8e36debf572042e53839ccd369fa2c0f",
+    "productSourceCommitMeaning": "checkout base; precommit product bytes identified by bundle and working diff hashes",
+    "workingDiffSha256": "e25158ecaa4c11045ff3a87805561c03d6ad5df5c3d4adb218413cafe1dce365",
+    "vscodeExecutableSha256": "de060e5a522201a1be3187c5ca97aad32db12565e8fb6037ba85ce3513ab0c2e",
+    "harnessState": "content hashes captured before Host; harness may be uncommitted",
+    "harnessHashes": {
+      "run.mjs": "4be8033718b79456f54dcfcdbdfadd954682a22271168aa5bdd4685baf117759",
+      "extension-test.cjs": "949003ca4c31e0ef8fb70207c7997a0310b5816b4191ed13d5bc6185a9ae62a2",
+      "cod18.cjs": "c19d6d0e0de409fd2c65e535286f1cb7f274d74a4a05770b38dd05636963fd0f",
+      "acceptance.cjs": "a7bc34d003bbe7e7586cde1ff656df03a6f55b49c6d2b78d7de547736ad34927",
+      "request-outcome.cjs": "495679cedec30d662ac2cb9c701168acfc3e63b56daf469079f1760a801e6a06"
+    },
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/cod18-followup-final.vsix",
+    "vsixBytes": 1230594,
+    "vsixSha256": "7984667d377cc5d69bc76397227d94c8009ce2586556beaeb721c586d163b654",
+    "extensionBundleSha256": "c69420206698bb4a131e774831e5a05806c51f95d597c422efa6fee4ed316bda",
+    "serverBundleSha256": "15a97e6a308885a9410cd2f14ef2e0ac70d0880a6c30fd66815a493b074f8afb",
+    "vscodeSourceSha256": "f29f2281d86eaca089526891207270b497bfd9d2be4a505707323075fac0d761",
+    "languageServerSourceSha256": "83547fe075fd9dcd5cf22302f0483b48982efe86212093263f537ecf5745cdae"
+  },
+  "install": {
+    "extensionRoot": "/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/codocs-host-qkJval/e/codocs.codocs-0.0.0",
+    "stdout": "Installing extensions...\nExtension 'cod18-followup-final.vsix' was successfully installed.\n",
+    "stderr": "(node:30261) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code --trace-deprecation ...` to show where the warning was created)\n"
+  },
+  "exitCode": 0,
+  "stdout": "\u001b[90m[main 2026-09-22T03:16:34.915Z]\u001b[0m StorageMainService: creating application shared storage\n\u001b[90m[main 2026-09-22T03:16:35.230Z]\u001b[0m [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)\n\u001b[90m[main 2026-09-22T03:16:35.231Z]\u001b[0m [shared storage] Initializing fallback application storage (path: in-memory)\n\u001b[90m[main 2026-09-22T03:16:35.354Z]\u001b[0m [shared storage] Fallback application storage initialized with 3 items\n\u001b[90m[main 2026-09-22T03:16:35.354Z]\u001b[0m update#setState disabled\n\u001b[90m[main 2026-09-22T03:16:35.355Z]\u001b[0m update#ctor - updates are disabled by the environment\n[AgentHost:renderer] Acquiring MessagePort to agent host...\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=undefined conversationKey=undefined modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n\u001b[90m[main 2026-09-22T03:16:36.448Z]\u001b[0m AgentHostProcessManager: agent host started\n[AgentHost:renderer] MessagePort acquired, creating client...\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/OTIwZDJjNjItYzc4OC00NWJiLWFjZmYtNGIzMjllNGRkNWFk\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\nStarted local extension host with pid 30726.\n[AgentHost:renderer] Protocol connection established; clientId=ec06a954-aa8f-451d-abc6-c9cea449e195\nLoading development extension at /var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/codocs-host-qkJval/e/codocs.codocs-0.0.0\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] Clearing authentication for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] Clearing authentication for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\nSettings Sync: Account status changed from uninitialized to unavailable\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/OTIwZDJjNjItYzc4OC00NWJiLWFjZmYtNGIzMjllNGRkNWFk\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n\u001b[90m[main 2026-09-22T03:20:52.375Z]\u001b[0m Extension host with pid 30726 exited with code: 0, signal: unknown.\n",
+  "stderr": "\u001b[91m[main 2026-09-22T03:16:36.864Z]\u001b[0m [AgentHost:stderr] (node:30723) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code Helper --trace-deprecation ...` to show where the warning was created)\n\nUnknown channel: agentHostClientByokLm\nUnknown channel: agentHostClientProxy\nUnknown channel: agentHostClientProxy\n2026-09-22 12:16:50.062 Code[30274:2273935] TSM AdjustCapsLockLEDForKeyTransitionHandling - _ISSetPhysicalKeyboardCapsLockLED Inhibit\n",
+  "evidence": {
+    "vscodeVersion": "1.136.1",
+    "method": "interactive UI session; acceptance is recorded separately from editor telemetry",
+    "events": [
+      {
+        "at": "2026-09-22T03:16:56.058Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 3,
+              "character": 4
+            },
+            "end": {
+              "line": 3,
+              "character": 4
+            },
+            "active": {
+              "line": 3,
+              "character": 4
+            },
+            "anchor": {
+              "line": 3,
+              "character": 4
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T03:17:01.412Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T03:17:01.422Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T03:17:07.498Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T03:17:07.511Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi/parent/nested/.codocs/ui-source.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T03:17:07.517Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 3,
+              "character": 4
+            },
+            "end": {
+              "line": 3,
+              "character": 4
+            },
+            "active": {
+              "line": 3,
+              "character": 4
+            },
+            "anchor": {
+              "line": 3,
+              "character": 4
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T03:17:19.312Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 4,
+              "character": 5
+            },
+            "end": {
+              "line": 4,
+              "character": 5
+            },
+            "active": {
+              "line": 4,
+              "character": 5
+            },
+            "anchor": {
+              "line": 4,
+              "character": 5
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T03:17:27.624Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T03:17:27.633Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi/parent/nested/.codocs/ui-a.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T03:17:33.134Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T03:17:33.145Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi/parent/nested/.codocs/ui-source.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T03:17:33.149Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 4,
+              "character": 5
+            },
+            "end": {
+              "line": 4,
+              "character": 5
+            },
+            "active": {
+              "line": 4,
+              "character": 5
+            },
+            "anchor": {
+              "line": 4,
+              "character": 5
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T03:20:44.341Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T03:20:44.349Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/cod16-host-SYYLmi/parent/nested/.codocs/ui-b.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      }
+    ]
+  }
+}

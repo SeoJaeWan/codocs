@@ -1,0 +1,225 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+... Skipped lines
+
+  [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+...
+    'reference_target_error',
++   'deprecated_reference'
+  ]
+
+    at file:///private/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/codocs%20build%20consumer-Fkagp7/consumer/name-references.mjs:48:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+    'self_reference',
+    'unconfirmed_reference',
+    'reference_target_error',
+    'deprecated_reference'
+  ],
+  expected: [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+    'self_reference',
+    'unconfirmed_reference',
+    'reference_target_error'
+  ],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+... Skipped lines
+
+  [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+...
+    'reference_target_error',
++   'deprecated_reference'
+  ]
+
+    at file:///private/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/codocs%20build%20consumer-Fkagp7/consumer/name-references.mjs:48:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+    'self_reference',
+    'unconfirmed_reference',
+    'reference_target_error',
+    'deprecated_reference'
+  ],
+  expected: [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+    'self_reference',
+    'unconfirmed_reference',
+    'reference_target_error'
+  ],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tools/build-checks/build-checks.test.ts > 빌드된 패키지의 외부 소비자 계약 > 공개 JS와 선언 파일 소비 > 이름 참조 공개 JS 소비자가 추출·색인·갱신·rename 계획과 실제 파일 상태를 확인한다
+Error: Command failed: /Users/seojaewan/.nvm/versions/node/v24.21.0/bin/node name-references.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+... Skipped lines
+
+  [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+...
+    'reference_target_error',
++   'deprecated_reference'
+  ]
+
+    at file:///private/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/codocs%20build%20consumer-Fkagp7/consumer/name-references.mjs:48:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+    'self_reference',
+    'unconfirmed_reference',
+    'reference_target_error',
+    'deprecated_reference'
+  ],
+  expected: [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+    'self_reference',
+    'unconfirmed_reference',
+    'reference_target_error'
+  ],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+
+ ❯ ../../../../../../../private/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/codocs%20build%20consumer-Fkagp7/consumer/name-references.mjs:48:8
+ ❯ run tools/build-checks/build-checks.test.ts:54:10
+     52| /** 실제 subprocess를 실행해 stdout과 실패 상태를 확인한다. */
+     53| function run(args: string[], cwd = consumer): string {
+     54|   return execFileSync(process.execPath, args, {
+       |          ^
+     55|     cwd,
+     56|     encoding: 'utf8',
+ ❯ tools/build-checks/build-checks.test.ts:251:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tools/build-checks/build-checks.test.ts > 빌드된 패키지의 외부 소비자 계약 > tarball 소비와 내부 경로 차단 > 이름 참조 tarball 소비자가 공개 JS·d.ts와 내부 subpath 거부를 실행한다
+Error: Command failed: /Users/seojaewan/.nvm/versions/node/v24.21.0/bin/node name-references.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+... Skipped lines
+
+  [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+...
+    'reference_target_error',
++   'deprecated_reference'
+  ]
+
+    at file:///private/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/codocs%20build%20consumer-Fkagp7/consumer/name-references.mjs:48:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+    'self_reference',
+    'unconfirmed_reference',
+    'reference_target_error',
+    'deprecated_reference'
+  ],
+  expected: [
+    'duplicate_id',
+    'duplicate_name',
+    'missing_reference',
+    'ambiguous_reference',
+    'self_reference',
+    'unconfirmed_reference',
+    'reference_target_error'
+  ],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+
+ ❯ ../../../../../../../private/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/codocs%20build%20consumer-Fkagp7/consumer/name-references.mjs:48:8
+ ❯ run tools/build-checks/build-checks.test.ts:54:10
+     52| /** 실제 subprocess를 실행해 stdout과 실패 상태를 확인한다. */
+     53| function run(args: string[], cwd = consumer): string {
+     54|   return execFileSync(process.execPath, args, {
+       |          ^
+     55|     cwd,
+     56|     encoding: 'utf8',
+ ❯ tools/build-checks/build-checks.test.ts:304:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

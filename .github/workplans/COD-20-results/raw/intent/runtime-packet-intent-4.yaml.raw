@@ -1,0 +1,241 @@
+task_id: INT-001
+run_id: wb-cod20-dom-20260924
+intent_revision: wb-cod20-dom-20260924/intent/4
+kind: integration
+title: Windows 두 버전 통합 검증과 결과 정리
+objective: Verify the implemented serial head using bounded representative checks, preserve existing evidence, and commit honest implementation results; full statistical benchmark is deferred by the user.
+execution_profile:
+  model: gpt-6-sol
+  reasoning_effort: high
+  rationale: Cross-process evidence and measurement validity require careful integration judgment; source repairs remain with their owners.
+  escalation: none
+repository_id: github.com/SeoJaeWan/codocs
+repository_root: C:/Users/sjw73/OneDrive/Desktop/dev/codocs
+git_common_dir: C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.git
+base_selector:
+  kind: task_result
+  value: REPAIR-001
+resolved_base_commit: e720db92b4430f3d6fee59bfbf8555c8cd445ef9
+dependency_bindings:
+  TASK-001:
+    commit: 642208878e18285c88934147b4f1d07195b36525
+    kind: provisional_candidate
+    continuation: ALLOWED
+    verification: FAIL
+  TASK-002:
+    commit: ac90f36b4ed793418ac16a229a51459ffbdecc98
+    kind: provisional_candidate
+    continuation: ALLOWED
+    verification: FAIL
+  TASK-003:
+    commit: 21eabb2d14490491357b73715825dc3c8285e386
+    kind: provisional_candidate
+    continuation: ALLOWED
+    verification: FAIL
+  REPAIR-001:
+    commit: e720db92b4430f3d6fee59bfbf8555c8cd445ef9
+    kind: provisional_candidate
+    continuation: ALLOWED
+    verification: FAIL
+depends_on:
+  - REPAIR-001
+assigned_worktree: C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001
+branch: codex/wb-cod20-dom-20260924/int-001
+inputs:
+  - artifact_ref:
+      type: artifact
+      project_id: seojaewan/codosc
+      work_item_key: COD-20
+      folder: shape
+      artifact_id: 01a0cf1f-ea9b-744a-847e-0f1d8ad61e86
+    source_digest: 0d68aeb6741ded695e5cbd321f6213d99e27e1a4c511cbc663035f8711ea748c
+    read: Retrieve complete body; SHA-256 UTF-8 after Gateway LF normalization. Reject changed content.
+  - repository_id: github.com/SeoJaeWan/codocs
+    repository_root: C:/Users/sjw73/OneDrive/Desktop/dev/codocs
+    base_provenance: 382e03fc36355e96c5261d03f546c3eb57a88318
+  - local_documents:
+      - .codocs/development/release.yaml @ sha256:df3c53116775d40541dcdc9481a40ee5889fba9bf879421ada56b9a3a9716267
+      - .codocs/development/test-convention.yaml @ sha256:47c163c4b34319756ac8b785595962e824a84aac9dba06363e9ca0b13a7bd55b
+      - .codocs/development/folder-convention.yaml @ sha256:c86df12cd645ecc5f925cdce16ed39286a8d088e2ed80e9a77c63fe76fb13986
+      - .codocs/development/development-environment.yaml @ sha256:3d111d4d200f241544bfde2e9a4bc7928b95646f1897f7719c7e00a1132ad298
+      - .codocs/development/documentation-convention.yaml @ sha256:37186e8500fb7b0706b6788c5c7761a0c4bf2a923d8b11ced40c2a3b43fdc5b6
+    constraints: Read local .codocs at the selected commit. Keep Korean behavior tests adjacent, package test support excluded from bundles, shared runtime under tools/test/runtime. Update existing contract owners; no duplicate policy or source sections.
+    digest_scope: Prepare-time source provenance; dirty release/test contracts are in the Shape artifact. Dependency commits may contain authorized updates; these hashes are not expected result hashes.
+  - environment: Windows; Node 24.21.0, pnpm 10.34.5, pnpm install --frozen-lockfile in the assigned worktree. Recheck future-host model availability. Regenerate ignored outputs; no copied node_modules/profiles.
+requirements:
+  - "Keep product measurement defaults and formal benchmark contract unchanged: API warmup100/measured1000 and all original targets remain in source. User explicitly deferred bulk statistical measurement from this implementation task."
+  - Validate implementation with bounded representative scenarios and failure/cancellation paths on pinned Windows1.100.0 and1.139.0. Reuse exact applicable functional/lifecycle/focused evidence already collected at e720db9; do not rerun unaffected passing checks.
+  - Safely stop current bulk run through supported run-control.json cancelRequest; preserve all raw API samples and warmup progress. Classify as user-directed scope reduction, not product failure or completed1000 benchmark. Record actual counts without truncating raw data.
+  - Use ignored smoke configuration overrides only; do not change tracked defaults or source code. On1.100.0 existing200+ correct API samples cover implementation; use a short all-scenario smoke if needed after cancellation, with apiWarmup0 and each target1. On1.139.0 use apiWarmup0 and api35 with other targets1, because frozen corpus first35 covers normal/reference/long/duplicate/error categories; reduce redundant runs only when exact valid evidence covers the same requirement.
+  - Verify real installed VSIX pointer first/reentry expected-body/no-Loading completion, propagation, edit, window isolation, progress/partial report and cleanup using final source. No synthetic/forced product delay to obtain edit-indexing samples; honest shortage or prior applicable evidence.
+  - Report implementation checks separately from deferred formal performance measurement. Preserve source/VSIX/data/environment/clock identities and explicit smoke settings/commands. Existing partial latency statistics are diagnostic, not a completed fair two-version1000-sample comparison.
+acceptance_conditions:
+  - All material implementation interfaces and bounded representative scenarios have applicable evidence on both pinned versions; failed checks remain explicit findings.
+  - Defaults still1000; no bulk1000 or200 perversion requirement for this implementation task. Formal benchmark execution is deferred by explicit user clarification.
+  - Reuse same-code successful checks; preserve known Windows symlink EPERM and reproducible1.139.0 locked-fixture EBUSY compatibility findings. Prepare local reproducible follow-up payload with registrationpending under no-publish policy.
+  - Final owned workplan/results explain what was implemented, actually verified, failed, and deferred. Do not claim verified supported environment or full benchmark when failures/incomplete formal samples remain.
+invariants:
+  - Default pnpm test:vscode remains functional; performance is explicit and absent from normal CI/hooks. Reuse its build/install/launch/cleanup path; no second launcher.
+  - Each scenario owns fresh profiles, sessions and mutable fixtures; no dependency on another scenario's result. Immutable runtime/VSIX/source may be shared.
+  - No fixed product-readiness or API/UI/edit/propagation deadline in performance mode. Retain bounded management operations, cancellation, durable progress, partial reports and process-tree cleanup.
+  - No product optimization or unrelated bug fixes. Tool defects require repair and affected reruns; product defects require repro and linked separate work, with independent checks continuing.
+  - Preserve caller dirty documents and existing worktrees. Do not stash, reset, copy caller changes, merge, push or publish. Task-local commits require execution authority beyond this plan.
+  - Use exclusive 800/100/50/30/20 corpus with frozen expectations; no forced refresh/restart for propagation, artificial indexing delays, or invented missing durations.
+  - No screenshot/video/OCR in completion or timing. No Playwright Electron launcher. Screenshots only optional diagnostic evidence; manual readings never substitute for samples.
+decisions:
+  - Use the existing runner for functional/performance validation; only reports and workplan may change here.
+  - Tool defects return to responsible task for authorized repair and affected reruns; do not silently repair forbidden source paths or accept failed checks.
+  - Latest user clarified that1000 remains the configured formal measurement target but repeated statistical measurement is unnecessary in this implementation task. This supersedes both old full matrix mandate and earlier selected200-perversion option.
+  - Proceed with bounded representative implementation validation, preservation of existing data, and final task-local report commit without new confirmation.
+source_contract_ids:
+  - REQ-01
+  - REQ-02
+  - REQ-03
+  - REQ-04
+  - REQ-05
+  - REQ-06
+  - REQ-07
+  - REQ-08
+  - REQ-09
+  - AC-01
+  - AC-02
+  - AC-03
+  - AC-04
+  - AC-05
+  - AC-06
+  - INV-01
+  - INV-02
+  - INV-03
+  - INV-04
+  - INV-05
+  - DEC-01
+  - DEC-08
+owned_paths:
+  - .github/workplans/COD-20.md
+  - .github/workplans/COD-20-results/**
+forbidden_paths:
+  - All tracked paths outside owned_paths
+  - Original checkout and unrelated worktrees
+  - .github/workflows/**
+  - .husky/**
+  - tools/git/**
+shared_surfaces:
+  - Read-only dependency code; report formatter limited to owned paths. No further commits on consumed task branches during validation.
+runtime_resources:
+  - Unique per-task output/cache/temp roots; ephemeral loopback ports; isolated profiles and extension directories.
+  - Windows desktop/IDE focus exclusive to this task while GUI checks run; do not overlap other GUI measurements.
+implementation_notes:
+  - Read the PR17 plan at commit 17cae89264ce27ffb753396ac9b1e37f8b7fa2b6 for scope only; never base product execution on that older branch.
+  - Publish artifacts locally under COD-20-results, preserving raw evidence before cleaning disposable sessions; exclude binaries, profiles and unrelated user data.
+  - If a product defect lacks external registration authority, prepare repro and mark follow-up registration pending; do not claim completion until the required reference exists.
+  - Read C:/Users/sjw73/.codex/plugins/cache/local-work/workbench/0.3.0/skills/execute-task/SKILL.md and references; no recursive implementation delegation. Own only integration report/workplan paths; source repairs must return to owners through coordinator.
+  - Use git -c core.longpaths=true for worktree creation and status. Correct Node 24.21.0 available read-only at C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.workbench/ui-probe/node-v24.21.0-win-x64/node.exe; put directory in PATH for pnpm children. Install own dependencies and regenerate ignored outputs.
+  - TASK-001 candidate 642208878e18285c88934147b4f1d07195b36525 and TASK-002 candidate ac90f36b4ed793418ac16a229a51459ffbdecc98 failed broad checks only at Windows actual symlink EPERM. No affirmative user setting-change response received. Recheck actual capability, do not change machine settings or replace real symlinks with mocks/junctions. Known failure does not cancel independent GUI verification.
+  - Required pnpm check stops at pnpm test due inherited symlink failures, leaving vitest.checks.config.mjs unexecuted. Run its relevant meaningful check phase explicitly after failure, recording known consumer EPERM distinctly; do not claim the aggregate check passed.
+  - Read Task Results under each predecessor worktree .workbench/task-result-TASK-00N.md. Cross-process event mapping is timeOrigin+monotonic with clockUncertaintyMs null and separate received/observer overhead; report this honestly and never infer precise absolute cross-process accuracy from null uncertainty.
+  - Persist exact normalized runtime packet and integration Task Result under assigned ignored .workbench. Return a clean exact verified integrated SHA only if all applicable checks pass; otherwise clearly candidate_integrated_head_sha and unresolved actions. One task-authored result commit maximum. No push, PR, merge or worktree cleanup.
+  - TASK-003 candidate 21eabb2d14490491357b73715825dc3c8285e386 adds UI observer, first/reentry fresh loops, host cancellation interrupting in-flight calls, and renderer-loss partial finalization. State tests 15/15 run explicitly via node --test packages/vscode/test-runner/ui-state.test.mjs; existing default test collector does not include this adjacent .mjs file.
+  - Shared immutable runtime override CODOCS_VSCODE_RUNTIME_CACHE may point to C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.workbench/vscode-cache after exact receipt/platform/hash verification under existing runtime lock. TASK-003 used this after new1.139.0 download stalled. Reuse downloaded runtime only; all mutable profiles, extensions, corpus, outputs, VSIX and dependencies remain integration-local.
+  - Send concise Korean progress about once per minute with actual phase/count advancement and new findings. Do not start another concurrent GUI/performance task. During long product waits keep heartbeat/partial records; ask coordinator about concrete material blockers while running independent meaningful checks.
+  - "Revision3 repair result at C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-repair-001/.workbench/task-result-REPAIR-001.md: e720db92b4430f3d6fee59bfbf8555c8cd445ef9 is clean descendant of21eabb2, focused21/21 and actual default-pipe API progress plus warmup/measured whole-run cancellation all pass withzero residual."
+  - Use each output/run-control.json cancelRequest (cancel-run.json existence) for supported controlled whole-run cancellation; do not rely on terminal Ctrl-C. New api-request-progress-0.jsonl identifies phase/iteration/request/start/returned. Inspect durable progress without modifying product wait or running CPU-heavy parallel tasks.
+  - "Explicit final focused command: node --test packages/vscode/src/integration/test-support/performance/api-request-progress.test.cjs packages/vscode/test-runner/api-progress-reconcile.test.mjs packages/vscode/test-runner/run-control.test.mjs packages/vscode/test-runner/ui-state.test.mjs. Reuse or rerun other checks only with honest same-code/environment applicability; broad failure remains846/45EPERM andconsumer114/1."
+  - Intent4 explicitly supersedes the full benchmark execution mandate and earlier200-perversion selection for this implementation task. Preserve configured formal defaults; only ignored smoke settings may lower sample counts.
+  - Preserve all previous packets/revisions/raw reports. Persist this complete runtime packet at .workbench/runtime-packet-intent-4.yaml and verify binding before further GUI/report writes; existing same-worker worktree stays at exact e720db92b4430f3d6fee59bfbf8555c8cd445ef9, no source import/edit needed.
+  - Keep pinned stable1.139.0 resolved2026-09-24T10:23:32.7802894+09:00. Final-source static/focused/functional/lifecycle checks already completed and should be reused with exact evidence rather than repeated unchanged.
+  - Do not rename the cancelled1000-target run as a completed200-target benchmark. Preserve actual212 completed samples and1 cancelled request, warmup100, original target1000/statuscancelled; summarize as implementation evidence/diagnostic partial data under user scope reduction.
+  - Bounded latest API35 is representative category coverage from frozen first35 requests, not statistical replication. Use apiWarmup0 for smoke; existing warmup/cancellation behavior is already verified. If existing exact valid evidence proves a check, reuse it and avoid redundant GUI runs.
+  - After remaining meaningful representative checks, finish owned Korean workplan/results and one candidate integration commit. Explicitly distinguish implementation findings, platform failures, and intentionally deferred full benchmark. No further discretionary expansion.
+focused_checks:
+  - Reuse final-source API/control/UI21/21 and actual controlled cancellation evidence; verify final bulk run scope-reduction cancellation cleans/finalizes.
+  - Bounded actual installed-VSIX representative scenarios on pinned versions, including post-cancellation independent execution.
+broader_checks:
+  - Reuse final-source pnpmcheck846/45EPERM and consumer114/1EPERM, functional1.10051/51,1.13945/51 same6failures and both lifecycle4/4. No repeated unchanged checks.
+  - Verify default target settings unchanged, source-to-report provenance, actual smoke configuration and diagnostic-only partial sample labels.
+verification_commands:
+  - Inspect existing run-control.json and create its cancelRequest to stop bulk run; verify result/progress/partial files and zero residuals.
+  - Reuse applicable final-source checks already completed; inspect exact evidence paths and source/VSIX identities.
+  - pnpm test:vscode --mode performance --scenario all --vscode-version 1.100.0 --config .workbench/implementation-smoke-min.json (apiWarmup0; alltargets1; omit if exact existing combination evidence fully covers remaining implementation requirements)
+  - pnpm test:vscode --mode performance --scenario all --vscode-version 1.139.0 --config .workbench/implementation-smoke-latest.json (apiWarmup0; api35; other targets1)
+  - git -c core.longpaths=true diff --check; owned-path formatting and final clean status
+commit_policy: task_local_required
+completion_contract:
+  clean_worktree: true
+  result_sha_required: true
+environment:
+  package_manager: pnpm@10.34.5
+  node: 24.21.0
+  frozen_install_command: pnpm install --frozen-lockfile
+  ignored_file_requirements:
+    - Install node_modules and build outputs per worktree; regenerate fixtures/VSIX/profiles. Caller ignored experiments are evidence only.
+    - Use a verified Node 24.21.0 installation and its child-process PATH; do not rely on the current default Node.
+  symlink_requirements:
+    - No symlink components in assigned worktree roots. Existing package-consumer tests retain their real filesystem/link prerequisites.
+  services:
+    - Interactive Windows desktop; only one task uses IDE windows at a time.
+    - CDP binds loopback with dynamically allocated ports; separate profiles, extensions, sessions and mutable fixtures.
+  shared_caches:
+    - Prefer task-local caches. Any shared immutable VS Code download requires existing lock and integrity checks; never share mutable profiles.
+  model_availability: Selected profiles advertised by current host; future executor must recheck before launch.
+delivery_policy:
+  merge_local: false
+  push: false
+  pull_request: false
+  handoff: manual
+source_plan:
+  execution_plan_id: wb-cod20-dom-20260924/plan/1
+  execution_plan_digest: f8d0eb194b1fa504639b625ab2bba76e0967e405aac558c642dc81474efc0f34
+  source_artifact_ref:
+    type: artifact
+    project_id: seojaewan/codosc
+    work_item_key: COD-20
+    folder: prepare
+    artifact_id: 01a0cf2b-866c-70f3-805c-e8a1ae0d05b5
+task_packet_digest: 19db47b54f9c8a4313f615fe3c7b9442600893f546aa72a3518769353de1a6a5
+execution_binding_digest: 78f69fdc517c38914c76c1bd3685f0c5ffd1cf757951012f34de5f6c66a8d179
+resume_state:
+  observed_head_commit: e720db92b4430f3d6fee59bfbf8555c8cd445ef9
+  owned_change_digests: []
+  worker_id: /root/cod20_int001
+  quiescence_evidence: Supported cancel-run.json finalized run1790219725252-16496 with startup10,warmup100,APIcompleted212/cancelled1,cleanedtrue/residual0. Worker confirmed exact HEAD e720db9 and clean tracked status; only ignored diagnostics/runtime files exist.
+required_task_ids:
+  - TASK-001
+  - TASK-002
+  - TASK-003
+  - REPAIR-001
+integration_order:
+  - TASK-001
+  - TASK-002
+  - TASK-003
+  - REPAIR-001
+strategy: verify_existing_head
+dependency_imported_paths:
+  - packages/vscode/test-runner/**
+  - packages/vscode/src/integration/test-support/performance/**
+  - tools/test/runtime/**
+  - tools/test/support/**
+  - .codocs/development/release.yaml
+  - .codocs/development/test-convention.yaml
+  - .codocs/development/development-environment.yaml
+  - packages/vscode/src/vscode-client/**
+  - packages/vscode/src/performance-observation/**
+  - packages/vscode/src/index.ts
+  - packages/vscode/src/client-manager/**
+  - packages/language-server/src/index.ts
+  - packages/language-server/src/server/**
+  - packages/language-server/src/server-session/**
+  - packages/language-server/src/performance-observation/**
+  - packages/workspace/src/query/**
+  - packages/workspace/src/watcher/**
+  - packages/workspace/src/index.ts
+  - .codocs/vscode/server-connection.yaml
+  - .codocs/language-server/language-server.yaml
+  - .codocs/workspace/query/workspace-query-session.yaml
+  - .codocs/workspace/watcher/workspace-watcher.yaml
+cross_task_checks:
+  - Verify TASK-003 result contains the exact TASK-001/TASK-002 ancestry; no cherry-picking a serial chain.
+  - Exercise runner, instrumentation, CDP, corpus and partial reporter together on installed VSIX.
+output: integrated_head_sha
+execution_revision_ref:
+  path: .workbench/revision-intent-4.yaml
+  digest: 602963742b1b545e9b51ca93e12b6ecc9e516607c48d0a15b198d35534b6c16f

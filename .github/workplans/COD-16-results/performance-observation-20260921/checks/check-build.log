@@ -1,0 +1,12 @@
+
+> codocs@0.0.0 check:build /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001
+> node tools/check/run.mjs build
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001
+
+
+ Test Files  1 passed (1)
+      Tests  32 passed (32)
+   Start at  20:24:50
+   Duration  25.28s (tests 100%)

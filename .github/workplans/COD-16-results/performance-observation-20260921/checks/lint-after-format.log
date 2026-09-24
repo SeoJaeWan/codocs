@@ -1,0 +1,13 @@
+
+> codocs@0.0.0 lint /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001
+> eslint . --max-warnings=0
+
+
+/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/performance/progress.test.mjs
+   12:103  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+   82:91   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  102:85   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+
+✖ 3 problems (3 errors, 0 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.

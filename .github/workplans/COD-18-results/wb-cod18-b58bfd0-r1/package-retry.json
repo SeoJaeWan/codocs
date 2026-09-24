@@ -1,0 +1,18 @@
+{
+  "command": [
+    "pnpm",
+    "--dir",
+    "packages/vscode",
+    "dlx",
+    "@vscode/vsce@3.6.2",
+    "package",
+    "--no-dependencies",
+    "--skip-license",
+    "--out",
+    "../../.workbench/cod18.vsix"
+  ],
+  "startedAt": "2026-09-22T01:36:50.754Z",
+  "durationMilliseconds": 5947,
+  "code": 1,
+  "signal": null
+}

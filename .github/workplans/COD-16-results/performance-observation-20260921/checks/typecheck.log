@@ -1,0 +1,3 @@
+
+> codocs@0.0.0 typecheck /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001
+> node tools/build/build.mjs typecheck

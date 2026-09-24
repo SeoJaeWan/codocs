@@ -1,0 +1,30 @@
+{
+  "platform": "win32",
+  "version": "1.139.0",
+  "results": [
+    {
+      "mode": "startup-failure",
+      "passed": true,
+      "reason": "exit",
+      "residualProcesses": 0
+    },
+    {
+      "mode": "failure",
+      "passed": true,
+      "reason": "exit",
+      "residualProcesses": 0
+    },
+    {
+      "mode": "timeout",
+      "passed": true,
+      "reason": "timeout",
+      "residualProcesses": 0
+    },
+    {
+      "mode": "cancelled",
+      "passed": true,
+      "reason": "cancelled",
+      "residualProcesses": 0
+    }
+  ]
+}

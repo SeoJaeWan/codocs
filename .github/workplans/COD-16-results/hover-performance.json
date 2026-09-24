@@ -1,0 +1,126 @@
+{
+  "kind": "actual-vscode-hover-performance",
+  "packageKind": "installed-vsix",
+  "status": "FAIL",
+  "result": "p95 NOT_MEASURED",
+  "runId": "resume-performance-node24-final-vsix-01",
+  "vscode": {
+    "requestedVersion": null,
+    "version": "1.136.1"
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "runnerNode": "v24.21.0",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": {
+    "seed": 16018,
+    "projectDocumentCount": 1000,
+    "queryableDocumentCount": 980,
+    "invalidDocumentCount": 10,
+    "collisionDocumentCount": 10,
+    "collisionIdCount": 5,
+    "referenceCount": 10,
+    "longDefinitionCount": 10,
+    "documentBytes": {
+      "total": 115150,
+      "minimum": 77,
+      "median": 101,
+      "maximum": 1523
+    },
+    "documentCharacters": {
+      "total": 99390,
+      "minimum": 77,
+      "median": 93,
+      "maximum": 723
+    },
+    "codeInput": {
+      "utf8Bytes": 12740,
+      "utf16CodeUnits": 12740,
+      "lines": 980,
+      "identifiers": 980,
+      "identifierPattern": "perfTerm0000",
+      "requestPositionSelection": "32-bit LCG(seed=16018), state % queryableDocumentCount, line index at character 5"
+    }
+  },
+  "artifacts": {
+    "sourceCommit": "576778c81dea536d8ba4119667390ff1ca9be92e",
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-380d487-r1/task-005/.workbench/artifacts/cod16-final.vsix",
+    "vsixSha256": "e025f2340aa1f0621ccfcbab1614afc9b8eb850b78cc27b89740d33a860953ad",
+    "extensionBundleSha256": "59d7275545238dbc7b7006a16ecdbc1467a9506bb862d00931f0c4a154d06955",
+    "serverBundleSha256": "3757ca4e63e20fedd80d64c5d3c59a7686bfc60c847d739db4fe44affdf87d0c"
+  },
+  "performance": {
+    "targetMilliseconds": 100,
+    "warmupRuns": 100,
+    "queryRuns": 1000,
+    "completedWarmupRuns": 0,
+    "completedMeasuredRuns": 0,
+    "attemptedWarmupRuns": 1,
+    "attemptedMeasuredRuns": 0,
+    "p95Milliseconds": null,
+    "p95Status": "NOT_MEASURED",
+    "failure": "executeHoverProvider timed out",
+    "failureSamples": [
+      {
+        "phase": "performance:warmup-request-failure",
+        "at": "2026-09-21T06:22:28.454Z",
+        "run": 0,
+        "index": 277,
+        "position": {
+          "line": 277,
+          "character": 5
+        },
+        "error": "executeHoverProvider timed out"
+      }
+    ],
+    "progress": [
+      {
+        "phase": "run:start",
+        "at": "2026-09-21T06:22:06.581Z",
+        "vscodeVersion": "1.136.1"
+      },
+      {
+        "phase": "performance:start",
+        "at": "2026-09-21T06:22:06.584Z"
+      },
+      {
+        "phase": "activate-extension:start",
+        "at": "2026-09-21T06:22:06.586Z"
+      },
+      {
+        "phase": "activate-extension:ready",
+        "at": "2026-09-21T06:22:06.812Z",
+        "workspaceFolders": 1,
+        "serverProcesses": 1
+      },
+      {
+        "phase": "performance:index-ready",
+        "at": "2026-09-21T06:22:18.453Z"
+      },
+      {
+        "phase": "performance:warmup-request-start",
+        "at": "2026-09-21T06:22:18.454Z",
+        "run": 0,
+        "index": 277,
+        "position": {
+          "line": 277,
+          "character": 5
+        }
+      },
+      {
+        "phase": "performance:warmup-request-failure",
+        "at": "2026-09-21T06:22:28.454Z",
+        "run": 0,
+        "index": 277,
+        "position": {
+          "line": 277,
+          "character": 5
+        },
+        "error": "executeHoverProvider timed out"
+      }
+    ]
+  }
+}
