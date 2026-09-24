@@ -13,7 +13,7 @@ h2. 작업 순서와 선행 조건
 
 h2. 구현 범위
 
-- 코어 list/get 엔진을 공식 도구에 연결하고 입력 unknown 검증·필터·커서·집계·partial results를 보존.
+- list/get은 기존 코어·workspace·MCP 구현을 재사용한다. 입력 unknown 검증·필터·커서·집계·partial results의 현재 `.codocs` 계약을 실제 MCP stdio 호출로 검증하고, 누락·오류를 이번 PR에서 보완하여 기능을 완성한다.
 - 고정50·ids중복제거후20 계약과 limit 미지원, 일부 없음의 성공/항목 오류를 구현.
 - JSON 불가능 문서 rawYaml·진단·id/source/revision을 반환하고 정상 다른 문서를 함께 제공.
 - validate 전체/단일 프로젝트 상대 파일을 지원하고 파일 요청도 전체 ID/참조 색인 검증.
@@ -36,6 +36,14 @@ h2. 구현 중 확인할 사항
 
 - 실제 MCP stdio 전송에서 큰 응답의 문서 본문·rawYaml·참조 목록이 절단·변형 없이 보존되는지 검증한다.
 - 별도 응답 크기 제한이나 분할 기능은 추가하지 않는다. 클라이언트별 크기 한계 측정과 대응은 이번 범위에서 제외한다.
+
+## list/get 완료 범위와 후속 작업
+
+- 이번 PR #19는 list/get의 현재 계약을 완성한다. 기존 구현이 있다는 이유로 누락된 기능이나 계약 오류를 후속 PR로 넘기지 않는다.
+- [PR #22](https://github.com/SeoJaeWan/codocs/pull/22)는 write 저장·ID 변경 직후 list/get이 새 결과를 반환하는 연결을 구현·검증한다.
+- [PR #23](https://github.com/SeoJaeWan/codocs/pull/23)은 refresh 이후 커서 만료·준비 상태·실패 복구와 조회의 연결을 검증한다.
+- [PR #24](https://github.com/SeoJaeWan/codocs/pull/24)는 list→get→write→validate→refresh 전체 흐름과 조회 경계·필터·성능 회귀를 검증한다.
+- 후속 PR에서는 해당 기능과의 통합 및 회귀 검증에 필요한 list/get 수정을 할 수 있다.
 
 ## 문서 기준
 
