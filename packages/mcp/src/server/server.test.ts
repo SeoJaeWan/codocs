@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -16,6 +17,7 @@ const cli = path.resolve('packages/mcp/dist/cli.js');
 let fixture: string;
 let projectA: string;
 let projectB: string;
+let projectPages: string;
 
 /** 실제 파일 두 벌로 서로 다른 프로젝트의 조회 결과를 구별한다. */
 beforeAll(async () => {
@@ -23,6 +25,7 @@ beforeAll(async () => {
   fixture = await mkdtemp(path.resolve('.workbench/mcp-server-'));
   projectA = path.join(fixture, 'a');
   projectB = path.join(fixture, 'b');
+  projectPages = path.join(fixture, 'pages');
   for (const [project, id] of [
     [projectA, 'alpha'],
     [projectB, 'bravo'],
@@ -33,6 +36,19 @@ beforeAll(async () => {
       `id: ${id}\nname: ${id}\ndomains: [test]\ndefinition: 본문\n`,
     );
   }
+  const pages = path.join(projectPages, '.codocs');
+  await mkdir(pages, { recursive: true });
+  for (let index = 50; index >= 0; index--) {
+    const id = `doc-${String(index).padStart(2, '0')}`;
+    await writeFile(
+      path.join(pages, `${id}.yaml`),
+      `id: ${id}\nname: ${id}\ndomains: [selected]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+    );
+  }
+  await writeFile(
+    path.join(pages, 'other.yaml'),
+    'id: other\nname: Other\ndomains: [other]\ndefinition: 본문\n',
+  );
 });
 
 afterAll(async () => {
@@ -52,6 +68,7 @@ async function clientFor(
     args: [cli, ...args],
     cwd,
     stderr: 'pipe',
+    maxBufferSize: 16 * 1024 * 1024,
   });
   const client = new Client({ name: 'codocs-test', version: '1.0.0' });
   await client.connect(transport);
@@ -76,11 +93,16 @@ function payload(response: unknown): Record<string, unknown> {
 }
 
 describe('빌드 MCP stdio 서버', () => {
-  it('초기화 후 세 도구만 제공하고 실제 문서를 목록·상세·갱신한다', async () => {
+  it('초기화 후 네 도구를 제공하고 실제 문서를 목록·상세·검증·갱신한다', async () => {
     const { client, transport } = await clientFor(projectA);
     try {
       const names = (await client.listTools()).tools.map((tool) => tool.name);
-      expect(names).toEqual(['codocs_list', 'codocs_get', 'codocs_refresh']);
+      expect(names).toEqual([
+        'codocs_list',
+        'codocs_get',
+        'codocs_refresh',
+        'codocs_validate',
+      ]);
       const listed = payload(
         await client.callTool({ name: 'codocs_list', arguments: {} }),
       );
@@ -113,9 +135,15 @@ describe('빌드 MCP stdio 서버', () => {
         success: false,
         error: { code: 'invalid_input' },
       });
-      await expect(
-        client.callTool({ name: 'codocs_validate', arguments: {} }),
-      ).rejects.toThrow();
+      expect(
+        payload(
+          await client.callTool({ name: 'codocs_validate', arguments: {} }),
+        ),
+      ).toMatchObject({
+        success: true,
+        scanStatus: 'complete',
+        diagnostics: [],
+      });
       expect(transport.stderr).toBeTruthy();
     } finally {
       await client.close();
@@ -148,6 +176,238 @@ describe('빌드 MCP stdio 서버', () => {
     } finally {
       await client.close();
       await session.close();
+    }
+  });
+
+  it('검증 handler와 stdio가 파일 진단과 요청 실패를 같은 형태로 전달한다', async () => {
+    const session = createWorkspaceQuerySession({ project: projectA });
+    const handlers = createCodocsQueryHandlers(session);
+    const { client } = await clientFor(projectA);
+    try {
+      const selected = { path: '.codocs/alpha.yaml' };
+      expect(
+        payload(
+          await client.callTool({
+            name: 'codocs_validate',
+            arguments: selected,
+          }),
+        ),
+      ).toEqual(await handlers.codocsValidate(selected));
+      const invalid = { path: '../outside.yaml' };
+      expect(
+        payload(
+          await client.callTool({
+            name: 'codocs_validate',
+            arguments: invalid,
+          }),
+        ),
+      ).toEqual(await handlers.codocsValidate(invalid));
+      expect(
+        payload(
+          await client.callTool({
+            name: 'codocs_validate',
+            arguments: invalid,
+          }),
+        ),
+      ).toMatchObject({ success: false, error: { code: 'invalid_path' } });
+    } finally {
+      await client.close();
+      await session.close();
+    }
+  });
+
+  it('51개 필터 목록을 stdio에서 50+1 페이지와 필터 후 개수로 전달한다', async () => {
+    const { client } = await clientFor(projectPages);
+    try {
+      const first = payload(
+        await client.callTool({
+          name: 'codocs_list',
+          arguments: {
+            domain: 'selected',
+            kind: 'policy',
+            status: 'confirmed',
+          },
+        }),
+      );
+      expect(first).toMatchObject({
+        success: true,
+        totalCount: 51,
+        returnedCount: 50,
+      });
+      const cursor = first.nextCursor as string;
+      expect(cursor).toEqual(expect.any(String));
+      const second = payload(
+        await client.callTool({ name: 'codocs_list', arguments: { cursor } }),
+      );
+      expect(second).toMatchObject({
+        success: true,
+        totalCount: 51,
+        returnedCount: 1,
+        nextCursor: null,
+        items: [{ id: 'doc-50' }],
+      });
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('미등록 domain 문자열을 필터로 보내면 빈 성공 목록을 반환한다', async () => {
+    const { client } = await clientFor(projectPages);
+    try {
+      expect(
+        payload(
+          await client.callTool({
+            name: 'codocs_list',
+            arguments: { domain: 'unregistered' },
+          }),
+        ),
+      ).toMatchObject({
+        success: true,
+        totalCount: 0,
+        returnedCount: 0,
+        nextCursor: null,
+      });
+    } finally {
+      await client.close();
+    }
+  });
+
+  it.each([
+    { kind: 'wrong' },
+    { status: 'wrong' },
+    { domain: 1 },
+    { limit: 1 },
+  ])(
+    '목록의 잘못된 입력 %j를 보내면 invalid_input을 반환한다',
+    async (argumentsValue) => {
+      const { client } = await clientFor(projectPages);
+      try {
+        expect(
+          payload(
+            await client.callTool({
+              name: 'codocs_list',
+              arguments: argumentsValue,
+            }),
+          ),
+        ).toMatchObject({ success: false, error: { code: 'invalid_input' } });
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it('refresh 뒤 이전 목록 cursor를 보내면 cursor_expired를 반환한다', async () => {
+    const { client } = await clientFor(projectPages);
+    try {
+      const first = payload(
+        await client.callTool({
+          name: 'codocs_list',
+          arguments: { domain: 'selected' },
+        }),
+      );
+      const cursor = first.nextCursor as string;
+      expect(cursor).toEqual(expect.any(String));
+      payload(await client.callTool({ name: 'codocs_refresh', arguments: {} }));
+      expect(
+        payload(
+          await client.callTool({ name: 'codocs_list', arguments: { cursor } }),
+        ),
+      ).toMatchObject({ success: false, error: { code: 'cursor_expired' } });
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('20개 고유 ID를 stdio로 상세 조회하면 전부 입력 순서대로 반환한다', async () => {
+    const { client } = await clientFor(projectPages);
+    try {
+      const ids = Array.from(
+        { length: 20 },
+        (_, index) => `doc-${String(19 - index).padStart(2, '0')}`,
+      );
+      const result = payload(
+        await client.callTool({ name: 'codocs_get', arguments: { ids } }),
+      );
+      expect(result).toMatchObject({ success: true });
+      expect(
+        (result.results as { id: string }[]).map((item) => item.id),
+      ).toEqual(ids);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('큰 정상 문서와 .inf 원문을 혼합 조회해 본문·직접 참조·revision·진단을 전부 보존한다', async () => {
+    const selected = path.join(fixture, 'large');
+    const folder = path.join(selected, '.codocs');
+    await mkdir(folder, { recursive: true });
+    const targets = Array.from(
+      { length: 20 },
+      (_, index) => `target-${String(index).padStart(2, '0')}`,
+    );
+    const definition = `${targets.map((_, index) => `[[Target ${String(index).padStart(2, '0')}]]`).join(' ')} ${'x'.repeat(500_000)}`;
+    const rawYaml = `id: invalid\nname: Invalid\ndomains: [test]\ndefinition: ${'y'.repeat(500_000)}\nvalue: .inf\n`;
+    await writeFile(
+      path.join(folder, 'normal.yaml'),
+      `id: normal\nname: Normal\ndomains: [test]\ndefinition: ${JSON.stringify(definition)}\n`,
+    );
+    for (const [index, id] of targets.entries())
+      await writeFile(
+        path.join(folder, `${id}.yaml`),
+        `id: ${id}\nname: Target ${String(index).padStart(2, '0')}\ndomains: [test]\ndefinition: 대상\n`,
+      );
+    await writeFile(path.join(folder, 'invalid.yaml'), rawYaml);
+    await writeFile(
+      path.join(folder, 'conflict-a.yaml'),
+      'id: shared\nname: Conflict A\ndomains: [test]\ndefinition: 본문\n',
+    );
+    await writeFile(
+      path.join(folder, 'conflict-b.yaml'),
+      'id: shared\nname: Conflict B\ndomains: [test]\ndefinition: 본문\n',
+    );
+    const { client } = await clientFor(selected);
+    try {
+      const response = payload(
+        await client.callTool({
+          name: 'codocs_get',
+          arguments: { ids: ['normal', 'invalid', 'shared', 'missing'] },
+        }),
+      );
+      const results = response.results as Record<string, unknown>[];
+      expect(response.success).toBe(true);
+      expect(results[0]).toMatchObject({
+        found: true,
+        document: { definition },
+        source: { path: path.join('.codocs', 'normal.yaml') },
+        references: targets,
+      });
+      expect(results[1]).toMatchObject({
+        found: true,
+        rawYaml,
+        source: { path: path.join('.codocs', 'invalid.yaml') },
+      });
+      expect(results[1]).not.toHaveProperty('document');
+      expect(results[1]?.revision).toBe(
+        createHash('sha256').update(Buffer.from(rawYaml, 'utf8')).digest('hex'),
+      );
+      expect((results[1]?.diagnostics as unknown[]).length).toBeGreaterThan(0);
+      expect(results[2]).toMatchObject({
+        found: true,
+        conflict: true,
+        paths: [
+          path.join('.codocs', 'conflict-a.yaml'),
+          path.join('.codocs', 'conflict-b.yaml'),
+        ],
+      });
+      expect(results[3]).toMatchObject({
+        found: false,
+        diagnostics: [expect.objectContaining({ code: 'not_found' })],
+      });
+      const responseBytes = Buffer.byteLength(JSON.stringify(response));
+      console.info(`stdio-large-payload-bytes=${responseBytes}`);
+      expect(responseBytes).toBeGreaterThan(1_000_000);
+    } finally {
+      await client.close();
     }
   });
 

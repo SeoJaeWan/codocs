@@ -151,6 +151,10 @@ export type ChangePlanDiagnosticCode =
   (typeof changePlanDiagnosticCodes)[keyof typeof changePlanDiagnosticCodes];
 /** 조회 투영에서 외부 계약으로 정규화하는 진단 코드다. @domainValues */
 export const queryDiagnosticCodes = {
+  /** 검증 경로가 프로젝트 상대 .codocs YAML 파일이 아니면 반환한다. */
+  invalidPath: 'invalid_path',
+  /** 검증 대상 파일에 접근하지 못하면 반환한다. */
+  fileAccessFailed: 'file_access_failed',
   /** 전체 요청의 ID 배열이나 크기가 계약과 다르면 반환한다. */
   invalidInput: 'invalid_input',
   /** 완전한 Catalog에 요청한 ID가 없으면 반환한다. */
@@ -162,6 +166,9 @@ export const queryDiagnosticCodes = {
 } as const;
 /** 조회 투영이 추가하는 고정 진단 문구다. */
 export const queryDiagnosticMessages = {
+  invalidPath: '프로젝트 상대 .codocs YAML 파일 경로 하나를 지정하세요.',
+  fileNotFound: '검증할 파일이 없습니다.',
+  fileAccessFailed: '검증할 파일을 읽을 수 없습니다.',
   invalidInput: '조회 입력이 올바르지 않습니다.',
   notFound: '요청한 ID의 문서가 없습니다.',
   referenceNotFound: '참조 이름에 해당하는 문서가 없습니다.',

@@ -14,11 +14,13 @@ import {
   type WorkspaceQueryFailure,
   type WorkspaceQuerySession,
   type WorkspaceRefreshResult,
+  type WorkspaceValidationResult,
 } from '@codocs/workspace';
 import {
   acceptsToolInput,
   parseGetInput,
   parseListInput,
+  parseValidateInput,
 } from '../tool-input/index.js';
 
 /** MCP 호출자가 조회와 변경 요청의 허용 상태를 판단하는 값이다. */
@@ -48,11 +50,15 @@ export type CodocsListResponse = WorkspaceListResult;
 /** codocs_get의 공통 success 응답이다. */
 export type CodocsGetResponse = WorkspaceGetResponse;
 
+/** codocs_validate의 공통 결과이며 문서 오류 진단도 요청 성공이다. */
+export type CodocsValidationResponse = WorkspaceValidationResult;
+
 /** SDK 등록과 독립적으로 직접 호출할 수 있는 조회 handler 모음이다. */
 export interface CodocsQueryHandlers {
   readonly access: CodocsAccessState;
   codocsList(input?: unknown): Promise<CodocsListResponse>;
   codocsGet(input: unknown): Promise<CodocsGetResponse>;
+  codocsValidate(input?: unknown): Promise<CodocsValidationResponse>;
   codocsRefresh(input?: unknown): Promise<WorkspaceRefreshResult>;
   refresh(input?: unknown): Promise<WorkspaceRefreshResult>;
 }
@@ -133,6 +139,12 @@ export function createCodocsQueryHandlers(
       const parsed = parseGetInput(input);
       if (!parsed) return invalidInput();
       return session.get(parsed.ids);
+    },
+    /** 같은 세션의 완료 색인과 경로 검사로 검증 범위를 결정한다. */
+    async codocsValidate(input?: unknown): Promise<CodocsValidationResponse> {
+      const parsed = parseValidateInput(arguments.length === 0 ? {} : input);
+      if (!parsed) return invalidInput();
+      return session.validate(parsed.path);
     },
     /** 같은 세션의 명시 refresh로 기존 목록 cursor를 만료한다. */
     codocsRefresh: refresh,

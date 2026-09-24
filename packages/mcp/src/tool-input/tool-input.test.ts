@@ -4,6 +4,7 @@ import {
   codocsInputSchemas,
   codocsJsonInputSchema,
   parseGetInput,
+  parseValidateInput,
 } from './index.js';
 
 describe('MCP 여섯 입력 계약', () => {
@@ -68,5 +69,16 @@ describe('MCP 여섯 입력 계약', () => {
     expect(codocsInputSchemas.get('codocs_write')!.parse(update)).toEqual(
       update,
     );
+  });
+
+  it('검증 입력은 선택 문자열 하나만 허용하고 복수 경로는 거부한다', () => {
+    expect(parseValidateInput({})).toEqual({});
+    expect(parseValidateInput({ path: '.codocs/a.yaml' })).toEqual({
+      path: '.codocs/a.yaml',
+    });
+    expect(
+      parseValidateInput({ path: ['.codocs/a.yaml', '.codocs/b.yaml'] }),
+    ).toBeUndefined();
+    expect(parseValidateInput({ path: null })).toBeUndefined();
   });
 });

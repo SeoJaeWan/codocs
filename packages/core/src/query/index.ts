@@ -534,6 +534,22 @@ function queryDiagnostics(
   return diagnostics.sort(compareDiagnostics);
 }
 
+/** 현재 색인의 전체 또는 한 발견 경로에 속한 진단을 조회와 같은 규칙으로 투영한다. */
+export function projectCatalogDiagnostics(
+  catalog: Catalog,
+  documentPath?: string,
+): CatalogQueryDiagnostic[] {
+  const documents =
+    documentPath === undefined
+      ? [...catalog.documents.values()]
+      : [catalog.documents.get(documentPath)].filter(
+          (document) => document !== undefined,
+        );
+  return documents
+    .flatMap((document) => queryDiagnostics(catalog, document))
+    .sort(compareDiagnostics);
+}
+
 /** 경로·위치·코드·부가 정보 순으로 같은 Catalog에서 항상 같은 순서를 만든다. */
 function compareDiagnostics(
   left: CatalogQueryDiagnostic,

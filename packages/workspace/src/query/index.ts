@@ -8,6 +8,7 @@ import {
   isDocumentStatus,
   matchCode,
   projectCatalogGet,
+  projectCatalogDiagnostics,
   projectCatalogList,
   projectCatalogPaths,
   projectLiveReferences,
@@ -41,7 +42,7 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { open, readFile } from 'node:fs/promises';
 import {
   openSync,
   closeSync,
@@ -55,6 +56,7 @@ import { resolveWorkspacePath } from '../paths/index.js';
 import { calculateRevision } from '../revision/index.js';
 import { pathToFileURL } from 'node:url';
 import {
+  getIoErrorCode,
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
 } from '../diagnostics/index.js';
@@ -67,9 +69,16 @@ import {
   type WorkspaceScanDiagnostic,
   type WorkspaceScanResult,
 } from '../loader/index.js';
-import { workspaceTargetKinds } from '../paths/domain-values.js';
+import {
+  workspacePathFailureStatuses,
+  workspaceTargetKinds,
+} from '../paths/domain-values.js';
 import { WorkspaceWatcher } from '../watcher/index.js';
-import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
+import {
+  codocsDirectoryName,
+  resolveProjectRoot,
+  type ProjectRoot,
+} from '../project-root/index.js';
 import { QueryObservations } from './observations.js';
 import {
   workspaceLifecycleStates,
@@ -103,6 +112,11 @@ export const workspaceQueryDiagnosticMessages = {
 export type WorkspaceQueryDiagnostic =
   | CatalogQueryDiagnostic
   | WorkspaceScanDiagnostic
+  | (Diagnostic<
+      | typeof queryDiagnosticCodes.invalidPath
+      | typeof queryDiagnosticCodes.notFound
+      | typeof queryDiagnosticCodes.fileAccessFailed
+    > & { ioCode?: string })
   | Diagnostic<
       (typeof workspaceQueryDiagnosticCodes)[keyof typeof workspaceQueryDiagnosticCodes]
     >;
@@ -164,6 +178,20 @@ export type WorkspaceListResult = RequestResult<
 /** 상세 조회 결과다. */
 export type WorkspaceGetResponse = RequestResult<
   WorkspaceGetSuccess,
+  WorkspaceQueryFailure
+>;
+
+/** 전체 또는 한 파일의 현재 색인 진단이며 문서 오류도 요청 성공이다. */
+export interface WorkspaceValidationSuccess {
+  success: true;
+  scanStatus: typeof scanStatuses.complete;
+  diagnostics: readonly WorkspaceQueryDiagnostic[];
+  path?: string;
+}
+
+/** 경로·준비 상태 실패와 정상 문서 진단을 구분하는 검증 결과다. */
+export type WorkspaceValidationResult = RequestResult<
+  WorkspaceValidationSuccess,
   WorkspaceQueryFailure
 >;
 
@@ -531,6 +559,44 @@ function invalidInput(
       severity: diagnosticSeverities.error,
       message: queryDiagnosticMessages.invalidInput,
     },
+  };
+}
+
+/** 검증 요청은 발견 가능한 프로젝트 상대 YAML 파일 한 개만 지정한다. */
+function validationPath(input: string): string | undefined {
+  if (path.isAbsolute(input) || path.win32.isAbsolute(input)) return;
+  const normalized = discoveryPath(input);
+  const segments = normalized
+    .split(path.sep)
+    .filter((segment) => segment !== '');
+  while (segments[0] === '.') segments.shift();
+  if (
+    segments[0] !== codocsDirectoryName ||
+    segments.length < 2 ||
+    segments.some((segment) => /[*?\[\]{}]/u.test(segment)) ||
+    !/\.ya?ml$/u.test(normalized)
+  )
+    return;
+  return normalized;
+}
+
+/** 실제 경로·IO 원인을 잃지 않고 검증 요청 실패의 외부 진단을 만든다. */
+function validationDiagnostic(
+  code:
+    | typeof queryDiagnosticCodes.invalidPath
+    | typeof queryDiagnosticCodes.notFound
+    | typeof queryDiagnosticCodes.fileAccessFailed,
+  message: string,
+  documentPath: string,
+  error?: unknown,
+): WorkspaceQueryDiagnostic {
+  const ioCode = getIoErrorCode(error);
+  return {
+    code,
+    severity: diagnosticSeverities.error,
+    message,
+    path: documentPath,
+    ...(ioCode === undefined ? {} : { ioCode }),
   };
 }
 
@@ -1135,6 +1201,132 @@ export class WorkspaceQuerySession {
       scanStatus,
       results,
       ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
+    };
+  }
+
+  /** 같은 완료 색인에서 전체 또는 지정 파일의 진단만 반환한다. 실제 대상 접근과 비동기 경쟁도 확인한다. */
+  async validate(inputPath?: string): Promise<WorkspaceValidationResult> {
+    if (this.#scan && this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
+    const scan = await this.#current();
+    if (this.#explicitRefreshPromise) return workspaceIndexNotReady();
+    if (scan.status === scanStatuses.failed) return scanFailure(scan);
+    const watchFailure = this.#watchFailure();
+    if (watchFailure) return this.#watchFailureResult(watchFailure);
+    if (scan.status !== scanStatuses.complete)
+      return {
+        success: false,
+        scanStatus: scan.status,
+        error:
+          scan.failures[0]?.diagnostics[0] ??
+          scan.diagnostics[0] ??
+          workspaceIndexNotReady().error,
+      };
+    if (
+      this.readiness.state !== workspaceLifecycleStates.ready ||
+      !this.#catalog
+    )
+      return workspaceIndexNotReady();
+    const catalog = this.#catalog;
+    /** 경로 IO를 기다리는 동안 refresh·감시 실패·색인 교체가 발생하면 해당 공통 실패를 반환한다. */
+    const changedState = (): WorkspaceQueryFailure | undefined => {
+      if (
+        this.#explicitRefreshPromise ||
+        this.#scan !== scan ||
+        this.#catalog !== catalog
+      )
+        return workspaceIndexNotReady();
+      const watchFailure = this.#watchFailure();
+      if (watchFailure) return this.#watchFailureResult(watchFailure);
+      return this.readiness.state === workspaceLifecycleStates.ready
+        ? undefined
+        : workspaceIndexNotReady();
+    };
+    let selectedPath: string | undefined;
+    if (inputPath !== undefined) {
+      const candidate = validationPath(inputPath);
+      if (!candidate)
+        return {
+          success: false,
+          scanStatus: scan.status,
+          error: validationDiagnostic(
+            queryDiagnosticCodes.invalidPath,
+            queryDiagnosticMessages.invalidPath,
+            inputPath,
+          ),
+        };
+      const resolved = await resolveWorkspacePath(scan.root, candidate);
+      const unavailable = changedState();
+      if (unavailable) return unavailable;
+      if (!resolved.success) {
+        const diagnostic = resolved.diagnostics[0];
+        const missing =
+          resolved.status === workspacePathFailureStatuses.missing;
+        return {
+          success: false,
+          scanStatus: scan.status,
+          error:
+            diagnostic?.code ===
+            workspaceDiagnosticCodes.unsupportedWorkspaceLink
+              ? diagnostic
+              : validationDiagnostic(
+                  missing
+                    ? queryDiagnosticCodes.notFound
+                    : resolved.status === workspacePathFailureStatuses.denied
+                      ? queryDiagnosticCodes.invalidPath
+                      : queryDiagnosticCodes.fileAccessFailed,
+                  missing
+                    ? queryDiagnosticMessages.fileNotFound
+                    : resolved.status === workspacePathFailureStatuses.denied
+                      ? queryDiagnosticMessages.invalidPath
+                      : queryDiagnosticMessages.fileAccessFailed,
+                  resolved.path ?? candidate,
+                  diagnostic?.ioCode === undefined
+                    ? undefined
+                    : { code: diagnostic.ioCode },
+                ),
+        };
+      }
+      if (resolved.kind !== workspaceTargetKinds.file)
+        return {
+          success: false,
+          scanStatus: scan.status,
+          error: validationDiagnostic(
+            queryDiagnosticCodes.invalidPath,
+            queryDiagnosticMessages.invalidPath,
+            resolved.path,
+          ),
+        };
+      try {
+        const file = await open(resolved.logicalPath, 'r');
+        await file.close();
+      } catch (error: unknown) {
+        const unavailable = changedState();
+        if (unavailable) return unavailable;
+        return {
+          success: false,
+          scanStatus: scan.status,
+          error: validationDiagnostic(
+            queryDiagnosticCodes.fileAccessFailed,
+            queryDiagnosticMessages.fileAccessFailed,
+            resolved.path,
+            error,
+          ),
+        };
+      }
+      selectedPath = resolved.path;
+      if (!catalog.documents.has(selectedPath)) return workspaceIndexNotReady();
+    }
+    const unavailable = changedState();
+    if (unavailable) return unavailable;
+    return {
+      success: true,
+      scanStatus: scanStatuses.complete,
+      ...(selectedPath === undefined ? {} : { path: selectedPath }),
+      diagnostics: [
+        ...projectCatalogDiagnostics(catalog, selectedPath),
+        ...(selectedPath === undefined ? scan.skippedLinks : []),
+      ],
     };
   }
 
