@@ -1,0 +1,31 @@
+
+> codocs@0.0.0 check /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003
+> node tools/check/run.mjs all
+
+
+/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/check-command.mjs
+  21:34  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+
+/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs
+  100:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  119:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  148:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  174:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  221:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  242:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  246:37  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  262:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  279:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  285:9   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  298:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  310:61  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  326:40  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  339:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  375:5   error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+
+/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/run.mjs
+  910:15  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+
+✖ 17 problems (17 errors, 0 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.

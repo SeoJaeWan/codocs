@@ -1,0 +1,6 @@
+
+> codocs@0.0.0 check /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003
+> node tools/check/run.mjs all
+
+Checking formatting...
+ ELIFECYCLE  Command failed with exit code 1.

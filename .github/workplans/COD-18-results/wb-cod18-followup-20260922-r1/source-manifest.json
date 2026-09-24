@@ -1,0 +1,86 @@
+[
+  {
+    "path": ".codocs/core/catalog/reference-candidate.yaml",
+    "sha256": "bb214382196552c5b2f8c7da0bbc7211b18986272d3555fcfb0f3361944244d9"
+  },
+  {
+    "path": ".codocs/language-server/document-sync.yaml",
+    "sha256": "7bd33f04ce0cddd56d46e1da2e5b436c7b0093231e834afa3b8e94991926d0a4"
+  },
+  {
+    "path": ".codocs/language-server/hover.yaml",
+    "sha256": "69d86d671fe79fa5eff2d84cd22f14c1169274bb3120b0f1042b60361205f852"
+  },
+  {
+    "path": ".codocs/language-server/ide-support.yaml",
+    "sha256": "9d98a2714090ba0d9dbce1231f69d7b4e3c255f337577e024597c118e711e85c"
+  },
+  {
+    "path": ".codocs/vscode/open-source.yaml",
+    "sha256": "36e38d89adf21711879e0a8d04819d9ea66b00f6bb372e825c585d1d49834e60"
+  },
+  {
+    "path": ".codocs/workspace/query/workspace-query-session.yaml",
+    "sha256": "090b1d71a6b93fb03e530b3f98c18f1531c267af4e7017e782449353977d4e72"
+  },
+  {
+    "path": "packages/core/src/catalog/catalog.test.ts",
+    "sha256": "3b9e5f8bd59e4ee6ed5dc17d1bcb68126498598816642a4394e7b12c31a8a3b8"
+  },
+  {
+    "path": "packages/language-server/src/hover/hover.test.ts",
+    "sha256": "bf047a085eeea13764a05404f9fda7404d2bb7528d5808ecddf6625c3188420a"
+  },
+  {
+    "path": "packages/language-server/src/hover/index.ts",
+    "sha256": "35ce9c070097d55a0546b4df52c2365619fa32f0e93bdaf57b18a5fd4a59a016"
+  },
+  {
+    "path": "packages/language-server/src/navigation/index.ts",
+    "sha256": "54e9ba049a0baeff52d8fd2903b7f189ec06f1409b4e947ca190583914e2dc89"
+  },
+  {
+    "path": "packages/language-server/src/navigation/navigation.test.ts",
+    "sha256": "e6cc4183b59a33ebf00af2353bae48a7b84295d27633b20759a1bfdca479cbfa"
+  },
+  {
+    "path": "packages/language-server/src/server-session/index.ts",
+    "sha256": "7af7eac03942cafeca6e46067b7c233e533211d0b41aa1091d33ab4adbba38c0"
+  },
+  {
+    "path": "packages/language-server/src/server-session/live-navigation.test.ts",
+    "sha256": "8eb1767bf0d27cab826599af2c346f53189cd82d253c20c6fbdd703e90475784"
+  },
+  {
+    "path": "packages/vscode/src/vscode-client/index.ts",
+    "sha256": "424ac005362681d6d215f92824c9376bb68d4b7d694780d0be32902c21385af8"
+  },
+  {
+    "path": "packages/vscode/src/vscode-client/vscode-client.test.ts",
+    "sha256": "7f603df0614f15b375eda9b55d7742694666f00a34cde9f3598bd11111c42878"
+  },
+  {
+    "path": "packages/workspace/src/query/candidate.test.ts",
+    "sha256": "2995753196bb1e4575d2cae2ceb3e435d6afd7ad252f3967130b4b46681e1995"
+  },
+  {
+    "path": "packages/workspace/src/query/index.ts",
+    "sha256": "21d23f92da22e4d554be1ceef03d6d4cffab1dc54e0b4493ae24fbcb8ff4b179"
+  },
+  {
+    "path": "tools/build-checks/name-references/index.ts",
+    "sha256": "6fa809be83aaed577d4b2755b74d4aa868020d233d6a1d0e5985891c48fe5525"
+  },
+  {
+    "path": "tools/extension-host/cod18.cjs",
+    "sha256": "c19d6d0e0de409fd2c65e535286f1cb7f274d74a4a05770b38dd05636963fd0f"
+  },
+  {
+    "path": "tools/extension-host/extension-test.cjs",
+    "sha256": "949003ca4c31e0ef8fb70207c7997a0310b5816b4191ed13d5bc6185a9ae62a2"
+  },
+  {
+    "path": "tools/extension-host/run.mjs",
+    "sha256": "4be8033718b79456f54dcfcdbdfadd954682a22271168aa5bdd4685baf117759"
+  }
+]

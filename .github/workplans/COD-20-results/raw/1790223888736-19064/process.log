@@ -1,0 +1,191 @@
+Installing extensions...
+Extension 'codocs.vsix' was successfully installed.
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:26:01.801Z] update#setState disabled
+[main 2026-09-24T04:26:01.801Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:26:01.842Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 11688.
+ComputeTargetPlatform: win32-x64
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:26:07.017Z] Extension host with pid 11688 exited with code: 0, signal: unknown.
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:26:09.089Z] update#setState disabled
+[main 2026-09-24T04:26:09.089Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:26:09.126Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 10724.
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+ComputeTargetPlatform: win32-x64
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:26:25.269Z] Extension host with pid 10724 exited with code: 0, signal: unknown.
+
+
+DevTools listening on ws://127.0.0.1:3769/devtools/browser/02ebed57-8da6-4af2-9f61-71279d8044f6
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'remote-debugging-port' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:26:27.483Z] update#setState disabled
+[main 2026-09-24T04:26:27.483Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:26:27.512Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 13900.
+ComputeTargetPlatform: win32-x64
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:26:48.522Z] Extension host with pid 13900 exited with code: 0, signal: unknown.
+
+
+DevTools listening on ws://127.0.0.1:3780/devtools/browser/c7cb8b52-db64-4a9b-bc3b-ea0bae4eb11e
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'remote-debugging-port' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:26:50.642Z] update#setState disabled
+[main 2026-09-24T04:26:50.642Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:26:50.669Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 8476.
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+ComputeTargetPlatform: win32-x64
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:27:14.989Z] Extension host with pid 8476 exited with code: 0, signal: unknown.
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:27:17.297Z] update#setState disabled
+[main 2026-09-24T04:27:17.298Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:27:17.341Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 9788.
+ComputeTargetPlatform: win32-x64
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:27:53.295Z] Extension host with pid 9788 exited with code: 0, signal: unknown.
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:27:55.540Z] update#setState disabled
+[main 2026-09-24T04:27:55.540Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:27:55.568Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 25168.
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+ComputeTargetPlatform: win32-x64
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:28:48.781Z] Extension host with pid 25168 exited with code: 0, signal: unknown.
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:28:51.004Z] update#setState disabled
+[main 2026-09-24T04:28:51.005Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:28:51.034Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 11096.
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+ComputeTargetPlatform: win32-x64
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+[main 2026-09-24T04:28:54.403Z] Extension host with pid 11096 exited with code: 0, signal: unknown.
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:28:56.636Z] update#setState disabled
+[main 2026-09-24T04:28:56.637Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:28:56.685Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 24144.
+ComputeTargetPlatform: win32-x64
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:29:01.925Z] Extension host with pid 24144 exited with code: 0, signal: unknown.
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:29:04.351Z] update#setState disabled
+[main 2026-09-24T04:29:04.351Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:29:04.383Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 24332.
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+ComputeTargetPlatform: win32-x64
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:29:32.005Z] Extension host with pid 24332 exited with code: 0, signal: unknown.
+
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:29:34.237Z] update#setState disabled
+[main 2026-09-24T04:29:34.238Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:29:34.280Z] update#setState disabled
+[main 2026-09-24T04:29:34.281Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:29:34.298Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+[main 2026-09-24T04:29:34.346Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 11336.
+Started local extension host with pid 3896.
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+ComputeTargetPlatform: win32-x64
+ComputeTargetPlatform: win32-x64
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Settings Sync: Account status changed from uninitialized to unavailable
+[24072:0924/132936.820:ERROR:electron_api_app.cc(1260)] Failed to commit changes to custom Jump List.
+[main 2026-09-24T04:29:36.822Z] updateWindowsJumpList#setJumpList unexpected result: error
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:30:04.041Z] Extension host with pid 3896 exited with code: 0, signal: unknown.
+[main 2026-09-24T04:30:16.524Z] Extension host with pid 11336 exited with code: 0, signal: unknown.
+
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T04:30:19.882Z] update#setState disabled
+[main 2026-09-24T04:30:19.883Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:30:19.898Z] update#setState disabled
+[main 2026-09-24T04:30:19.899Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T04:30:19.939Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+[main 2026-09-24T04:30:19.952Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 18052.
+Started local extension host with pid 14392.
+ComputeTargetPlatform: win32-x64
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+ComputeTargetPlatform: win32-x64
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-1EwRic\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T04:31:10.529Z] Extension host with pid 14392 exited with code: 0, signal: unknown.
+[main 2026-09-24T04:31:21.858Z] Extension host with pid 18052 exited with code: 0, signal: unknown.

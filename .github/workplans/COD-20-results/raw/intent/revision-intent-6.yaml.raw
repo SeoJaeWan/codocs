@@ -1,0 +1,19 @@
+intent_revision: wb-cod20-dom-20260924/intent/6
+previous_revision: wb-cod20-dom-20260924/intent/5
+user_instruction: 이어서 진행해
+affected_tasks:
+  - DELIVERY-001
+reuse:
+  prior_implementation_candidate: 328bb041286982ce4d131479425e80c2a8dfadf0
+  prior_tests: Existing same-source PASS and FAIL evidence reused without reclassification.
+  delivery_worktree: Same assigned worktree, clean at exact base before resume.
+quiescence:
+  worker: /root/cod20_delivery001
+  observed_head_commit: 328bb041286982ce4d131479425e80c2a8dfadf0
+  tracked_untracked_clean: true
+  pr17_head: 17cae89264ce27ffb753396ac9b1e37f8b7fa2b6
+  publication_occurred: false
+scope_changes: []
+previous_delivery_binding: e76af0e2eee0de7a229425b38a86736edfe122efb2aa435da6afa0ae6acbac9a
+new_delivery_binding: cf2237d3789027bd2505dc869e73d63b97b9e3970f5db9820435b5da22ff2b07
+revision_digest: 59525f199b3bba779705ec837fbd2604c2636ea95c09896d836a2feb12f06518

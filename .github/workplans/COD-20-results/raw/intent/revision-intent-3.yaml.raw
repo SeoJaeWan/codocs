@@ -1,0 +1,34 @@
+intent_revision: wb-cod20-dom-20260924/intent/3
+previous_revision: wb-cod20-dom-20260924/intent/2
+user_instruction: Continue approved execute-task; existing plan requires harness defects repaired and partial evidence/cancellation preserved. No new product decision or sample-target change.
+reason: INT-001 found missing in-flight API warmup/measured progress and terminal-dependent cancellation bypassing finalization; bounded repair authorized by current scope.
+source_plan:
+  id: wb-cod20-dom-20260924/plan/1
+  digest: f8d0eb194b1fa504639b625ab2bba76e0967e405aac558c642dc81474efc0f34
+task_bindings:
+  TASK-001:
+    reuse: historical allowed provisional
+    commit: 642208878e18285c88934147b4f1d07195b36525
+  TASK-002:
+    reuse: historical allowed provisional
+    commit: ac90f36b4ed793418ac16a229a51459ffbdecc98
+  TASK-003:
+    reuse: historical allowed provisional
+    commit: 21eabb2d14490491357b73715825dc3c8285e386
+  REPAIR-001:
+    binding: 7b7f22c5ab1a734341c1230b5acd3ee0d908417a6c16e1ddb61fcdb80ca81f92
+    action: fresh isolated implementation
+  INT-001:
+    previous_binding: c402d2dcd5e0b5fd26729b3bbc795581decc9effd995bb3d1e2dcb0068a3e3e1
+    action: quiescent pending exact repair commit and revised binding; formal performance restarts on repaired source
+quiescence:
+  int_head: 21eabb2d14490491357b73715825dc3c8285e386
+  tracked_clean: true
+  owned_code_processes: 0
+  evidence: .workbench/diagnostic-cancel-1.100.0.json; worker acknowledgment
+  raw_reports: preserved unchanged; abrupt diagnostic cancellation not product failure
+checks_to_repeat:
+  - full performance both pinned versions on repaired exact source
+  - affected controlled cancellation/progress regressions
+  - applicable final source checks
+revision_digest: d52e2aed5ac8668244ad240708b89d8bc9fb16231646e8340ed64322fa78be37
