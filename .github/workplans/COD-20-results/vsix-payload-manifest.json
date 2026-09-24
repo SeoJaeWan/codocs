@@ -1,0 +1,180 @@
+{
+  "schema": "cod20-vsix-payload-v1",
+  "measuredSourceHead": "e720db92b4430f3d6fee59bfbf8555c8cd445ef9",
+  "payloadIdenticalAcrossRuns": true,
+  "canonicalRunId": "1790218927821-7256",
+  "runs": [
+    {
+      "runId": "1790218927821-7256",
+      "vscode": "1.100.0",
+      "mode": "functional",
+      "archiveSha256": "eb4fb19184e752a985ebc0939985fe8f0096c5c2bcf18a55a71d2d8b03e5a8a8",
+      "entryCount": 26,
+      "payloadDifferencesFromCanonical": 0
+    },
+    {
+      "runId": "1790219067924-10968",
+      "vscode": "1.139.0",
+      "mode": "functional",
+      "archiveSha256": "82f02bdc0e50b7989c4cd43866d8f73422b26fd8e14d8552bc7ebab9f5575154",
+      "entryCount": 26,
+      "payloadDifferencesFromCanonical": 0
+    },
+    {
+      "runId": "1790219725252-16496",
+      "vscode": "1.100.0",
+      "mode": "performance-cancelled",
+      "archiveSha256": "45892c891ec4e18cb71b0be2fc5b227b5475dd52ab233d9f5b610dd9e23952b3",
+      "entryCount": 26,
+      "payloadDifferencesFromCanonical": 0
+    },
+    {
+      "runId": "1790223888736-19064",
+      "vscode": "1.100.0",
+      "mode": "performance-smoke",
+      "archiveSha256": "0acdc55610dbb56e9ca42104f42c17f4d20c275e0ea204f457380445bdd47896",
+      "entryCount": 26,
+      "payloadDifferencesFromCanonical": 0
+    },
+    {
+      "runId": "1790224305493-25376",
+      "vscode": "1.139.0",
+      "mode": "performance-smoke",
+      "archiveSha256": "1b3168fb21496d44a21fa94bcb950cc0098761a7f651e04ab4080ef405e42a76",
+      "entryCount": 26,
+      "payloadDifferencesFromCanonical": 0
+    }
+  ],
+  "canonicalEntries": [
+    {
+      "name": "extension.vsixmanifest",
+      "sha256": "d3813848c186ec21910cbb3c7e70b8f65256d412390f163d0ab4b1268af6a756",
+      "bytes": 1629
+    },
+    {
+      "name": "[Content_Types].xml",
+      "sha256": "3d34b4e493f665b70f11cd5eef890c38277efb79150439d1ff6e3cefd3468bde",
+      "bytes": 523
+    },
+    {
+      "name": "extension/package.json",
+      "sha256": "2702c6adfc88a868f4bfeeff801497595fd8963edc5c462bba4163740c684081",
+      "bytes": 1111
+    },
+    {
+      "name": "extension/dist/index.d.ts.map",
+      "sha256": "a48e49a29ed4dde7bf0ec8cb915c2a308ca4200afccd39acf2fb8901a69341f8",
+      "bytes": 317
+    },
+    {
+      "name": "extension/dist/index.d.ts",
+      "sha256": "32155c20cb1b233fda254b7f1f261bd9c9f8fd04ed5108b9d72d7b622fd09344",
+      "bytes": 413
+    },
+    {
+      "name": "extension/dist/index.cjs.map",
+      "sha256": "fd03eb546677b5e306d2acc18667572cb257a57422a89d0709707ea1acc704f9",
+      "bytes": 1478068
+    },
+    {
+      "name": "extension/dist/index.cjs",
+      "sha256": "9199b105ca09cc5a8d2921e588693dfe4b2f6c88ec8fef15b6478b79172c17dc",
+      "bytes": 836272
+    },
+    {
+      "name": "extension/dist/workspace-routing/index.d.ts.map",
+      "sha256": "d23f09bbe2bd911c9de8a7c44cb72edb125f295cf01a190ab1efd498f9908264",
+      "bytes": 643
+    },
+    {
+      "name": "extension/dist/workspace-routing/index.d.ts",
+      "sha256": "61e6262ec3e27df9fb7f6d625c50fed074a83b77176b1f5670b5ef97398060dc",
+      "bytes": 856
+    },
+    {
+      "name": "extension/dist/vscode-client/index.d.ts.map",
+      "sha256": "322be17da1e7ebf058037d3c1f657c60473f1ccf61e600acf78922023e6a5226",
+      "bytes": 926
+    },
+    {
+      "name": "extension/dist/vscode-client/index.d.ts",
+      "sha256": "c6bcf1a5c5f6739a86069050144e9576abd3b245f57277631f8ec1f8dd30b4fb",
+      "bytes": 1791
+    },
+    {
+      "name": "extension/dist/package-assembly/index.d.ts.map",
+      "sha256": "cae92464d95ed1a31fe4ac8cc1f86032cb0bfc001818801bceb6502a8848efa8",
+      "bytes": 191
+    },
+    {
+      "name": "extension/dist/package-assembly/index.d.ts",
+      "sha256": "3efa1466d25644ff4af6b4ab4ae189344231f735111913d950f163ad49c3e844",
+      "bytes": 199
+    },
+    {
+      "name": "extension/dist/performance-observation/index.d.ts.map",
+      "sha256": "86cdb47ed6d7bd70cef3ea323fc3d6083ba139b53a402be29976d3da31702ef2",
+      "bytes": 245
+    },
+    {
+      "name": "extension/dist/performance-observation/index.d.ts",
+      "sha256": "d311225ec0a4798cea950838d8e22d811bc10cba741707c77db2f1e25be28ed8",
+      "bytes": 234
+    },
+    {
+      "name": "extension/dist/diagnostic-status/index.d.ts.map",
+      "sha256": "e67d2907d0989ff23146096af5604b4939dfd3d86d8dd4fee10f00f2547b43d9",
+      "bytes": 851
+    },
+    {
+      "name": "extension/dist/diagnostic-status/index.d.ts",
+      "sha256": "4d11405ab9486e25a22d33c34b7b45eeaa2ee41731f74b3a180ec75120dc9148",
+      "bytes": 1656
+    },
+    {
+      "name": "extension/dist/client-manager/index.d.ts.map",
+      "sha256": "c8dce039bc722e00886eecad060be1e012952e33cf529ed0c14e177def6a427b",
+      "bytes": 1382
+    },
+    {
+      "name": "extension/dist/client-manager/index.d.ts",
+      "sha256": "f1312041f590dd48d17fc32a6d957e261ae401e69c7b1d5349f235c207289b6d",
+      "bytes": 2685
+    },
+    {
+      "name": "extension/dist/open-source/index.d.ts.map",
+      "sha256": "971fba63f915670cf652b676f5ccb9da50da0f459ef1f58264be744f6d4d8c22",
+      "bytes": 1495
+    },
+    {
+      "name": "extension/dist/open-source/index.d.ts",
+      "sha256": "8ea5476ef377bc34d8276882526f7d92f16d88c82ba2fb78fb1d3f73493a44a1",
+      "bytes": 2209
+    },
+    {
+      "name": "extension/dist/server/index.cjs.map",
+      "sha256": "f988f330f4df64e4c7e3c59805ef06bf6b7078bd427df53914157b90a653d26b",
+      "bytes": 3338170
+    },
+    {
+      "name": "extension/dist/server/index.cjs",
+      "sha256": "c03aebef67da2f4015d8d91d05681f3377bccb64d56ee343b93aca5c51e69f66",
+      "bytes": 1739086
+    },
+    {
+      "name": "extension/dist/examples/.codocs/order.yaml",
+      "sha256": "6fb2ff144880f67ed44cdd9f5f447399251d4fc416db9f8d60ba3c8e3650fabe",
+      "bytes": 294
+    },
+    {
+      "name": "extension/dist/examples/.codocs/fulfillment.yaml",
+      "sha256": "d8a229538713a53846786a3cbb66ad32b3d94e8020fd3db72ff1fdbe97a4e56f",
+      "bytes": 263
+    },
+    {
+      "name": "extension/dist/docs/guide/README.md",
+      "sha256": "ccd2b20e648126f337c1e27f73d5cc34f34d1b8bd20ef41ee56ad87e05608fbd",
+      "bytes": 17179
+    }
+  ]
+}

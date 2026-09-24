@@ -1,0 +1,35 @@
+
+> codocs@0.0.0 test:run /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+> node tools/check/run.mjs test:run packages/workspace/src/query packages/language-server packages/vscode packages/core/src/catalog packages/core/src/query --reporter=default
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+
+ ✓ packages/core/src/catalog/catalog.test.ts (76 tests) 30ms
+ ✓ packages/core/src/query/query.test.ts (48 tests) 42ms
+ ✓ packages/workspace/src/query/snapshot.test.ts (6 tests) 78ms
+ ✓ packages/language-server/src/hover/hover.test.ts (26 tests) 22ms
+ ✓ packages/vscode/src/client-manager/client-manager.test.ts (7 tests) 8ms
+ ✓ packages/vscode/src/open-source/open-source.test.ts (15 tests) 7ms
+ ✓ packages/language-server/src/document-sync/document-sync.test.ts (6 tests) 4ms
+ ✓ packages/vscode/src/package-assembly/package-assembly.test.ts (2 tests) 3ms
+ ✓ packages/vscode/src/vscode-client/vscode-client.test.ts (13 tests) 6ms
+ ✓ packages/language-server/src/navigation/navigation.test.ts (3 tests) 4ms
+ ✓ packages/vscode/src/workspace-routing/workspace-routing.test.ts (3 tests) 3ms
+ ✓ packages/language-server/src/server-session/live-navigation.test.ts (12 tests) 438ms
+ ✓ packages/language-server/src/server-session/server-session.test.ts (12 tests) 464ms
+ ✓ packages/workspace/src/query/candidate.test.ts (24 tests) 793ms
+ ✓ packages/language-server/src/server/server-process.test.ts (4 tests) 973ms
+   ✓ language server stdio 프로세스 (4)
+     ✓ 다중 루트·catalog 생명주기와 재시작 뒤 최신 원문을 실제 프로세스에서 처리한다 317ms
+ ✓ packages/workspace/src/query/query.test.ts (56 tests) 2355ms
+
+ Test Files  16 passed (16)
+      Tests  313 passed (313)
+   Start at  12:03:08
+   Duration  3.01s (tests 53%, transform 28%, import 19%, worker 1%)
+
+  Transform  transforming modules took 2.74s · 28% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

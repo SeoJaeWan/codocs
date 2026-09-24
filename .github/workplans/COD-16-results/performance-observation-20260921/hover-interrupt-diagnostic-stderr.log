@@ -1,0 +1,16 @@
+준비 1회, 워밍업 1/100회, 본 요청 0/1회 완료; 워밍업 1회차 대기 2.7초
+file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/extension-host/run.mjs:961
+      throw new Error(
+            ^
+
+Error: Interrupted by SIGINT
+Preserved failure evidence: /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/.workbench/evidence/host-1.136.1-performance-1789988727599-14382
+    at file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/extension-host/run.mjs:961:13 {
+  [cause]: Error: Interrupted by SIGINT
+      at ChildProcess.<anonymous> (file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/extension-host/run.mjs:169:18)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+}
+
+Node.js v24.21.0

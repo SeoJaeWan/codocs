@@ -1,0 +1,73 @@
+[
+  {
+    "name": "typecheck",
+    "command": ["pnpm", "typecheck"],
+    "exitCode": 0,
+    "durationSeconds": 7.569,
+    "log": "typecheck.log"
+  },
+  {
+    "name": "lint",
+    "command": ["pnpm", "lint"],
+    "exitCode": 0,
+    "durationSeconds": 7.405,
+    "log": "lint.log"
+  },
+  {
+    "name": "format-check",
+    "command": ["pnpm", "format:check"],
+    "exitCode": 0,
+    "durationSeconds": 16.667,
+    "log": "format-check.log"
+  },
+  {
+    "name": "build",
+    "command": ["pnpm", "build"],
+    "exitCode": 0,
+    "durationSeconds": 3.863,
+    "log": "build.log"
+  },
+  {
+    "name": "test-run",
+    "command": ["pnpm", "test:run"],
+    "exitCode": 1,
+    "durationSeconds": 9.609,
+    "log": "test-run.log"
+  },
+  {
+    "name": "check-development",
+    "command": ["pnpm", "check:development"],
+    "exitCode": 0,
+    "durationSeconds": 16.529,
+    "log": "check-development.log"
+  },
+  {
+    "name": "check-build",
+    "command": ["pnpm", "check:build"],
+    "exitCode": 0,
+    "durationSeconds": 25.845,
+    "log": "check-build.log"
+  },
+  {
+    "name": "focused",
+    "command": [
+      "node",
+      "--test",
+      "tools/performance/progress.test.mjs",
+      "tools/performance/reporter.test.mjs",
+      "tools/extension-host/progress.test.mjs",
+      "tools/extension-host/report.test.mjs",
+      "tools/extension-host/request-outcome.test.mjs"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 0.283,
+    "log": "focused.log"
+  },
+  {
+    "name": "test-run-default-confirmation",
+    "command": ["pnpm", "test:run"],
+    "exitCode": 1,
+    "durationSeconds": 8.381,
+    "log": "test-run-default-confirmation.log"
+  }
+]

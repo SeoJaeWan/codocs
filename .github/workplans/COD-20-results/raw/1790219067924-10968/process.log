@@ -1,0 +1,338 @@
+Installing extensions...
+Extension 'codocs.vsix' was successfully installed.
+(node:16708) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+
+[main 2026-09-24T03:07:41.235Z] StorageMainService: creating application shared storage
+[main 2026-09-24T03:07:41.332Z] [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)
+[main 2026-09-24T03:07:41.332Z] [shared storage] Initializing fallback application storage (path: in-memory)
+[main 2026-09-24T03:07:41.387Z] [shared storage] Fallback application storage initialized with 3 items
+[main 2026-09-24T03:07:41.388Z] update#setState disabled
+[main 2026-09-24T03:07:41.388Z] update#ctor - updates are disabled by the environment
+[RemoteAgentHost] Reconciling: desired=[], current=[]
+[AgentHost:renderer] Acquiring MessagePort to agent host...
+[main 2026-09-24T03:07:42.416Z] AgentHostProcessManager: agent host started
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey=undefined conversationKey=undefined modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[AgentHost:renderer] MessagePort acquired, creating client...
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[main 2026-09-24T03:07:42.991Z] [AgentHost:stderr] (node:19116) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+
+Started local extension host with pid 19672.
+[AgentHost:renderer] Protocol connection established; clientId=b4247e79-4945-44a2-bc96-bf5744847603
+[main 2026-09-24T03:07:43.153Z] [AgentHost:stderr] Unhandled Promise Rejection:  Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29 {
+  code: 'ERR_STREAM_DESTROYED'
+}
+
+[main 2026-09-24T03:07:43.166Z] [AgentHost:stderr] Unhandled Promise Rejection:  Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29 {
+  code: 'ERR_STREAM_DESTROYED'
+}
+
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-CZsKpx\test-harness
+Unknown channel: agentHostClientByokLm
+Unknown channel: agentHostClientProxy
+Unknown channel: agentHostClientProxy
+[main 2026-09-24T03:07:44.148Z] [AgentHost:stderr] rejected promise not handled within 1 second: Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+stack trace: Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29
+Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29 {
+  code: 'ERR_STREAM_DESTROYED'
+}
+
+[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false
+[main 2026-09-24T03:07:44.168Z] [AgentHost:stderr] rejected promise not handled within 1 second: Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+stack trace: Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29
+
+[main 2026-09-24T03:07:44.169Z] [AgentHost:stderr] Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29 {
+  code: 'ERR_STREAM_DESTROYED'
+}
+
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[main 2026-09-24T03:07:44.408Z] [AgentHost:stderr] Unhandled Promise Rejection:  Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29 {
+  code: 'ERR_STREAM_DESTROYED'
+}
+
+[RemoteAgentHostProtocol] Request 2 failed: {
+  code: -32603,
+  message: 'Error: Cannot call write after a stream was destroyed\n' +
+    '    at c:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\.workbench\\vscode-cache\\win32-x64-1.139.0\\vscode-win32-x64-archive-1.139.0\\2242ebbb54\\resources\\app\\node_modules.asar\\vscode-jsonrpc\\lib\\common\\connection.js:1089:44\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)'
+}
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+Settings Sync: Account status changed from uninitialized to unavailable
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[AgentHost] No signed-in session resolved for resource: https://api.github.com
+[main 2026-09-24T03:07:44.928Z] [AgentHost:stderr] Unhandled Promise Rejection:  Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29 {
+  code: 'ERR_STREAM_DESTROYED'
+}
+
+[AgentHost] No signed-in session resolved for resource: https://api.github.com/repos
+[RemoteAgentHostProtocol] Request 3 failed: {
+  code: -32603,
+  message: 'Error: Cannot call write after a stream was destroyed\n' +
+    '    at c:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\.workbench\\vscode-cache\\win32-x64-1.139.0\\vscode-win32-x64-archive-1.139.0\\2242ebbb54\\resources\\app\\node_modules.asar\\vscode-jsonrpc\\lib\\common\\connection.js:1089:44\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)'
+}
+[main 2026-09-24T03:07:45.416Z] [AgentHost:stderr] rejected promise not handled within 1 second: Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+stack trace: Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29
+Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29 {
+  code: 'ERR_STREAM_DESTROYED'
+}
+
+[main 2026-09-24T03:07:45.485Z] vscode-file: Failed to load resource c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\out\vs\workbench\services\textMate\browser\backgroundTokenization\worker\textMateTokenizationWorker.workerMain.js Error: net::ERR_FILE_NOT_FOUND
+    at SimpleURLLoaderWrapper.<anonymous> (node:electron/js2c/browser_init:2:139974)
+    at SimpleURLLoaderWrapper.emit (node:events:514:28)
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.139.0/vscode-win32-x64-archive-1.139.0/2242ebbb54/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+[main 2026-09-24T03:07:45.938Z] [AgentHost:stderr] rejected promise not handled within 1 second: Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+stack trace: Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29
+
+[main 2026-09-24T03:07:45.939Z] [AgentHost:stderr] Error [ERR_STREAM_DESTROYED]: Cannot call write after a stream was destroyed
+    at _write (node:internal/streams/writable:493:11)
+    at Writable.write (node:internal/streams/writable:512:10)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:88:29
+    at new Promise (<anonymous>)
+    at WritableStreamWrapper.write (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\node\ril.js:78:16)
+    at TeardownResilientStreamMessageWriter.doWrite (c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:99:33)
+    at c:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-cache\win32-x64-1.139.0\vscode-win32-x64-archive-1.139.0\2242ebbb54\resources\app\node_modules.asar\vscode-jsonrpc\lib\common\messageWriter.js:90:29 {
+  code: 'ERR_STREAM_DESTROYED'
+}
+
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/NWU5ZmFhNmItZTBhNS00ODFhLThkNDEtYzgwOWNlNThhMTM4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+Extension host (LocalProcess pid: 19672) is unresponsive.
+Extension host (LocalProcess pid: 19672) is responsive.
+[main 2026-09-24T03:12:44.189Z] CodeWindow: renderer process gone (reason: oom, code: -536870904)
+[main 2026-09-24T03:12:46.734Z] Extension host with pid 19672 exited with code: 0, signal: unknown.
