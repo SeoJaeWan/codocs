@@ -30,6 +30,8 @@ import {
   type CodeMatchEvidence,
   type CodeMatchResult,
   type Diagnostic,
+  type RequestFailure,
+  type RequestResult,
   type ScanStatus,
 } from '@codocs/core';
 import {
@@ -111,11 +113,16 @@ export interface WorkspaceListInput extends CatalogListFilters {
   cursor?: string;
 }
 
+/** partial 관측의 미확인 진단을 함께 담을 수 있는 목록 항목이다. */
+export type WorkspaceListItem = CatalogListItem & {
+  diagnostics?: readonly WorkspaceQueryDiagnostic[];
+};
+
 /** 성공한 목록은 현재 scan 상태와 고정 페이지 계수를 함께 반환한다. */
 export interface WorkspaceListSuccess {
   success: true;
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
-  items: readonly CatalogListItem[];
+  items: readonly WorkspaceListItem[];
   totalCount: number;
   returnedCount: number;
   nextCursor: string | null;
@@ -143,17 +150,23 @@ export interface WorkspaceGetSuccess {
 }
 
 /** scan 또는 요청 조건 때문에 전체 요청을 수행하지 못한 결과다. */
-export interface WorkspaceQueryFailure {
+export interface WorkspaceQueryFailure extends RequestFailure {
   success: false;
   scanStatus: WorkspaceScanResult['status'];
   error: WorkspaceQueryDiagnostic;
 }
 
 /** 목록 조회 결과다. */
-export type WorkspaceListResult = WorkspaceListSuccess | WorkspaceQueryFailure;
+export type WorkspaceListResult = RequestResult<
+  WorkspaceListSuccess,
+  WorkspaceQueryFailure
+>;
 
 /** 상세 조회 결과다. */
-export type WorkspaceGetResponse = WorkspaceGetSuccess | WorkspaceQueryFailure;
+export type WorkspaceGetResponse = RequestResult<
+  WorkspaceGetSuccess,
+  WorkspaceQueryFailure
+>;
 
 /** 같은 catalog 버전에서 경로별 내용과 관계를 조회한 결과다. */
 export interface WorkspacePathGetSuccess {
@@ -219,18 +232,19 @@ export type WorkspaceMatchResult =
   WorkspaceMatchSuccess | WorkspaceQueryFailure;
 
 /** 명시 refresh의 scan 결과다. */
-export type WorkspaceRefreshResult =
-  | {
-      success: true;
-      scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
-      fileCount: number;
-      itemCount: number;
-      errorCount: number;
-      warningCount: number;
-      countsComplete: boolean;
-      diagnostics: readonly WorkspaceScanDiagnostic[];
-    }
-  | WorkspaceQueryFailure;
+export type WorkspaceRefreshResult = RequestResult<
+  {
+    success: true;
+    scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
+    fileCount: number;
+    itemCount: number;
+    errorCount: number;
+    warningCount: number;
+    countsComplete: boolean;
+    diagnostics: readonly WorkspaceScanDiagnostic[];
+  },
+  WorkspaceQueryFailure
+>;
 
 /** 완료된 관측의 버전·상태 알림이다. partial/failed도 변경 사실을 알린다. */
 export interface WorkspaceSnapshotChange {
@@ -498,6 +512,19 @@ function scanFailure(scan: WorkspaceScanResult): WorkspaceQueryFailure {
     message: workspaceDiagnosticMessages.readFailed,
   };
   return { success: false, scanStatus: scanStatuses.failed, error };
+}
+
+/** 명시적 전체 갱신 중 마지막 색인을 최신 조회 결과로 노출하지 않는다. */
+export function workspaceIndexNotReady(): WorkspaceQueryFailure {
+  return {
+    success: false,
+    scanStatus: scanStatuses.failed,
+    error: {
+      code: workspaceDiagnosticCodes.indexNotReady,
+      severity: diagnosticSeverities.error,
+      message: workspaceDiagnosticMessages.indexNotReady,
+    },
+  };
 }
 
 /** 같은 읽기에서 로더가 원본 바이트로 계산한 revision을 전달한다. */
@@ -966,6 +993,8 @@ export class WorkspaceQuerySession {
 
   /** 최신 실제 scan에서 필터 snapshot을 50개씩 반환한다. */
   async list(input: WorkspaceListInput = {}): Promise<WorkspaceListResult> {
+    if (this.#scan && this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
     const scan = await this.#current();
     const watchFailure = this.#watchFailure();
     if (scan.status === scanStatuses.failed) return scanFailure(scan);
@@ -1003,6 +1032,24 @@ export class WorkspaceQuerySession {
         watchFailure && !item.conflict
           ? { ...item, confirmation: catalogConfirmations.unconfirmed }
           : item,
+      )
+      .map(
+        /** 부분 목록의 미확인 문서에 공통 진단을 붙인다. */ (item) =>
+          scanStatus === scanStatuses.partial &&
+          !item.conflict &&
+          item.confirmation === catalogConfirmations.unconfirmed
+            ? {
+                ...item,
+                diagnostics: [
+                  {
+                    code: catalogDiagnosticCodes.unconfirmedReference,
+                    severity: diagnosticSeverities.warning,
+                    message: catalogDiagnosticMessages.unconfirmedReference,
+                    path: item.source.path,
+                  },
+                ],
+              }
+            : item,
       );
     const nextPosition = position + items.length;
     const nextCursor =
@@ -1028,6 +1075,8 @@ export class WorkspaceQuerySession {
 
   /** 최신 실제 scan에서 1~20개 ID를 독립 결과로 반환한다. */
   async get(ids: readonly string[]): Promise<WorkspaceGetResponse> {
+    if (this.#scan && this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
     const scan = await this.#current();
     const watchFailure = this.#watchFailure();
     if (scan.status === scanStatuses.failed) return scanFailure(scan);

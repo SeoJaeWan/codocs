@@ -40,5 +40,5 @@ definition: |
 
   ## 코드와 검증 위치
 
-  목록·상세 요청의 결과 연결은 [조회 어댑터](../../packages/mcp/src/query/index.ts)와 [조회 테스트](../../packages/mcp/src/query/query.test.ts)에서 확인한다.
+  목록·상세 요청의 결과 연결은 [조회 어댑터](../../packages/mcp/src/query/index.ts)와 [조회 테스트](../../packages/mcp/src/query/query.test.ts)에서 확인한다. 공통 실패 분기는 [공통 진단](../../packages/core/src/diagnostics/index.ts), 준비·부분 목록 결과는 [작업 공간 조회](../../packages/workspace/src/query/index.ts), MCP 포장은 [stdio 서버](../../packages/mcp/src/server/index.ts)에서 확인한다.
   이 연결은 목록·상세 결과의 검증 범위이며 모든 도구의 파일 반영·복구 검증을 대신하지 않는다.

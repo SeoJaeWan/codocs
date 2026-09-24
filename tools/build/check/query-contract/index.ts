@@ -7,10 +7,12 @@ import {queryDiagnosticCodes} from '@codocs/core';
 import {createWorkspaceQuerySession} from '@codocs/workspace';
 const project = path.join(process.cwd(), 'mcp project');
 await mkdir(path.join(project, '.codocs'), {recursive: true});
+let handlerSession;
 try {
   await writeFile(path.join(project, '.codocs', 'b.yaml'), 'id: b\nname: B\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: "[[A]]"\n');
   await writeFile(path.join(project, '.codocs', 'a.yaml'), 'id: a\nname: A\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n');
-  const handlers = createCodocsQueryHandlers({cwd: project});
+  handlerSession = createWorkspaceQuerySession({cwd: project});
+  const handlers = createCodocsQueryHandlers(handlerSession);
   const list = await handlers.codocsList({domain: '업무', kind: 'policy', status: 'confirmed'});
   assert.equal(list.success, true);
   assert.equal(list.scanStatus, 'complete');
@@ -42,11 +44,9 @@ try {
   assert.ok(import.meta.resolve('@codocs/mcp').startsWith(new URL('./node_modules/', import.meta.url).href));
   for (const subpath of ['src/index.js', 'dist/index.js', 'dist/query/index.js']) await assert.rejects(import('@codocs/mcp/' + subpath), {code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'});
   console.log('MCP query JS contract verified');
-} finally { await rm(project, {recursive: true, force: true}); }
-// The public query handlers keep a file watcher alive after this contract finishes.
-process.exit(0);`;
+} finally { await handlerSession?.close(); await rm(project, {recursive: true, force: true}); }`;
 
-/** Node 전역 타입 없는 strict d.ts 소비자 설정이다. */
+/** 서버의 Node stream 타입을 포함한 strict d.ts 소비자 설정이다. */
 export const queryContractConfig = {
   compilerOptions: {
     strict: true,
@@ -57,7 +57,7 @@ export const queryContractConfig = {
     moduleResolution: 'NodeNext',
     target: 'ES2022',
     lib: ['ES2022', 'DOM'],
-    types: [],
+    types: ['node'],
     skipLibCheck: false,
   },
   files: ['query-contract.ts'],
@@ -70,7 +70,8 @@ import {createWorkspaceQuerySession, workspaceQueryDiagnosticCodes} from '@codoc
 import type {Catalog, CatalogPathProjection} from '@codocs/core';
 import type {WorkspacePathGetResponse} from '@codocs/workspace';
 import type {CodocsGetInput, CodocsGetResponse, CodocsListInput, CodocsListResponse} from '@codocs/mcp';
-const handlers = createCodocsQueryHandlers({cwd: '.'});
+const handlerSession = createWorkspaceQuerySession({cwd: '.'});
+const handlers = createCodocsQueryHandlers(handlerSession);
 const listInput: CodocsListInput = {domain: '업무', kind: 'policy', status: 'confirmed'};
 const getInput: CodocsGetInput = {ids: ['a', 'b']};
 const list: CodocsListResponse = await handlers.codocsList(listInput);
@@ -126,6 +127,7 @@ if (!pathGet.success && 'expectedCatalogVersion' in pathGet) {
   console.log(mismatchCode, pathGet.expectedCatalogVersion, pathGet.catalogVersion);
 }
 await pathSession.close();
+await handlerSession.close();
 const invalidCode: 'invalid_input' = queryDiagnosticCodes.invalidInput;
 const cursorCode: 'cursor_expired' = workspaceQueryDiagnosticCodes.cursorExpired;
 console.log(invalidCode, cursorCode);

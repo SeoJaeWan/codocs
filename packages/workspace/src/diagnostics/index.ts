@@ -3,6 +3,8 @@ import { diagnosticSeverities } from '@codocs/core';
 
 /** workspace의 경로·IO·탐색 진단 코드와 발생 조건이다. @domainValues */
 export const workspaceDiagnosticCodes = {
+  /** 초기 구성이나 명시적 전체 갱신이 진행 중일 때 반환한다. */
+  indexNotReady: 'index_not_ready',
   /** 루트 선택 입력이 잘못됐거나 선택 대상이 디렉터리가 아니면 반환한다. */
   invalidProjectRoot: 'invalid_project_root',
   /** 선택 루트의 대상 확인 또는 읽기·탐색 권한 확인에 실패하면 반환한다. */
@@ -23,6 +25,8 @@ export const workspaceDiagnosticCodes = {
 
 /** workspace 진단의 고정 문구다. 실제 시스템 오류 코드는 IO 경계가 별도로 보존한다. */
 export const workspaceDiagnosticMessages = {
+  /** 진행 중인 색인이 완료된 뒤 조회를 다시 시도하도록 안내한다. */
+  indexNotReady: '문서 색인을 구성하는 중입니다. 완료 후 다시 조회하세요.',
   /** 객체가 아닌 루트 선택 옵션을 받았을 때 사용한다. */
   invalidRootOptions: '프로젝트 루트 선택 옵션은 객체이어야 합니다.',
   /** 시작 cwd가 유효한 절대 경로 문자열이 아닐 때 사용한다. */

@@ -4,7 +4,7 @@ Codocs는 `.codocs` YAML에 프로젝트의 용어·동작·정책을 기록하�
 
 문서를 처음 작성한다면 [작성 가이드](docs/guide/README.md)와 [가상 프로젝트 예시](examples/.codocs)부터 확인한다.
 
-현재 이 저장소는 파싱·검증·파일 탐색·색인·코드 매칭, 변경 후보 계산과 MCP 조회 handler를 제공한다. MCP stdio 서버와 LSP·VS Code 확장을 로컬 빌드로 실행할 수 있다. 공개 게시 및 지원 OS 전체의 검증은 별도 단계다.
+현재 이 저장소는 파싱·검증·파일 탐색·색인·코드 매칭, 변경 후보 계산과 MCP stdio 조회 서버를 제공한다. LSP·VS Code 확장도 로컬 빌드로 실행할 수 있다. 공개 게시 및 지원 OS 전체의 검증은 별도 단계다.
 
 ## 시작하기
 
@@ -15,17 +15,25 @@ pnpm install --frozen-lockfile
 pnpm build
 ```
 
+빌드한 MCP 서버를 stdio 클라이언트에서 실행할 때는 다음 명령을 설정한다. `--project`를 생략하면 서버 시작 시점의 작업 디렉터리가 프로젝트다. 상대 경로는 그 디렉터리를 기준으로 해석한다.
+
+```sh
+node packages/mcp/dist/cli.js --project ./my-project
+```
+
+현재 서버가 제공하는 도구는 `codocs_list`, `codocs_get`, `codocs_refresh`다.
+
 현재 API는 모노레포 내부 패키지에서 사용한다. 공개 npm 패키지나 설치 가능한 VS Code 확장을 전제로 하지 않는다. 패키지의 책임과 계약은 아래 소개 문서에서 확인한다. 공개 API는 각 패키지의 `src/index.ts`에서 확인하고 패키지 루트에서 import한다. 구체적인 입력·출력과 사용 사례는 해당 코드의 JSDoc·타입·인접 테스트에서 확인한다.
 
 ## 패키지
 
-| 패키지                                                                  | 역할                                              |
-| ----------------------------------------------------------------------- | ------------------------------------------------- |
-| [@codocs/core](.codocs/core/core.yaml)                                  | IO 없는 파싱·검증·참조·색인·매칭·변경 후보 계산   |
-| [@codocs/workspace](.codocs/workspace/workspace.yaml)                   | 프로젝트 선택, 파일 탐색·원문 버전과 Core 연결    |
-| [@codocs/mcp](.codocs/mcp/mcp.yaml)                                     | MCP 조회 입력과 workspace 결과를 연결하는 handler |
-| [@codocs/language-server](.codocs/language-server/language-server.yaml) | LSP 연동을 위한 패키지                            |
-| [@codocs/vscode](.codocs/vscode/vscode.yaml)                            | VS Code 확장 연동을 위한 패키지                   |
+| 패키지                                                                  | 역할                                            |
+| ----------------------------------------------------------------------- | ----------------------------------------------- |
+| [@codocs/core](.codocs/core/core.yaml)                                  | IO 없는 파싱·검증·참조·색인·매칭·변경 후보 계산 |
+| [@codocs/workspace](.codocs/workspace/workspace.yaml)                   | 프로젝트 선택, 파일 탐색·원문 버전과 Core 연결  |
+| [@codocs/mcp](.codocs/mcp/mcp.yaml)                                     | MCP 입력 계약, 조회 handler와 stdio 서버        |
+| [@codocs/language-server](.codocs/language-server/language-server.yaml) | LSP 연동을 위한 패키지                          |
+| [@codocs/vscode](.codocs/vscode/vscode.yaml)                            | VS Code 확장 연동을 위한 패키지                 |
 
 ## 개발하기
 

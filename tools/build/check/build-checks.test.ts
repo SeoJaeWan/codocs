@@ -55,11 +55,19 @@ const subprocessOutputLimit = 16 * 1024 * 1024;
 
 /** 실제 subprocess를 실행해 stdout과 실패 상태를 확인한다. */
 function run(args: string[], cwd = consumer): string {
-  return execFileSync(process.execPath, args, {
-    cwd,
-    encoding: 'utf8',
-    maxBuffer: subprocessOutputLimit,
-  });
+  try {
+    return execFileSync(process.execPath, args, {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: subprocessOutputLimit,
+    });
+  } catch (error) {
+    const stderr =
+      error instanceof Error && 'stderr' in error ? String(error.stderr) : '';
+    const stdout =
+      error instanceof Error && 'stdout' in error ? String(error.stdout) : '';
+    throw new Error(`${String(error)}\n${stdout}\n${stderr}`);
+  }
 }
 
 /** 원본 또는 배포된 예제를 소스 없는 소비자의 공개 파서와 검증기로 검사한다. */
