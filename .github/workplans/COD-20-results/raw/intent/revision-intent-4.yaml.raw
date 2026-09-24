@@ -1,0 +1,30 @@
+intent_revision: wb-cod20-dom-20260924/intent/4
+previous_revision: wb-cod20-dom-20260924/intent/3
+user_instruction: Keep the1000-run formal setting, but do not execute bulk repeats to reduce sampling error in this implementation task. Complete necessary representative implementation checks and remaining work. Latest clarification supersedes earlier200-perversion option.
+source_message: 아니 내 말은 1000회 남겨두ㄴㄴ건 맞는데 지금 작업에서 1000회가 같은 테스트를 1000회해서 오차를 없애려는거아냐?? 지금 굳이 그거까진 할 필요없는거 아니냐는거지
+affected_tasks:
+  - INT-001
+source_plan:
+  id: wb-cod20-dom-20260924/plan/1
+  digest: f8d0eb194b1fa504639b625ab2bba76e0967e405aac558c642dc81474efc0f34
+  policy: Original immutable; current implementation execution scope revised by user.
+reuse:
+  TASK-001: 642208878e18285c88934147b4f1d07195b36525
+  TASK-002: ac90f36b4ed793418ac16a229a51459ffbdecc98
+  TASK-003: 21eabb2d14490491357b73715825dc3c8285e386
+  REPAIR-001: e720db92b4430f3d6fee59bfbf8555c8cd445ef9
+  final_source_checks: Reuse same-source applicable focused/functional/lifecycle/static results; failures remain failures.
+scope_changes:
+  - Formal default targets unchanged includingAPI1000; bulk formal benchmark deferred.
+  - Use bounded representative smoke configurations only, preserving all prior raw data.
+  - No requirement for200 samples on latest; latest user clarified implementation verification scope.
+quiescence:
+  head: e720db92b4430f3d6fee59bfbf8555c8cd445ef9
+  tracked_clean: true
+  owned_processes: 0
+  run: .workbench/vscode-tests/1790219725252-16496
+  cancellation: Supported cancel-run.json finalized report/result/process, cleaned true, residual0
+  samples: startup10;warmup100;APIcompleted212,incorrect0,failed0,cancelled1;raw1000target report remains cancelled not relabeledcomplete.
+previous_int_binding: d2db664fd36f0a5bfe2bde5dd6b0f26f13147aba5e8178e51ffeb90e1079e397
+new_int_binding: resolved in subsequent standalone runtime-packet-intent-4.yaml
+revision_digest: 602963742b1b545e9b51ca93e12b6ecc9e516607c48d0a15b198d35534b6c16f

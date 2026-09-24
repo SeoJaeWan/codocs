@@ -1,0 +1,690 @@
+
+> codocs@0.0.0 check C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001
+> pnpm typecheck && pnpm lint && pnpm exec prettier . --check && pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs
+
+
+> codocs@0.0.0 typecheck C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001
+> node tools/build/build.mjs typecheck
+
+
+> codocs@0.0.0 lint C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001
+> eslint . --max-warnings=0
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> codocs@0.0.0 build C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001
+> node tools/build/build.mjs build
+
+
+> codocs@0.0.0 test C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001
+> node tools/test/run.mjs
+
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001
+
+ ❯ packages/workspace/src/loader/loader-identity.test.ts (2 tests | 1 failed) 107ms
+   ❯ loadWorkspace: 연결 폴더의 순환 식별 (2)
+     × 같은 실제 폴더의 realPath 표기가 다르면 현재 bigint 폴더 정보로 순환을 중단한다 36ms
+ ❯ packages/workspace/src/project-root/project-root.test.ts (27 tests | 1 failed) 159ms
+   ❯ resolveProjectRoot: 프로젝트 루트 선택 (27)
+     ❯ 기본 cwd와 논리·실제 경로 보존 (5)
+       × 루트가 폴더 링크이면 논리 선택 경로와 확인한 실제 경로를 구분한다 17ms
+ ❯ packages/workspace/src/paths/paths.test.ts (35 tests | 17 failed) 535ms
+   ❯ resolveWorkspacePath: 프로젝트 파일 접근 범위 (35)
+     ❯ 일반 파일과 연결 파일·폴더의 허용 범위 (3)
+       × 외부 파일 링크를 요청하면 그 파일의 읽기와 쓰기 범위를 허용한다 25ms
+       × 외부 폴더 링크의 하위 파일을 요청하면 읽기와 쓰기 범위를 허용한다 27ms
+     ❯ 연결 범위 밖 직접 접근 차단 (3)
+       × 연결된 파일의 실제 외부 경로를 직접 요청하면 거부한다 14ms
+       × 폴더 링크에서 ..로 연결 루트를 벗어나면 거부한다 16ms
+       × 파일 링크에서 ..로 부모나 형제에 접근하면 거부한다 12ms
+     ❯ 경로 정규화와 연결 루트 이탈 판정 (7)
+       × 연결 폴더 하위에서 ..로 연결 루트까지만 돌아오면 허용한다 13ms
+       × 연결 폴더 하위에서 ..를 반복해 연결 루트 밖으로 요청하면 거부한다 18ms
+       × 논리 절대 경로의 폴더 링크 뒤에 ..가 있으면 정규화 전에 거부한다 9ms
+     ❯ 중첩 연결과 경로 별칭 유지 (5)
+       × .codocs 자체가 외부 폴더 링크이면 하위 파일을 허용하고 연결 루트 밖 이동은 거부한다 20ms
+       × 외부 폴더 안에 별도 외부 파일 링크가 있으면 해당 파일만 새 연결 범위로 허용한다 10ms
+       × 파일 링크가 다른 파일 링크를 가리키면 최종 확인한 실제 파일을 반환한다 8ms
+       × 두 폴더 링크가 같은 외부 폴더에 도달하면 서로 다른 논리 경로를 보존한다 9ms
+       × 한글과 Unicode 표기가 다른 링크 이름을 요청하면 두 논리 경로를 별도로 유지한다 13ms
+     ❯ 누락·접근 실패와 잘못된 경로 진단 (16)
+       × .codocs 자체가 깨진 링크이면 부재 대신 대상 확인 실패를 반환한다 13ms
+       × 하위 파일 링크가 깨지면 원문·실경로·좌표 없이 실패 경로와 실제 ENOENT를 반환한다 11ms
+       × 파일 링크 두 개가 서로를 가리키면 실제 ELOOP를 실패 진단으로 반환한다 10ms
+       × 연결 파일에 OS 쓰기 권한이 없어도 정책 범위는 읽기와 쓰기를 허용한다 10ms
+ ❯ packages/workspace/src/loader/loader.test.ts (31 tests | 9 failed) 651ms
+   ❯ loadWorkspace: 발견 경로별 문서 읽기 (31)
+     × 다른 Unicode와 대소문자 이름으로 같은 파일을 연결하면 두 발견 경로를 유지한다 25ms
+     × 외부 파일과 폴더 링크를 읽으면 논리 경로와 읽기 쓰기 범위를 제공한다 13ms
+     × .codocs 자체가 외부 폴더 링크이면 그 하위 문서를 읽는다 15ms
+     × 자기와 부모 폴더로 돌아오는 연결이 있으면 연결만 건너뛰고 정상 문서를 읽는다 21ms
+     × 여러 연결을 거쳐 조상으로 돌아오면 순환 연결만 중단한다 9ms
+     × 다른 두 가지가 같은 폴더에 도달하면 양쪽 논리 경로를 각각 읽는다 11ms
+     × 같은 파일의 링크 별칭과 hardlink를 읽으면 모든 발견 경로를 보존한다 11ms
+     × 깨진 링크가 있으면 실패 경로만 보관하고 정상 문서를 계속 읽어 부분 완료다 8ms
+     × 깨진 .codocs 링크이면 정상 부재로 숨기지 않고 전체 실패다 10ms
+ ❯ packages/workspace/src/loader/scoped-scan.test.ts (23 tests | 8 failed) 1657ms
+   ❯ loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상 (8)
+     × 빈 외부 폴더 링크를 발견하면 열거 전에 대상 등록 완료를 기다린다 64ms
+     × 깨진 외부 파일 링크를 확인하면 대상 위치를 등록하고 실패로 남긴다 72ms
+     × 외부 폴더 열거가 실패해도 확인한 연결을 반환한다 70ms
+     × 같은 외부 폴더의 두 별칭을 탐색하면 문서와 이벤트 대응을 발견 경로별로 보존한다 92ms
+     × 등록 대기 중 링크 대상이 바뀌면 새 실제 경로와 새 원문을 함께 반환한다 71ms
+     × 파일 링크의 실대상이 바뀌면 같은 캐시에서도 새 원문을 읽는다 104ms
+     × 파일 링크의 형제 외부 신호를 받으면 읽기 범위를 확장하지 않는다 88ms
+     × 범위의 조상으로 되돌아가는 링크를 직접 확인하면 순환을 건너뛴다 55ms
+ ❯ packages/workspace/src/query/query-initialization.test.ts (11 tests | 2 failed) 2371ms
+   ❯ 실제 감시와 초기 열거·대상 준비 경계 (9)
+     × 외부 대상 등록이 준비되는 동안 원문이 바뀌면 준비 뒤 읽은 revision을 게시한다 65ms
+     × 빈 외부 폴더의 두 발견 경로에 파일이 생기면 별칭을 합치지 않고 두 경로를 게시한다 32ms
+ ❯ packages/workspace/src/query/query.test.ts (56 tests | 7 failed) 9894ms
+   ❯ workspace 조회 세션 (34)
+     × partial refresh는 집계가 불완전함을 명시한다 116ms
+     × 완료 snapshot 없이 감시가 실패하면 조회 실패를 반환한다 89ms
+     ❯ 부분 스캔 후 이전 조회 결과 보존 (3)
+       × 문서 경로가 깨진 링크로 바뀌면 이전 본문과 revision을 미확인 상태로 반환한다 51ms
+       × 부분 스캔에서 색인 밖 ID를 조회하면 부재로 확정하지 않는다 36ms
+       × 부분 스캔에서 목록을 조회하면 이전 항목을 포함한 개수를 반환한다 69ms
+     × failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다 51ms
+   ❯ 경로와 catalog 버전 기반 문서 조회 (5)
+     × 부분 관측에서 확인하지 못한 경로는 부재로 확정하지 않는다 60ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 45 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/workspace/src/loader/loader-identity.test.ts > loadWorkspace: 연결 폴더의 순환 식별 > 같은 실제 폴더의 realPath 표기가 다르면 현재 bigint 폴더 정보로 순환을 중단한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-identity-cONrOo\project\.codocs' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-identity-cONrOo\project\.codocs\back'
+ ❯ packages/workspace/src/loader/loader-identity.test.ts:51:5
+     49|   it('같은 실제 폴더의 realPath 표기가 다르면 현재 bigint 폴더 정보로 순환을 중단한다', /** 실제 폴더…
+     50|     await writeFile(path.join(codocs, 'ok.yaml'), raw);
+     51|     await symlink(codocs, path.join(codocs, 'back'), 'dir');
+       |     ^
+     52|     const original =
+     53|       await vi.importActual<typeof import('../paths/index.js')>(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/45]⎯
+
+ FAIL  packages/workspace/src/loader/loader.test.ts > loadWorkspace: 발견 경로별 문서 읽기 > 다른 Unicode와 대소문자 이름으로 같은 파일을 연결하면 두 발견 경로를 유지한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-TuREVe\outside\target.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-TuREVe\project\.codocs\first\Mixed-가.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/loader.test.ts:104:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/45]⎯
+
+ FAIL  packages/workspace/src/loader/loader.test.ts > loadWorkspace: 발견 경로별 문서 읽기 > 외부 파일과 폴더 링크를 읽으면 논리 경로와 읽기 쓰기 범위를 제공한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-Fq2mp5\outside\외부 파일.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-Fq2mp5\project\.codocs\file.yml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/loader.test.ts:198:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/45]⎯
+
+ FAIL  packages/workspace/src/loader/loader.test.ts > loadWorkspace: 발견 경로별 문서 읽기 > .codocs 자체가 외부 폴더 링크이면 그 하위 문서를 읽는다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-d3boSO\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-d3boSO\project\.codocs'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/loader.test.ts:230:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/45]⎯
+
+ FAIL  packages/workspace/src/loader/loader.test.ts > loadWorkspace: 발견 경로별 문서 읽기 > 자기와 부모 폴더로 돌아오는 연결이 있으면 연결만 건너뛰고 정상 문서를 읽는다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-QBxXwB\project\.codocs' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-QBxXwB\project\.codocs\self'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/loader.test.ts:239:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/45]⎯
+
+ FAIL  packages/workspace/src/loader/loader.test.ts > loadWorkspace: 발견 경로별 문서 읽기 > 여러 연결을 거쳐 조상으로 돌아오면 순환 연결만 중단한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-Qq0rUK\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-Qq0rUK\project\.codocs\first'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/loader.test.ts:258:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/45]⎯
+
+ FAIL  packages/workspace/src/loader/loader.test.ts > loadWorkspace: 발견 경로별 문서 읽기 > 다른 두 가지가 같은 폴더에 도달하면 양쪽 논리 경로를 각각 읽는다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-OoFynM\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-OoFynM\project\.codocs\SharedA'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/loader.test.ts:273:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/45]⎯
+
+ FAIL  packages/workspace/src/loader/loader.test.ts > loadWorkspace: 발견 경로별 문서 읽기 > 같은 파일의 링크 별칭과 hardlink를 읽으면 모든 발견 경로를 보존한다
+Error: EPERM: operation not permitted, symlink 'original.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-CJZrO3\project\.codocs\alias.yml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/loader.test.ts:297:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/45]⎯
+
+ FAIL  packages/workspace/src/loader/loader.test.ts > loadWorkspace: 발견 경로별 문서 읽기 > 깨진 링크가 있으면 실패 경로만 보관하고 정상 문서를 계속 읽어 부분 완료다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-TyN0Tw\outside\missing.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-TyN0Tw\project\.codocs\broken.yml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/loader.test.ts:390:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/45]⎯
+
+ FAIL  packages/workspace/src/loader/loader.test.ts > loadWorkspace: 발견 경로별 문서 읽기 > 깨진 .codocs 링크이면 정상 부재로 숨기지 않고 전체 실패다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-41mkyX\outside\missing' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-loader-41mkyX\project\.codocs'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/loader.test.ts:514:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/45]⎯
+
+ FAIL  packages/workspace/src/loader/scoped-scan.test.ts > loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상 > 빈 외부 폴더 링크를 발견하면 열거 전에 대상 등록 완료를 기다린다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-thrMKa\outside' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-thrMKa\.codocs\linked'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/scoped-scan.test.ts:368:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/45]⎯
+
+ FAIL  packages/workspace/src/loader/scoped-scan.test.ts > loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상 > 깨진 외부 파일 링크를 확인하면 대상 위치를 등록하고 실패로 남긴다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-pcxBsY\outside\missing.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-pcxBsY\.codocs\broken.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/scoped-scan.test.ts:400:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/45]⎯
+
+ FAIL  packages/workspace/src/loader/scoped-scan.test.ts > loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상 > 외부 폴더 열거가 실패해도 확인한 연결을 반환한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-rcYK2e\outside' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-rcYK2e\.codocs\linked'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/scoped-scan.test.ts:422:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/45]⎯
+
+ FAIL  packages/workspace/src/loader/scoped-scan.test.ts > loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상 > 같은 외부 폴더의 두 별칭을 탐색하면 문서와 이벤트 대응을 발견 경로별로 보존한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-PTuczB\outside' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-PTuczB\.codocs\left'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/scoped-scan.test.ts:440:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/45]⎯
+
+ FAIL  packages/workspace/src/loader/scoped-scan.test.ts > loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상 > 등록 대기 중 링크 대상이 바뀌면 새 실제 경로와 새 원문을 함께 반환한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-uc2yXh\outside\old.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-uc2yXh\.codocs\a.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/scoped-scan.test.ts:460:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/45]⎯
+
+ FAIL  packages/workspace/src/loader/scoped-scan.test.ts > loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상 > 파일 링크의 실대상이 바뀌면 같은 캐시에서도 새 원문을 읽는다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-wGYCW9\outside\old.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-wGYCW9\.codocs\a.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/scoped-scan.test.ts:483:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/45]⎯
+
+ FAIL  packages/workspace/src/loader/scoped-scan.test.ts > loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상 > 파일 링크의 형제 외부 신호를 받으면 읽기 범위를 확장하지 않는다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-6m5WjL\outside\a.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-6m5WjL\.codocs\a.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/scoped-scan.test.ts:498:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/45]⎯
+
+ FAIL  packages/workspace/src/loader/scoped-scan.test.ts > loadWorkspacePath: 외부 연결의 발견 경로와 감시 대상 > 범위의 조상으로 되돌아가는 링크를 직접 확인하면 순환을 건너뛴다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-1uNoxX\.codocs' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\node_modules\.cache\scoped-1uNoxX\.codocs\back'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/loader/scoped-scan.test.ts:517:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/45]⎯
+
+ FAIL  packages/workspace/src/project-root/project-root.test.ts > resolveProjectRoot: 프로젝트 루트 선택 > 기본 cwd와 논리·실제 경로 보존 > 루트가 폴더 링크이면 논리 선택 경로와 확인한 실제 경로를 구분한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-root-Q043jO\실제' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-root-Q043jO\별칭'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/project-root/project-root.test.ts:189:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 일반 파일과 연결 파일·폴더의 허용 범위 > 외부 파일 링크를 요청하면 그 파일의 읽기와 쓰기 범위를 허용한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-oMi4Aa\outside\target.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-oMi4Aa\project\.codocs\file.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:63:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 일반 파일과 연결 파일·폴더의 허용 범위 > 외부 폴더 링크의 하위 파일을 요청하면 읽기와 쓰기 범위를 허용한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-cajiGW\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-cajiGW\project\.codocs\folder'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:78:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 연결 범위 밖 직접 접근 차단 > 연결된 파일의 실제 외부 경로를 직접 요청하면 거부한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-ae5omW\outside\target.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-ae5omW\project\.codocs\file.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:91:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 연결 범위 밖 직접 접근 차단 > 폴더 링크에서 ..로 연결 루트를 벗어나면 거부한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-ry9QPU\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-ry9QPU\project\.codocs\folder'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:119:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 연결 범위 밖 직접 접근 차단 > 파일 링크에서 ..로 부모나 형제에 접근하면 거부한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-esqdgp\outside\target.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-esqdgp\project\.codocs\file.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:128:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 경로 정규화와 연결 루트 이탈 판정 > 연결 폴더 하위에서 ..로 연결 루트까지만 돌아오면 허용한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-fzMsLk\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-fzMsLk\project\.codocs\folder'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:192:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 경로 정규화와 연결 루트 이탈 판정 > 연결 폴더 하위에서 ..를 반복해 연결 루트 밖으로 요청하면 거부한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-jLmcvw\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-jLmcvw\project\.codocs\folder'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:206:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 경로 정규화와 연결 루트 이탈 판정 > 논리 절대 경로의 폴더 링크 뒤에 ..가 있으면 정규화 전에 거부한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-SWjOsF\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-SWjOsF\project\.codocs\folder'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:225:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 중첩 연결과 경로 별칭 유지 > .codocs 자체가 외부 폴더 링크이면 하위 파일을 허용하고 연결 루트 밖 이동은 거부한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-IJY899\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-IJY899\project\.codocs'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:266:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 중첩 연결과 경로 별칭 유지 > 외부 폴더 안에 별도 외부 파일 링크가 있으면 해당 파일만 새 연결 범위로 허용한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-neCPAf\shared.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-neCPAf\outside\nested.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:289:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 중첩 연결과 경로 별칭 유지 > 파일 링크가 다른 파일 링크를 가리키면 최종 확인한 실제 파일을 반환한다
+Error: EPERM: operation not permitted, symlink 'target.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-1CovWj\outside\chain.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:309:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 중첩 연결과 경로 별칭 유지 > 두 폴더 링크가 같은 외부 폴더에 도달하면 서로 다른 논리 경로를 보존한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-fdqpQf\outside' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-fdqpQf\project\.codocs\공통A'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:324:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 중첩 연결과 경로 별칭 유지 > 한글과 Unicode 표기가 다른 링크 이름을 요청하면 두 논리 경로를 별도로 유지한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-zkzg10\outside\target.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-zkzg10\project\.codocs\first\Mixed-가.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:350:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 누락·접근 실패와 잘못된 경로 진단 > .codocs 자체가 깨진 링크이면 부재 대신 대상 확인 실패를 반환한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-4N4xpF\missing' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-4N4xpF\project\.codocs'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:396:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 누락·접근 실패와 잘못된 경로 진단 > 하위 파일 링크가 깨지면 원문·실경로·좌표 없이 실패 경로와 실제 ENOENT를 반환한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-Pn20ym\outside\missing.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-Pn20ym\project\.codocs\broken.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:416:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 누락·접근 실패와 잘못된 경로 진단 > 파일 링크 두 개가 서로를 가리키면 실제 ELOOP를 실패 진단으로 반환한다
+Error: EPERM: operation not permitted, symlink 'b.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-PN8MQq\project\.codocs\a.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:494:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/45]⎯
+
+ FAIL  packages/workspace/src/paths/paths.test.ts > resolveWorkspacePath: 프로젝트 파일 접근 범위 > 누락·접근 실패와 잘못된 경로 진단 > 연결 파일에 OS 쓰기 권한이 없어도 정책 범위는 읽기와 쓰기를 허용한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-z5snCo\outside\target.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs-path-z5snCo\project\.codocs\readonly.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/paths/paths.test.ts:572:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/45]⎯
+
+ FAIL  packages/workspace/src/query/query-initialization.test.ts > 실제 감시와 초기 열거·대상 준비 경계 > 외부 대상 등록이 준비되는 동안 원문이 바뀌면 준비 뒤 읽은 revision을 게시한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\initialization-X78Sdx\external.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\initialization-X78Sdx\.codocs\linked.yaml'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/query/query-initialization.test.ts:244:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/45]⎯
+
+ FAIL  packages/workspace/src/query/query-initialization.test.ts > 실제 감시와 초기 열거·대상 준비 경계 > 빈 외부 폴더의 두 발견 경로에 파일이 생기면 별칭을 합치지 않고 두 경로를 게시한다
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\initialization-KmgwWP\external' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\initialization-KmgwWP\.codocs\first'
+ ❯ Module.createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/query/query-initialization.test.ts:277:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/45]⎯
+
+ FAIL  packages/workspace/src/query/query.test.ts > workspace 조회 세션 > partial refresh는 집계가 불완전함을 명시한다
+Error: EPERM: operation not permitted, symlink 'missing-target.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\query-di1MkP\.codocs\alpha.yaml'
+ ❯ createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/query/query.test.ts:181:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39/45]⎯
+
+ FAIL  packages/workspace/src/query/query.test.ts > workspace 조회 세션 > 완료 snapshot 없이 감시가 실패하면 조회 실패를 반환한다
+Error: EPERM: operation not permitted, symlink 'missing-target.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\query-1EfcTz\.codocs\alpha.yaml'
+ ❯ createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/query/query.test.ts:255:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[40/45]⎯
+
+ FAIL  packages/workspace/src/query/query.test.ts > workspace 조회 세션 > 부분 스캔 후 이전 조회 결과 보존 > 문서 경로가 깨진 링크로 바뀌면 이전 본문과 revision을 미확인 상태로 반환한다
+Error: EPERM: operation not permitted, symlink 'missing-target.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\query-XfsUS8\.codocs\alpha.yaml'
+ ❯ createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/query/query.test.ts:463:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[41/45]⎯
+
+ FAIL  packages/workspace/src/query/query.test.ts > workspace 조회 세션 > 부분 스캔 후 이전 조회 결과 보존 > 부분 스캔에서 색인 밖 ID를 조회하면 부재로 확정하지 않는다
+Error: EPERM: operation not permitted, symlink 'missing-target.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\query-TTMyor\.codocs\alpha.yaml'
+ ❯ createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/query/query.test.ts:491:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[42/45]⎯
+
+ FAIL  packages/workspace/src/query/query.test.ts > workspace 조회 세션 > 부분 스캔 후 이전 조회 결과 보존 > 부분 스캔에서 목록을 조회하면 이전 항목을 포함한 개수를 반환한다
+Error: EPERM: operation not permitted, symlink 'missing-target.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\query-FX5ZLW\.codocs\alpha.yaml'
+ ❯ createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/query/query.test.ts:519:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[43/45]⎯
+
+ FAIL  packages/workspace/src/query/query.test.ts > workspace 조회 세션 > failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다
+Error: EPERM: operation not permitted, symlink 'missing-codocs' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\query-X8GTx3\.codocs'
+ ❯ createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/query/query.test.ts:542:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[44/45]⎯
+
+ FAIL  packages/workspace/src/query/query.test.ts > 경로와 catalog 버전 기반 문서 조회 > 부분 관측에서 확인하지 못한 경로는 부재로 확정하지 않는다
+Error: EPERM: operation not permitted, symlink 'missing-target.yaml' -> 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\fixtures\query-PJEdCI\.codocs\alpha.yaml'
+ ❯ createLink packages/workspace/src/test-support/links.ts:23:3
+     21|     }
+     22|   }
+     23|   await symlink(target, input, selected);
+       |   ^
+     24| }
+     25|
+ ❯ packages/workspace/src/query/query.test.ts:1079:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[45/45]⎯
+
+
+ Test Files  7 failed | 37 passed (44)
+      Tests  45 failed | 846 passed (891)
+   Start at  11:57:55
+   Duration  12.01s (tests 54%, import 32%, transform 13%, worker 1%)
+
+    Isolate  44 workers spawned · ~330ms startup each (spawn + environment, per file)
+             at least ~638ms faster with isolate: false — reuses workers across files instead of one per file
+
+ ELIFECYCLE  Test failed. See above for more details.
+ ELIFECYCLE  Command failed with exit code 1.

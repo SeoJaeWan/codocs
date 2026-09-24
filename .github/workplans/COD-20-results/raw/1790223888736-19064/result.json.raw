@@ -1,0 +1,21 @@
+{
+  "platform": "win32",
+  "arch": "x64",
+  "version": "1.100.0",
+  "mode": "performance",
+  "scenario": "all",
+  "phase": "complete",
+  "passed": true,
+  "output": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\.workbench\\vscode-tests\\1790223888736-19064",
+  "visualInteraction": true,
+  "packageKind": "installed-vsix",
+  "head": "e720db92b4430f3d6fee59bfbf8555c8cd445ef9",
+  "trackedDiff": "",
+  "process": {
+    "reason": "exit",
+    "exitCode": 0,
+    "cleanup": "taskkill-tree",
+    "residualProcesses": 0
+  },
+  "cleaned": true
+}

@@ -1,0 +1,395 @@
+{
+  "status": "complete",
+  "transitions": [
+    {
+      "kind": "capability",
+      "capability": {
+        "supported": true,
+        "timeResolutionMs": 0.10000000149011612,
+        "observerScope": "target Monaco editor subtree",
+        "loadingSelector": ".hover-row > .hover-contents exact Loading...",
+        "requestedLocale": "en",
+        "documentLanguage": "en"
+      },
+      "targetId": "C483B4171789BB8F8F080DD6ACDA9B3B",
+      "targetUrl": "vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/code/electron-sandbox/workbench/workbench.html",
+      "point": {
+        "x": 462.4875030517578,
+        "y": 443.8000183105469
+      }
+    },
+    {
+      "kind": "armed",
+      "popup": {
+        "open": false,
+        "loading": false,
+        "body": "",
+        "rows": [],
+        "rowCount": 0,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 3083.5,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "entry",
+      "x": 462,
+      "y": 443,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 3088.5,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": false,
+        "loading": false,
+        "body": "",
+        "rows": [],
+        "rowCount": 0,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.09999999403953552,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 3088.6999999955297,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": true,
+        "loading": true,
+        "body": "",
+        "rows": [
+          {
+            "hasContents": true,
+            "contentsText": "Loading...",
+            "body": "Loading..."
+          }
+        ],
+        "rowCount": 1,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.29999999701976776,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 4025.6999999955297,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": true,
+        "loading": true,
+        "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001",
+        "rows": [
+          {
+            "hasContents": true,
+            "contentsText": "normal0001\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo현재 ID: normal0001도메인: performance원문 열기이 문서를 참조\nreferences0001\n\n",
+            "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001"
+          },
+          {
+            "hasContents": true,
+            "contentsText": "Loading...",
+            "body": "Loading..."
+          }
+        ],
+        "rowCount": 2,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.20000000298023224,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 19852.60000000149,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": true,
+        "loading": false,
+        "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001",
+        "rows": [
+          {
+            "hasContents": true,
+            "contentsText": "normal0001\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo현재 ID: normal0001도메인: performance원문 열기이 문서를 참조\nreferences0001\n\n",
+            "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001"
+          }
+        ],
+        "rowCount": 1,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.29999999701976776,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 19866.5,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "established-popup",
+      "sample": {
+        "status": "completed",
+        "scenario": "reentry-ui",
+        "iteration": 0,
+        "attempt": 0,
+        "durationMs": 16778,
+        "loadingObserved": true,
+        "loadingDurationMs": 15840.80000000447,
+        "entry": {
+          "kind": "entry",
+          "x": 462,
+          "y": 443,
+          "windowId": "reentry-ui/0/window-1",
+          "target": "normal0001",
+          "generation": 1,
+          "monotonicMs": 3088.5,
+          "timeOrigin": 1790224010623.4
+        },
+        "loading": {
+          "kind": "dom",
+          "armed": true,
+          "entered": true,
+          "popup": {
+            "open": true,
+            "loading": true,
+            "body": "",
+            "rows": [
+              {
+                "hasContents": true,
+                "contentsText": "Loading...",
+                "body": "Loading..."
+              }
+            ],
+            "rowCount": 1,
+            "target": "normal0001",
+            "structureSupported": true
+          },
+          "observationOverheadMs": 0.29999999701976776,
+          "windowId": "reentry-ui/0/window-1",
+          "target": "normal0001",
+          "generation": 1,
+          "monotonicMs": 4025.6999999955297,
+          "timeOrigin": 1790224010623.4
+        },
+        "complete": {
+          "kind": "dom",
+          "armed": true,
+          "entered": true,
+          "popup": {
+            "open": true,
+            "loading": false,
+            "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001",
+            "rows": [
+              {
+                "hasContents": true,
+                "contentsText": "normal0001\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo현재 ID: normal0001도메인: performance원문 열기이 문서를 참조\nreferences0001\n\n",
+                "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001"
+              }
+            ],
+            "rowCount": 1,
+            "target": "normal0001",
+            "structureSupported": true
+          },
+          "observationOverheadMs": 0.29999999701976776,
+          "windowId": "reentry-ui/0/window-1",
+          "target": "normal0001",
+          "generation": 1,
+          "monotonicMs": 19866.5,
+          "timeOrigin": 1790224010623.4
+        },
+        "launchToRequestAgeMs": 3822.0947265625,
+        "clockUncertaintyMs": null,
+        "capability": {
+          "supported": true,
+          "timeResolutionMs": 0.10000000149011612,
+          "observerScope": "target Monaco editor subtree",
+          "loadingSelector": ".hover-row > .hover-contents exact Loading...",
+          "requestedLocale": "en",
+          "documentLanguage": "en"
+        },
+        "readiness": [],
+        "windowId": "reentry-ui/0/window-1",
+        "targetId": "C483B4171789BB8F8F080DD6ACDA9B3B",
+        "target": "normal0001",
+        "expectedBody": "Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo"
+      }
+    },
+    {
+      "kind": "dom",
+      "armed": false,
+      "entered": true,
+      "popup": {
+        "open": false,
+        "loading": false,
+        "body": "",
+        "rows": [],
+        "rowCount": 0,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.6000000014901161,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 19898.5,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "closed-before-reentry",
+      "attempt": 1
+    },
+    {
+      "kind": "armed",
+      "popup": {
+        "open": false,
+        "loading": false,
+        "body": "",
+        "rows": [],
+        "rowCount": 0,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 2,
+      "monotonicMs": 19928.5,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "entry",
+      "x": 462,
+      "y": 443,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 2,
+      "monotonicMs": 19933.19999999553,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": false,
+        "loading": false,
+        "body": "",
+        "rows": [],
+        "rowCount": 0,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.10000000149011612,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 2,
+      "monotonicMs": 19933.39999999851,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": true,
+        "loading": true,
+        "body": "",
+        "rows": [
+          {
+            "hasContents": true,
+            "contentsText": "Loading...",
+            "body": "Loading..."
+          }
+        ],
+        "rowCount": 1,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.10000000149011612,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 2,
+      "monotonicMs": 20858.60000000149,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": true,
+        "loading": true,
+        "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001",
+        "rows": [
+          {
+            "hasContents": true,
+            "contentsText": "normal0001\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo현재 ID: normal0001도메인: performance원문 열기이 문서를 참조\nreferences0001\n\n",
+            "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001"
+          },
+          {
+            "hasContents": true,
+            "contentsText": "Loading...",
+            "body": "Loading..."
+          }
+        ],
+        "rowCount": 2,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 2,
+      "monotonicMs": 24215.89999999851,
+      "timeOrigin": 1790224010623.4
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": true,
+        "loading": false,
+        "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001",
+        "rows": [
+          {
+            "hasContents": true,
+            "contentsText": "normal0001\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo현재 ID: normal0001도메인: performance원문 열기이 문서를 참조\nreferences0001\n\n",
+            "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001"
+          }
+        ],
+        "rowCount": 1,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.10000000149011612,
+      "windowId": "reentry-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 2,
+      "monotonicMs": 24222.29999999702,
+      "timeOrigin": 1790224010623.4
+    }
+  ]
+}

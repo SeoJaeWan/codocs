@@ -1,0 +1,25 @@
+# IDE 성능 측정 보고서
+
+상태: cancelled
+VS Code: 1.100.0
+환경: win32/x64, Node v24.21.0, sjw
+측정 명령: `pnpm test:vscode -- --mode performance --scenario all --vscode-version 1.100.0`
+원본 해시: 소스 af819c687af42e2cf7333289378c3ee31ad849e3c4d17414daf9a0c29095646a, VSIX 45892c891ec4e18cb71b0be2fc5b227b5475dd52ab233d9f5b610dd9e23952b3, 데이터 45775d59c8d078e8a5150557d7d7720ef94db79ac19a7981171f284a793ea4f6
+마지막 진행: api / running / performance-api / 3804648ms 관측
+
+| 시나리오 | 시도 | 완료 | 오답 | 실패 | 취소 | 미완료 | 부족 | 중앙값(ms) | p95(ms) | 최댓값(ms) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| startup | 10 | 10 | 0 | 0 | 0 | 0 | 0 | 5389.5084228515625 | 6416.4599609375 | 6416.4599609375 |
+| api | 213 | 212 | 0 | 0 | 1 | 0 | 788 | 7695.979149999912 | 21895.533400000073 | 84158.25 |
+| first-ui | 0 | 0 | 0 | 0 | 0 | 0 | 10 | - | - | - |
+| reentry-ui | 0 | 0 | 0 | 0 | 0 | 0 | 30 | - | - | - |
+| save | 0 | 0 | 0 | 0 | 0 | 0 | 30 | - | - | - |
+| external | 0 | 0 | 0 | 0 | 0 | 0 | 30 | - | - | - |
+| edit-indexing | 0 | 0 | 0 | 0 | 0 | 0 | 30 | - | - | - |
+| edit-ready | 0 | 0 | 0 | 0 | 0 | 0 | 30 | - | - | - |
+| multiwindow | 0 | 0 | 0 | 0 | 0 | 0 | 1 | - | - | - |
+
+시간 목표는 정보성 비교이며 정확성·표본 완결성과 별개입니다. 완료 표본이 없는 항목은 미측정입니다.
+
+## 오류
+- Error: 테스트 실행 cancelled (null)     at main (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/packages/vscode/test-runner/run.mjs:177:13)     at async file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/packages/vscode/test-runner/run.mjs:274:3

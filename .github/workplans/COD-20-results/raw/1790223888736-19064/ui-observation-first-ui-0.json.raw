@@ -1,0 +1,152 @@
+{
+  "status": "complete",
+  "transitions": [
+    {
+      "kind": "capability",
+      "capability": {
+        "supported": true,
+        "timeResolutionMs": 0.10000000149011612,
+        "observerScope": "target Monaco editor subtree",
+        "loadingSelector": ".hover-row > .hover-contents exact Loading...",
+        "requestedLocale": "en",
+        "documentLanguage": "en"
+      },
+      "targetId": "E88109156B0178C98129C926C1DFF3B6",
+      "targetUrl": "vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/code/electron-sandbox/workbench/workbench.html",
+      "point": {
+        "x": 462.4875030517578,
+        "y": 443.8000183105469
+      }
+    },
+    {
+      "kind": "armed",
+      "popup": {
+        "open": false,
+        "loading": false,
+        "body": "",
+        "rows": [],
+        "rowCount": 0,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "windowId": "first-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 3155.7999999970198,
+      "timeOrigin": 1790223987465.9
+    },
+    {
+      "kind": "entry",
+      "x": 462,
+      "y": 443,
+      "windowId": "first-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 3163.2000000029802,
+      "timeOrigin": 1790223987465.9
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": false,
+        "loading": false,
+        "body": "",
+        "rows": [],
+        "rowCount": 0,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0,
+      "windowId": "first-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 3163.5,
+      "timeOrigin": 1790223987465.9
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": true,
+        "loading": true,
+        "body": "",
+        "rows": [
+          {
+            "hasContents": true,
+            "contentsText": "Loading...",
+            "body": "Loading..."
+          }
+        ],
+        "rowCount": 1,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.10000000149011612,
+      "windowId": "first-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 4098,
+      "timeOrigin": 1790223987465.9
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": true,
+        "loading": true,
+        "body": "normal0001\n\nExpected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001",
+        "rows": [
+          {
+            "hasContents": true,
+            "contentsText": "normal0001\nExpected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj현재 ID: normal0001도메인: performance원문 열기이 문서를 참조\nreferences0001\n\n",
+            "body": "normal0001\n\nExpected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001"
+          },
+          {
+            "hasContents": true,
+            "contentsText": "Loading...",
+            "body": "Loading..."
+          }
+        ],
+        "rowCount": 2,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.19999999552965164,
+      "windowId": "first-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 20915.89999999851,
+      "timeOrigin": 1790223987465.9
+    },
+    {
+      "kind": "dom",
+      "armed": true,
+      "entered": true,
+      "popup": {
+        "open": true,
+        "loading": false,
+        "body": "normal0001\n\nExpected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001",
+        "rows": [
+          {
+            "hasContents": true,
+            "contentsText": "normal0001\nExpected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj현재 ID: normal0001도메인: performance원문 열기이 문서를 참조\nreferences0001\n\n",
+            "body": "normal0001\n\nExpected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001"
+          }
+        ],
+        "rowCount": 1,
+        "target": "normal0001",
+        "structureSupported": true
+      },
+      "observationOverheadMs": 0.10000000149011612,
+      "windowId": "first-ui/0/window-1",
+      "target": "normal0001",
+      "generation": 1,
+      "monotonicMs": 20925,
+      "timeOrigin": 1790223987465.9
+    }
+  ]
+}

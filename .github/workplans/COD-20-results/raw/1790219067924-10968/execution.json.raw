@@ -1,0 +1,6 @@
+{
+  "phase": "extension-host",
+  "version": "1.139.0",
+  "passed": false,
+  "error": "Error: Test run failed with code 1\n    at ChildProcess.onProcessClosed (C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\node_modules\\.pnpm\\@vscode+test-electron@3.1.0\\node_modules\\@vscode\\test-electron\\out\\runTest.js:125:24)\n    at ChildProcess.emit (node:events:514:28)\n    at ChildProcess._handle.onexit (node:internal/child_process:295:12)"
+}

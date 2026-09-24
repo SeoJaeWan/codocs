@@ -59,7 +59,7 @@ h2. 구현 중 확인할 사항
 - 전체 탐색이 complete이고 준비·감시 상태가 정상일 때 validate를 허용한다. partial 탐색이나 감시 실패에서는 단일 파일 요청도 차단하며, 기존 workspace의 원인·진단·복구 안내를 보존해 공통 실패 결과로 전달한다.
 - 읽은 파일의 YAML·ID·참조 오류는 탐색 실패와 구분한다. 검증 요청을 정상 처리해 문서 오류를 보고한 경우에는 success:true를 반환한다.
 - 기존 MCP accessState의 canValidate 판단, 공통 입력 스키마·검증, workspace의 진단·준비·실패 처리와 wrapCodocsResult의 응답 포장을 재사용한다. 도구별로 별도 세션이나 색인을 만들지 않는다.
-- 현재 validate는 입력 스키마와 접근 가능 상태 판단만 있으며 실행 handler·서버 등록은 미구현이다. 기존 처리에 validate 실행을 연결하고 필요한 공통 처리를 소유 계층에서 확장한다. canValidate 값만으로 실패 원인을 추측하거나 diagnostics()의 관측 결과를 완성된 validate 응답으로 간주하지 않는다.
+- 계획 당시 validate는 입력 스키마와 접근 가능 상태 판단만 있었다. 이번 구현은 기존 처리에 validate 실행 handler·서버 등록을 연결하고 필요한 공통 처리를 소유 계층에서 확장했다. canValidate 값만으로 실패 원인을 추측하거나 diagnostics()의 관측 결과를 완성된 validate 응답으로 간주하지 않는다.
 - MCP는 공통 결과를 structuredContent와 같은 내용의 JSON text에 담고 isError를 !success로 설정한다. 기존 오류 코드·메시지·경로·위치·심각도와 복구 안내가 전달 과정에서 보존되는지 검증한다.
 
 ## 문서 기준
@@ -79,7 +79,13 @@ h2. 구현 중 확인할 사항
 - Codocs 진단 코드와 좌표 계약 (codocs-diagnostics)
   ** 조회 참조: {{{"type":"wiki","project_id":"seojaewan/codosc","wiki_id":"01a0997a-d7e7-7702-bae7-9fd9cdb92a75","revision":"01a0997a-d7e7-7658-923f-c18caf415695"}}}
 
-2026-09-13 최초 계획을 바탕으로 현재 로컬 `.codocs` 계약에 따라 진행하는 실행 작업이다. 아직 구현·성능·호환성 검증을 완료한 상태가 아니다.
+2026-09-13 최초 계획을 바탕으로 현재 로컬 `.codocs` 계약에 따라 구현했다. 이 문서는 계획과 결정의 이력을 보존하며, 현재 제품 계약은 `.codocs`가 소유한다.
+
+## 실행 상태 (2026-09-25)
+
+- list/get의 누락된 계약과 validate 실행 handler·stdio 서버 등록을 완료했다. 경로 지정 검증은 전체 색인을 사용해 요청 파일과 관련 충돌 정보만 반환하며, 문서 오류와 요청 실패를 구분한다.
+- Windows에서 `pnpm check`(일반 Vitest 890개, Node 45개, 빌드·개발 검사 115개), 관련 집중 검사 24개 파일/418개 테스트, 실제 MCP stdio 응답 1,002,140 JSON 바이트 및 `.codocs` 76개 문서 검사를 통과했다. 대형 응답의 본문·rawYaml·참조 20개와 SHA-256 revision 보존을 확인했다.
+- macOS·Linux 실행, 실제 GUI에서의 대화형 IDE 시나리오, 클라이언트별 응답 크기 한계 측정은 수행하지 않았다. 해당 환경의 결과를 Windows 검증으로 대체하지 않는다.
 
 ## Jira
 
