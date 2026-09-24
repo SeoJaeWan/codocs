@@ -599,6 +599,8 @@ export interface WorkspaceDiagnosticsSnapshot {
 /** 실제 scan과 이전 Catalog를 직렬로 연결하는 process 범위 조회 세션이다. */
 export class WorkspaceQuerySession {
   readonly #input: unknown;
+  readonly #observe:
+    ((kind: string, detail: Record<string, unknown>) => void) | undefined;
   #catalog: Catalog | undefined;
   #scan: WorkspaceScanResult | undefined;
   #revisions = new Map<string, string>();
@@ -622,8 +624,12 @@ export class WorkspaceQuerySession {
   readonly #selections = new Map<string, CandidateSelection>();
 
   /** 프로젝트 선택의 own data 값만 고정하고 IO는 각 요청 시 수행한다. */
-  constructor(input: unknown = {}) {
+  constructor(
+    input: unknown = {},
+    observe?: (kind: string, detail: Record<string, unknown>) => void,
+  ) {
     this.#input = sessionInput(input);
+    this.#observe = observe;
   }
 
   /** 감시 신호를 허용된 발견 경로로만 되돌리고 진행 중 읽기의 세대를 무효화한다. */
@@ -679,7 +685,10 @@ export class WorkspaceQuerySession {
         ...(selected.projectRoot ? { projectRoot: selected.projectRoot } : {}),
       };
     this.#root = selected.root;
-    const watcher = new WorkspaceWatcher(selected.root.projectRoot);
+    const watcher = new WorkspaceWatcher(
+      selected.root.projectRoot,
+      this.#observe,
+    );
     this.#watcher = watcher;
     watcher.subscribe((batch) => this.#collect(batch.paths));
     await watcher.start();
@@ -688,6 +697,7 @@ export class WorkspaceQuerySession {
   /** 채택한 관측의 내용·revision·참조·진단을 await 없이 한 번에 게시한다. */
   #publish(scan: WorkspaceScanResult): void {
     if (this.#closed) return;
+    const initial = !this.#scan;
     const previousFingerprint = this.#catalog
       ? fingerprint(projectCatalogList(this.#catalog, {}).items)
       : undefined;
@@ -715,6 +725,13 @@ export class WorkspaceQuerySession {
         };
     }
     this.#scan = scan;
+    this.#observe?.('index-published', {
+      folder: this.#root?.projectRoot,
+      status: scan.status,
+      catalogVersion: this.#catalogVersion,
+      initial,
+      documents: scan.documents.length,
+    });
   }
 
   /** 전체 순회를 계속하면서 이후 신호의 파일·하위 범위만 다시 확인한다. */
@@ -821,6 +838,12 @@ export class WorkspaceQuerySession {
   #synchronize(full = true): Promise<WorkspaceScanResult> {
     if (this.#refreshPromise) return this.#refreshPromise;
     if (this.#closed) return Promise.resolve(this.#closedScan());
+    this.#observe?.('index-start', {
+      folder: this.#root?.projectRoot,
+      full,
+      initial: !this.#scan,
+      previousCatalogVersion: this.#catalogVersion,
+    });
     const operation = this.#scanOperation(full).catch(
       /** 예외를 실패 관측으로 게시해 준비 상태를 끝낸다. */ (
         error: unknown,
@@ -1648,8 +1671,9 @@ export class WorkspaceQuerySession {
 /** 프로젝트용 조회 세션을 만든다. 첫 IO는 list/get/refresh에서 실행한다. */
 export function createWorkspaceQuerySession(
   input: unknown = {},
+  observe?: (kind: string, detail: Record<string, unknown>) => void,
 ): WorkspaceQuerySession {
-  return new WorkspaceQuerySession(input);
+  return new WorkspaceQuerySession(input, observe);
 }
 
 /** 후보 출처의 경로도 저장된 발견 경로와 같은 표기로 비교한다. */

@@ -61,6 +61,8 @@ definition: |
   종료 promise는 OS 감시의 close와 교체 중인 이전 연결의 종료까지 기다린다. 반복 종료 요청은 같은 완료를 공유하며 소비자는 이 완료 뒤 임시 파일을 정리한다.
   시작·대상 등록·재연결 중 종료된 경우에도 뒤늦은 준비 완료가 감시 자원을 다시 열거나 ready 상태로 되돌리지 않는다.
 
+  명시적 IDE 성능 관측은 공개 ready/error와 세션 취소·복구의 실제 경계에만 붙는다. watcher-ready는 감시 연결이 준비된 시각이며 색인 게시 시각과 별개다. 관측자는 파일을 탐색하거나 준비 순서를 바꾸지 않는다.
+
   ## 코드와 검증 위치
 
   대표 자료형 WorkspaceWatcher와 createWorkspaceWatcher는 [담당 구현](../../../packages/workspace/src/watcher/index.ts)에서 확인한다.

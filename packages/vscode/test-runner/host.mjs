@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { finished } from 'node:stream/promises';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, existsSync } from 'node:fs';
 import path from 'node:path';
 import { runTests } from '@vscode/test-electron';
 import { createVSIX } from '@vscode/vsce';
@@ -14,7 +14,10 @@ import {
 import { fixtureFiles } from '../src/integration/test-support/fixtures.mjs';
 import { withCacheLock } from '../../../tools/test/runtime/cache-lock.mjs';
 import readDenial from '../../../tools/test/runtime/read-denial.cjs';
-import { scenarioNames } from '../../../tools/test/runtime/performance-contract.mjs';
+import {
+  clockSnapshot,
+  scenarioNames,
+} from '../../../tools/test/runtime/performance-contract.mjs';
 import {
   corpusSettings,
   createCorpus,
@@ -37,6 +40,235 @@ async function progress(extra = {}) {
     path.join(output, 'execution.json'),
     JSON.stringify({ phase, version: config.version, ...extra }, null, 2),
   );
+}
+
+/** 같은 설치 경로와 runTests launcher로 1창 기준, 같은 프로젝트 2창, 다른 프로젝트 2창을 잰다. */
+async function runMultiwindow({ runtime, harness, extensions, report }) {
+  const matrixStarted = clockSnapshot();
+  const stageSamples = [];
+  const phases = ['baseline', 'same', 'distinct'];
+  for (const [iteration, currentPhase] of phases.entries()) {
+    const root = path.join(
+      config.temporary,
+      'scenarios',
+      'multiwindow',
+      currentPhase,
+    );
+    const control = path.join(root, 'control');
+    await mkdir(control, { recursive: true });
+    const workspaceA = path.join(root, 'project-a');
+    const corpusA = createCorpus(corpusSettings, 'project-multia');
+    await writeCorpus(workspaceA, corpusA);
+    const workspaceB =
+      currentPhase === 'distinct' ? path.join(root, 'project-b') : workspaceA;
+    const corpusB =
+      currentPhase === 'distinct'
+        ? createCorpus(corpusSettings, 'project-multib')
+        : corpusA;
+    if (currentPhase === 'distinct') await writeCorpus(workspaceB, corpusB);
+    report.hashes.corpora ??= {};
+    report.hashes.corpora[`multiwindow/${currentPhase}/a`] = corpusA.sha256;
+    report.hashes.corpora[`multiwindow/${currentPhase}/b`] = corpusB.sha256;
+    const roles = currentPhase === 'baseline' ? ['a'] : ['a', 'b'];
+    const finished = new Set();
+    const launches = [];
+    for (const role of roles) {
+      const profile = path.join(root, role, 'profile');
+      const eventDirectory = path.join(root, role, 'events');
+      await mkdir(path.join(profile, 'User'), { recursive: true });
+      await mkdir(eventDirectory, { recursive: true });
+      await writeFile(
+        path.join(profile, 'User/settings.json'),
+        JSON.stringify({
+          'files.autoSave': 'off',
+          'telemetry.telemetryLevel': 'off',
+          'update.mode': 'none',
+          'extensions.autoUpdate': false,
+          'security.workspace.trust.enabled': false,
+          'workbench.startupEditor': 'none',
+          'window.restoreWindows': 'none',
+        }),
+      );
+      const workspace = role === 'b' ? workspaceB : workspaceA;
+      const corpus = role === 'b' ? corpusB : corpusA;
+      const session = {
+        id: `${path.basename(output)}/multiwindow/${currentPhase}/${role}`,
+        scenario: 'multiwindow',
+        iteration,
+        phase: currentPhase,
+        windowRole: role,
+        isolated: currentPhase === 'distinct' && role === 'b',
+        workspace,
+        profile,
+        eventsDirectory: eventDirectory,
+        controlDirectory: control,
+        corpusManifest: path.join(workspace, 'corpus-manifest.json'),
+        corpusHash: corpus.sha256,
+      };
+      const windowConfig = path.join(root, `config-${role}.json`);
+      await writeFile(
+        windowConfig,
+        JSON.stringify({ ...config, performanceSession: session }),
+      );
+      const started = clockSnapshot();
+      const launched = runTests({
+        vscodeExecutablePath: runtime.executable,
+        extensionDevelopmentPath: harness,
+        extensionTestsPath: path.join(
+          config.root,
+          'packages/vscode/src/integration/test-support/performance/index.cjs',
+        ),
+        extensionTestsEnv: {
+          CODOCS_VSCODE_CONFIG: windowConfig,
+          CODOCS_PERFORMANCE_EVENTS_DIR: eventDirectory,
+          CODOCS_PERFORMANCE_SESSION_ID: session.id,
+          CODOCS_PERFORMANCE_WINDOW_ID: `multiwindow/${currentPhase}/${role}`,
+          CODOCS_PERFORMANCE_LAUNCH_STARTED: JSON.stringify(started),
+        },
+        stdout: log,
+        stderr: log,
+        launchArgs: [
+          workspace,
+          '--user-data-dir',
+          profile,
+          '--extensions-dir',
+          extensions,
+          '--disable-telemetry',
+          '--disable-experiments',
+          '--new-window',
+        ],
+      }).finally(() => finished.add(role));
+      launches.push(launched);
+    }
+    /** 두 창의 실제 준비·전파 확인 파일을 완료까지 기다린다. */
+    const waitForFiles = async (names) => {
+      while (!names.every((name) => existsSync(path.join(control, name)))) {
+        if (
+          names.includes('done-a') &&
+          finished.has('a') &&
+          !existsSync(path.join(control, 'done-a'))
+        )
+          throw new Error(`multiwindow ${currentPhase}: A 창 전파 실패`);
+        if (
+          [...finished].some(
+            (role) => !existsSync(path.join(control, `ready-${role}.json`)),
+          )
+        )
+          throw new Error(`multiwindow ${currentPhase}: 창 준비 전에 종료됨`);
+        await new Promise(
+          /** 제어 파일을 확인하는 대기만 짧게 양보한다. */ (resolve) =>
+            setTimeout(resolve, 25),
+        );
+      }
+    };
+    const launchesFinished = Promise.allSettled(launches);
+    let coordinationError;
+    try {
+      await waitForFiles(roles.map((role) => `ready-${role}.json`));
+      const token = `cod20-multiwindow-${currentPhase}-${Date.now()}`;
+      const target = path.join(
+        workspaceA,
+        '.codocs/performance/normal-0001.yaml',
+      );
+      const source = await readFile(target, 'utf8');
+      await writeFile(
+        target,
+        source.replace(/definition: .*/u, `definition: "${token}"`),
+      );
+      await writeFile(
+        path.join(control, 'change.json'),
+        JSON.stringify({ token, changedAt: clockSnapshot() }),
+      );
+      if (currentPhase === 'distinct') {
+        await waitForFiles(['done-a']);
+        await writeFile(path.join(control, 'verify-isolation'), '');
+      }
+    } catch (error) {
+      coordinationError = error;
+      await writeFile(path.join(control, 'abort'), String(error));
+    }
+    const outcomes = await launchesFinished;
+    for (const role of roles) {
+      const sampleFile = path.join(
+        output,
+        `scenario-samples-multiwindow-${iteration}-${role}.jsonl`,
+      );
+      try {
+        const raw = await readFile(sampleFile, 'utf8');
+        for (const line of raw.split('\n').filter(Boolean))
+          stageSamples.push(JSON.parse(line));
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+      const eventDirectory = path.join(root, role, 'events');
+      for (const eventFile of await readdir(eventDirectory)) {
+        const isEvent = /^events-\d+\.jsonl$/u.test(eventFile);
+        const isOverhead = /^observer-overhead-\d+\.jsonl$/u.test(eventFile);
+        if (!isEvent && !isOverhead) continue;
+        const raw = await readFile(
+          path.join(eventDirectory, eventFile),
+          'utf8',
+        );
+        for (const line of raw.split('\n').filter(Boolean))
+          if (isEvent)
+            report.events.push({
+              ...JSON.parse(line),
+              received: clockSnapshot(),
+            });
+          else {
+            report.observationOverhead ??= [];
+            report.observationOverhead.push(JSON.parse(line));
+          }
+      }
+    }
+    const pids = new Set(
+      report.events
+        .filter((event) =>
+          event.sessionId?.includes(`/multiwindow/${currentPhase}/`),
+        )
+        .map((event) => event.occurred.pid),
+    );
+    const latestMemory = new Map();
+    for (const event of report.events)
+      if (pids.has(event.occurred?.pid) && Number.isFinite(event.rssBytes))
+        latestMemory.set(event.occurred.pid, event.rssBytes);
+    report.events.push({
+      kind: 'multiwindow-memory',
+      phase: currentPhase,
+      uniquePids: [...pids],
+      rssByPid: Object.fromEntries(latestMemory),
+      totalRssBytes: [...latestMemory.values()].reduce(
+        (sum, value) => sum + value,
+        0,
+      ),
+      method: 'last lifecycle RSS per unique Extension Host/server PID',
+    });
+    await persistPerformanceReport(report, output);
+    const failed = outcomes.filter((outcome) => outcome.status === 'rejected');
+    if (coordinationError || failed.length)
+      throw new Error(
+        `multiwindow ${currentPhase}: ${coordinationError ?? failed.map((item) => item.reason).join('; ')}`,
+      );
+  }
+  const matrixEnded = clockSnapshot();
+  const valid =
+    stageSamples.length === 5 &&
+    stageSamples.every((sample) => sample.status === 'completed');
+  recordPerformanceSample(report, 'multiwindow', {
+    status: valid ? 'completed' : 'incorrect',
+    durationMs: matrixEnded.monotonicMs - matrixStarted.monotonicMs,
+    stages: stageSamples,
+    begin: matrixStarted,
+    end: matrixEnded,
+    memoryAttribution:
+      'latest RSS per unique Extension Host/server PID in each phase',
+  });
+  await persistPerformanceReport(report, output);
+  if (!valid)
+    throw new Error(
+      'multiwindow 단계별 측정이 다섯 개 모두 완료되지 않았습니다',
+    );
+  return report;
 }
 try {
   await progress();
@@ -226,74 +458,167 @@ try {
         );
         phase = `performance-${scenario}`;
         await progress({ executable: runtime.executable, scenario });
-        const scenarioRoot = path.join(config.temporary, 'scenarios', scenario);
-        const scenarioWorkspace = path.join(scenarioRoot, 'workspace');
-        const scenarioProfile = path.join(scenarioRoot, 'profile');
-        const corpus = createCorpus(
-          { ...corpusSettings, seed: config.settings.seed },
-          `project-${scenario.replaceAll('-', '')}`,
-        );
-        await writeCorpus(scenarioWorkspace, corpus);
-        await mkdir(path.join(scenarioProfile, 'User'), { recursive: true });
-        await writeFile(
-          path.join(scenarioProfile, 'User/settings.json'),
-          JSON.stringify({
-            'files.autoSave': 'off',
-            'telemetry.telemetryLevel': 'off',
-            'update.mode': 'none',
-            'extensions.autoUpdate': false,
-            'security.workspace.trust.enabled': false,
-            'workbench.startupEditor': 'none',
-            'window.restoreWindows': 'none',
-          }),
-        );
-        config.performanceSession = {
-          scenario,
-          workspace: scenarioWorkspace,
-          profile: scenarioProfile,
-          corpusManifest: path.join(scenarioWorkspace, 'corpus-manifest.json'),
-          corpusHash: corpus.sha256,
-        };
-        performanceReport.hashes.corpora ??= {};
-        performanceReport.hashes.corpora[scenario] = corpus.sha256;
-        performanceReport.hashes.data ??= corpus.sha256;
-        performanceReport.events.push({
-          kind: 'scenario-prepared',
-          scenario,
-          corpusHash: corpus.sha256,
-          at: new Date().toISOString(),
-        });
-        await persistPerformanceReport(performanceReport, output);
-        await writeFile(process.argv[2], JSON.stringify(config));
         scenarioStarted = Date.now();
         saveScenarioProgress('running');
         heartbeat = setInterval(() => saveScenarioProgress('running'), 5000);
-        await runTests({
-          vscodeExecutablePath: runtime.executable,
-          extensionDevelopmentPath: harness,
-          extensionTestsPath: path.join(
-            config.root,
-            'packages/vscode/src/integration/test-support/performance/index.cjs',
-          ),
-          extensionTestsEnv: { CODOCS_VSCODE_CONFIG: process.argv[2] },
-          stdout: log,
-          stderr: log,
-          launchArgs: [
-            scenarioWorkspace,
-            '--user-data-dir',
-            scenarioProfile,
-            '--extensions-dir',
+        if (scenario === 'multiwindow') {
+          performanceReport = await runMultiwindow({
+            runtime,
+            harness,
             extensions,
-            '--disable-telemetry',
-            '--disable-experiments',
-            '--new-window',
-          ],
-        });
+            report: performanceReport,
+          });
+        } else {
+          const repeats =
+            scenario === 'startup' ? config.settings.targets.startup : 1;
+          for (let iteration = 0; iteration < repeats; iteration++) {
+            const scenarioRoot = path.join(
+              config.temporary,
+              'scenarios',
+              scenario,
+              String(iteration),
+            );
+            const scenarioWorkspace = path.join(scenarioRoot, 'workspace');
+            const scenarioProfile = path.join(scenarioRoot, 'profile');
+            const eventsDirectory = path.join(scenarioRoot, 'events');
+            await mkdir(eventsDirectory, { recursive: true });
+            const corpus = createCorpus(
+              { ...corpusSettings, seed: config.settings.seed },
+              `project-${scenario.replaceAll('-', '')}`,
+            );
+            await writeCorpus(scenarioWorkspace, corpus);
+            await mkdir(path.join(scenarioProfile, 'User'), {
+              recursive: true,
+            });
+            await writeFile(
+              path.join(scenarioProfile, 'User/settings.json'),
+              JSON.stringify({
+                'files.autoSave': 'off',
+                'telemetry.telemetryLevel': 'off',
+                'update.mode': 'none',
+                'extensions.autoUpdate': false,
+                'security.workspace.trust.enabled': false,
+                'workbench.startupEditor': 'none',
+                'window.restoreWindows': 'none',
+              }),
+            );
+            config.performanceSession = {
+              id: `${path.basename(output)}/${scenario}/${iteration}`,
+              scenario,
+              iteration,
+              workspace: scenarioWorkspace,
+              profile: scenarioProfile,
+              eventsDirectory,
+              corpusManifest: path.join(
+                scenarioWorkspace,
+                'corpus-manifest.json',
+              ),
+              corpusHash: corpus.sha256,
+            };
+            performanceReport.hashes.corpora ??= {};
+            performanceReport.hashes.corpora[`${scenario}/${iteration}`] =
+              corpus.sha256;
+            performanceReport.hashes.data ??= corpus.sha256;
+            performanceReport.events.push({
+              kind: 'scenario-prepared',
+              scenario,
+              iteration,
+              corpusHash: corpus.sha256,
+              at: new Date().toISOString(),
+            });
+            await persistPerformanceReport(performanceReport, output);
+            await writeFile(process.argv[2], JSON.stringify(config));
+            const launchStarted = clockSnapshot();
+            try {
+              await runTests({
+                vscodeExecutablePath: runtime.executable,
+                extensionDevelopmentPath: harness,
+                extensionTestsPath: path.join(
+                  config.root,
+                  'packages/vscode/src/integration/test-support/performance/index.cjs',
+                ),
+                extensionTestsEnv: {
+                  CODOCS_VSCODE_CONFIG: process.argv[2],
+                  CODOCS_PERFORMANCE_EVENTS_DIR: eventsDirectory,
+                  CODOCS_PERFORMANCE_SESSION_ID: config.performanceSession.id,
+                  CODOCS_PERFORMANCE_WINDOW_ID: `${scenario}/${iteration}/window-1`,
+                  CODOCS_PERFORMANCE_LAUNCH_STARTED:
+                    JSON.stringify(launchStarted),
+                },
+                stdout: log,
+                stderr: log,
+                launchArgs: [
+                  scenarioWorkspace,
+                  '--user-data-dir',
+                  scenarioProfile,
+                  '--extensions-dir',
+                  extensions,
+                  '--disable-telemetry',
+                  '--disable-experiments',
+                  '--new-window',
+                ],
+              });
+            } finally {
+              const samplePath = path.join(
+                output,
+                `scenario-samples-${scenario}-${iteration}-main.jsonl`,
+              );
+              let samples = '';
+              try {
+                samples = await readFile(samplePath, 'utf8');
+              } catch (error) {
+                if (error.code !== 'ENOENT') throw error;
+              }
+              performanceReport = JSON.parse(
+                await readFile(path.join(output, 'performance.json'), 'utf8'),
+              );
+              for (const line of samples.split('\n').filter(Boolean))
+                recordPerformanceSample(
+                  performanceReport,
+                  scenario,
+                  JSON.parse(line),
+                );
+              for (const eventFile of await readdir(eventsDirectory)) {
+                const isEvent = /^events-\d+\.jsonl$/u.test(eventFile);
+                const isOverhead = /^observer-overhead-\d+\.jsonl$/u.test(
+                  eventFile,
+                );
+                if (!isEvent && !isOverhead) continue;
+                const raw = await readFile(
+                  path.join(eventsDirectory, eventFile),
+                  'utf8',
+                );
+                for (const line of raw.split('\n').filter(Boolean))
+                  if (isEvent)
+                    performanceReport.events.push({
+                      ...JSON.parse(line),
+                      received: clockSnapshot(),
+                    });
+                  else {
+                    performanceReport.observationOverhead ??= [];
+                    performanceReport.observationOverhead.push(
+                      JSON.parse(line),
+                    );
+                  }
+              }
+              await persistPerformanceReport(performanceReport, output);
+            }
+            if (
+              scenario !== 'edit-indexing' &&
+              performanceReport.scenarios[scenario].completed <
+                (scenario === 'startup'
+                  ? iteration + 1
+                  : config.settings.targets[scenario])
+            )
+              throw new Error(`${scenario} 완료 표본이 목표보다 부족합니다`);
+          }
+        }
         if (heartbeatError) throw heartbeatError;
       } catch (error) {
         failures++;
         scenarioStatus = 'failed';
         let scenarioError = String(error?.stack ?? error);
+        let cancelled = false;
         try {
           const detail = JSON.parse(
             await readFile(
@@ -303,6 +628,7 @@ try {
           );
           if (detail.scenario === scenario && detail.error)
             scenarioError = `${detail.error}\n${scenarioError}`;
+          cancelled = detail.scenario === scenario && detail.cancelled === true;
         } catch (detailError) {
           if (detailError.code !== 'ENOENT') throw detailError;
         }
@@ -310,8 +636,9 @@ try {
         performanceReport = JSON.parse(
           await readFile(path.join(output, 'performance.json'), 'utf8'),
         );
+        scenarioStatus = cancelled ? 'cancelled' : 'failed';
         recordPerformanceSample(performanceReport, scenario, {
-          status: 'failed',
+          status: scenarioStatus,
           error: scenarioError,
         });
         performanceReport.errors.push(`${scenario}: ${scenarioError}`);
