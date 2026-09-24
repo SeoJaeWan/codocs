@@ -1,0 +1,17 @@
+{
+  "command": [
+    "pnpm",
+    "--config.store-dir=/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/pnpm-store",
+    "dlx",
+    "@vscode/vsce@3.6.2",
+    "package",
+    "--no-dependencies",
+    "--skip-license",
+    "--out",
+    "../../.workbench/cod18-followup-final.vsix"
+  ],
+  "startedAt": "2026-09-22T03:10:19.535Z",
+  "durationMilliseconds": 1535,
+  "code": 0,
+  "signal": null
+}

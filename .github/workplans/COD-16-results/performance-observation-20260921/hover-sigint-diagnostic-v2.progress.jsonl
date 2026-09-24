@@ -1,0 +1,13 @@
+{"phase":"run:start","at":"2026-09-21T11:12:14.533Z","vscodeVersion":"1.136.1"}
+{"phase":"performance:resources","at":"2026-09-21T11:12:14.537Z","boundary":"before-readiness","memory":{"rss":149405696,"heapTotal":39780352,"heapUsed":30314680,"external":7298149,"arrayBuffers":0},"eventLoop":{"count":0,"minimumMilliseconds":null,"medianMilliseconds":null,"p95Milliseconds":null,"maximumMilliseconds":null}}
+{"phase":"performance:start","at":"2026-09-21T11:12:14.537Z","requestedWarmups":100,"requestedMeasured":1}
+{"phase":"activate-extension:start","at":"2026-09-21T11:12:14.538Z"}
+{"phase":"activate-extension:ready","at":"2026-09-21T11:12:14.776Z","workspaceFolders":1,"serverProcesses":1}
+{"phase":"performance:readiness-request-start","at":"2026-09-21T11:12:14.833Z","run":1,"index":0,"startedAt":"2026-09-21T11:12:14.833Z"}
+{"phase":"performance:readiness-request-complete","at":"2026-09-21T11:12:26.951Z","run":1,"index":0,"durationMilliseconds":12117.051792,"success":true,"hoverCount":1}
+{"phase":"performance:resources","at":"2026-09-21T11:12:26.951Z","boundary":"after-readiness","memory":{"rss":147750912,"heapTotal":52772864,"heapUsed":33389724,"external":6694715,"arrayBuffers":0},"eventLoop":{"count":1123,"minimumMilliseconds":9.601024,"medianMilliseconds":11.067391,"p95Milliseconds":11.116543,"maximumMilliseconds":39.649279}}
+{"phase":"performance:index-ready","at":"2026-09-21T11:12:26.951Z","readinessAttempts":1}
+{"phase":"performance:warmup-request-start","at":"2026-09-21T11:12:26.952Z","run":0,"index":277,"position":{"line":277,"character":5},"startedAt":"2026-09-21T11:12:26.952Z"}
+{"phase":"performance:warmup-request-complete","at":"2026-09-21T11:12:38.605Z","run":0,"index":277,"durationMilliseconds":11652.563709000002,"success":true,"cancelled":false}
+{"phase":"performance:warmup-request-start","at":"2026-09-21T11:12:38.605Z","run":1,"index":744,"position":{"line":744,"character":5},"startedAt":"2026-09-21T11:12:38.605Z"}
+{"phase":"performance:warmup-request-complete","at":"2026-09-21T11:12:38.824Z","run":1,"index":744,"durationMilliseconds":218.25587499999892,"success":false,"cancelled":true,"error":"Canceled"}

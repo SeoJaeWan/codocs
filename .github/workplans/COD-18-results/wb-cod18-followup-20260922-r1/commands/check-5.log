@@ -1,0 +1,45 @@
+
+> codocs@0.0.0 check /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+> node tools/check/run.mjs all
+
+Checking formatting...
+All matched files use Prettier code style!
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+
+ ❯ packages/workspace/src/watcher/watcher.test.ts (14 tests | 1 failed) 6979ms
+   ❯ createWorkspaceWatcher 파일 변화 신호 (14)
+     ❯ 내부 문서의 생성·수정·삭제 신호 (5)
+       × 문서를 다른 이름으로 이동하면 이전 경로와 새 경로를 전달한다 5017ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/workspace/src/watcher/watcher.test.ts > createWorkspaceWatcher 파일 변화 신호 > 내부 문서의 생성·수정·삭제 신호 > 문서를 다른 이름으로 이동하면 이전 경로와 새 경로를 전달한다
+AssertionError: expected [ Array(1) ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
++ [
+    "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/watcher-cl7eKM/.codocs/alpha.yaml",
+-   "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/watcher-cl7eKM/.codocs/renamed.yaml",
+  ]
+
+ ❯ vi.waitFor.timeout packages/workspace/src/watcher/watcher.test.ts:115:25
+    113|       await vi.waitFor(
+    114|         () =>
+    115|           expect(paths).toEqual(expect.arrayContaining([source, destin…
+       |                         ^
+    116|         { timeout: 5_000 },
+    117|       );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 31 passed (32)
+      Tests  1 failed | 777 passed (778)
+   Start at  12:06:37
+   Duration  8.24s (tests 73%, transform 13%, import 13%)
+
+ ELIFECYCLE  Command failed with exit code 1.

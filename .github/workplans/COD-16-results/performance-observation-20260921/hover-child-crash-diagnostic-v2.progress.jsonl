@@ -1,0 +1,12 @@
+{"phase":"run:start","at":"2026-09-21T11:13:46.964Z","vscodeVersion":"1.136.1"}
+{"phase":"performance:resources","at":"2026-09-21T11:13:46.970Z","boundary":"before-readiness","memory":{"rss":148029440,"heapTotal":38649856,"heapUsed":29752800,"external":6894102,"arrayBuffers":0},"eventLoop":{"count":0,"minimumMilliseconds":null,"medianMilliseconds":null,"p95Milliseconds":null,"maximumMilliseconds":null}}
+{"phase":"performance:start","at":"2026-09-21T11:13:46.975Z","requestedWarmups":100,"requestedMeasured":1}
+{"phase":"activate-extension:start","at":"2026-09-21T11:13:46.976Z"}
+{"phase":"activate-extension:ready","at":"2026-09-21T11:13:47.226Z","workspaceFolders":1,"serverProcesses":1}
+{"phase":"performance:readiness-request-start","at":"2026-09-21T11:13:47.272Z","run":1,"index":0,"startedAt":"2026-09-21T11:13:47.272Z"}
+{"phase":"performance:readiness-request-complete","at":"2026-09-21T11:13:59.883Z","run":1,"index":0,"durationMilliseconds":12610.595042,"success":true,"hoverCount":1}
+{"phase":"performance:resources","at":"2026-09-21T11:13:59.883Z","boundary":"after-readiness","memory":{"rss":146997248,"heapTotal":53411840,"heapUsed":33218484,"external":6744458,"arrayBuffers":0},"eventLoop":{"count":1168,"minimumMilliseconds":9.560064,"medianMilliseconds":11.075583,"p95Milliseconds":11.124735,"maximumMilliseconds":46.596095}}
+{"phase":"performance:index-ready","at":"2026-09-21T11:13:59.884Z","readinessAttempts":1}
+{"phase":"performance:warmup-request-start","at":"2026-09-21T11:13:59.884Z","run":0,"index":277,"position":{"line":277,"character":5},"startedAt":"2026-09-21T11:13:59.884Z"}
+{"phase":"performance:warmup-request-complete","at":"2026-09-21T11:14:12.230Z","run":0,"index":277,"durationMilliseconds":12345.215540999998,"success":true,"cancelled":false}
+{"phase":"performance:warmup-request-start","at":"2026-09-21T11:14:12.230Z","run":1,"index":744,"position":{"line":744,"character":5},"startedAt":"2026-09-21T11:14:12.230Z"}

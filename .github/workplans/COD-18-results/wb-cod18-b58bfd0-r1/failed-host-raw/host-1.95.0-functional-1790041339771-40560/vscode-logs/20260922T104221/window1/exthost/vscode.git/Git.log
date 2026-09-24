@@ -1,0 +1,23 @@
+2026-09-22 10:42:23.568 [info] [main] Log level: Info
+2026-09-22 10:42:23.568 [info] [main] Validating found git in: "/opt/homebrew/bin/git"
+2026-09-22 10:42:23.593 [info] [main] Using git "2.54.0" from "/opt/homebrew/bin/git"
+2026-09-22 10:42:23.593 [info] [Model][doInitialScan] Initial repository scan started
+2026-09-22 10:42:23.652 [info] > git rev-parse --show-toplevel [51ms]
+2026-09-22 10:42:23.667 [info] > git rev-parse --show-toplevel [9ms]
+2026-09-22 10:42:23.677 [info] > git rev-parse --show-toplevel [9ms]
+2026-09-22 10:42:23.686 [info] > git rev-parse --show-toplevel [8ms]
+2026-09-22 10:42:23.696 [info] > git rev-parse --show-toplevel [9ms]
+2026-09-22 10:42:23.706 [info] > git rev-parse --show-toplevel [8ms]
+2026-09-22 10:42:23.714 [info] > git rev-parse --show-toplevel [7ms]
+2026-09-22 10:42:23.721 [info] > git rev-parse --show-toplevel [6ms]
+2026-09-22 10:42:23.722 [info] [Model][doInitialScan] Initial repository scan completed - repositories (0), closed repositories (0), parent repositories (1), unsafe repositories (0)
+2026-09-22 10:42:24.262 [info] > git rev-parse --show-toplevel [6ms]
+2026-09-22 10:42:24.369 [info] > git rev-parse --show-toplevel [8ms]
+2026-09-22 10:42:24.788 [info] > git rev-parse --show-toplevel [7ms]
+2026-09-22 10:42:25.654 [info] > git rev-parse --show-toplevel [7ms]
+2026-09-22 10:42:25.662 [info] > git rev-parse --show-toplevel [7ms]
+2026-09-22 10:42:25.670 [info] > git rev-parse --show-toplevel [7ms]
+2026-09-22 10:42:25.679 [info] > git rev-parse --show-toplevel [8ms]
+2026-09-22 10:42:40.208 [info] > git rev-parse --show-toplevel [29ms]
+2026-09-22 10:42:40.434 [info] > git rev-parse --show-toplevel [9ms]
+2026-09-22 10:42:41.285 [info] > git rev-parse --show-toplevel [13ms]

@@ -1,0 +1,102 @@
+task_id: DELIVERY-001
+run_id: wb-cod20-dom-20260924
+intent_revision: wb-cod20-dom-20260924/intent/6
+kind: integration
+title: Record PR17 completion, publish implementation and merge main
+objective: Complete the user's explicit request to record the known findings in PR17, mark this implementation work complete, commit and push to its existing branch, then merge PR17 into main, preserving honest failed verification.
+execution_profile:
+  model: gpt-6-sol
+  reasoning_effort: high
+  rationale: Bounded Git integration and publication with existing dirty caller checkout, divergent plan history and failed verification provenance.
+  escalation: none
+repository_id: github.com/SeoJaeWan/codocs
+repository_root: C:/Users/sjw73/OneDrive/Desktop/dev/codocs
+git_common_dir: C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.git
+base_selector:
+  kind: integration_result
+  value: INT-001
+resolved_base_commit: 328bb041286982ce4d131479425e80c2a8dfadf0
+depends_on:
+  - INT-001
+dependency_bindings:
+  INT-001:
+    commit: 328bb041286982ce4d131479425e80c2a8dfadf0
+    kind: provisional_candidate
+    continuation: ALLOWED
+    verification: FAIL
+assigned_worktree: C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-delivery-001
+branch: codex/wb-cod20-dom-20260924/delivery-001
+owned_paths:
+  - .github/workplans/COD-20.md
+  - .github/workplans/COD-20-results/**
+forbidden_paths:
+  - Original caller checkout mutations
+  - Other task worktrees mutations
+  - Product/runtime/test implementation edits
+  - Global machine settings, billing, branch protection changes
+  - Unrelated PRs/issues or publication
+  - Delete worktrees/branches
+  - Force-push
+shared_surfaces: []
+runtime_resources:
+  - Exclusive Git publication to origin feature/COD-20 and PR17 merge to main
+requirements:
+  - User expressly authorizes PR recording, marking current work complete, commit, push and main merge. This supersedes earlier no-push/no-PR/no-merge delivery policy only for PR17 and this work. No new confirmation needed for these authorized actions.
+  - "Keep main caller checkout untouched: HEAD382e03fc36355e96c5261d03f546c3eb57a88318 with existing dirty .codocs/development/release.yaml and test-convention.yaml. All edits and Git integration in assigned fresh worktree."
+  - Fetch and recheck remote identity. Observed origin main382e03fc36355e96c5261d03f546c3eb57a88318; PR17 head feature/COD-20 at17cae89264ce27ffb753396ac9b1e37f8b7fa2b6, draft OPEN, base main. Its 23 unique commits change only .github/workplans/COD-20.md relative to merge-base a387100e9f2ca40b37262f0350e881b2079c64f2.
+  - Reconcile old PR plan history and implementation without destructive resets or force push. Starting from exact INT candidate, merge current PR head using no-commit/no-ff; resolve anticipated COD-20.md add/add to current completed summary plus accurate scope, retaining original plan in Git ancestry. Preserve all runtime/source files exactly as final candidate. Confirm PR head ancestor of resulting commit before ordinary push HEAD:refs/heads/feature/COD-20.
+  - "Update owned docs as needed: current implementation is complete by user acceptance, but full verification not all pass. Explicitly correct prior overclassification: general Hover/link functionality passed; in locked-file test conditions latest VSCode actually fails; root cause could be fixture lock affecting watch, product/runtime compatibility, or change regression; not yet isolated. All six failures are not proven same root cause. Baseline pre-change same-version reproduction remains needed. Do not call it a confirmed fundamental Hover/link defect."
+  - Record EPERM symlink setup failure separately. Record fixed measurement runner implementation, both version9scenarios pass, latestAPI35/35, original212 measured correct retained as cancelledpartial; default warmup100/API1000 unchanged and full statistical benchmark deferred by user. macOS PR34/Linux PR25 remain followups.
+  - "PR description should be rewritten cohesively for final implementation, preserve useful scope/provenance/followups/JiraCOD20, remove stale 'not implemented' statements and outdated required fullbenchmark scope. Follow existing finalPR naming (e.g. COD-19: ...), remove Workplan prefix; mark draft ready. Add a clear top-level PR comment explicitly documenting known findings, uncertainty, user-authorized completion/merge and followup actions. User authorizes this message."
+  - Use exact PR head matching when merging. Prefer merge commit (repository allows all methods; recent main commit is mergePR16). Do not use admin bypass or alter requirements. No branch deletion. If protected requirements block, leave exact state and report rather than bypass.
+  - Existing PR checks failed without steps due account payment/spending limit, confirmed check annotations. After push inspect fresh checks/annotations and actual merge gating. If no enforced merge gate and same billing infrastructure failure, user-authorized merge may proceed with clear record of unavailable CI; do not label it passing. Wait only meaningfully; no recurring automation or billing change.
+  - After merge verify PR state MERGED, merge SHA and remote main contains delivered implementation. Keep local caller main unchanged due dirty user files. Final result must distinguish implementation accepted/completed from known verificationFAIL and report URLs, exact deliverySHA/mergeSHA/status.
+acceptance_conditions:
+  - PR17 contains accurate completion and unresolved-findings record
+  - Implementation and prior PR plan history both preserved in pushed existing branch
+  - PR17 merged to main when permitted by enforced repository policy, with exact SHA verified
+  - No unrelated or caller-checkout edits; no force push, protection changes or false passing claims
+invariants:
+  - No full1000/200 performance reruns
+  - Preserve 111raw evidence bytes and scoped raw/.gitattributes * -text
+  - Keep all product/test/source files at INT candidate content; doc changes only
+  - Reuse existing relevant tests; no unnecessary full hooks repeated merely for report-only changes
+decisions:
+  - "Latest user instruction: 좋아 그럼 pr에 기록해두고 현재 작업은 완료로 해서 커밋후 pr에 푸시해서 완료로 해서 main에 머지하자"
+source_contract_ids:
+  - wb-cod20-dom-20260924/plan/1
+  - wb-cod20-dom-20260924/intent/4
+  - User publication/completion instruction supersedes original delivery limits
+implementation_notes:
+  - Read workbench execute-task SKILL and refs at C:/Users/sjw73/.codex/plugins/cache/local-work/workbench/0.3.0/skills/execute-task. No subagents. Root coordinator read-only; you own this bounded integration/delivery.
+  - Use git -c core.longpaths=true for all relevant git operations; tracked historical paths exceed MAX_PATH.
+  - Exact Node24.21.0 binary at C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.workbench/ui-probe/node-v24.21.0-win-x64/node.exe, pnpm10.34.5. Read-only tools may be invoked from existing INT dependencies, no copy node_modules or profiles. For doc-only changes don't install/build rerun entire product suites.
+  - INT result and full report at C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/task-result-INT-001.md and .github/workplans/COD-20-results/implementation-validation-20260924.md. Known directcheck846pass45EPERM, consumer114/1, normalhook845/46EPERM. Existing normal hook failure is recorded; a doc-only delivery commit may use HUSKY=0 with explicit disclosure, not claimpassing. Do not weaken CI/hook source.
+  - Read repository .codocs conventions and .github workflows from assigned exacthead. NoAGENTS found earlier; check if additional applies. Prior workplans identify docs as implementation evidence and canonical .codocs owns productcontracts.
+  - GitHub CLI gh is authenticated and working. Prefer --body-file for multiline PR changes/comments, create files only in own .workbench. Attach PR via mcp codex tool if doing any PRupdate (rootalreadyattached).
+  - Sourceplan digest f8d0eb194b1fa504639b625ab2bba76e0967e405aac558c642dc81474efc0f34 remains immutable. INT4binding78f69fdc517c38914c76c1bd3685f0c5ffd1cf757951012f34de5f6c66a8d179 remains historical. New standalone delivery packet source digest null; verify normalized binding before writes and persist packet plus intent5revision.
+  - No need to create a new follow-up PR/issue; record concrete reproducible follow-up tasks in PR17 and owned follow-up doc, indicate separate remediation remains pending. Existing plan criterion for separate work is superseded by latest instruction to recordinPR and complete current implementation; no fabricated external ticket.
+  - Resume intent6 after user says 이어서 진행해. Scope and publication authority unchanged from intent5. Assigned worktree already exists and is clean at exact bound base; adopt same worker-owned worktree rather than recreate. Preserve intent5 packet history. Record explicit intent6 revision with reuse of all prior implementation/test evidence. Previous binding e76af0e2eee0de7a229425b38a86736edfe122efb2aa435da6afa0ae6acbac9a.
+focused_checks:
+  - Verify exact branch ancestry and no changes outside owned docs from328bb
+  - Check authored Markdown/JSON format and links; raw whitespace intentionallypreserved
+  - Verify raw evidence unchanged and no source-content differences after integration
+  - Verify actual remote ref before push, fresh PR head/checks/draft/state beforemerge, mergedstate/mainSHAafter
+broader_checks:
+  - Reuse final-source existing tests; full benchmark deferred
+  - Inspect fresh CI status; preserve billing notstarted classification and do notbypass enforced gates
+verification_commands:
+  - git -c core.longpaths=true status --porcelain=v1
+  - git -c core.longpaths=true diff --name-only 328bb041286982ce4d131479425e80c2a8dfadf0 HEAD
+  - gh pr view 17 --repo SeoJaeWan/codocs --json headRefOid,state,isDraft,mergeable,mergeStateStatus,statusCheckRollup
+  - gh pr merge 17 --repo SeoJaeWan/codocs --merge --match-head-commit <verified-delivery-sha>
+commit_policy: task_local_required
+commit_authority: One task-authored final delivery commit (may be a merge commit importing PR plan history plus owned doc updates); publication and main merge explicitly authorized by latest user.
+integration_strategy: Merge existing PR history into exact INT result with doc-only conflict reconciliation; ordinary non-force push existingPRhead; GitHub mergecommitPR17
+task_packet_digest: null
+execution_binding_digest: cf2237d3789027bd2505dc869e73d63b97b9e3970f5db9820435b5da22ff2b07
+resume_state:
+  observed_head_commit: 328bb041286982ce4d131479425e80c2a8dfadf0
+  owned_change_digests: []
+  worker_id: /root/cod20_delivery001
+  quiescence_evidence: Worker turn terminated on usage limit. Root read-only inspection confirms assigned worktree exists on assigned branch at exact base, tracked/untracked status empty; PR17 still draft OPEN at17cae89264ce27ffb753396ac9b1e37f8b7fa2b6; no publication occurred. Recheck no pending Git operation/process before mutations.
