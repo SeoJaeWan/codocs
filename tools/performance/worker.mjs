@@ -84,9 +84,9 @@ function exactResponse(response, documents) {
 function isRebuilding(response) {
   return (
     response?.success === false &&
-    response.error?.code === 'workspace_read_failed' &&
+    response.error?.code === 'index_not_ready' &&
     response.error?.message ===
-      '색인을 구성하는 중입니다. 완료 후 다시 조회하세요.'
+      '문서 색인을 구성하는 중입니다. 완료 후 다시 조회하세요.'
   );
 }
 
@@ -161,7 +161,12 @@ async function main() {
     path.join(repository, 'packages/mcp/dist/index.js'),
   ).href;
   const { createCodocsQueryHandlers } = await import(moduleUrl);
-  const handlers = createCodocsQueryHandlers({ project: fixture });
+  const { createWorkspaceQuerySession } = await import(
+    pathToFileURL(path.join(repository, 'packages/workspace/dist/index.js'))
+      .href
+  );
+  const handlerSession = createWorkspaceQuerySession({ project: fixture });
+  const handlers = createCodocsQueryHandlers(handlerSession);
   const firstDocument = expected.documents[0];
   const readinessObservations = [];
   /** 준비 확인 호출의 실제 완료 시간과 내용 판정을 개별 표본으로 기록한다. */

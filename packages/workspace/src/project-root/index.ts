@@ -1,7 +1,7 @@
 /** 프로젝트 지식 파일을 찾는 논리 루트 이름이다. */
 export const codocsDirectoryName = '.codocs';
 import { constants } from 'node:fs';
-import { access, realpath, stat } from 'node:fs/promises';
+import { access, lstat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import {
   createWorkspaceDiagnostic,
@@ -44,6 +44,31 @@ export function isPathString(input: unknown): input is string {
     input.trim().length > 0 &&
     !input.includes('\0')
   );
+}
+
+/** 선택 경로의 이름 성분에 연결이 있으면 후속 파일 작업 전에 그 위치를 반환한다. */
+async function selectedLink(
+  startCwd: string,
+  projectRoot: string,
+): Promise<string | undefined> {
+  for (const selected of [startCwd, projectRoot]) {
+    const volumeRoot = path.parse(selected).root;
+    let current = volumeRoot;
+    for (const segment of path.relative(volumeRoot, selected).split(path.sep)) {
+      if (!segment) continue;
+      current = path.join(current, segment);
+      if (!(await lstat(current)).isSymbolicLink()) continue;
+      // macOS의 /var·/tmp·/etc는 프로젝트보다 위의 시스템 경로 별칭이다.
+      if (
+        process.platform === 'darwin' &&
+        current !== selected &&
+        ['/var', '/tmp', '/etc'].includes(current)
+      )
+        continue;
+      return current;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -122,7 +147,21 @@ export async function resolveProjectRoot(
   const startCwd = path.resolve(cwd);
   const projectRoot = path.resolve(startCwd, project ?? '.');
   try {
-    const target = await stat(projectRoot);
+    const linked = await selectedLink(startCwd, projectRoot);
+    if (linked) {
+      return {
+        success: false,
+        projectRoot,
+        diagnostics: [
+          createWorkspaceDiagnostic(
+            workspaceDiagnosticCodes.unsupportedWorkspaceLink,
+            workspaceDiagnosticMessages.unsupportedWorkspaceLink,
+            linked,
+          ),
+        ],
+      };
+    }
+    const target = await lstat(projectRoot);
     if (!target.isDirectory()) {
       return {
         success: false,

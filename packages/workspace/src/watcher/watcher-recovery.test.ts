@@ -19,9 +19,15 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...actual,
-    stat: async (...args: Parameters<typeof actual.stat>) => {
+    lstat: async (...args: Parameters<typeof actual.lstat>) => {
       fake.statCalls += 1;
-      return fake.contentIdentity ?? actual.stat(...args);
+      return fake.contentIdentity
+        ? {
+            ...fake.contentIdentity,
+            isDirectory: () => true,
+            isSymbolicLink: () => false,
+          }
+        : actual.lstat(...args);
     },
   };
 });
@@ -300,42 +306,6 @@ describe('감시 시작·대상 등록·재연결의 종료 경합', () => {
     expect(watcher.readiness.state).toBe(workspaceLifecycleStates.closed);
   });
 
-  it('같은 외부 대상 등록을 겹쳐 요청하면 하나의 준비 작업을 공유한다', async () => {
-    watcher = await createWorkspaceWatcher(project);
-    fake.manualReady = true;
-    const target = path.join(project, 'external.yaml');
-    const first = watcher.trackTargets([target]);
-    const count = fake.watchers.length;
-    const second = watcher.trackTargets([target]);
-    expect(fake.watchers).toHaveLength(count);
-    let complete = false;
-    const completion = first.then(() => {
-      complete = true;
-    });
-    await Promise.resolve();
-    expect(complete).toBe(false);
-    for (const connection of fake.watchers) connection.emit('ready');
-    await Promise.all([first, second, completion]);
-    await watcher.trackTargets([target]);
-    expect(fake.watchers).toHaveLength(count);
-  });
-
-  it('외부 대상 준비 중 close하면 등록 대기를 끝내고 이후 등록을 열지 않는다', async () => {
-    watcher = await createWorkspaceWatcher(project);
-    fake.manualReady = true;
-    const registration = watcher.trackTargets([
-      path.join(project, 'external.yaml'),
-    ]);
-    await watcher.close();
-    await registration;
-    const count = fake.watchers.length;
-    await watcher.trackTargets([path.join(project, 'other.yaml')]);
-    expect(fake.watchers).toHaveLength(count);
-    for (const connection of fake.watchers)
-      expect(connection.close).toHaveBeenCalled();
-    expect(watcher.readiness.state).toBe(workspaceLifecycleStates.closed);
-  });
-
   it('수동 재연결 ready 대기 중 close하면 닫힌 상태를 ready로 되돌리지 않는다', async () => {
     watcher = await createWorkspaceWatcher(project);
     fake.manualReady = true;
@@ -371,14 +341,16 @@ describe('감시 시작·대상 등록·재연결의 종료 경합', () => {
 
 describe('루트 보완 감시의 새 하위 폴더 신호', () => {
   it('내용 감시가 놓친 하위 폴더를 루트 감시가 발견하면 새 하위 감시를 준비하고 문서 경로를 전달한다', async () => {
+    await mkdir(path.join(project, '.codocs'));
     watcher = await createWorkspaceWatcher(project);
     const directory = path.join(project, '.codocs', 'nested');
     const target = path.join(directory, 'deep', 'alpha.yaml');
     const listener = vi.fn();
     watcher.subscribe(listener);
     fake.manualReady = true;
+    await mkdir(directory, { recursive: true });
     fake.watchers[0]!.emit('all', 'addDir', directory);
-    expect(fake.watchers).toHaveLength(3);
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(3));
     const subtree = fake.watchers[2]!;
     subtree.emit('all', 'add', target);
     subtree.emit('ready');
@@ -392,29 +364,17 @@ describe('루트 보완 감시의 새 하위 폴더 신호', () => {
 });
 
 describe('동적 대상 준비의 실패와 종료', () => {
-  it('외부 등록 ready 전에 오류가 발생하면 등록을 거부하고 자동 감시 복구를 마친다', async () => {
-    watcher = await createWorkspaceWatcher(project);
-    fake.failNext = true;
-    await expect(
-      watcher.trackTargets([path.join(project, 'external.yaml')]),
-    ).rejects.toThrow('watch failed');
-    await vi.waitFor(() =>
-      expect(watcher!.readiness).toEqual({
-        state: workspaceLifecycleStates.ready,
-        ready: true,
-      }),
-    );
-    expect(watcher.automaticRecoveryAttempts).toBe(1);
-  });
-
   it('새 하위 감시 settle 중 close하면 모든 준비 대기를 끝내고 늦은 ready를 무시한다', async () => {
+    await mkdir(path.join(project, '.codocs'));
     watcher = await createWorkspaceWatcher(project);
     fake.manualReady = true;
+    await mkdir(path.join(project, '.codocs', 'nested'), { recursive: true });
     fake.watchers[0]!.emit(
       'all',
       'addDir',
       path.join(project, '.codocs', 'nested'),
     );
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(3));
     const settling = watcher.settle();
     await watcher.close();
     await settling;

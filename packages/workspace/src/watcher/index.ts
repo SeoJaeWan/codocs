@@ -3,14 +3,19 @@ import {
   watch as watchDirectory,
   type FSWatcher as DirectoryWatcher,
 } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { lstat } from 'node:fs/promises';
 import path from 'node:path';
 import { containsWorkspacePath } from '../loader/observations.js';
+import { resolveWorkspacePath } from '../paths/index.js';
+import { workspaceTargetKinds } from '../paths/domain-values.js';
 import {
   workspaceLifecycleStates,
   type WorkspaceReadiness,
 } from '../lifecycle/index.js';
-import { codocsDirectoryName } from '../project-root/index.js';
+import {
+  codocsDirectoryName,
+  resolveProjectRoot,
+} from '../project-root/index.js';
 
 /** 하나의 병합된 파일 변경 알림이다. */
 export interface WorkspaceChangeBatch {
@@ -23,6 +28,8 @@ export const watcherRecoveryGuidance =
 
 /** YAML이나 snapshot 없이 경로 신호·대상별 준비·배치 수명만 관리한다. */
 export class WorkspaceWatcher {
+  readonly #observe:
+    ((kind: string, detail: Record<string, unknown>) => void) | undefined;
   readonly #root: string;
   readonly #listeners = new Set<(batch: WorkspaceChangeBatch) => void>();
   readonly #connections = new Set<FSWatcher>();
@@ -31,11 +38,6 @@ export class WorkspaceWatcher {
     { watcher: FSWatcher; ready: Promise<void> }
   >();
   readonly #waiters = new Map<FSWatcher, () => void>();
-  readonly #targets = new Set<string>();
-  readonly #registrations = new Map<string, Promise<void>>();
-  readonly #parentRegistrations = new Map<string, Promise<void>>();
-  readonly #parentTimers = new Set<ReturnType<typeof setInterval>>();
-  readonly #parentChecks = new Set<Promise<void>>();
   #entryWatcher: DirectoryWatcher | undefined;
   #contentWatcher: FSWatcher | undefined;
   #pending = new Set<string>();
@@ -57,7 +59,11 @@ export class WorkspaceWatcher {
   #closing: Promise<void> | undefined;
 
   /** 선택한 프로젝트 경로를 고정하며 시작 전에 구독을 허용한다. */
-  constructor(projectRoot: string) {
+  constructor(
+    projectRoot: string,
+    observe?: (kind: string, detail: Record<string, unknown>) => void,
+  ) {
+    this.#observe = observe;
     this.#root = path.resolve(projectRoot);
   }
   /** 원인과 수동 복구 안내를 포함한 현재 준비 상태다. */
@@ -130,6 +136,7 @@ export class WorkspaceWatcher {
       ) => {
         /** 종료·연결 교체는 ready 이벤트가 없어도 대기를 끝낸다. */
         const cancel = (): void => {
+          this.#observe?.('watcher-cancelled', { folder: this.#root });
           cleanup();
           resolve();
         };
@@ -141,12 +148,17 @@ export class WorkspaceWatcher {
         };
         /** 등록 이후의 실제 이벤트만 소비자에게 전달한다. */
         const success = (): void => {
+          this.#observe?.('watcher-connection-ready', { folder: this.#root });
           prepared = true;
           cleanup();
           resolve();
         };
         /** 등록 오류를 무한 대기로 남기지 않는다. */
         const failure = (error: unknown): void => {
+          this.#observe?.('watcher-error', {
+            folder: this.#root,
+            error: String(error),
+          });
           cleanup();
           reject(error instanceof Error ? error : new Error(String(error)));
         };
@@ -183,11 +195,16 @@ export class WorkspaceWatcher {
   /** 루트 보완 감시가 먼저 발견한 새 하위 폴더도 독립 ready 이후 재확인한다. */
   async #prepareDirectory(directory: string, epoch: number): Promise<void> {
     if (!this.#active(epoch)) return;
+    const selected = await resolveProjectRoot({ cwd: this.#root });
+    if (!selected.success) return;
+    const checked = await resolveWorkspacePath(selected.root, directory);
+    if (!checked.success || checked.kind !== workspaceTargetKinds.directory)
+      return;
     let connection = this.#directoryRegistrations.get(directory);
     if (!connection) {
       connection = this.#connect(
         directory,
-        { followSymlinks: true },
+        { followSymlinks: false },
         epoch,
         (_event, changed) => this.#signal(changed),
         true,
@@ -199,10 +216,14 @@ export class WorkspaceWatcher {
   }
 
   /** 디렉터리 식별자로 같은 경로의 실제 교체를 구분한다. */
-  async #readContentIdentity(): Promise<ContentIdentity> {
+  async #readContentIdentity(): Promise<ContentIdentity | undefined> {
+    const selected = await resolveProjectRoot({ cwd: this.#root });
+    if (!selected.success) return undefined;
     try {
-      const result = await stat(path.join(this.#root, codocsDirectoryName));
-      return { dev: result.dev, ino: result.ino };
+      const result = await lstat(path.join(this.#root, codocsDirectoryName));
+      return result.isDirectory() && !result.isSymbolicLink()
+        ? { dev: result.dev, ino: result.ino }
+        : undefined;
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw error;
@@ -210,6 +231,8 @@ export class WorkspaceWatcher {
   }
   /** 루트 교체 감시와 내용 감시를 연결하고 모든 대상의 준비를 기다린다. */
   async #open(epoch: number): Promise<void> {
+    const selected = await resolveProjectRoot({ cwd: this.#root });
+    if (!selected.success) throw new Error('Workspace root is unavailable');
     const codocs = path.join(this.#root, codocsDirectoryName);
     this.#contentIdentity = await this.#readContentIdentity();
     if (!this.#active(epoch)) return;
@@ -251,25 +274,26 @@ export class WorkspaceWatcher {
         }
       },
     );
-    const content = this.#connect(
-      codocs,
-      { followSymlinks: true },
-      epoch,
-      /** 수집한 변경과 연결 상태를 현재 작업에 반영한다. */ (
-        event,
-        changed,
-      ) => {
-        if (
-          path.resolve(changed) === codocs &&
-          (event === 'addDir' || event === 'unlinkDir')
-        )
-          void this.#reopenContent(epoch).catch((error: unknown) =>
-            this.#fail(error),
-          );
-        else this.#signal(changed);
-      },
-    );
-    this.#contentWatcher = content.watcher;
+    const content =
+      this.#contentIdentity !== undefined
+        ? this.#connect(
+            codocs,
+            { followSymlinks: false },
+            epoch,
+            /** 일반 .codocs 내용의 변화만 현재 세대에 전달한다. */
+            (event, changed) => {
+              if (
+                path.resolve(changed) === codocs &&
+                (event === 'addDir' || event === 'unlinkDir')
+              )
+                void this.#reopenContent(epoch).catch((error: unknown) =>
+                  this.#fail(error),
+                );
+              else this.#signal(changed);
+            },
+          )
+        : undefined;
+    this.#contentWatcher = content?.watcher;
     this.#entryWatcher = watchDirectory(
       this.#root,
       /** 감시가 수집한 경로를 현재 연결 세대에 전달한다. */ (
@@ -292,7 +316,7 @@ export class WorkspaceWatcher {
       },
     );
     try {
-      await Promise.all([root.ready, content.ready]);
+      await Promise.all([root.ready, content?.ready]);
     } finally {
       this.#openingContent = false;
     }
@@ -301,124 +325,6 @@ export class WorkspaceWatcher {
       this.#reopenRequested = false;
       await this.#reopenContent(epoch);
     }
-    await this.trackTargets([...this.#targets]);
-  }
-  /** 조상 자체의 상태만 확인하고 보호된 형제 파일을 열거하지 않는다. */
-  async #watchParent(parent: string, epoch: number): Promise<void> {
-    /** 무관한 형제 변경을 제외하고 조상 자체의 삭제·교체를 구분한다. */
-    const identity = async (): Promise<string | null> => {
-      try {
-        const value = await stat(parent);
-        return JSON.stringify([value.dev, value.ino, value.birthtimeMs]);
-      } catch (error: unknown) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-        throw error;
-      }
-    };
-    let previous = await identity();
-    if (!this.#active(epoch)) return;
-    let checking = false;
-    const timer = setInterval(
-      /** 이전 확인이 끝난 뒤 현재 세대의 조상만 확인한다. */ () => {
-        if (checking || !this.#active(epoch)) return;
-        checking = true;
-        const check = identity()
-          .then(
-            /** 조상 식별자가 달라진 경우에만 재확인을 요청한다. */ (
-              current,
-            ) => {
-              if (this.#active(epoch) && current !== previous)
-                this.#signal(parent);
-              previous = current;
-            },
-          )
-          .catch(
-            /** 현재 세대의 실제 접근 실패는 기존 자동 복구에 전달한다. */ (
-              error: unknown,
-            ) => {
-              if (this.#active(epoch))
-                void this.#recover(error).catch((failure: unknown) =>
-                  this.#fail(failure),
-                );
-            },
-          )
-          .finally(
-            /** 종료 대기 목록에서 완료한 확인을 제거한다. */ () => {
-              checking = false;
-              this.#parentChecks.delete(check);
-            },
-          );
-        this.#parentChecks.add(check);
-      },
-      100,
-    );
-    this.#parentTimers.add(timer);
-  }
-
-  /** 외부 대상과 그 조상만 감시하며 등록별 독립 ready를 공유한다. */
-  async trackTargets(realPaths: readonly string[]): Promise<void> {
-    if (this.#closed) return;
-    const epoch = this.#epoch;
-    const codocs = path.join(this.#root, codocsDirectoryName);
-    const pending: Promise<void>[] = [];
-    for (const supplied of realPaths) {
-      const target = path.resolve(supplied);
-      if (containsWorkspacePath(codocs, target)) continue;
-      this.#targets.add(target);
-      let registration = this.#registrations.get(target);
-      if (!registration) {
-        const ancestors = new Set<string>();
-        for (
-          let parent = path.dirname(target);
-          ;
-          parent = path.dirname(parent)
-        ) {
-          ancestors.add(parent);
-          if (parent === path.dirname(parent)) break;
-        }
-        const parentReady: Promise<void>[] = [];
-        for (const parent of ancestors) {
-          let prepared = this.#parentRegistrations.get(parent);
-          if (!prepared) {
-            prepared = this.#watchParent(parent, epoch);
-            this.#parentRegistrations.set(parent, prepared);
-          }
-          parentReady.push(prepared);
-        }
-        const content = this.#connect(
-          target,
-          { followSymlinks: false },
-          epoch,
-          (_event, changed) => this.#signal(changed),
-        );
-        const supplement = this.#connect(
-          target,
-          { followSymlinks: false, usePolling: true, interval: 100 },
-          epoch,
-          (_event, changed) => this.#signal(changed),
-        );
-        registration = Promise.all([
-          ...parentReady,
-          content.ready,
-          supplement.ready,
-        ])
-          .then(() => undefined)
-          .catch(
-            /** 감시가 수집한 경로를 현재 연결 세대에 전달한다. */ (
-              error: unknown,
-            ) => {
-              if (this.#active(epoch))
-                void this.#recover(error).catch((failure: unknown) =>
-                  this.#fail(failure),
-                );
-              throw error;
-            },
-          );
-        this.#registrations.set(target, registration);
-      }
-      pending.push(registration);
-    }
-    await Promise.all(pending);
   }
   /** 실제 .codocs 교체만 재연결하고 준비 이후 하위 범위 재확인을 요청한다. */
   #reopenContent(epoch: number): Promise<void> {
@@ -438,8 +344,13 @@ export class WorkspaceWatcher {
           const identity = await this.#readContentIdentity();
           if (!this.#active(epoch)) return;
           if (
-            identity?.dev === this.#contentIdentity?.dev &&
-            identity?.ino === this.#contentIdentity?.ino
+            identity === this.#contentIdentity ||
+            (identity !== null &&
+              identity !== undefined &&
+              this.#contentIdentity !== null &&
+              this.#contentIdentity !== undefined &&
+              identity.dev === this.#contentIdentity.dev &&
+              identity.ino === this.#contentIdentity.ino)
           )
             continue;
           for (const [directory, connection] of this.#directoryRegistrations) {
@@ -450,26 +361,27 @@ export class WorkspaceWatcher {
           if (current) await this.#retire(current);
           if (!this.#active(epoch)) return;
           const codocs = path.join(this.#root, codocsDirectoryName);
-          const next = this.#connect(
-            codocs,
-            { followSymlinks: true },
-            epoch,
-            /** 수집한 변경과 연결 상태를 현재 작업에 반영한다. */ (
-              event,
-              changed,
-            ) => {
-              if (
-                path.resolve(changed) === codocs &&
-                (event === 'addDir' || event === 'unlinkDir')
-              )
-                void this.#reopenContent(epoch).catch((error: unknown) =>
-                  this.#fail(error),
-                );
-              else this.#signal(changed);
-            },
-          );
-          this.#contentWatcher = next.watcher;
-          await next.ready;
+          this.#contentWatcher = undefined;
+          if (identity !== undefined) {
+            const next = this.#connect(
+              codocs,
+              { followSymlinks: false },
+              epoch,
+              /** 다시 연결한 일반 .codocs 내용의 변화를 전달한다. */
+              (event, changed) => {
+                if (
+                  path.resolve(changed) === codocs &&
+                  (event === 'addDir' || event === 'unlinkDir')
+                )
+                  void this.#reopenContent(epoch).catch((error: unknown) =>
+                    this.#fail(error),
+                  );
+                else this.#signal(changed);
+              },
+            );
+            this.#contentWatcher = next.watcher;
+            await next.ready;
+          }
           if (!this.#active(epoch)) return;
           this.#contentIdentity = identity;
           this.#signal(codocs);
@@ -497,11 +409,8 @@ export class WorkspaceWatcher {
     }
   }
 
-  /** 모든 연결과 준비 대기를 정리한다. 등록 대상 목록은 복구에 재사용한다. */
+  /** 모든 연결과 준비 대기를 정리한다. */
   async #disconnect(): Promise<void> {
-    const parentRegistrations = [...this.#parentRegistrations.values()];
-    for (const timer of this.#parentTimers) clearInterval(timer);
-    this.#parentTimers.clear();
     for (const cancel of this.#waiters.values()) cancel();
     const entry = this.#entryWatcher;
     this.#entryWatcher = undefined;
@@ -516,11 +425,7 @@ export class WorkspaceWatcher {
     this.#directoryRegistrations.clear();
     const connections = [...this.#connections];
     this.#connections.clear();
-    this.#registrations.clear();
-    this.#parentRegistrations.clear();
     await Promise.all([
-      ...this.#parentChecks,
-      Promise.allSettled(parentRegistrations),
       entryClosed,
       ...connections.map((watcher) => watcher.close()),
       ...this.#retiring,
@@ -535,11 +440,13 @@ export class WorkspaceWatcher {
           if (
             !this.#closed &&
             this.#state.state === workspaceLifecycleStates.starting
-          )
+          ) {
             this.#state = {
               state: workspaceLifecycleStates.ready,
               ready: true,
             };
+            this.#observe?.('watcher-ready', { folder: this.#root });
+          }
         },
       )
       .catch((error: unknown) => this.#recover(error));
@@ -583,6 +490,11 @@ export class WorkspaceWatcher {
               state: workspaceLifecycleStates.ready,
               ready: true,
             };
+          if (this.#state.ready)
+            this.#observe?.('watcher-ready', {
+              folder: this.#root,
+              recovery: true,
+            });
         } catch (error: unknown) {
           this.#fail(error);
         }

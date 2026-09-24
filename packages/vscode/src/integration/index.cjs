@@ -11,7 +11,8 @@ exports.run =
       await fs.readFile(process.env.CODOCS_VSCODE_CONFIG, 'utf8'),
     );
     const c = context(config);
-    const { fixtureFiles } = await import('./test-support/fixtures.mjs');
+    const { restoreWorkspaceFixture } =
+      await import('./test-support/workspace-fixture.mjs');
     const results = [];
     const environment = {
       vscode: vscode.version,
@@ -32,28 +33,21 @@ exports.run =
     environment.extensionPath = extension.extensionPath;
     await extension.activate();
     c.assert.ok(extension.isActive);
+    /** 사례가 연 편집기를 닫고 공유 작업 공간을 기준 파일로 되돌린다. */
+    async function resetWorkspace() {
+      for (const document of vscode.workspace.textDocuments)
+        if (document.isDirty && document.uri.scheme === 'file') {
+          await vscode.window.showTextDocument(document);
+          await vscode.commands.executeCommand(
+            'workbench.action.revertAndCloseActiveEditor',
+          );
+        }
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+      await restoreWorkspaceFixture(c.root);
+    }
     for (const scenario of scenarios) {
       const started = Date.now();
       try {
-        // 이전 사례의 미저장 버퍼를 실제 편집기 명령으로 폐기한 후 새 fixture를 준비한다.
-        for (const document of vscode.workspace.textDocuments)
-          if (document.isDirty && document.uri.scheme === 'file') {
-            await vscode.window.showTextDocument(document);
-            await vscode.commands.executeCommand(
-              'workbench.action.revertAndCloseActiveEditor',
-            );
-          }
-        await vscode.commands.executeCommand(
-          'workbench.action.closeAllEditors',
-        );
-        for (const extra of ['.codocs/moved.yaml', '.codocs/closed-a.yaml'])
-          await fs.rm(path.join(c.root, extra), { force: true });
-        for (const [relative, content] of Object.entries(fixtureFiles())) {
-          if (relative === 'partial/.codocs/unreadable.yaml') continue;
-          const target = path.join(c.root, relative);
-          await fs.mkdir(path.dirname(target), { recursive: true });
-          await fs.writeFile(target, content);
-        }
         await vscode.commands.executeCommand('codocs.restartLanguageServers');
         const ready = await c.open('source.java');
         await c.hover(ready, 'readySignal', 'UI ready sentinel');
@@ -72,6 +66,25 @@ exports.run =
           milliseconds: Date.now() - started,
           error: error.stack ?? String(error),
         });
+      }
+      try {
+        await resetWorkspace();
+        results.at(-1).milliseconds = Date.now() - started;
+      } catch (error) {
+        const result = results.at(-1);
+        result.passed = false;
+        result.milliseconds = Date.now() - started;
+        result.error = [
+          result.error,
+          `fixture 복원 실패: ${error.stack ?? String(error)}`,
+        ]
+          .filter(Boolean)
+          .join('\n');
+        await fs.writeFile(
+          path.join(config.output, 'functional.json'),
+          JSON.stringify({ environment, results }, null, 2),
+        );
+        throw error;
       }
       await fs.writeFile(
         path.join(config.output, 'functional.json'),

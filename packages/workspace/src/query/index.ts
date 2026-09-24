@@ -8,6 +8,7 @@ import {
   isDocumentStatus,
   matchCode,
   projectCatalogGet,
+  projectCatalogDiagnostics,
   projectCatalogList,
   projectCatalogPaths,
   projectLiveReferences,
@@ -30,6 +31,8 @@ import {
   type CodeMatchEvidence,
   type CodeMatchResult,
   type Diagnostic,
+  type RequestFailure,
+  type RequestResult,
   type ScanStatus,
 } from '@codocs/core';
 import {
@@ -39,11 +42,12 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
+import { open, readFile } from 'node:fs/promises';
 import {
   openSync,
   closeSync,
   fstatSync,
+  lstatSync,
   readFileSync,
   type Stats,
 } from 'node:fs';
@@ -52,6 +56,7 @@ import { resolveWorkspacePath } from '../paths/index.js';
 import { calculateRevision } from '../revision/index.js';
 import { pathToFileURL } from 'node:url';
 import {
+  getIoErrorCode,
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
 } from '../diagnostics/index.js';
@@ -61,14 +66,19 @@ import {
   loadWorkspacePath,
   WorkspaceObservationCache,
   containsWorkspacePath,
-  workspacePathsForLinkEvent,
   type WorkspaceScanDiagnostic,
   type WorkspaceScanResult,
 } from '../loader/index.js';
-import { workspaceTargetKinds } from '../paths/domain-values.js';
+import {
+  workspacePathFailureStatuses,
+  workspaceTargetKinds,
+} from '../paths/domain-values.js';
 import { WorkspaceWatcher } from '../watcher/index.js';
-import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
-import type { WorkspacePathLink } from '../paths/index.js';
+import {
+  codocsDirectoryName,
+  resolveProjectRoot,
+  type ProjectRoot,
+} from '../project-root/index.js';
 import { QueryObservations } from './observations.js';
 import {
   workspaceLifecycleStates,
@@ -102,6 +112,11 @@ export const workspaceQueryDiagnosticMessages = {
 export type WorkspaceQueryDiagnostic =
   | CatalogQueryDiagnostic
   | WorkspaceScanDiagnostic
+  | (Diagnostic<
+      | typeof queryDiagnosticCodes.invalidPath
+      | typeof queryDiagnosticCodes.notFound
+      | typeof queryDiagnosticCodes.fileAccessFailed
+    > & { ioCode?: string })
   | Diagnostic<
       (typeof workspaceQueryDiagnosticCodes)[keyof typeof workspaceQueryDiagnosticCodes]
     >;
@@ -111,11 +126,16 @@ export interface WorkspaceListInput extends CatalogListFilters {
   cursor?: string;
 }
 
+/** partial 관측의 미확인 진단을 함께 담을 수 있는 목록 항목이다. */
+export type WorkspaceListItem = CatalogListItem & {
+  diagnostics?: readonly WorkspaceQueryDiagnostic[];
+};
+
 /** 성공한 목록은 현재 scan 상태와 고정 페이지 계수를 함께 반환한다. */
 export interface WorkspaceListSuccess {
   success: true;
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
-  items: readonly CatalogListItem[];
+  items: readonly WorkspaceListItem[];
   totalCount: number;
   returnedCount: number;
   nextCursor: string | null;
@@ -143,17 +163,37 @@ export interface WorkspaceGetSuccess {
 }
 
 /** scan 또는 요청 조건 때문에 전체 요청을 수행하지 못한 결과다. */
-export interface WorkspaceQueryFailure {
+export interface WorkspaceQueryFailure extends RequestFailure {
   success: false;
   scanStatus: WorkspaceScanResult['status'];
   error: WorkspaceQueryDiagnostic;
 }
 
 /** 목록 조회 결과다. */
-export type WorkspaceListResult = WorkspaceListSuccess | WorkspaceQueryFailure;
+export type WorkspaceListResult = RequestResult<
+  WorkspaceListSuccess,
+  WorkspaceQueryFailure
+>;
 
 /** 상세 조회 결과다. */
-export type WorkspaceGetResponse = WorkspaceGetSuccess | WorkspaceQueryFailure;
+export type WorkspaceGetResponse = RequestResult<
+  WorkspaceGetSuccess,
+  WorkspaceQueryFailure
+>;
+
+/** 전체 또는 한 파일의 현재 색인 진단이며 문서 오류도 요청 성공이다. */
+export interface WorkspaceValidationSuccess {
+  success: true;
+  scanStatus: typeof scanStatuses.complete;
+  diagnostics: readonly WorkspaceQueryDiagnostic[];
+  path?: string;
+}
+
+/** 경로·준비 상태 실패와 정상 문서 진단을 구분하는 검증 결과다. */
+export type WorkspaceValidationResult = RequestResult<
+  WorkspaceValidationSuccess,
+  WorkspaceQueryFailure
+>;
 
 /** 같은 catalog 버전에서 경로별 내용과 관계를 조회한 결과다. */
 export interface WorkspacePathGetSuccess {
@@ -219,18 +259,19 @@ export type WorkspaceMatchResult =
   WorkspaceMatchSuccess | WorkspaceQueryFailure;
 
 /** 명시 refresh의 scan 결과다. */
-export type WorkspaceRefreshResult =
-  | {
-      success: true;
-      scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
-      fileCount: number;
-      itemCount: number;
-      errorCount: number;
-      warningCount: number;
-      countsComplete: boolean;
-      diagnostics: readonly WorkspaceScanDiagnostic[];
-    }
-  | WorkspaceQueryFailure;
+export type WorkspaceRefreshResult = RequestResult<
+  {
+    success: true;
+    scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
+    fileCount: number;
+    itemCount: number;
+    errorCount: number;
+    warningCount: number;
+    countsComplete: boolean;
+    diagnostics: readonly WorkspaceScanDiagnostic[];
+  },
+  WorkspaceQueryFailure
+>;
 
 /** 완료된 관측의 버전·상태 알림이다. partial/failed도 변경 사실을 알린다. */
 export interface WorkspaceSnapshotChange {
@@ -302,6 +343,37 @@ function sameFileObservation(left: Stats, right: Stats): boolean {
     left.mtimeMs === right.mtimeMs &&
     left.ctimeMs === right.ctimeMs
   );
+}
+
+/** 후보의 모든 경로 성분이 지금도 일반 파일·폴더인지 확인한다. */
+function supportedCandidateFile(
+  projectRoot: string,
+  selectedPath: string,
+): Stats | undefined {
+  const relative = path.relative(
+    projectRoot,
+    path.resolve(projectRoot, selectedPath),
+  );
+  const segments = relative.split(path.sep);
+  if (
+    segments[0] !== '.codocs' ||
+    segments.some((segment) => segment === '..' || segment === '')
+  )
+    return undefined;
+  let current = projectRoot;
+  let entry = lstatSync(current);
+  if (entry.isSymbolicLink() || !entry.isDirectory()) return undefined;
+  for (const segment of segments) {
+    current = path.join(current, segment);
+    entry = lstatSync(current);
+    if (entry.isSymbolicLink()) return undefined;
+    if (
+      current !== path.resolve(projectRoot, selectedPath) &&
+      !entry.isDirectory()
+    )
+      return undefined;
+  }
+  return entry.isFile() ? entry : undefined;
 }
 
 /** 최신 관측 및 현재 파일 바이트까지 확인한 후보의 내용이다. */
@@ -490,6 +562,44 @@ function invalidInput(
   };
 }
 
+/** 검증 요청은 발견 가능한 프로젝트 상대 YAML 파일 한 개만 지정한다. */
+function validationPath(input: string): string | undefined {
+  if (path.isAbsolute(input) || path.win32.isAbsolute(input)) return;
+  const normalized = discoveryPath(input);
+  const segments = normalized
+    .split(path.sep)
+    .filter((segment) => segment !== '');
+  while (segments[0] === '.') segments.shift();
+  if (
+    segments[0] !== codocsDirectoryName ||
+    segments.length < 2 ||
+    segments.some((segment) => /[*?\[\]{}]/u.test(segment)) ||
+    !/\.ya?ml$/u.test(normalized)
+  )
+    return;
+  return normalized;
+}
+
+/** 실제 경로·IO 원인을 잃지 않고 검증 요청 실패의 외부 진단을 만든다. */
+function validationDiagnostic(
+  code:
+    | typeof queryDiagnosticCodes.invalidPath
+    | typeof queryDiagnosticCodes.notFound
+    | typeof queryDiagnosticCodes.fileAccessFailed,
+  message: string,
+  documentPath: string,
+  error?: unknown,
+): WorkspaceQueryDiagnostic {
+  const ioCode = getIoErrorCode(error);
+  return {
+    code,
+    severity: diagnosticSeverities.error,
+    message,
+    path: documentPath,
+    ...(ioCode === undefined ? {} : { ioCode }),
+  };
+}
+
 /** failed scan의 확인된 첫 원인을 반환하고 원인이 비어 있어도 이전 문서는 노출하지 않는다. */
 function scanFailure(scan: WorkspaceScanResult): WorkspaceQueryFailure {
   const error = scan.diagnostics[0] ?? {
@@ -498,6 +608,19 @@ function scanFailure(scan: WorkspaceScanResult): WorkspaceQueryFailure {
     message: workspaceDiagnosticMessages.readFailed,
   };
   return { success: false, scanStatus: scanStatuses.failed, error };
+}
+
+/** 명시적 전체 갱신 중 마지막 색인을 최신 조회 결과로 노출하지 않는다. */
+export function workspaceIndexNotReady(): WorkspaceQueryFailure {
+  return {
+    success: false,
+    scanStatus: scanStatuses.failed,
+    error: {
+      code: workspaceDiagnosticCodes.indexNotReady,
+      severity: diagnosticSeverities.error,
+      message: workspaceDiagnosticMessages.indexNotReady,
+    },
+  };
 }
 
 /** 같은 읽기에서 로더가 원본 바이트로 계산한 revision을 전달한다. */
@@ -599,6 +722,8 @@ export interface WorkspaceDiagnosticsSnapshot {
 /** 실제 scan과 이전 Catalog를 직렬로 연결하는 process 범위 조회 세션이다. */
 export class WorkspaceQuerySession {
   readonly #input: unknown;
+  readonly #observe:
+    ((kind: string, detail: Record<string, unknown>) => void) | undefined;
   #catalog: Catalog | undefined;
   #scan: WorkspaceScanResult | undefined;
   #revisions = new Map<string, string>();
@@ -613,7 +738,6 @@ export class WorkspaceQuerySession {
   #root: ProjectRoot | undefined;
   #cache = new WorkspaceObservationCache();
   readonly #pending = new Set<string>();
-  readonly #links = new Map<string, WorkspacePathLink>();
   #closed = false;
   readonly #snapshotListeners = new Set<
     (change: WorkspaceSnapshotChange) => void
@@ -622,18 +746,19 @@ export class WorkspaceQuerySession {
   readonly #selections = new Map<string, CandidateSelection>();
 
   /** 프로젝트 선택의 own data 값만 고정하고 IO는 각 요청 시 수행한다. */
-  constructor(input: unknown = {}) {
+  constructor(
+    input: unknown = {},
+    observe?: (kind: string, detail: Record<string, unknown>) => void,
+  ) {
     this.#input = sessionInput(input);
+    this.#observe = observe;
   }
 
-  /** 감시 신호를 허용된 발견 경로로만 되돌리고 진행 중 읽기의 세대를 무효화한다. */
+  /** .codocs 감시 신호로 진행 중 읽기의 세대를 무효화한다. */
   #collect(paths: readonly string[]): void {
     if (this.#closed || !this.#root) return;
     for (const changed of paths) {
-      const scopes = workspacePathsForLinkEvent(
-        [...this.#links.values()],
-        changed,
-      );
+      const scopes: string[] = [];
       if (containsWorkspacePath(this.#root.codocsPath, changed))
         scopes.push(changed);
       else if (containsWorkspacePath(changed, this.#root.codocsPath))
@@ -655,15 +780,6 @@ export class WorkspaceQuerySession {
       void this.#synchronize(false).catch(() => undefined);
   }
 
-  /** 새 연결은 읽기 전에 감시 준비를 기다리며 발견 경로별 대응을 보존한다. */
-  async #register(link: WorkspacePathLink): Promise<void> {
-    if (this.#closed) return;
-    this.#links.set(link.logicalPath, link);
-    await this.#watcher?.trackTargets([
-      ...new Set([link.targetPath, ...(link.realPath ? [link.realPath] : [])]),
-    ]);
-  }
-
   /** 프로젝트 선택 후 첫 문서 IO 전에 구독과 감시 준비를 완료한다. */
   async #prepare(): Promise<WorkspaceScanResult | undefined> {
     if (this.#watcher || this.#closed) return;
@@ -674,12 +790,15 @@ export class WorkspaceQuerySession {
         status: scanStatuses.failed,
         documents: [],
         failures: [],
-        skippedCycles: [],
+        skippedLinks: [],
         diagnostics: selected.diagnostics,
         ...(selected.projectRoot ? { projectRoot: selected.projectRoot } : {}),
       };
     this.#root = selected.root;
-    const watcher = new WorkspaceWatcher(selected.root.projectRoot);
+    const watcher = new WorkspaceWatcher(
+      selected.root.projectRoot,
+      this.#observe,
+    );
     this.#watcher = watcher;
     watcher.subscribe((batch) => this.#collect(batch.paths));
     await watcher.start();
@@ -688,6 +807,7 @@ export class WorkspaceQuerySession {
   /** 채택한 관측의 내용·revision·참조·진단을 await 없이 한 번에 게시한다. */
   #publish(scan: WorkspaceScanResult): void {
     if (this.#closed) return;
+    const initial = !this.#scan;
     const previousFingerprint = this.#catalog
       ? fingerprint(projectCatalogList(this.#catalog, {}).items)
       : undefined;
@@ -715,6 +835,13 @@ export class WorkspaceQuerySession {
         };
     }
     this.#scan = scan;
+    this.#observe?.('index-published', {
+      folder: this.#root?.projectRoot,
+      status: scan.status,
+      catalogVersion: this.#catalogVersion,
+      initial,
+      documents: scan.documents.length,
+    });
   }
 
   /** 전체 순회를 계속하면서 이후 신호의 파일·하위 범위만 다시 확인한다. */
@@ -737,12 +864,7 @@ export class WorkspaceQuerySession {
       this.#publish(failed);
       return failed;
     }
-    const options = {
-      cache: this.#cache,
-      /** 발견한 연결의 감시 준비를 내용 읽기 전에 완료한다. */ onLink: (
-        link: WorkspacePathLink,
-      ) => this.#register(link),
-    };
+    const options = { cache: this.#cache };
     let working: QueryObservations;
     if (
       full ||
@@ -806,7 +928,7 @@ export class WorkspaceQuerySession {
       status: scanStatuses.failed,
       documents: [],
       failures: [],
-      skippedCycles: [],
+      skippedLinks: [],
       diagnostics: [
         {
           code: workspaceDiagnosticCodes.readFailed,
@@ -821,6 +943,12 @@ export class WorkspaceQuerySession {
   #synchronize(full = true): Promise<WorkspaceScanResult> {
     if (this.#refreshPromise) return this.#refreshPromise;
     if (this.#closed) return Promise.resolve(this.#closedScan());
+    this.#observe?.('index-start', {
+      folder: this.#root?.projectRoot,
+      full,
+      initial: !this.#scan,
+      previousCatalogVersion: this.#catalogVersion,
+    });
     const operation = this.#scanOperation(full).catch(
       /** 예외를 실패 관측으로 게시해 준비 상태를 끝낸다. */ (
         error: unknown,
@@ -943,6 +1071,8 @@ export class WorkspaceQuerySession {
 
   /** 최신 실제 scan에서 필터 snapshot을 50개씩 반환한다. */
   async list(input: WorkspaceListInput = {}): Promise<WorkspaceListResult> {
+    if (this.#scan && this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
     const scan = await this.#current();
     const watchFailure = this.#watchFailure();
     if (scan.status === scanStatuses.failed) return scanFailure(scan);
@@ -980,6 +1110,24 @@ export class WorkspaceQuerySession {
         watchFailure && !item.conflict
           ? { ...item, confirmation: catalogConfirmations.unconfirmed }
           : item,
+      )
+      .map(
+        /** 부분 목록의 미확인 문서에 공통 진단을 붙인다. */ (item) =>
+          scanStatus === scanStatuses.partial &&
+          !item.conflict &&
+          item.confirmation === catalogConfirmations.unconfirmed
+            ? {
+                ...item,
+                diagnostics: [
+                  {
+                    code: catalogDiagnosticCodes.unconfirmedReference,
+                    severity: diagnosticSeverities.warning,
+                    message: catalogDiagnosticMessages.unconfirmedReference,
+                    path: item.source.path,
+                  },
+                ],
+              }
+            : item,
       );
     const nextPosition = position + items.length;
     const nextCursor =
@@ -1005,6 +1153,8 @@ export class WorkspaceQuerySession {
 
   /** 최신 실제 scan에서 1~20개 ID를 독립 결과로 반환한다. */
   async get(ids: readonly string[]): Promise<WorkspaceGetResponse> {
+    if (this.#scan && this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
     const scan = await this.#current();
     const watchFailure = this.#watchFailure();
     if (scan.status === scanStatuses.failed) return scanFailure(scan);
@@ -1051,6 +1201,132 @@ export class WorkspaceQuerySession {
       scanStatus,
       results,
       ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
+    };
+  }
+
+  /** 같은 완료 색인에서 전체 또는 지정 파일의 진단만 반환한다. 실제 대상 접근과 비동기 경쟁도 확인한다. */
+  async validate(inputPath?: string): Promise<WorkspaceValidationResult> {
+    if (this.#scan && this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
+    const scan = await this.#current();
+    if (this.#explicitRefreshPromise) return workspaceIndexNotReady();
+    if (scan.status === scanStatuses.failed) return scanFailure(scan);
+    const watchFailure = this.#watchFailure();
+    if (watchFailure) return this.#watchFailureResult(watchFailure);
+    if (scan.status !== scanStatuses.complete)
+      return {
+        success: false,
+        scanStatus: scan.status,
+        error:
+          scan.failures[0]?.diagnostics[0] ??
+          scan.diagnostics[0] ??
+          workspaceIndexNotReady().error,
+      };
+    if (
+      this.readiness.state !== workspaceLifecycleStates.ready ||
+      !this.#catalog
+    )
+      return workspaceIndexNotReady();
+    const catalog = this.#catalog;
+    /** 경로 IO를 기다리는 동안 refresh·감시 실패·색인 교체가 발생하면 해당 공통 실패를 반환한다. */
+    const changedState = (): WorkspaceQueryFailure | undefined => {
+      if (
+        this.#explicitRefreshPromise ||
+        this.#scan !== scan ||
+        this.#catalog !== catalog
+      )
+        return workspaceIndexNotReady();
+      const watchFailure = this.#watchFailure();
+      if (watchFailure) return this.#watchFailureResult(watchFailure);
+      return this.readiness.state === workspaceLifecycleStates.ready
+        ? undefined
+        : workspaceIndexNotReady();
+    };
+    let selectedPath: string | undefined;
+    if (inputPath !== undefined) {
+      const candidate = validationPath(inputPath);
+      if (!candidate)
+        return {
+          success: false,
+          scanStatus: scan.status,
+          error: validationDiagnostic(
+            queryDiagnosticCodes.invalidPath,
+            queryDiagnosticMessages.invalidPath,
+            inputPath,
+          ),
+        };
+      const resolved = await resolveWorkspacePath(scan.root, candidate);
+      const unavailable = changedState();
+      if (unavailable) return unavailable;
+      if (!resolved.success) {
+        const diagnostic = resolved.diagnostics[0];
+        const missing =
+          resolved.status === workspacePathFailureStatuses.missing;
+        return {
+          success: false,
+          scanStatus: scan.status,
+          error:
+            diagnostic?.code ===
+            workspaceDiagnosticCodes.unsupportedWorkspaceLink
+              ? diagnostic
+              : validationDiagnostic(
+                  missing
+                    ? queryDiagnosticCodes.notFound
+                    : resolved.status === workspacePathFailureStatuses.denied
+                      ? queryDiagnosticCodes.invalidPath
+                      : queryDiagnosticCodes.fileAccessFailed,
+                  missing
+                    ? queryDiagnosticMessages.fileNotFound
+                    : resolved.status === workspacePathFailureStatuses.denied
+                      ? queryDiagnosticMessages.invalidPath
+                      : queryDiagnosticMessages.fileAccessFailed,
+                  resolved.path ?? candidate,
+                  diagnostic?.ioCode === undefined
+                    ? undefined
+                    : { code: diagnostic.ioCode },
+                ),
+        };
+      }
+      if (resolved.kind !== workspaceTargetKinds.file)
+        return {
+          success: false,
+          scanStatus: scan.status,
+          error: validationDiagnostic(
+            queryDiagnosticCodes.invalidPath,
+            queryDiagnosticMessages.invalidPath,
+            resolved.path,
+          ),
+        };
+      try {
+        const file = await open(resolved.logicalPath, 'r');
+        await file.close();
+      } catch (error: unknown) {
+        const unavailable = changedState();
+        if (unavailable) return unavailable;
+        return {
+          success: false,
+          scanStatus: scan.status,
+          error: validationDiagnostic(
+            queryDiagnosticCodes.fileAccessFailed,
+            queryDiagnosticMessages.fileAccessFailed,
+            resolved.path,
+            error,
+          ),
+        };
+      }
+      selectedPath = resolved.path;
+      if (!catalog.documents.has(selectedPath)) return workspaceIndexNotReady();
+    }
+    const unavailable = changedState();
+    if (unavailable) return unavailable;
+    return {
+      success: true,
+      scanStatus: scanStatuses.complete,
+      ...(selectedPath === undefined ? {} : { path: selectedPath }),
+      diagnostics: [
+        ...projectCatalogDiagnostics(catalog, selectedPath),
+        ...(selectedPath === undefined ? scan.skippedLinks : []),
+      ],
     };
   }
 
@@ -1334,6 +1610,11 @@ export class WorkspaceQuerySession {
     // 같은 관측의 바이트를 가진 파일 객체만 선택에 묶는다.
     let descriptor: number | undefined;
     try {
+      const before = supportedCandidateFile(
+        this.#scan.root.projectRoot,
+        selectedPath,
+      );
+      if (!before) return undefined;
       descriptor = openSync(
         path.resolve(this.#scan.root.projectRoot, selectedPath),
         'r',
@@ -1341,11 +1622,17 @@ export class WorkspaceQuerySession {
       file = fstatSync(descriptor);
       if (
         !file.isFile() ||
+        !sameFile(before, file) ||
         calculateRevision(readFileSync(descriptor)) !==
           this.#revisions.get(selectedPath) ||
         !sameFileObservation(file, fstatSync(descriptor))
       )
         return undefined;
+      const after = supportedCandidateFile(
+        this.#scan.root.projectRoot,
+        selectedPath,
+      );
+      if (!after || !sameFile(file, after)) return undefined;
     } catch {
       return undefined;
     } finally {
@@ -1563,6 +1850,9 @@ export class WorkspaceQuerySession {
         return this.#candidateObservationChanged(version) ? false : undefined;
       if (!sameFileObservation(file, await stat(checked.logicalPath)))
         return this.#candidateObservationChanged(version) ? false : undefined;
+      const rechecked = await resolveWorkspacePath(scan.root, candidate.path);
+      if (!rechecked.success || rechecked.kind !== workspaceTargetKinds.file)
+        return this.#candidateObservationChanged(version) ? false : undefined;
     } catch {
       // 삭제·접근 실패는 열기 후보를 확인하지 못한 결과다.
       return this.#candidateObservationChanged(version) ? false : undefined;
@@ -1637,7 +1927,6 @@ export class WorkspaceQuerySession {
   async close(): Promise<void> {
     this.#closed = true;
     this.#pending.clear();
-    this.#links.clear();
     this.#snapshotListeners.clear();
     this.#liveDocuments.clear();
     for (const token of this.#selections.keys()) this.releaseCandidate(token);
@@ -1648,8 +1937,9 @@ export class WorkspaceQuerySession {
 /** 프로젝트용 조회 세션을 만든다. 첫 IO는 list/get/refresh에서 실행한다. */
 export function createWorkspaceQuerySession(
   input: unknown = {},
+  observe?: (kind: string, detail: Record<string, unknown>) => void,
 ): WorkspaceQuerySession {
-  return new WorkspaceQuerySession(input);
+  return new WorkspaceQuerySession(input, observe);
 }
 
 /** 후보 출처의 경로도 저장된 발견 경로와 같은 표기로 비교한다. */

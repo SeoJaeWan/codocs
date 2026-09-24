@@ -1,4 +1,5 @@
 import { scanStatuses } from '@codocs/core';
+import path from 'node:path';
 import {
   containsWorkspacePath,
   type WorkspaceDocumentResult,
@@ -7,7 +8,6 @@ import {
   type WorkspacePathScanResult,
   type WorkspaceScanFailure,
   type WorkspaceScanResult,
-  type WorkspaceSkippedCycle,
 } from '../loader/index.js';
 import type { ProjectRoot } from '../project-root/index.js';
 
@@ -16,7 +16,7 @@ export class QueryObservations {
   readonly #root: ProjectRoot;
   readonly #documents = new Map<string, WorkspaceDocumentResult>();
   #failures: readonly WorkspaceScanFailure[];
-  #cycles: readonly WorkspaceSkippedCycle[];
+  #skippedLinks: WorkspaceScanResult['skippedLinks'];
 
   /** 이전 전체 범위 또는 이번 전체 순회의 관측에서 작업 상태를 시작한다. */
   constructor(
@@ -33,7 +33,7 @@ export class QueryObservations {
       : scan.documents)
       this.#documents.set(document.source.logicalPath, document);
     this.#failures = scan.failures;
-    this.#cycles = scan.skippedCycles;
+    this.#skippedLinks = scan.skippedLinks;
   }
 
   /** 현재 세대의 범위 확인만 부재·실패를 반영하고 읽기는 각 관측 세대로 검증한다. */
@@ -51,11 +51,17 @@ export class QueryObservations {
         (item) =>
           !item.logicalPath || !containsWorkspacePath(scope, item.logicalPath),
       );
-      this.#cycles = this.#cycles.filter(
-        (item) => !containsWorkspacePath(scope, item.logicalPath),
+      this.#skippedLinks = this.#skippedLinks.filter(
+        /** 재확인 범위의 이전 연결 경고를 현재 관측으로 교체한다. */
+        (item) =>
+          !item.path ||
+          !containsWorkspacePath(
+            scope,
+            path.join(this.#root.projectRoot, item.path),
+          ),
       );
       this.#failures = [...this.#failures, ...result.failures];
-      this.#cycles = [...this.#cycles, ...result.skippedCycles];
+      this.#skippedLinks = [...this.#skippedLinks, ...result.skippedLinks];
     }
     if (result.outcome !== scanStatuses.failed)
       for (const observation of result.observations)
@@ -83,11 +89,11 @@ export class QueryObservations {
       status,
       documents,
       failures: this.#failures,
-      skippedCycles: this.#cycles,
+      skippedLinks: this.#skippedLinks,
       diagnostics: [
         ...documents.flatMap((item) => item.diagnostics),
         ...this.#failures.flatMap((item) => item.diagnostics),
-        ...this.#cycles.flatMap((item) => item.diagnostics),
+        ...this.#skippedLinks,
       ],
     };
   }

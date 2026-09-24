@@ -10,12 +10,13 @@ import {
   type Diagnostic,
   type OffsetRange,
 } from '@codocs/core';
-import type {
-  WorkspacePathDocumentResult,
-  WorkspacePathGetSuccess,
-  WorkspacePathGetLink,
-  WorkspaceQueryDiagnostic,
-  WorkspaceReadiness,
+import {
+  workspaceDiagnosticCodes,
+  type WorkspacePathDocumentResult,
+  type WorkspacePathGetSuccess,
+  type WorkspacePathGetLink,
+  type WorkspaceQueryDiagnostic,
+  type WorkspaceReadiness,
 } from '@codocs/workspace';
 import {
   MarkupKind,
@@ -652,7 +653,9 @@ export function createStatusHover(
   readiness: WorkspaceReadiness | undefined,
   error?: WorkspaceQueryDiagnostic,
 ): Hover {
-  const preparing = readiness !== undefined && !readiness.ready && !error;
+  const preparing =
+    error?.code === workspaceDiagnosticCodes.indexNotReady ||
+    (readiness !== undefined && !readiness.ready && !error);
   const lines = [preparing ? preparingMessage : failedMessage];
   if (error) lines.push(error.message);
   if (readiness?.cause) lines.push(readiness.cause);

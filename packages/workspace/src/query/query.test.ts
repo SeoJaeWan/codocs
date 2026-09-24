@@ -1,4 +1,10 @@
 import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures } from '../test-support/file-system.js';
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
+});
 import {
   catalogDiagnosticCodes,
   diagnosticSeverities,
@@ -6,6 +12,7 @@ import {
   documentStatuses,
   queryDiagnosticCodes,
   scanStatuses,
+  yamlDiagnosticCodes,
 } from '@codocs/core';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
@@ -44,6 +51,7 @@ beforeEach(
 
 afterEach(
   /** 해당 사례가 만든 fixture만 정리한다. */ async () => {
+    ioFailures.clear();
     await Promise.all(sessions.splice(0).map((session) => session.close()));
     await rm(project, { recursive: true, force: true });
   },
@@ -57,6 +65,262 @@ async function file(name: string, raw: string): Promise<string> {
 }
 
 describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검증한다. */ () => {
+  describe('문서 검증', () => {
+    it('초기 요청은 실제 complete 색인을 기다린 뒤 진단 성공을 반환한다', async () => {
+      await file(
+        'alpha.yaml',
+        'id: alpha\nname: Alpha\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const result = await session.validate();
+      expect(result).toMatchObject({
+        success: true,
+        scanStatus: scanStatuses.complete,
+        diagnostics: [],
+      });
+    });
+
+    it('partial 탐색에서 validate는 확인한 파일의 성공 진단을 반환하지 않는다', async () => {
+      const target = await file(
+        'alpha.yaml',
+        'id: alpha\nname: Alpha\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const result = await session.validate();
+      expect(result).toMatchObject({
+        success: false,
+        scanStatus: scanStatuses.partial,
+        error: { path: path.join('.codocs', 'alpha.yaml'), ioCode: 'EACCES' },
+      });
+    });
+
+    it('감시 실패 중 validate는 복구 안내가 있는 공통 실패를 반환한다', async () => {
+      await file(
+        'alpha.yaml',
+        'id: alpha\nname: Alpha\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      await session.validate();
+      const spy = vi
+        .spyOn(WorkspaceWatcher.prototype, 'readiness', 'get')
+        .mockReturnValue({
+          state: 'failed',
+          ready: false,
+          cause: 'watcher error',
+          guidance: watcherRecoveryGuidance,
+        });
+      try {
+        const result = await session.validate();
+        expect(result).toMatchObject({
+          success: false,
+          scanStatus: scanStatuses.failed,
+          error: { severity: diagnosticSeverities.error },
+        });
+        if (result.success) throw new Error('감시 실패를 성공으로 반환함');
+        expect(result.error.message).toContain('codocs_refresh');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('명시 refresh가 진행 중이면 validate는 이전 색인의 성공을 반환하지 않는다', async () => {
+      await file(
+        'alpha.yaml',
+        'id: alpha\nname: Alpha\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      await session.validate();
+      const refresh = session.refresh();
+      const result = await session.validate();
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: 'index_not_ready' },
+      });
+      await refresh;
+    });
+    it('전체 검증은 중복 ID와 별도 YAML 오류를 모두 보고하고 파일 검증은 대상과 관련 경로만 보고한다', async () => {
+      await file(
+        'a.yaml',
+        'id: shared\nname: A\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      await file(
+        'b.yaml',
+        'id: shared\nname: B\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      await file('c.yaml', 'id: [\n');
+      const session = createWorkspaceQuerySession({ cwd: project });
+
+      const all = await session.validate();
+      const selected = await session.validate('.codocs/a.yaml');
+
+      expect(all).toMatchObject({
+        success: true,
+        scanStatus: scanStatuses.complete,
+      });
+      expect(selected).toMatchObject({
+        success: true,
+        scanStatus: scanStatuses.complete,
+        path: path.join('.codocs', 'a.yaml'),
+      });
+      if (!all.success || !selected.success) throw new Error('검증 실패');
+      expect(
+        all.diagnostics.some(
+          (item) =>
+            item.path === path.join('.codocs', 'c.yaml') &&
+            item.code === yamlDiagnosticCodes.invalidYaml,
+        ),
+      ).toBe(true);
+      expect(selected.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: catalogDiagnosticCodes.duplicateId,
+          path: path.join('.codocs', 'a.yaml'),
+          relatedPaths: [
+            path.join('.codocs', 'a.yaml'),
+            path.join('.codocs', 'b.yaml'),
+          ],
+        }),
+      );
+      expect(
+        selected.diagnostics.every(
+          (item) => item.path !== path.join('.codocs', 'c.yaml'),
+        ),
+      ).toBe(true);
+    });
+
+    it('ID가 없는 문서와 파싱 실패 문서도 발견 경로로 검증한다', async () => {
+      await file(
+        'no-id.yaml',
+        'name: No ID\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      await file('broken.yaml', 'id: [\n');
+      const session = createWorkspaceQuerySession({ cwd: project });
+
+      const missingId = await session.validate('.codocs/no-id.yaml');
+      const broken = await session.validate('.codocs/broken.yaml');
+
+      expect(missingId).toMatchObject({
+        success: true,
+        diagnostics: [
+          expect.objectContaining({
+            code: 'missing_required_field',
+            path: path.join('.codocs', 'no-id.yaml'),
+          }),
+        ],
+      });
+      expect(broken).toMatchObject({
+        success: true,
+        diagnostics: [
+          expect.objectContaining({
+            code: 'invalid_yaml',
+            path: path.join('.codocs', 'broken.yaml'),
+          }),
+        ],
+      });
+    });
+
+    it.each([
+      '../outside.yaml',
+      '.codocs',
+      '.codocs/*.yaml',
+      '.codocs/a.txt',
+      '.codocs/a.yaml/',
+    ])(
+      '허용되지 않는 경로 %s를 지정하면 invalid_path를 반환한다',
+      async (requested) => {
+        const session = createWorkspaceQuerySession({ cwd: project });
+        const result = await session.validate(requested);
+        expect(result).toMatchObject({
+          success: false,
+          error: { code: queryDiagnosticCodes.invalidPath },
+        });
+      },
+    );
+
+    it('없는 파일의 경로와 ENOENT 원인을 보존한다', async () => {
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const result = await session.validate('.codocs/missing.yaml');
+      expect(result).toMatchObject({
+        success: false,
+        error: {
+          code: queryDiagnosticCodes.notFound,
+          path: path.join('.codocs', 'missing.yaml'),
+          ioCode: 'ENOENT',
+        },
+      });
+    });
+
+    it('실제 파일의 접근 확인 실패는 경로와 EACCES를 반환한다', async () => {
+      const target = await file(
+        'locked.yaml',
+        'id: locked\nname: Locked\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      await session.validate();
+      ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
+      const result = await session.validate('.codocs/locked.yaml');
+      expect(result).toMatchObject({
+        success: false,
+        error: {
+          code: queryDiagnosticCodes.fileAccessFailed,
+          path: path.join('.codocs', 'locked.yaml'),
+          ioCode: 'EACCES',
+        },
+      });
+    });
+
+    it('프로젝트 안의 절대 YAML 파일을 지정해도 invalid_path와 상대 경로 안내를 반환한다', async () => {
+      const target = await file(
+        'absolute.yaml',
+        'id: absolute\nname: Absolute\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const result = await session.validate(target);
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: queryDiagnosticCodes.invalidPath },
+      });
+      if (result.success) throw new Error('절대 경로를 허용함');
+      expect(result.error.message).toContain('상대');
+    });
+
+    it('Windows 정션 경로를 지정하면 연결 대상을 읽지 않고 거부한다', async () => {
+      const target = path.join(project, '.codocs', 'ordinary');
+      await mkdir(target);
+      await writeFile(
+        path.join(target, 'item.yaml'),
+        'id: item\nname: Item\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      await symlink(
+        target,
+        path.join(project, '.codocs', 'linked'),
+        'junction',
+      );
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const result = await session.validate('.codocs/linked/item.yaml');
+      expect(result).toMatchObject({
+        success: false,
+        error: {
+          code: 'unsupported_workspace_link',
+          path: path.join('.codocs', 'linked'),
+        },
+      });
+    });
+
+    it('색인에 아직 없는 새 파일을 성공 검증으로 보고하지 않는다', async () => {
+      const session = createWorkspaceQuerySession({ cwd: project });
+      await session.validate();
+      await file(
+        'new.yaml',
+        'id: new\nname: New\ndomains: [업무]\ndefinition: 본문\n',
+      );
+      const result = await session.validate('.codocs/new.yaml');
+      expect(result).toMatchObject({
+        success: false,
+        error: { code: 'index_not_ready' },
+      });
+    });
+  });
   describe('전체 텍스트 매칭', () => {
     it('저장하지 않은 주석·문자열·불완전 원문을 요청마다 새 UTF-16 범위로 매칭한다', async () => {
       await file(
@@ -177,8 +441,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.list();
-    await rm(target);
-    await symlink('missing-target.yaml', target);
+    ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
 
     const result = await session.refresh();
 
@@ -251,8 +514,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       'alpha.yaml',
       'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
     );
-    await rm(target);
-    await symlink('missing-target.yaml', target);
+    ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
     const session = createWorkspaceQuerySession({ cwd: project });
     expect(await session.list()).toMatchObject({
       success: true,
@@ -446,7 +708,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   });
 
   describe('부분 스캔 후 이전 조회 결과 보존', () => {
-    it('문서 경로가 깨진 링크로 바뀌면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
+    it('문서 경로의 확인이 실패하면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
       const raw =
         "id: alpha\nname: 알파\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: '이전 본문'\n";
       const target = await file('alpha.yaml', raw);
@@ -459,8 +721,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       )
         throw new Error('초기 문서 조회 실패');
       const revision = initial.results[0].revision;
-      await rm(target);
-      await symlink('missing-target.yaml', target);
+      ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
 
       await session.refresh();
       const result = await session.get(['alpha']);
@@ -487,8 +748,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.get(['alpha']);
-      await rm(target);
-      await symlink('missing-target.yaml', target);
+      ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
 
       await session.refresh();
       const result = await session.get(['outside']);
@@ -515,8 +775,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.list();
-      await rm(target);
-      await symlink('missing-target.yaml', target);
+      ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
 
       await session.refresh();
       const result = await session.list();
@@ -529,7 +788,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     });
   });
 
-  it('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 깨진 .codocs로 실제 failed 전환을 만든다. */ async () => {
+  it('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 미지원 .codocs 정션으로 failed 전환을 만든다. */ async () => {
     await file(
       'alpha.yaml',
       'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
@@ -539,7 +798,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     const codocs = path.join(project, '.codocs');
     const saved = path.join(project, 'saved-codocs');
     await rename(codocs, saved);
-    await symlink('missing-codocs', codocs);
+    await symlink(saved, codocs, 'junction');
 
     await session.refresh();
     const list = await session.list();
@@ -1075,8 +1334,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
     const session = createWorkspaceQuerySession({ cwd: project });
     const initial = await session.match('alpha');
     if (!initial.success) throw new Error('초기 매칭 실패');
-    await rm(target);
-    await symlink('missing-target.yaml', target);
+    ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
     const refreshed = await session.refresh();
     if (!refreshed.success) throw new Error('부분 갱신 실패');
 

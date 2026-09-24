@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import lintStaged from 'lint-staged';
 
 /** 설정 파일을 바꾸지 않고 Git이 원본 줄바꿈과 긴 경로를 보존하게 한다. */
-export async function formatIndex(options) {
+export async function formatIndex(options, logger = console) {
   const before = indexEntries(options.cwd);
   let passed;
   const count = Number(process.env.GIT_CONFIG_COUNT ?? 0);
@@ -18,7 +18,7 @@ export async function formatIndex(options) {
   );
   Object.assign(process.env, values);
   try {
-    passed = await lintStaged(options);
+    passed = await lintStaged(options, logger);
   } finally {
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];

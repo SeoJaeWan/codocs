@@ -1,5 +1,5 @@
 import { createLink as symlink } from '../test-support/links.js';
-import { ioFailures } from '../test-support/file-system.js';
+import { ioFailures, simulatedFileLinks } from '../test-support/file-system.js';
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   const { withIoFailures } = await import('../test-support/file-system.js');
@@ -23,7 +23,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspaceDiagnosticCodes } from '../diagnostics/index.js';
-import { resolveWorkspacePath } from '../paths/index.js';
 import { loadWorkspace } from './index.js';
 import { workspaceDocumentStatuses } from './domain-values.js';
 
@@ -46,6 +45,7 @@ beforeEach(
 afterEach(
   /** 오류 주입과 각 테스트의 fixture를 정리한다. */ async () => {
     ioFailures.clear();
+    simulatedFileLinks.clear();
     await rm(fixture, { recursive: true, force: true });
   },
 );
@@ -94,30 +94,13 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     }
     expect(result.failures).toEqual([]);
   });
-  it('다른 Unicode와 대소문자 이름으로 같은 파일을 연결하면 두 발견 경로를 유지한다', /** 경로를 임의로 정규화하여 문서를 병합하지 않는다. */ async () => {
-    const target = path.join(outside, 'target.yaml');
-    await writeFile(target, raw);
+  it('서로 다른 일반 파일의 Unicode 경로를 그대로 보존한다', async () => {
     const names = ['first/Mixed-가.yaml', 'second/mixed-가.yml'];
-    for (const name of names) {
-      const file = path.join(codocs, name);
-      await mkdir(path.dirname(file), { recursive: true });
-      await symlink(target, file, 'file');
-    }
+    for (const name of names) await document(name, raw);
     const result = await loadWorkspace({ cwd: project });
     expect(result.status).toBe('complete');
-    expect(result.documents).toHaveLength(2);
-    expect(
-      result.documents.map(
-        /** 경로 표기를 그대로 비교한다. */ (item) => item.source.path,
-      ),
-    ).toEqual(
-      names.map(
-        /** 프로젝트 상대 경로를 계산한다. */ (name) =>
-          path.join('.codocs', name),
-      ),
-    );
-    expect(result.documents[0]?.source.realPath).toBe(
-      result.documents[1]?.source.realPath,
+    expect(result.documents.map((item) => item.source.path)).toEqual(
+      names.map((name) => path.join('.codocs', name)),
     );
   });
   it('BOM과 주석이 있는 원문 및 빈 YAML을 읽으면 원문을 유지하고 내용 오류만 분리한다', /** 읽은 원문을 파서에 그대로 전달한다. */ async () => {
@@ -192,118 +175,57 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       documents: [],
     });
   });
-  it('외부 파일과 폴더 링크를 읽으면 논리 경로와 읽기 쓰기 범위를 제공한다', /** 외부 연결 범위는 부모 전체로 확장하지 않는다. */ async () => {
-    const file = path.join(outside, '외부 파일.yaml');
-    await writeFile(file, raw);
-    await symlink(file, path.join(codocs, 'file.yml'), 'file');
-    await symlink(outside, path.join(codocs, 'folder'), 'dir');
-    const result = await loadWorkspace({ cwd: project });
-    expect(result.status).toBe('complete');
-    expect(result.documents).toHaveLength(2);
-    expect(
-      result.documents.map(
-        /** 연결 종류를 비교한다. */ (item) => item.scope.kind,
-      ),
-    ).toEqual(['linkedFile', 'linkedDirectory']);
-    if (result.status === scanStatuses.failed)
-      throw new Error('정상 루트가 필요하다');
-    for (const item of result.documents)
-      expect(
-        await resolveWorkspacePath(result.root, item.source.path),
-      ).toMatchObject({ success: true, access: { read: true, write: true } });
-    expect(
-      await resolveWorkspacePath(
-        result.root,
-        path.join(outside, 'sibling.yaml'),
-      ),
-    ).toMatchObject({ success: false, status: 'denied' });
-    expect(
-      await resolveWorkspacePath(
-        result.root,
-        '.codocs/file.yml/../sibling.yaml',
-      ),
-    ).toMatchObject({ success: false, status: 'denied' });
-  });
-  it('.codocs 자체가 외부 폴더 링크이면 그 하위 문서를 읽는다', /** 명시적으로 연결된 스캔 루트를 처리한다. */ async () => {
-    await rm(codocs, { recursive: true });
-    await writeFile(path.join(outside, 'term.yaml'), raw);
-    await symlink(outside, codocs, 'dir');
-    const result = await loadWorkspace({ cwd: project });
-    expect(result).toMatchObject({
-      status: 'complete',
-      documents: [{ status: 'valid', scope: { kind: 'linkedDirectory' } }],
-    });
-  });
-  it('자기와 부모 폴더로 돌아오는 연결이 있으면 연결만 건너뛰고 정상 문서를 읽는다', /** 확인된 순환은 탐색 누락과 별도로 기록한다. */ async () => {
-    await document('nested/ok.yaml', raw);
-    await symlink(codocs, path.join(codocs, 'self'), 'dir');
-    await symlink(codocs, path.join(codocs, 'nested', 'parent'), 'dir');
+  it('하위 정션은 경고 후 제외하고 일반 문서는 계속 읽는다', async () => {
+    await document('ordinary.yaml', raw);
+    await writeFile(path.join(outside, 'external.yaml'), raw);
+    await symlink(outside, path.join(codocs, 'linked'), 'junction');
     const result = await loadWorkspace({ cwd: project });
     expect(result.status).toBe('complete');
     expect(result.documents).toHaveLength(1);
-    expect(result.skippedCycles).toHaveLength(2);
+    expect(result.documents[0]?.source.path).toBe(
+      path.join('.codocs', 'ordinary.yaml'),
+    );
     expect(result.failures).toEqual([]);
-    for (const cycle of result.skippedCycles)
-      expect(cycle.diagnostics).toMatchObject([
-        {
-          code: workspaceDiagnosticCodes.circularDirectoryLink,
-          path: cycle.path,
-        },
-      ]);
+    expect(result.skippedLinks).toMatchObject([
+      {
+        code: workspaceDiagnosticCodes.unsupportedWorkspaceLink,
+        severity: 'warning',
+        path: path.join('.codocs', 'linked'),
+      },
+    ]);
   });
-  it('여러 연결을 거쳐 조상으로 돌아오면 순환 연결만 중단한다', /** 별도 정상 문서는 계속 처리한다. */ async () => {
-    const second = path.join(fixture, 'second');
-    await mkdir(second);
-    await writeFile(path.join(second, 'ok.yaml'), raw);
-    await symlink(outside, path.join(codocs, 'first'), 'dir');
-    await symlink(second, path.join(outside, 'second'), 'dir');
-    await symlink(codocs, path.join(second, 'back'), 'dir');
-    await document('normal.yaml', raw);
-    const result = await loadWorkspace({ cwd: project });
-    expect(result).toMatchObject({
-      status: 'complete',
-      skippedCycles: [
-        { path: path.join('.codocs', 'first', 'second', 'back') },
+
+  it('.codocs 자체가 정션이면 전체 실패다', async () => {
+    await rm(codocs, { recursive: true });
+    await writeFile(path.join(outside, 'term.yaml'), raw);
+    await symlink(outside, codocs, 'junction');
+    expect(await loadWorkspace({ cwd: project })).toMatchObject({
+      status: 'failed',
+      documents: [],
+      failures: [
+        {
+          path: '.codocs',
+          diagnostics: [
+            { code: workspaceDiagnosticCodes.unsupportedWorkspaceLink },
+          ],
+        },
       ],
     });
-    expect(result.documents).toHaveLength(2);
   });
-  it('다른 두 가지가 같은 폴더에 도달하면 양쪽 논리 경로를 각각 읽는다', /** 전역 중복 제거로 중복 ID를 숨기지 않는다. */ async () => {
-    await writeFile(path.join(outside, 'same.yaml'), raw);
-    await symlink(outside, path.join(codocs, 'SharedA'), 'dir');
-    await symlink(outside, path.join(codocs, 'sharedB'), 'dir');
-    const result = await loadWorkspace({ cwd: project });
-    expect(result.status).toBe('complete');
-    expect(result.skippedCycles).toEqual([]);
-    expect(
-      result.documents.map(
-        /** 발견한 논리 경로를 확인한다. */ (item) => item.source.path,
-      ),
-    ).toEqual([
-      path.join('.codocs', 'SharedA', 'same.yaml'),
-      path.join('.codocs', 'sharedB', 'same.yaml'),
-    ]);
-    expect(result.documents[0]?.source.realPath).toBe(
-      result.documents[1]?.source.realPath,
-    );
-    for (const item of result.documents) {
-      if (item.status !== workspaceDocumentStatuses.valid)
-        throw new Error('유효 문서가 필요하다');
-      expect(item.data.id).toBe('shared-term');
-    }
-  });
-  it('같은 파일의 링크 별칭과 hardlink를 읽으면 모든 발견 경로를 보존한다', /** 파일 실제 경로가 같아도 대표 별칭을 고르지 않는다. */ async () => {
+
+  it('하드 링크는 일반 파일로 읽고 발견 경로를 유지한다', async () => {
     await document('original.yaml', raw);
-    await symlink('original.yaml', path.join(codocs, 'alias.yml'), 'file');
     await link(
       path.join(codocs, 'original.yaml'),
       path.join(codocs, 'hardlink.yaml'),
     );
     const result = await loadWorkspace({ cwd: project });
-    expect(result.documents).toHaveLength(3);
-    expect(result.documents[0]?.source.realPath).toBe(
-      result.documents[2]?.source.realPath,
-    );
+    expect(result.status).toBe('complete');
+    expect(result.documents).toHaveLength(2);
+    expect(result.documents.map((item) => item.scope.kind)).toEqual([
+      'workspace',
+      'workspace',
+    ]);
   });
   describe('문서 내용 오류와 스캔 완료 상태', () => {
     it('정상 문서를 읽으면 검증된 데이터와 원문을 반환한다', async () => {
@@ -385,27 +307,21 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       ],
     });
   });
-  it('깨진 링크가 있으면 실패 경로만 보관하고 정상 문서를 계속 읽어 부분 완료다', /** 얻지 못한 원문과 실제 경로를 만들지 않는다. */ async () => {
+  it('깨진 파일 연결도 부재로 바꾸지 않고 경고 후 제외한다', async () => {
     await document('ok.yaml', raw);
-    await symlink(
-      path.join(outside, 'missing.yaml'),
-      path.join(codocs, 'broken.yml'),
-      'file',
-    );
+    const linked = path.join(codocs, 'broken.yml');
+    await writeFile(linked, '파일 연결을 대신하는 열거 항목');
+    simulatedFileLinks.add(linked);
     const result = await loadWorkspace({ cwd: project });
-    expect(result).toMatchObject({
-      status: 'partial',
-      failures: [
-        {
-          path: path.join('.codocs', 'broken.yml'),
-          diagnostics: [{ ioCode: 'ENOENT' }],
-        },
-      ],
-    });
+    expect(result.status).toBe('complete');
     expect(result.documents).toHaveLength(1);
-    expect(result.failures[0]).not.toHaveProperty('raw');
-    expect(result.failures[0]).not.toHaveProperty('realPath');
-    expect(result.failures[0]).not.toHaveProperty('id');
+    expect(result.failures).toEqual([]);
+    expect(result.skippedLinks).toMatchObject([
+      {
+        code: workspaceDiagnosticCodes.unsupportedWorkspaceLink,
+        severity: 'warning',
+      },
+    ]);
   });
   it('하위 파일의 읽기 오류를 받으면 확인한 실제 경로와 IO 실패를 보관한다', /** readFile 오류 응답의 보존을 확인한다. */ async () => {
     await document('restricted.yaml', raw);
@@ -509,12 +425,20 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       });
     });
   });
-  it('깨진 .codocs 링크이면 정상 부재로 숨기지 않고 전체 실패다', /** 존재하는 연결의 대상 실패를 기록한다. */ async () => {
+  it('깨진 .codocs 정션이면 부재가 아니라 미지원 전체 실패다', async () => {
+    const target = path.join(outside, 'missing');
     await rm(codocs, { recursive: true });
-    await symlink(path.join(outside, 'missing'), codocs, 'dir');
+    await symlink(target, codocs, 'junction');
     expect(await loadWorkspace({ cwd: project })).toMatchObject({
       status: 'failed',
-      failures: [{ path: '.codocs', diagnostics: [{ ioCode: 'ENOENT' }] }],
+      failures: [
+        {
+          path: '.codocs',
+          diagnostics: [
+            { code: workspaceDiagnosticCodes.unsupportedWorkspaceLink },
+          ],
+        },
+      ],
     });
   });
   describe('잘못된 루트 입력 방어', () => {

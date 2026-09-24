@@ -24,7 +24,7 @@ try {
     signal: controller.signal,
     /** 스테이징 파일의 서식과 lint를 자동 수정한다. */
     format: () => formatIndex({ cwd: root }),
-    /** 복사본에 의존성을 준비한 뒤 타입·린트·로직을 검사한다. */
+    /** 복사본에 의존성을 준비한 뒤 타입·린트·빌드·로직을 검사한다. */
     verify: async (snapshot, signal) => {
       await runNode(snapshot, [pnpm, 'install', '--frozen-lockfile']);
       signal.throwIfAborted();
@@ -35,6 +35,8 @@ try {
         '.',
         '--max-warnings=0',
       ]);
+      signal.throwIfAborted();
+      await runNode(snapshot, ['tools/build/build.mjs', 'build']);
       signal.throwIfAborted();
       await runNode(snapshot, ['tools/test/run.mjs']);
     },

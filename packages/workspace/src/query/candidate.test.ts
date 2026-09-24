@@ -1,4 +1,11 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as workspacePaths from '../paths/index.js';
@@ -66,6 +73,25 @@ describe('후보 개별 파일 확인의 비동기 경합', () => {
 });
 
 describe('선택 후보 확인의 거부·보존 계약', () => {
+  it('관측 후 .codocs 폴더가 정션으로 바뀌면 후보 파일을 열지 않는다', async () => {
+    await session.refresh();
+    const codocs = path.join(project, '.codocs');
+    const saved = path.join(project, 'saved');
+    await rename(codocs, saved);
+    await symlink(
+      saved,
+      codocs,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    expect(
+      session.captureCandidate(
+        { text: 'target' },
+        '.codocs/target.yaml',
+        session.catalogVersion,
+      ),
+    ).toBeUndefined();
+  });
+
   it('선택 당시 ID가 중복이면 선택한 경로가 삭제된 뒤 남은 문서로 이동하지 않는다', async () => {
     await writeFile(
       path.join(project, '.codocs/other.yaml'),

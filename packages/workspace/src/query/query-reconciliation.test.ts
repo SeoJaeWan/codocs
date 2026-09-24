@@ -55,7 +55,6 @@ vi.mock('../watcher/index.js', async (importOriginal) => {
       boundary.starts++;
       return Promise.resolve();
     }
-    async trackTargets(): Promise<void> {}
     async settle(): Promise<void> {}
     drain(): void {
       const pending = boundary.pending.splice(0);

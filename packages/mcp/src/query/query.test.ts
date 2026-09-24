@@ -1,6 +1,7 @@
 import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codocs/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCodocsQueryHandlers } from './index.js';
+import type { WorkspaceQuerySession } from '@codocs/workspace';
 
 const backend = vi.hoisted(
   /** 각 handler 호출과 전달 인수를 독립적으로 기록한다. */ () => {
@@ -82,7 +83,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         ],
       };
       backend.get.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const input = { ids: ['normal'] };
 
       const result = await handlers.codocsGet(input);
@@ -123,7 +126,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         ],
       };
       backend.get.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const input = { ids: ['normal', 'missing'] };
 
       const result = await handlers.codocsGet(input);
@@ -158,7 +163,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         ],
       };
       backend.get.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const input = { ids: ['shared', 'normal'] };
 
       const result = await handlers.codocsGet(input);
@@ -196,7 +203,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         ],
       };
       backend.get.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const input = { ids: ['alpha', 'outside'] };
 
       const result = await handlers.codocsGet(input);
@@ -216,7 +225,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         },
       };
       backend.get.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const input = { ids: ['alpha'] };
 
       const result = await handlers.codocsGet(input);
@@ -252,7 +263,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     ])(
       '$name을 전달하면 입력 오류를 반환하고 backend를 호출하지 않는다',
       async ({ method, input }) => {
-        const handlers = createCodocsQueryHandlers();
+        const handlers = createCodocsQueryHandlers(
+          backend as unknown as WorkspaceQuerySession,
+        );
 
         const result =
           method === 'list'
@@ -266,7 +279,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     );
 
     it('ID 속성이 접근자이면 접근자를 실행하지 않고 입력 오류를 반환한다', async () => {
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       let reads = 0;
       const input = Object.defineProperty({}, 'ids', {
         enumerable: true,
@@ -285,7 +300,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     });
 
     it('회수된 Proxy를 전달하면 입력 오류를 반환하고 backend를 호출하지 않는다', async () => {
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const revoked = Proxy.revocable({ ids: ['alpha'] }, {});
       revoked.revoke();
 
@@ -302,7 +319,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         results: [{ id: 'same', found: false, diagnostics: [] }],
       };
       backend.get.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const input = { ids: Array(21).fill('same') as string[] };
 
       const result = await handlers.codocsGet(input);
@@ -323,7 +342,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         nextCursor: 'cursor',
       };
       backend.list.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const input = { domain: '업무', kind: 'policy', status: 'confirmed' };
 
       const result = await handlers.codocsList(input);
@@ -332,7 +353,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(backend.list).toHaveBeenCalledWith(input);
     });
 
-    it('partial 목록에서 미확인 문서에 진단을 더하고 기존 항목을 보존한다', async () => {
+    it('partial 목록의 공통 진단을 그대로 전달한다', async () => {
       const response = {
         success: true,
         scanStatus: 'partial',
@@ -344,6 +365,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             confirmation: 'unconfirmed',
             hasErrors: false,
             conflict: false,
+            diagnostics: [
+              { code: 'unconfirmed_reference', severity: 'warning' },
+            ],
           },
           {
             id: 'new',
@@ -359,7 +383,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         nextCursor: null,
       };
       backend.list.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
 
       const result = await handlers.codocsList();
 
@@ -392,7 +418,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         nextCursor: null,
       };
       backend.list.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const input = { cursor: 'cursor' };
 
       const result = await handlers.codocsList(input);
@@ -404,7 +432,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     it('cursor와 다른 도메인을 함께 전달하면 backend의 입력 오류를 그대로 반환한다', async () => {
       const response = invalidInput();
       backend.list.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
       const input = { cursor: 'cursor', domain: '다른 업무' };
 
       const result = await handlers.codocsList(input);
@@ -426,7 +456,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
           },
         };
         backend.list.mockResolvedValue(response);
-        const handlers = createCodocsQueryHandlers();
+        const handlers = createCodocsQueryHandlers(
+          backend as unknown as WorkspaceQuerySession,
+        );
         const input = { cursor };
 
         const result = await handlers.codocsList(input);
@@ -439,7 +471,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     it('새로 고침을 호출하면 같은 작업 공간 세션의 응답을 반환한다', async () => {
       const response = { success: true, scanStatus: 'complete' };
       backend.refresh.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
 
       const result = await handlers.refresh();
 
@@ -450,7 +484,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
 
   describe('준비 상태와 복구 요청', () => {
     it('완료 색인만 write와 validate를 허용하고 partial은 조회만 허용한다', () => {
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
 
       expect(handlers.access).toMatchObject({
         state: 'ready',
@@ -472,17 +508,30 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     });
 
     it.each(['refreshing', 'recovering'])(
-      '%s 중 조회를 차단하고 refresh는 유지한다',
+      '%s 중 workspace 준비 결과를 그대로 전달한다',
       async (state) => {
         backend.readiness = { state, ready: false };
-        const handlers = createCodocsQueryHandlers();
+        const pending = {
+          success: false,
+          scanStatus: 'failed',
+          error: {
+            code: 'index_not_ready',
+            severity: 'error',
+            message: '준비 중',
+          },
+        };
+        backend.list.mockResolvedValue(pending);
+        backend.get.mockResolvedValue(pending);
+        const handlers = createCodocsQueryHandlers(
+          backend as unknown as WorkspaceQuerySession,
+        );
         const list = await handlers.codocsList();
         const get = await handlers.codocsGet({ ids: ['alpha'] });
 
-        expect(list).toMatchObject({ success: false, scanStatus: 'failed' });
-        expect(get).toMatchObject({ success: false, scanStatus: 'failed' });
-        expect(backend.list).not.toHaveBeenCalled();
-        expect(backend.get).not.toHaveBeenCalled();
+        expect(list).toBe(pending);
+        expect(get).toBe(pending);
+        expect(backend.list).toHaveBeenCalledOnce();
+        expect(backend.get).toHaveBeenCalledOnce();
         expect(handlers.access).toMatchObject({
           canRead: false,
           canWrite: false,
@@ -500,7 +549,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         guidance: 'codocs_refresh를 실행하세요.',
       };
       backend.limitedReadAvailable = false;
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
 
       expect(handlers.access).toMatchObject({
         cause: 'watcher error',
@@ -534,7 +585,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         scanStatus: 'partial',
         results: [],
       });
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
 
       expect(handlers.access).toMatchObject({
         canRead: true,
@@ -560,7 +613,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       };
       const operation = Promise.resolve(response);
       backend.refresh.mockReturnValue(operation);
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
 
       const first = handlers.codocsRefresh();
       const second = handlers.refresh({});
@@ -572,7 +627,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     });
 
     it('refresh에 알 수 없는 입력을 주면 backend를 호출하지 않는다', async () => {
-      const handlers = createCodocsQueryHandlers();
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
 
       expect(await handlers.codocsRefresh({ force: true })).toEqual(
         invalidInput(),
@@ -623,7 +680,9 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       results,
     };
     backend.get.mockResolvedValue(response);
-    const handlers = createCodocsQueryHandlers();
+    const handlers = createCodocsQueryHandlers(
+      backend as unknown as WorkspaceQuerySession,
+    );
     const ids = results.map(
       /** 결과 순서와 같은 요청 ID를 만든다. */ (result) => result.id,
     );

@@ -57,6 +57,7 @@ export async function checkStaged({
   verify,
   signal,
   snapshotParent = os.tmpdir(),
+  report = console.log,
 }) {
   signal?.throwIfAborted();
   if (!(await format()))
@@ -113,7 +114,7 @@ export async function checkStaged({
       path.join(output, 'result.json'),
       JSON.stringify(result, null, 2),
     );
-    console.log(`커밋 검사 ${result.passed ? 'PASS' : 'FAIL'}: ${output}`);
+    report(`커밋 검사 ${result.passed ? 'PASS' : 'FAIL'}: ${output}`);
   }
   return result;
 }

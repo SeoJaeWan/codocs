@@ -39,7 +39,7 @@ afterEach(async () => {
 });
 
 describe('현재 OS의 실제 경로·링크와 오류 처리', () => {
-  it('외부 폴더 링크를 통해 읽으면 발견 경로와 실제 범위를 구분한다', async () => {
+  it('외부 폴더 연결은 대상을 읽지 않고 거부한다', async () => {
     const selected = await resolveProjectRoot({ cwd: root });
     if (!selected.success) throw new Error('root');
     const result = await resolveWorkspacePath(
@@ -47,11 +47,10 @@ describe('현재 OS의 실제 경로·링크와 오류 처리', () => {
       '.codocs/연결/한글.yaml',
     );
     expect(result).toMatchObject({
-      success: true,
-      path: path.join('.codocs', '연결', '한글.yaml'),
-      realPath: path.join(target, '한글.yaml'),
-      scope: { logicalPath: logical, realPath: target },
-      links: [{ targetPath: target, confirmed: true }],
+      success: false,
+      status: 'denied',
+      path: path.join('.codocs', '연결'),
+      diagnostics: [{ code: 'unsupported_workspace_link' }],
     });
   });
   it('링크 뒤 상위 이동으로 범위를 벗어나면 거부한다', async () => {
@@ -76,7 +75,7 @@ describe('현재 OS의 실제 경로·링크와 오류 처리', () => {
       });
     },
   );
-  it('실제 링크 대상이 삭제되면 끊어진 링크와 원인을 보존한다', async () => {
+  it('연결 대상이 삭제되어도 미지원 연결로 구분한다', async () => {
     const selected = await resolveProjectRoot({ cwd: root });
     if (!selected.success) throw new Error('root');
     await rm(target, { recursive: true });
@@ -84,9 +83,8 @@ describe('현재 OS의 실제 경로·링크와 오류 처리', () => {
       await resolveWorkspacePath(selected.root, '.codocs/연결/한글.yaml'),
     ).toMatchObject({
       success: false,
-      status: 'unavailable',
-      links: [{ targetPath: target, confirmed: false }],
-      diagnostics: [{ ioCode: 'ENOENT' }],
+      status: 'denied',
+      diagnostics: [{ code: 'unsupported_workspace_link' }],
     });
   });
 });

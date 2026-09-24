@@ -7,6 +7,7 @@ import {
   rm,
   readdir,
   lstat,
+  stat,
 } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import path from 'node:path';
@@ -18,22 +19,20 @@ export const vscodeVersion = '1.100.0';
 export function vscodeApplicationPaths(
   executable,
   platform = process.platform,
+  applicationRoot,
 ) {
   const paths = platform === 'win32' ? path.win32 : path.posix;
-  if (platform === 'win32')
+  if (platform === 'win32') {
+    const root = applicationRoot ?? paths.dirname(executable);
     return {
       executable,
       cli: executable,
-      cliPrefix: [
-        paths.join(paths.dirname(executable), 'resources/app/out/cli.js'),
-      ],
+      cliPrefix: [paths.join(root, 'resources/app/out/cli.js')],
       cliAsNode: true,
       runtimeRoot: paths.dirname(executable),
-      packageJson: paths.join(
-        paths.dirname(executable),
-        'resources/app/package.json',
-      ),
+      packageJson: paths.join(root, 'resources/app/package.json'),
     };
+  }
   if (platform === 'darwin') {
     const contents = paths.resolve(paths.dirname(executable), '..');
     return {
@@ -64,10 +63,41 @@ export function vscodeApplicationPaths(
 
 /** 기능·성능 실행기에 같은 무결성 검증 VS Code 설치를 제공한다. */
 export async function prepareVSCodeApplication(options) {
-  return vscodeApplicationPaths(
-    await prepareVSCode(options),
-    options.platform ?? process.platform,
-  );
+  const executable = await prepareVSCode(options);
+  const platform = options.platform ?? process.platform;
+  return resolveVSCodeApplicationPaths(executable, platform);
+}
+
+/** Windows 공식 압축본의 구형/중첩 app 레이아웃을 파일로 확인한다. */
+export async function resolveVSCodeApplicationPaths(
+  executable,
+  platform = process.platform,
+) {
+  if (platform === 'win32') {
+    const root = path.dirname(executable);
+    const candidates = [root];
+    for (const entry of await readdir(root, { withFileTypes: true }))
+      if (entry.isDirectory()) candidates.push(path.join(root, entry.name));
+    const found = [];
+    for (const candidate of candidates) {
+      const paths = vscodeApplicationPaths(executable, platform, candidate);
+      try {
+        if (
+          (await stat(paths.cliPrefix[0])).isFile() &&
+          (await stat(paths.packageJson)).isFile()
+        )
+          found.push(paths);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+    }
+    if (found.length !== 1)
+      throw new Error(
+        `VS Code Windows CLI 경로가 정확히 하나여야 합니다: ${found.length} (${root})`,
+      );
+    return found[0];
+  }
+  return vscodeApplicationPaths(executable, platform);
 }
 
 /** 다운로드 완료 후 실행 파일·라이브러리 전체의 내용을 해시한다. 프로필은 캐시에 만들지 않는다. */

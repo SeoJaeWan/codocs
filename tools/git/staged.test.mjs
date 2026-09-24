@@ -5,6 +5,18 @@ import path from 'node:path';
 import { formatIndex } from './format-index.mjs';
 import { checkStaged, git, isolatedEnvironment } from './staged.mjs';
 
+/** 예상된 실패를 검증할 때 내부 명령의 오류 출력을 기록하지 않는다. */
+const silentLogger = {
+  /** 정상 출력을 숨긴다. */
+  log() {},
+  /** 경고 출력을 숨긴다. */
+  warn() {},
+  /** 예상 오류 출력을 숨긴다. */
+  error() {},
+};
+/** 테스트가 판정하는 커밋 검사 결과만 Node 시험 실행기가 출력한다. */
+function quietReport() {}
+
 /** 사용자 저장소와 분리된 실제 Git 저장소를 준비한다. */
 async function fixture(t) {
   const parent = path.resolve('.workbench/staged-tests');
@@ -56,6 +68,7 @@ async function verifyPartialStaging(t) {
   const result = await checkStaged({
     root,
     snapshotParent: root,
+    report: quietReport,
     /** 조건별 실행 결과와 변경 보존을 확인한다. */
     format: async () => true,
     /** 조건별 실행 결과와 변경 보존을 확인한다. */
@@ -88,13 +101,17 @@ async function verifyFormatting(t) {
   const result = await checkStaged({
     root,
     snapshotParent: root,
+    report: quietReport,
     /** 조건별 실행 결과와 변경 보존을 확인한다. */
     format: () =>
-      formatIndex({
-        cwd: root,
-        quiet: true,
-        config: { '*.txt': 'node format.cjs' },
-      }),
+      formatIndex(
+        {
+          cwd: root,
+          quiet: true,
+          config: { '*.txt': 'node format.cjs' },
+        },
+        silentLogger,
+      ),
     /** 조건별 실행 결과와 변경 보존을 확인한다. */
     verify: async (snapshot) => {
       assert.equal(
@@ -130,13 +147,17 @@ async function verifyFormatterFailure(t) {
     checkStaged({
       root,
       snapshotParent: root,
+      report: quietReport,
       /** 조건별 실행 결과와 변경 보존을 확인한다. */
       format: () =>
-        formatIndex({
-          cwd: root,
-          quiet: true,
-          config: { '*.txt': 'node format.cjs' },
-        }),
+        formatIndex(
+          {
+            cwd: root,
+            quiet: true,
+            config: { '*.txt': 'node format.cjs' },
+          },
+          silentLogger,
+        ),
       /** 조건별 실행 결과와 변경 보존을 확인한다. */
       verify: async () => assert.fail('검사를 실행하면 안 됩니다.'),
     }),
@@ -159,6 +180,7 @@ for (const kind of ['기능 실패', '취소']) {
       checkStaged({
         root,
         snapshotParent: root,
+        report: quietReport,
         signal: controller.signal,
         /** 조건별 실행 결과와 변경 보존을 확인한다. */
         format: async () => true,
@@ -185,6 +207,7 @@ async function verifyIndexMutation(t) {
     checkStaged({
       root,
       snapshotParent: root,
+      report: quietReport,
       /** 조건별 실행 결과와 변경 보존을 확인한다. */
       format: async () => true,
       /** 조건별 실행 결과와 변경 보존을 확인한다. */
@@ -211,6 +234,7 @@ async function verifySnapshotMutation(t) {
     checkStaged({
       root,
       snapshotParent: root,
+      report: quietReport,
       /** 조건별 실행 결과와 변경 보존을 확인한다. */
       format: async () => true,
       /** 조건별 실행 결과와 변경 보존을 확인한다. */
@@ -246,8 +270,9 @@ const root=${JSON.stringify(root)};
 const controller=new AbortController();
 process.on('SIGINT',()=>controller.abort(new Error('cancel')));
 const watcher=${JSON.stringify(mode)}==='cancel'?watch(root,()=>{if(existsSync(root+'/ready')){watcher.close();process.emit('SIGINT');}}):null;
-try { await checkStaged({root,snapshotParent:root,signal:controller.signal,format:()=>formatIndex({cwd:root,quiet:true,config:{'*.txt':'node format.cjs'}}),verify:async(snapshot)=>{if(${JSON.stringify(mode)}==='failure')throw Error('failure'); if(readFileSync(snapshot+'/sample.txt','utf8')!=='staged\\n\\n\\n\\nlast\\n')throw Error('wrong staged bytes');}}); }
-catch(error){console.error(error.message);process.exitCode=1;}
+const silent={log(){},warn(){},error(){}};
+try { await checkStaged({root,snapshotParent:root,signal:controller.signal,report:()=>{},format:()=>formatIndex({cwd:root,quiet:true,config:{'*.txt':'node format.cjs'}},silent),verify:async(snapshot)=>{if(${JSON.stringify(mode)}==='failure')throw Error('failure'); if(readFileSync(snapshot+'/sample.txt','utf8')!=='staged\\n\\n\\n\\nlast\\n')throw Error('wrong staged bytes');}}); }
+catch(error){if(${JSON.stringify(mode)}==='success')console.error(error.message);process.exitCode=1;}
 finally{watcher?.close();}`;
     await writeFile(path.join(root, 'driver.mjs'), driver);
     await writeFile(
@@ -298,11 +323,14 @@ async function verifyCleanFilter(t) {
   process.env.GIT_CONFIG_PARAMETERS = "'core.autocrlf'='true'";
   try {
     assert.equal(
-      await formatIndex({
-        cwd: root,
-        quiet: true,
-        config: { '*.txt': 'node format.cjs' },
-      }),
+      await formatIndex(
+        {
+          cwd: root,
+          quiet: true,
+          config: { '*.txt': 'node format.cjs' },
+        },
+        silentLogger,
+      ),
       true,
     );
     assert.equal(git(root, ['show', ':sample.txt']), 'FORMATTED\n\n\n\nlast');
@@ -332,11 +360,14 @@ async function verifyFormattingConflict(t) {
     path.join(root, 'format.cjs'),
     'const fs=require("node:fs");for(const f of process.argv.slice(2))fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace("staged","FORMATTED").replaceAll("\\n","\\r\\n"));',
   );
-  const passed = await formatIndex({
-    cwd: root,
-    quiet: true,
-    config: { '*.txt': 'node format.cjs' },
-  });
+  const passed = await formatIndex(
+    {
+      cwd: root,
+      quiet: true,
+      config: { '*.txt': 'node format.cjs' },
+    },
+    silentLogger,
+  );
   assert.equal(passed, false);
   assert.deepEqual(await state(root), before);
 }
