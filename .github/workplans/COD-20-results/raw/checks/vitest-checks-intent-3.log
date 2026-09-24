@@ -1,0 +1,60 @@
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001
+
+node:internal/fs/promises:1707
+  return await PromisePrototypeThen(
+         ^
+
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs build consumer-UM9OLD\workspace packed 3bEaj7\consumer\실제 프로젝트 aZk5hT\외부 용어.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs build consumer-UM9OLD\workspace packed 3bEaj7\consumer\실제 프로젝트 aZk5hT\project\.codocs\연결 용어.yaml'
+    at async symlink (node:internal/fs/promises:1707:10)
+    at async file:///C:/Users/sjw73/AppData/Local/Temp/codocs%20build%20consumer-UM9OLD/workspace%20packed%203bEaj7/consumer/workspace.mjs:27:3 {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'symlink',
+  path: 'C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs build consumer-UM9OLD\\workspace packed 3bEaj7\\consumer\\실제 프로젝트 aZk5hT\\외부 용어.yaml',
+  dest: 'C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs build consumer-UM9OLD\\workspace packed 3bEaj7\\consumer\\실제 프로젝트 aZk5hT\\project\\.codocs\\연결 용어.yaml'
+}
+
+Node.js v24.21.0
+ ❯ tools/build/check/build-checks.test.ts (32 tests | 1 failed) 65343ms
+   ❯ 빌드된 패키지의 외부 소비자 계약 (32)
+     ❯ tarball 소비와 내부 경로 차단 (2)
+       × workspace tarball만 설치한 JS·TS 소비자가 실제 문서를 로딩하고 내부 subpath를 거부한다 20356ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tools/build/check/build-checks.test.ts > 빌드된 패키지의 외부 소비자 계약 > tarball 소비와 내부 경로 차단 > workspace tarball만 설치한 JS·TS 소비자가 실제 문서를 로딩하고 내부 subpath를 거부한다
+Error: Command failed: C:\Users\sjw73\OneDrive\Desktop\dev\codocs\.workbench\ui-probe\node-v24.21.0-win-x64\node.exe workspace.mjs
+node:internal/fs/promises:1707
+  return await PromisePrototypeThen(
+         ^
+
+Error: EPERM: operation not permitted, symlink 'C:\Users\sjw73\AppData\Local\Temp\codocs build consumer-UM9OLD\workspace packed 3bEaj7\consumer\실제 프로젝트 aZk5hT\외부 용어.yaml' -> 'C:\Users\sjw73\AppData\Local\Temp\codocs build consumer-UM9OLD\workspace packed 3bEaj7\consumer\실제 프로젝트 aZk5hT\project\.codocs\연결 용어.yaml'
+    at async symlink (node:internal/fs/promises:1707:10)
+    at async file:///C:/Users/sjw73/AppData/Local/Temp/codocs%20build%20consumer-UM9OLD/workspace%20packed%203bEaj7/consumer/workspace.mjs:27:3 {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'symlink',
+  path: 'C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs build consumer-UM9OLD\\workspace packed 3bEaj7\\consumer\\실제 프로젝트 aZk5hT\\외부 용어.yaml',
+  dest: 'C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs build consumer-UM9OLD\\workspace packed 3bEaj7\\consumer\\실제 프로젝트 aZk5hT\\project\\.codocs\\연결 용어.yaml'
+}
+
+Node.js v24.21.0
+
+ ❯ run tools/build/check/build-checks.test.ts:58:10
+     56| /** 실제 subprocess를 실행해 stdout과 실패 상태를 확인한다. */
+     57| function run(args: string[], cwd = consumer): string {
+     58|   return execFileSync(process.execPath, args, {
+       |          ^
+     59|     cwd,
+     60|     encoding: 'utf8',
+ ❯ tools/build/check/build-checks.test.ts:515:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 114 passed (115)
+   Start at  11:58:17
+   Duration  212.84s (tests 99%, import 1%)
+

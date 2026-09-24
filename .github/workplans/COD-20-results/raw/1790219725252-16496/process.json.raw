@@ -1,0 +1,6 @@
+{
+  "reason": "cancelled",
+  "exitCode": null,
+  "cleanup": "taskkill-tree",
+  "residualProcesses": 0
+}
