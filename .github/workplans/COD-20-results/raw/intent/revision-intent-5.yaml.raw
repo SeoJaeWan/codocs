@@ -1,0 +1,18 @@
+intent_revision: wb-cod20-dom-20260924/intent/5
+previous_revision: wb-cod20-dom-20260924/intent/4
+user_instruction: 좋아 그럼 pr에 기록해두고 현재 작업은 완료로 해서 커밋후 pr에 푸시해서 완료로 해서 main에 머지하자
+affected_tasks:
+  - DELIVERY-001
+source_plan:
+  id: wb-cod20-dom-20260924/plan/1
+  digest: f8d0eb194b1fa504639b625ab2bba76e0967e405aac558c642dc81474efc0f34
+  policy: Original immutable; user authorized delivery supersedes earlier no-publication policy only for PR17.
+reuse:
+  INT-001: 328bb041286982ce4d131479425e80c2a8dfadf0
+  verification: Existing same-source results retained as FAIL, not relabeled passing.
+changed_authority:
+  - Record known findings and implementation completion in PR17.
+  - Commit, push to existing feature/COD-20, mark ready, and merge PR17 into main if enforced policy permits.
+previous_int_binding: 78f69fdc517c38914c76c1bd3685f0c5ffd1cf757951012f34de5f6c66a8d179
+new_delivery_binding: e76af0e2eee0de7a229425b38a86736edfe122efb2aa435da6afa0ae6acbac9a
+revision_digest: 8ffdafa04ba6b95ee8af87f9f669453618af504ab6c668c2843d9cd31bb37e07

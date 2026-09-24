@@ -1,0 +1,13 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "tools/extension-host/cod18.test.mjs",
+    "tools/extension-host/run.test.mjs",
+    "tools/extension-host/ui-evidence.test.mjs",
+    "tools/extension-host/report.test.mjs"
+  ],
+  "code": 0,
+  "durationMs": 283,
+  "log": "harness-final.log"
+}

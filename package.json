@@ -5,26 +5,38 @@
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
-    "typecheck": "node tools/build/build.mjs typecheck",
-    "lint": "eslint .",
-    "format:check": "prettier . --check",
-    "test": "node tools/check/run.mjs test",
-    "check:development": "node tools/check/run.mjs development",
+    "prepare": "husky",
     "build": "node tools/build/build.mjs build",
     "bundle": "node tools/build/build.mjs bundle",
-    "check:build": "node tools/check/run.mjs build",
-    "test:run": "node tools/check/run.mjs test:run",
-    "check": "node tools/check/run.mjs all"
+    "typecheck": "node tools/build/build.mjs typecheck",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier . --write",
+    "test": "node tools/test/run.mjs",
+    "test:vscode": "node packages/vscode/test-runner/run.mjs",
+    "check": "pnpm typecheck && pnpm lint && pnpm exec prettier . --check && pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs",
+    "bench": "node tools/performance/runner.mjs"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}": [
+      "eslint --fix --max-warnings=0",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,mdx,yaml,yml,css,scss,html,svg}": "prettier --write"
   },
   "devDependencies": {
     "@types/node": "22.19.3",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "3.6.2",
     "esbuild": "0.28.2",
     "eslint": "10.10.0",
+    "eslint-plugin-check-file": "3.3.2",
     "eslint-plugin-jsdoc": "64.3.10",
+    "husky": "9.1.7",
+    "lint-staged": "17.5.1",
+    "pnpm": "10.34.5",
     "prettier": "3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0",
-    "vitest": "5.0.0",
-    "eslint-plugin-check-file": "3.3.2"
+    "vitest": "5.0.0"
   }
 }

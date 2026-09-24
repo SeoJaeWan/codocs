@@ -2,10 +2,6 @@
 export const workspaceScopeKinds = {
   /** 논리 지식 루트가 부여한 접근 범위다. */
   workspace: 'workspace',
-  /** 명시적으로 연결된 파일의 접근 범위다. */
-  linkedFile: 'linkedFile',
-  /** 명시적으로 연결된 디렉터리의 접근 범위다. */
-  linkedDirectory: 'linkedDirectory',
 } as const;
 /** 원본 상수에서 도출한 WorkspaceScopeKind 타입이다. */
 export type WorkspaceScopeKind =

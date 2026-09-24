@@ -1,9 +1,8 @@
-/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
-import { ESLint } from 'eslint';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { createFixtureEslint } from '../test/support/eslint.js';
 
-const eslint = new ESLint({ cwd: process.cwd() });
+const eslint = createFixtureEslint();
 const preamble = `import { referenceResolutionStatuses, scanStatuses, type ReferenceResolution, type ReferenceResolutionStatus, type ScanStatus } from '@codocs/core';\n`;
 
 describe('도메인 값 ESLint 규칙: 선언 문맥 검사', () => {
@@ -90,7 +89,7 @@ const document: DocumentStatus = 'confirmed';`;
 
 describe('도메인 값 ESLint 규칙: 자동 수정', () => {
   it('별칭으로 가져온 상수가 있으면 직접 문자열을 별칭 상수로 수정한다', async () => {
-    const fixing = new ESLint({ cwd: process.cwd(), fix: true });
+    const fixing = createFixtureEslint({ fix: true });
     const results = await fixing.lintText(
       `import { referenceResolutionStatuses as values, type ReferenceResolutionStatus } from '@codocs/core';
 const value: ReferenceResolutionStatus = 'ambiguous' as const;
@@ -107,7 +106,7 @@ console.log(value);`,
   });
 
   it('type-only import만 있으면 값으로 자동 수정하지 않고 진단을 남긴다', async () => {
-    const fixing = new ESLint({ cwd: process.cwd(), fix: true });
+    const fixing = createFixtureEslint({ fix: true });
     const results = await fixing.lintText(
       `import type { referenceResolutionStatuses, ReferenceResolutionStatus } from '@codocs/core';
 const value: ReferenceResolutionStatus = 'ambiguous';

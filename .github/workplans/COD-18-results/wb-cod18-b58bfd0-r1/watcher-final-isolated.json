@@ -1,0 +1,13 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "packages/workspace/src/watcher/watcher.test.ts"
+  ],
+  "startedAt": "2026-09-22T02:04:13.825Z",
+  "durationMilliseconds": 3974,
+  "code": 0,
+  "signal": null
+}

@@ -3,6 +3,7 @@ import { cpSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { assertNodeVersion } from '../toolchain.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const folders = ['core', 'workspace', 'mcp', 'language-server', 'vscode'];
@@ -74,6 +75,7 @@ function copyAssets() {
 
 /** 런타임 출력과 선언 파일을 의존 순서대로 만들거나 독립 타입 검사를 수행한다. */
 async function main(mode) {
+  assertNodeVersion();
   if (!['build', 'bundle', 'typecheck'].includes(mode))
     throw new Error('Expected build, bundle, or typecheck');
   if (mode === 'typecheck') {

@@ -1,4 +1,8 @@
-import { referenceResolutionStatuses } from '../catalog/domain-values.js';
+import {
+  catalogConfirmations,
+  referenceResolutionStatuses,
+  scanStatuses,
+} from '../catalog/domain-values.js';
 import type {
   Catalog,
   CatalogDocument,
@@ -10,6 +14,7 @@ import type {
   Diagnostic,
   DiagnosticCode,
   OffsetRange,
+  SourceRange,
 } from '../diagnostics/index.js';
 import {
   catalogDiagnosticCodes,
@@ -26,6 +31,8 @@ import {
 } from '../validator/domain-values.js';
 import type { JsonValue } from '../validator/index.js';
 import { documentFields, type DocumentField } from '../validator/index.js';
+import { offsetToPosition, parseYaml } from '../parser/index.js';
+import { resolveLiveDocument } from '../catalog/index.js';
 import {
   referenceIdFailureReasons,
   type ReferenceIdFailureReason,
@@ -136,6 +143,67 @@ export type CatalogGetProjection =
 
 /** workspace가 같은 시점의 원문 revision을 주입하는 선택 입력이다. */
 export interface CatalogGetProjectionOptions {
+  revisions?: ReadonlyMap<string, string>;
+}
+
+/** 같은 Catalog가 확정한 문서 간 경로 연결이다. */
+export interface CatalogPathLink {
+  path: string;
+  realPath?: string;
+  id?: string;
+}
+
+/** 요청한 발견 경로가 현재 관측에 없는 결과다. */
+export interface CatalogPathMissingResult {
+  path: string;
+  found: false;
+  confirmation: CatalogIdentity['confirmation'];
+  diagnostics: readonly CatalogQueryDiagnostic[];
+}
+
+/** 발견 경로 문서의 내용과 같은 관측에서 계산한 관계를 공유하는 결과다. */
+interface CatalogPathDocumentResultBase {
+  path: string;
+  found: true;
+  source: {
+    path: string;
+    realPath?: string;
+    offsetRange?: OffsetRange;
+    range?: SourceRange;
+  };
+  confirmation: CatalogIdentity['confirmation'];
+  id?: string;
+  conflictPaths?: readonly string[];
+  revision?: string;
+  references?: readonly CatalogPathLink[];
+  referencedBy?: readonly CatalogPathLink[];
+  diagnostics: readonly CatalogQueryDiagnostic[];
+}
+
+/** 경로로 찾은 문서는 JSON 값 또는 손실 없는 원문 중 정확히 하나를 반환한다. */
+export type CatalogPathDocumentResult = CatalogPathDocumentResultBase &
+  (
+    | {
+        document: Readonly<Record<string, JsonValue>>;
+        rawYaml?: never;
+      }
+    | {
+        document?: never;
+        rawYaml: string;
+      }
+  );
+
+/** 발견 경로 하나의 현재 관측 결과다. */
+export type CatalogPathResult =
+  CatalogPathMissingResult | CatalogPathDocumentResult;
+
+/** 유효한 경로 요청과 전체 입력 오류를 구분하는 투영이다. */
+export type CatalogPathProjection =
+  | { success: true; results: readonly CatalogPathResult[] }
+  | { success: false; error: CatalogQueryDiagnostic };
+
+/** workspace가 같은 관측의 원문 revision을 주입하는 경로 조회 선택 입력이다. */
+export interface CatalogPathProjectionOptions {
   revisions?: ReadonlyMap<string, string>;
 }
 
@@ -466,6 +534,22 @@ function queryDiagnostics(
   return diagnostics.sort(compareDiagnostics);
 }
 
+/** 현재 색인의 전체 또는 한 발견 경로에 속한 진단을 조회와 같은 규칙으로 투영한다. */
+export function projectCatalogDiagnostics(
+  catalog: Catalog,
+  documentPath?: string,
+): CatalogQueryDiagnostic[] {
+  const documents =
+    documentPath === undefined
+      ? [...catalog.documents.values()]
+      : [catalog.documents.get(documentPath)].filter(
+          (document) => document !== undefined,
+        );
+  return documents
+    .flatMap((document) => queryDiagnostics(catalog, document))
+    .sort(compareDiagnostics);
+}
+
 /** 경로·위치·코드·부가 정보 순으로 같은 Catalog에서 항상 같은 순서를 만든다. */
 function compareDiagnostics(
   left: CatalogQueryDiagnostic,
@@ -589,6 +673,56 @@ function externalIds(
   return [...ids].sort((left, right) => left.localeCompare(right, 'en'));
 }
 
+/** 확정 관계의 발견 경로와 사용할 수 있는 현재 ID만 복사한다. */
+function pathLinks(
+  catalog: Catalog,
+  identities: readonly CatalogIdentity[],
+): CatalogPathLink[] {
+  const links = new Map<string, CatalogPathLink>();
+  for (const identity of identities) {
+    const document = catalog.documents.get(identity.path);
+    if (!document) continue;
+    const id =
+      idFailure(catalog, document) === undefined ? document.id : undefined;
+    links.set(document.path, {
+      path: document.path,
+      ...(document.realPath === undefined
+        ? {}
+        : { realPath: document.realPath }),
+      ...(id === undefined ? {} : { id }),
+    });
+  }
+  return [...links.values()].sort((left, right) =>
+    left.path.localeCompare(right.path, 'en'),
+  );
+}
+
+/** 실제 파서 관측에서 확인한 발견 경로와 최상위 YAML 범위만 반환한다. */
+function documentSource(
+  document: CatalogDocument,
+): CatalogPathDocumentResultBase['source'] {
+  const parsed = document.observation.parsed;
+  const offsets = parsed.success ? parsed.rootRange : undefined;
+  const start =
+    parsed.success && offsets
+      ? offsetToPosition(parsed.source, offsets.start)
+      : undefined;
+  const end =
+    parsed.success && offsets
+      ? offsetToPosition(parsed.source, offsets.end)
+      : undefined;
+  return {
+    path: document.path,
+    ...(document.realPath === undefined ? {} : { realPath: document.realPath }),
+    ...(offsets && start && end && offsets.start <= offsets.end
+      ? {
+          offsetRange: { ...offsets },
+          range: { start, end },
+        }
+      : {}),
+  };
+}
+
 /** 오류 문서도 원문을 손실하지 않고 한 유일 ID 결과로 투영한다. */
 function documentResult(
   catalog: Catalog,
@@ -690,4 +824,133 @@ export function projectCatalogGet(
     },
   );
   return { success: true, results };
+}
+
+/** 발견 경로를 같은 Catalog 관측의 내용·진단·직접/역참조로 투영한다.
+ * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
+ * @param paths 코드 매칭이 반환한 발견 경로 목록이다.
+ * @param options 같은 원문 시점의 선택적인 경로별 revision이다.
+ */
+export function projectCatalogPaths(
+  catalog: Catalog,
+  paths: readonly string[],
+  options: CatalogPathProjectionOptions = {},
+): CatalogPathProjection {
+  const uniquePaths = [...new Set(paths)];
+  if (
+    uniquePaths.length === 0 ||
+    uniquePaths.some(
+      (documentPath) =>
+        typeof documentPath !== 'string' || documentPath.length === 0,
+    )
+  )
+    return {
+      success: false,
+      error: {
+        code: queryDiagnosticCodes.invalidInput,
+        severity: diagnosticSeverities.error,
+        message: queryDiagnosticMessages.invalidInput,
+      },
+    };
+  const results = uniquePaths.map(
+    /** 각 경로의 부재·내용·ID 오류를 다른 경로와 독립적으로 계산한다. */ (
+      documentPath,
+    ): CatalogPathResult => {
+      const document = catalog.documents.get(documentPath);
+      if (!document) {
+        const confirmed = catalog.status === scanStatuses.complete;
+        return {
+          path: documentPath,
+          found: false,
+          confirmation: confirmed
+            ? catalogConfirmations.confirmed
+            : catalogConfirmations.unconfirmed,
+          diagnostics: confirmed
+            ? [
+                {
+                  code: queryDiagnosticCodes.notFound,
+                  severity: diagnosticSeverities.error,
+                  message: queryDiagnosticMessages.notFound,
+                  path: documentPath,
+                },
+              ]
+            : [
+                {
+                  code: catalogDiagnosticCodes.unconfirmedReference,
+                  severity: diagnosticSeverities.warning,
+                  message: catalogDiagnosticMessages.unconfirmedReference,
+                  path: documentPath,
+                },
+              ],
+        };
+      }
+      const parsed = document.observation.parsed;
+      const cloned = parsed.success
+        ? cloneJson(parsed.data)
+        : { success: false as const };
+      const failure = idFailure(catalog, document);
+      const revision = options.revisions?.get(document.path);
+      const references = pathLinks(catalog, document.references);
+      const referencedBy = pathLinks(catalog, document.referencedBy);
+      const conflictPaths =
+        failure === referenceIdFailureReasons.duplicateId && document.id
+          ? [...(catalog.idPaths.get(document.id) ?? [])].sort()
+          : undefined;
+      return {
+        path: document.path,
+        found: true,
+        source: documentSource(document),
+        confirmation: document.confirmation,
+        ...(failure === undefined && document.id !== undefined
+          ? { id: document.id }
+          : {}),
+        ...(conflictPaths?.length ? { conflictPaths } : {}),
+        ...(cloned.success
+          ? { document: cloned.value as Readonly<Record<string, JsonValue>> }
+          : { rawYaml: parsed.source ?? '' }),
+        ...(typeof revision === 'string' ? { revision } : {}),
+        ...(references.length ? { references } : {}),
+        ...(referencedBy.length ? { referencedBy } : {}),
+        diagnostics: queryDiagnostics(catalog, document),
+      };
+    },
+  );
+  return { success: true, results };
+}
+
+/** live 출처의 등장과 디스크 대상 내용을 같은 색인에서 계산한 결과다. */
+export interface CatalogLiveReferenceResult {
+  sourcePath: string;
+  occurrences: readonly CatalogOccurrence[];
+  diagnostics: readonly CatalogQueryDiagnostic[];
+  targets: readonly CatalogPathResult[];
+}
+
+/** 열린 YAML 하나만 파싱하고 기존 디스크 색인으로 이름 참조를 투영한다. */
+export function projectLiveReferences(
+  catalog: Catalog,
+  sourcePath: string,
+  text: string,
+  options: CatalogPathProjectionOptions = {},
+): CatalogLiveReferenceResult {
+  const document = resolveLiveDocument(catalog, {
+    path: sourcePath,
+    parsed: parseYaml(text),
+  });
+  const paths = [
+    ...new Set(
+      document.occurrences.flatMap((item) =>
+        item.resolution.candidates.map((candidate) => candidate.path),
+      ),
+    ),
+  ];
+  const projection = paths.length
+    ? projectCatalogPaths(catalog, paths, options)
+    : undefined;
+  return {
+    sourcePath,
+    occurrences: document.occurrences,
+    diagnostics: queryDiagnostics(catalog, document),
+    targets: projection?.success ? projection.results : [],
+  };
 }

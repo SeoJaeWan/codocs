@@ -1,0 +1,76 @@
+
+> codocs@0.0.0 test:run /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+> node tools/check/run.mjs test:run packages/workspace/src/query packages/language-server packages/vscode packages/core/src/catalog packages/core/src/query --reporter=default
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+
+ ✓ packages/core/src/catalog/catalog.test.ts (76 tests) 33ms
+ ✓ packages/core/src/query/query.test.ts (48 tests) 34ms
+ ✓ packages/language-server/src/hover/hover.test.ts (26 tests) 16ms
+ ✓ packages/workspace/src/query/snapshot.test.ts (6 tests) 73ms
+ ✓ packages/vscode/src/open-source/open-source.test.ts (15 tests) 6ms
+ ✓ packages/vscode/src/vscode-client/vscode-client.test.ts (8 tests) 6ms
+ ✓ packages/language-server/src/document-sync/document-sync.test.ts (6 tests) 3ms
+ ✓ packages/vscode/src/client-manager/client-manager.test.ts (7 tests) 7ms
+ ✓ packages/vscode/src/workspace-routing/workspace-routing.test.ts (3 tests) 3ms
+ ✓ packages/vscode/src/package-assembly/package-assembly.test.ts (2 tests) 3ms
+ ✓ packages/language-server/src/navigation/navigation.test.ts (3 tests) 4ms
+ ✓ packages/language-server/src/server-session/server-session.test.ts (12 tests) 328ms
+ ❯ packages/language-server/src/server-session/live-navigation.test.ts (12 tests | 1 failed) 360ms
+   ❯ live YAML과 디스크 대상의 연결 (12)
+     ✓ 감시가 상태 변경을 게시하면 수동 refresh 없이 폐기 경고를 갱신한다 141ms
+     ✓ 중첩 workspace의 참조는 가장 가까운 출처 색인에서 링크와 진단을 조회한다 29ms
+     ✓ 줄바꿈 "\n"에서 미저장 참조의 UTF-16 범위와 폐기 경고를 보존한다 24ms
+     ✓ 줄바꿈 "\r\n"에서 미저장 참조의 UTF-16 범위와 폐기 경고를 보존한다 25ms
+     × 동명 후보가 복수이면 본문 링크 없이 도메인과 경로로 구분한 개별 Hover 링크를 보존한다 21ms
+     ✓ edit 뒤에는 이전 본문 링크를 적용하지 않는다 12ms
+     ✓ close 뒤에는 이전 본문 링크를 적용하지 않는다 27ms
+     ✓ cancel 뒤에는 이전 본문 링크를 적용하지 않는다 14ms
+     ✓ 표시 뒤 대상 content 변경을 최신 관측으로 확인한다 16ms
+     ✓ 표시 뒤 대상 move 변경을 최신 관측으로 확인한다 22ms
+     ✓ 표시 뒤 대상 delete 변경을 최신 관측으로 확인한다 17ms
+     ✓ 표시 뒤 대상 reuse 변경을 최신 관측으로 확인한다 10ms
+ ✓ packages/workspace/src/query/candidate.test.ts (21 tests) 526ms
+ ✓ packages/language-server/src/server/server-process.test.ts (4 tests) 798ms
+ ✓ packages/workspace/src/query/query.test.ts (56 tests) 2154ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/language-server/src/server-session/live-navigation.test.ts > live YAML과 디스크 대상의 연결 > 동명 후보가 복수이면 본문 링크 없이 도메인과 경로로 구분한 개별 Hover 링크를 보존한다
+AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+  [
+    {
+      "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/live-kJSGZK/.codocs/other.yaml",
+    },
+    {
+-     "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/live-kJSGZK/.codocs/target.yaml",
++     "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/live-kJSGZK/.codocs/%EB%8C%80%EC%83%81%20%EB%AC%B8%EC%84%9C.yaml",
+    },
+  ]
+
+ ❯ packages/language-server/src/server-session/live-navigation.test.ts:180:21
+    178|       (JSON.parse(decodeURIComponent(query[1]!)) as unknown[])[0],
+    179|     )));
+    180|     expect(targets).toEqual([
+       |                     ^
+    181|       { uri: pathToFileURL(path.join(root, '.codocs/other.yaml')).href…
+    182|       { uri: pathToFileURL(path.join(root, '.codocs/target.yaml')).hre…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 15 passed (16)
+      Tests  1 failed | 304 passed (305)
+   Start at  11:59:25
+   Duration  2.72s (tests 51%, transform 29%, import 20%, worker 1%)
+
+  Transform  transforming modules took 2.45s · 29% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+ ELIFECYCLE  Command failed with exit code 1.

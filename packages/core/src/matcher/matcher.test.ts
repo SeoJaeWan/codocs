@@ -1,4 +1,3 @@
-/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
 import { describe, expect, it } from 'vitest';
 import {
   catalogConfirmations,
@@ -8,10 +7,12 @@ import {
   type CatalogDocument,
 } from '../catalog/index.js';
 import {
+  catalogDiagnosticCodes,
   diagnosticSeverities,
   schemaDiagnosticCodes,
 } from '../diagnostics/index.js';
 import {
+  compareEvidencePriority,
   matchCode,
   matcherComparisonKinds,
   matcherEvidenceKinds,
@@ -84,6 +85,48 @@ const zone = {
     },
   },
 } satisfies CatalogDocument;
+
+describe('compareEvidencePriority: 코드 매칭 근거 의미 우선순위', () => {
+  const baseEvidence = {
+    kind: matcherEvidenceKinds.previous,
+    comparison: matcherComparisonKinds.singular,
+    token: 'returnZones',
+    range: { start: 0, end: 11 },
+    sourceId: 'return-zone',
+    consecutiveTokens: 2,
+  } as const;
+
+  it('현재 ID 근거를 이전 ID 근거보다 먼저 비교한다', () => {
+    const current = { ...baseEvidence, kind: matcherEvidenceKinds.current };
+
+    expect(compareEvidencePriority(current, baseEvidence)).toBeLessThan(0);
+    expect(compareEvidencePriority(baseEvidence, current)).toBeGreaterThan(0);
+  });
+  it('같은 ID 종류에서는 연속 토큰 수가 많은 근거를 먼저 비교한다', () => {
+    const longer = { ...baseEvidence, consecutiveTokens: 3 };
+
+    expect(compareEvidencePriority(longer, baseEvidence)).toBeLessThan(0);
+    expect(compareEvidencePriority(baseEvidence, longer)).toBeGreaterThan(0);
+  });
+  it('같은 ID 종류와 토큰 수에서는 표기 일치를 단수화 일치보다 먼저 비교한다', () => {
+    const exact = {
+      ...baseEvidence,
+      comparison: matcherComparisonKinds.exact,
+    };
+
+    expect(compareEvidencePriority(exact, baseEvidence)).toBeLessThan(0);
+    expect(compareEvidencePriority(baseEvidence, exact)).toBeGreaterThan(0);
+  });
+  it('현재·토큰 수·비교 방식이 같으면 원문 위치가 달라도 동률로 비교한다', () => {
+    const otherLocation = {
+      ...baseEvidence,
+      range: { start: 20, end: 31 },
+      sourceId: 'other-zone',
+    };
+
+    expect(compareEvidencePriority(baseEvidence, otherLocation)).toBe(0);
+  });
+});
 
 describe('matchCode: 코드와 문서 ID 매칭', () => {
   describe('현재 ID·이전 ID로 문서 후보 조회', () => {
@@ -251,6 +294,31 @@ describe('matchCode: 코드와 문서 ID 매칭', () => {
           token: 'ReturnZones',
           range: { start: 10, end: 21 },
           consecutiveTokens: 2,
+        }),
+      ]);
+    });
+    it('주석·문자열과 문법이 끝나지 않은 CRLF 원문도 그대로 매칭한다', () => {
+      const code = '😀// returnZone\r\nconst broken = "returnZone';
+      const result = matchCode({
+        catalog: {
+          ...catalogBase,
+          documents: new Map<string, CatalogDocument>([
+            [returnZone.path, returnZone],
+          ]),
+        },
+        code,
+      });
+      const first = code.indexOf('returnZone');
+      const second = code.lastIndexOf('returnZone');
+
+      expect(result.candidates[0]?.evidence).toEqual([
+        expect.objectContaining({
+          token: 'returnZone',
+          range: { start: first, end: first + 'returnZone'.length },
+        }),
+        expect.objectContaining({
+          token: 'returnZone',
+          range: { start: second, end: second + 'returnZone'.length },
         }),
       ]);
     });
@@ -752,12 +820,83 @@ describe('matchCode: 코드와 문서 ID 매칭', () => {
         ]);
       },
     );
-    it('현재 ID가 중복되면 모든 문서를 경로순으로 반환한다', () => {
+    it('현재 ID가 없는 이전 ID 후보가 동률이면 경로순으로 모두 반환한다', () => {
       const second = {
         ...documentBase,
         path: 'b.yaml',
+        name: 'second',
+        observation: {
+          path: 'b.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"name": "second", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "old-name"}]}',
+            data: {
+              name: 'second',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'old-name' }],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const first = {
+        ...documentBase,
+        path: 'a.yaml',
+        name: 'first',
+        observation: {
+          path: 'a.yaml',
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"name": "first", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "old-name"}]}',
+            data: {
+              name: 'first',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'old-name' }],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const result = matchCode({
+        catalog: {
+          ...catalogBase,
+          documents: new Map([
+            [second.path, second],
+            [first.path, first],
+          ]),
+        },
+        code: 'oldName',
+      });
+
+      expect(result.candidates.map((candidate) => candidate.path)).toEqual([
+        first.path,
+        second.path,
+      ]);
+      expect(
+        result.candidates.every(
+          (candidate) => !('id' in candidate) && !('documentId' in candidate),
+        ),
+      ).toBe(true);
+    });
+    it('현재 ID가 중복되면 모든 문서를 경로순으로 반환한다', () => {
+      const relatedPaths = ['a.yaml', 'b.yaml'];
+      const secondError = {
+        code: catalogDiagnosticCodes.duplicateId,
+        severity: diagnosticSeverities.error,
+        message: '같은 ID를 가진 발견 경로가 여러 개입니다.',
+        path: 'b.yaml',
+        fieldPath: ['id'],
+        relatedPaths,
+      };
+      const second = {
+        ...documentBase,
+        path: secondError.path,
         id: 'return-zone',
         name: 'return-zone',
+        documentDiagnostics: [secondError],
+        diagnostics: [secondError],
         observation: {
           path: 'b.yaml',
           parsed: {
@@ -773,11 +912,14 @@ describe('matchCode: 코드와 문서 ID 매칭', () => {
           },
         },
       } satisfies CatalogDocument;
+      const firstError = { ...secondError, path: 'a.yaml' };
       const first = {
         ...documentBase,
-        path: 'a.yaml',
+        path: firstError.path,
         id: 'return-zone',
         name: 'return-zone',
+        documentDiagnostics: [firstError],
+        diagnostics: [firstError],
         observation: {
           path: 'a.yaml',
           parsed: {
@@ -808,6 +950,11 @@ describe('matchCode: 코드와 문서 ID 매칭', () => {
         first.path,
         second.path,
       ]);
+      expect(result.candidates.map((candidate) => candidate.errors)).toEqual([
+        [firstError],
+        [secondError],
+      ]);
+      expect(result.diagnostics).toEqual([firstError, secondError]);
     });
     it('같은 범위가 현재·이전 ID에 모두 일치하면 한 문서에 두 근거를 보존한다', () => {
       const document = {
@@ -865,6 +1012,108 @@ describe('matchCode: 코드와 문서 ID 매칭', () => {
     });
   });
   describe('문서 오류와 불완전한 탐색 결과 전달', () => {
+    it('현재 ID가 누락된 문서를 이전 ID로 찾으면 현재 ID 필드를 생략한다', () => {
+      const error = {
+        code: schemaDiagnosticCodes.missingRequiredField,
+        severity: diagnosticSeverities.error,
+        message: '필수 필드입니다.',
+        path: 'missing-id.yaml',
+        fieldPath: ['id'],
+      };
+      const document = {
+        ...documentBase,
+        path: error.path,
+        name: 'missing-id',
+        documentDiagnostics: [error],
+        diagnostics: [error],
+        observation: {
+          path: error.path,
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"name": "missing-id", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "old-name"}]}',
+            data: {
+              name: 'missing-id',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'old-name' }],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const result = matchCode({
+        catalog: {
+          ...catalogBase,
+          documents: new Map([[document.path, document]]),
+        },
+        code: 'oldName',
+      });
+
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]).not.toHaveProperty('id');
+      expect(result.candidates[0]).not.toHaveProperty('documentId');
+      expect(result.candidates[0]).toMatchObject({
+        path: document.path,
+        diagnostics: [error],
+        errors: [error],
+        evidence: [
+          {
+            kind: matcherEvidenceKinds.previous,
+            comparison: matcherComparisonKinds.exact,
+            token: 'oldName',
+            sourceId: 'old-name',
+            range: { start: 0, end: 7 },
+            consecutiveTokens: 2,
+          },
+        ],
+      });
+    });
+    it('현재 ID 형식이 잘못된 문서를 이전 ID로 찾으면 잘못된 ID를 제공하지 않는다', () => {
+      const error = {
+        code: schemaDiagnosticCodes.invalidFieldValue,
+        severity: diagnosticSeverities.error,
+        message: 'ID 형식이 올바르지 않습니다.',
+        path: 'invalid-id.yaml',
+        fieldPath: ['id'],
+      };
+      const document = {
+        ...documentBase,
+        path: error.path,
+        id: 'Invalid_Id',
+        name: 'invalid-id',
+        documentDiagnostics: [error],
+        diagnostics: [error],
+        observation: {
+          path: error.path,
+          parsed: {
+            ...parsedBase,
+            source:
+              '{"id": "Invalid_Id", "name": "invalid-id", "domains": ["test"], "definition": "설명", "deprecatedAliases": [{"id": "old-name"}]}',
+            data: {
+              id: 'Invalid_Id',
+              name: 'invalid-id',
+              domains: ['test'],
+              definition: '설명',
+              deprecatedAliases: [{ id: 'old-name' }],
+            },
+          },
+        },
+      } satisfies CatalogDocument;
+      const result = matchCode({
+        catalog: {
+          ...catalogBase,
+          documents: new Map([[document.path, document]]),
+        },
+        code: 'oldName',
+      });
+
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]).not.toHaveProperty('id');
+      expect(result.candidates[0]).not.toHaveProperty('documentId');
+      expect(result.candidates[0]?.evidence[0]?.sourceId).toBe('old-name');
+      expect(result.candidates[0]?.diagnostics).toEqual([error]);
+      expect(result.candidates[0]?.errors).toEqual([error]);
+    });
     it('ID 이외의 필드에 오류가 있으면 일치 후보와 문서 오류를 함께 반환한다', () => {
       const validDocument = {
         ...documentBase,

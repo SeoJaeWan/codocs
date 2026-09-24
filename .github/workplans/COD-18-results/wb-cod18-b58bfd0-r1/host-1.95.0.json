@@ -1,0 +1,16 @@
+{
+  "command": [
+    "node",
+    "tools/extension-host/run.mjs",
+    "--vsix",
+    ".workbench/cod18.vsix",
+    "--code-version",
+    "1.95.0",
+    "--report",
+    ".workbench/cod18-host-1.95.0.json"
+  ],
+  "startedAt": "2026-09-22T01:38:19.290Z",
+  "durationMilliseconds": 44797,
+  "code": 1,
+  "signal": null
+}
