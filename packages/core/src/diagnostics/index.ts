@@ -209,3 +209,15 @@ export interface Diagnostic<Code extends string = DiagnosticCode> {
   fieldPath?: FieldPath;
   range?: SourceRange;
 }
+
+/** 요청 실패는 개별 문서의 진단과 구분하여 공통 error로 전달한다. */
+export interface RequestFailure<Code extends string = string> {
+  success: false;
+  error: Diagnostic<Code>;
+}
+
+/** 요청 처리 성공과 실패를 같은 의미의 분기 타입으로 전달한다. */
+export type RequestResult<
+  Success extends { success: true },
+  Failure extends RequestFailure = RequestFailure,
+> = Success | Failure;

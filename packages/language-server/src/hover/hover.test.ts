@@ -940,6 +940,15 @@ describe('Hover 상태: 부분 결과·준비·실패·매칭 없음', () => {
 
     expect(markdown(preparing)).toContain('준비');
     expect(markdown(failed)).toContain('불러오지 못했습니다');
+    const rebuilding = createStatusHover(
+      { state: workspaceLifecycleStates.refreshing, ready: false },
+      {
+        code: workspaceDiagnosticCodes.indexNotReady,
+        severity: diagnosticSeverities.error,
+        message: '문서 색인을 구성하는 중입니다.',
+      },
+    );
+    expect(markdown(rebuilding)).toContain('준비');
   });
 
   it('선택 경로는 같은 식별자 후보만 중복 없이 유지한다', () => {

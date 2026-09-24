@@ -10,7 +10,6 @@ const watcher = vi.hoisted(() => ({
   start: vi.fn().mockResolvedValue(undefined),
   settle: vi.fn().mockResolvedValue(undefined),
   drain: vi.fn(),
-  trackTargets: vi.fn().mockResolvedValue(undefined),
   refresh: vi.fn().mockResolvedValue(undefined),
   close: vi.fn().mockResolvedValue(undefined),
   readiness: { state: 'ready', ready: true },
@@ -39,16 +38,14 @@ const complete: WorkspaceLoadResult = {
   root,
   documents: [],
   observations: [],
-  links: [],
   failures: [],
-  skippedCycles: [],
+  skippedLinks: [],
   diagnostics: [],
 };
 let session: WorkspaceQuerySession;
 
 beforeEach(() => {
   vi.mocked(loadWorkspace).mockReset().mockResolvedValue(complete);
-  watcher.trackTargets.mockReset().mockResolvedValue(undefined);
   session = new WorkspaceQuerySession();
 });
 afterEach(async () => {
@@ -130,23 +127,6 @@ describe('조회 세션 완료 관측 게시: 로더·감시를 격리한 경합
         documentVersion: 1,
       }),
     ).toMatchObject({ success: false, scanStatus: scanStatuses.failed });
-  });
-
-  it('관측 게시 전 대상 추적이 실패하면 이전 catalog 버전을 유지한다', async () => {
-    await session.refresh();
-    const version = session.catalogVersion;
-    watcher.trackTargets.mockRejectedValueOnce(new Error('tracking failed'));
-    vi.mocked(loadWorkspace).mockImplementationOnce(async (_input, options) => {
-      await options?.onLink?.({
-        path: '.codocs/external.yaml',
-        confirmed: false,
-        logicalPath: path.join(root.codocsPath, 'external.yaml'),
-        targetPath: path.resolve(root.projectRoot, '../external.yaml'),
-      });
-      return complete;
-    });
-    expect(await session.refresh()).toMatchObject({ success: false });
-    expect(session.catalogVersion).toBe(version);
   });
 
   it('명시 갱신 중 닫으면 버전을 게시하지 않고 실패 결과를 반환한다', async () => {

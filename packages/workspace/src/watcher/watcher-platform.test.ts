@@ -1,24 +1,31 @@
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { watcherBoundary as boundary } from '../test-support/watcher.js';
-import { stat } from 'node:fs/promises';
+import { lstat } from 'node:fs/promises';
 
 vi.mock('node:fs/promises', () => ({
-  stat: vi.fn(() => Promise.resolve({ dev: 1, ino: 1 })),
+  access: vi.fn(() => Promise.resolve()),
+  realpath: vi.fn((input: string) => Promise.resolve(input)),
+  lstat: vi.fn(() =>
+    Promise.resolve({
+      dev: 1,
+      ino: 1,
+      isDirectory: () => true,
+      isSymbolicLink: () => false,
+    }),
+  ),
 }));
-vi.mock('node:fs', async () =>
-  (await import('../test-support/watcher.js')).directoryMock(),
-);
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
+  ...(await import('../test-support/watcher.js')).directoryMock(),
+}));
 vi.mock('chokidar', async () =>
   (await import('../test-support/watcher.js')).chokidarMock(),
 );
 const root = path.resolve('자료 공간');
-const target = path.resolve('외부 자료');
 const contract = {
   root,
-  target,
   codocs: path.join(root, '.codocs'),
-  child: path.join(target, '한글.yaml'),
 };
 afterEach(() => {
   vi.clearAllMocks();
@@ -29,24 +36,20 @@ afterEach(() => {
 import { createWorkspaceWatcher } from './index.js';
 
 describe('현재 OS 경로와 watcher 이벤트·종료 처리', () => {
-  it('외부 대상 조상을 등록하면 무관한 보호 폴더를 metadata 탐색에서도 제외한다', async () => {
+  it('프로젝트와 .codocs만 감시하며 연결 추적을 열지 않는다', async () => {
     boundary.connections.length = 0;
     const watcher = await createWorkspaceWatcher(contract.root);
     try {
-      await watcher.trackTargets([contract.child]);
-      const parents = vi
-        .mocked(stat)
-        .mock.calls.map(([candidate]) => candidate);
-      expect(parents).toContain(contract.target);
-      const protectedPath = path.join(
-        path.parse(contract.root).root,
-        'unrelated',
-      );
-      expect(parents).not.toContain(protectedPath);
-      expect(parents).not.toContain(contract.target + '-형제');
-      expect(boundary.connections.map((entry) => entry.paths)).not.toContain(
-        contract.target,
-      );
+      expect(boundary.connections.map((entry) => entry.paths)).toEqual([
+        contract.root,
+        contract.codocs,
+      ]);
+      expect(
+        boundary.connections.every(
+          (entry) => entry.options.followSymlinks === false,
+        ),
+      ).toBe(true);
+      expect(vi.mocked(lstat)).toHaveBeenCalledWith(contract.codocs);
     } finally {
       await watcher.close();
     }

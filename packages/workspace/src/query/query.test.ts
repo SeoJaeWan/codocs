@@ -1,4 +1,10 @@
 import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures } from '../test-support/file-system.js';
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
+});
 import {
   catalogDiagnosticCodes,
   diagnosticSeverities,
@@ -44,6 +50,7 @@ beforeEach(
 
 afterEach(
   /** 해당 사례가 만든 fixture만 정리한다. */ async () => {
+    ioFailures.clear();
     await Promise.all(sessions.splice(0).map((session) => session.close()));
     await rm(project, { recursive: true, force: true });
   },
@@ -177,8 +184,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.list();
-    await rm(target);
-    await symlink('missing-target.yaml', target);
+    ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
 
     const result = await session.refresh();
 
@@ -251,8 +257,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       'alpha.yaml',
       'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
     );
-    await rm(target);
-    await symlink('missing-target.yaml', target);
+    ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
     const session = createWorkspaceQuerySession({ cwd: project });
     expect(await session.list()).toMatchObject({
       success: true,
@@ -446,7 +451,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   });
 
   describe('부분 스캔 후 이전 조회 결과 보존', () => {
-    it('문서 경로가 깨진 링크로 바뀌면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
+    it('문서 경로의 확인이 실패하면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
       const raw =
         "id: alpha\nname: 알파\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: '이전 본문'\n";
       const target = await file('alpha.yaml', raw);
@@ -459,8 +464,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       )
         throw new Error('초기 문서 조회 실패');
       const revision = initial.results[0].revision;
-      await rm(target);
-      await symlink('missing-target.yaml', target);
+      ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
 
       await session.refresh();
       const result = await session.get(['alpha']);
@@ -487,8 +491,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.get(['alpha']);
-      await rm(target);
-      await symlink('missing-target.yaml', target);
+      ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
 
       await session.refresh();
       const result = await session.get(['outside']);
@@ -515,8 +518,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.list();
-      await rm(target);
-      await symlink('missing-target.yaml', target);
+      ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
 
       await session.refresh();
       const result = await session.list();
@@ -529,7 +531,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     });
   });
 
-  it('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 깨진 .codocs로 실제 failed 전환을 만든다. */ async () => {
+  it('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 미지원 .codocs 정션으로 failed 전환을 만든다. */ async () => {
     await file(
       'alpha.yaml',
       'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
@@ -539,7 +541,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     const codocs = path.join(project, '.codocs');
     const saved = path.join(project, 'saved-codocs');
     await rename(codocs, saved);
-    await symlink('missing-codocs', codocs);
+    await symlink(saved, codocs, 'junction');
 
     await session.refresh();
     const list = await session.list();
@@ -1075,8 +1077,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
     const session = createWorkspaceQuerySession({ cwd: project });
     const initial = await session.match('alpha');
     if (!initial.success) throw new Error('초기 매칭 실패');
-    await rm(target);
-    await symlink('missing-target.yaml', target);
+    ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
     const refreshed = await session.refresh();
     if (!refreshed.success) throw new Error('부분 갱신 실패');
 
