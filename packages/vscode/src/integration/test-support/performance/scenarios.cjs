@@ -1,12 +1,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawn } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const vscode = require('vscode');
 let activeConfig;
 
 /** all 실행에서 한 대기 시나리오만 취소하는 내구 제어 파일이다. */
 function checkCancellation() {
-  if (activeConfig?.scenario !== 'all') return;
+  if (!activeConfig) return;
   const file = path.join(activeConfig.output, 'cancel-scenarios.json');
   if (!fs.existsSync(file)) return;
   const selected = JSON.parse(fs.readFileSync(file, 'utf8')).scenarios;
@@ -106,6 +107,78 @@ async function openProbe(session) {
   const document = await vscode.workspace.openTextDocument(uri);
   await vscode.window.showTextDocument(document);
   return uri;
+}
+
+/** 새 창의 지정 코드 위치에 편집기를 연 뒤 CDP 관측 자식을 기다린다. */
+async function ui(config) {
+  const session = config.performanceSession;
+  const manifest = JSON.parse(fs.readFileSync(session.corpusManifest, 'utf8'));
+  const line = manifest.requests.findIndex(
+    (request) => request.id === 'normal0001',
+  );
+  if (line < 0) throw new Error('첫 Hover 대상이 corpus에 없습니다');
+  const request = manifest.requests[line];
+  const uri = vscode.Uri.file(path.join(session.workspace, 'probe.java'));
+  const document = await vscode.workspace.openTextDocument(uri);
+  const editor = await vscode.window.showTextDocument(document, {
+    preview: false,
+  });
+  editor.revealRange(
+    new vscode.Range(line, 0, line, request.id.length),
+    vscode.TextEditorRevealType.InCenter,
+  );
+  const observerConfig = path.join(session.profile, 'ui-observer.json');
+  const sampleFile = path.join(
+    config.output,
+    `scenario-samples-${session.scenario}-${session.iteration}-main.jsonl`,
+  );
+  fs.writeFileSync(
+    observerConfig,
+    JSON.stringify({
+      output: config.output,
+      profile: session.profile,
+      sampleFile,
+      scenario: session.scenario,
+      iteration: session.iteration,
+      windowId: process.env.CODOCS_PERFORMANCE_WINDOW_ID,
+      launchStarted: JSON.parse(process.env.CODOCS_PERFORMANCE_LAUNCH_STARTED),
+      target: request.id,
+      expectedBody: request.expected.definition,
+      readiness: events(session).filter((event) =>
+        ['index-start', 'index-published', 'watcher-ready'].includes(
+          event.kind,
+        ),
+      ),
+    }),
+  );
+  await new Promise(
+    /** 관측 자식의 종료와 오류를 확장 Host에 전달한다. */ (
+      resolve,
+      reject,
+    ) => {
+      const child = spawn(
+        process.env.CODOCS_PERFORMANCE_OBSERVER_NODE,
+        [
+          path.join(config.root, 'packages/vscode/test-runner/ui-observer.mjs'),
+          observerConfig,
+        ],
+        { windowsHide: true, stdio: 'inherit' },
+      );
+      child.once('error', reject);
+      child.once(
+        'exit',
+        /** 관측 자식의 취소와 실패를 구분한다. */ (code) => {
+          if (code === 0) return resolve();
+          try {
+            checkCancellation();
+          } catch (error) {
+            return reject(error);
+          }
+          reject(new Error(`CDP 관측 종료 코드: ${code}`));
+        },
+      );
+    },
+  );
 }
 
 /** Hover Markdown의 이스케이프를 원문 비교에 맞게 되돌린다. */
@@ -450,6 +523,8 @@ async function run() {
     )
       throw new Error('이번 실행에 설치한 VSIX가 아닙니다');
     if (scenario === 'startup') await startup(config, extension);
+    else if (scenario === 'first-ui' || scenario === 'reentry-ui')
+      await ui(config);
     else if (scenario === 'api') await api(config, extension);
     else if (scenario === 'save') await propagation(config, extension, false);
     else if (scenario === 'external')

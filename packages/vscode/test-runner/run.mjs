@@ -47,11 +47,18 @@ export async function main(args = process.argv.slice(2)) {
     phase: 'preparation',
     passed: false,
     output,
-    visualInteraction: false,
+    visualInteraction:
+      options.mode === 'performance' &&
+      ['all', 'first-ui', 'reentry-ui'].includes(options.scenario),
     packageKind: 'installed-vsix',
   };
   let performanceReport;
   try {
+    const localCacheRoot = path.join(root, '.workbench/vscode-cache');
+    const cacheRoot =
+      options.mode === 'performance' && process.env.CODOCS_VSCODE_RUNTIME_CACHE
+        ? path.resolve(process.env.CODOCS_VSCODE_RUNTIME_CACHE)
+        : localCacheRoot;
     const configured =
       options.mode === 'performance'
         ? await readPerformanceConfig(options.config)
@@ -75,6 +82,12 @@ export async function main(args = process.argv.slice(2)) {
         settings,
         command: `pnpm test:vscode -- ${args.join(' ')}`,
       });
+      performanceReport.environment.vscodeCache = {
+        path: cacheRoot,
+        sharedImmutable: cacheRoot !== localCacheRoot,
+        validation:
+          'version/platform/arch receipt and full runtime SHA-256 under cache lock',
+      };
       await persistPerformanceReport(performanceReport, output);
     }
     temporary = await mkdtemp(path.join(os.tmpdir(), 'codocs-vscode-'));
@@ -89,7 +102,7 @@ export async function main(args = process.argv.slice(2)) {
         mode: options.mode,
         scenario: options.scenario,
         settings,
-        cacheRoot: path.join(root, '.workbench/vscode-cache'),
+        cacheRoot,
       }),
     );
     result.head = spawnSync(

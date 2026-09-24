@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { finished } from 'node:stream/promises';
-import { createWriteStream, existsSync } from 'node:fs';
+import { createWriteStream, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { runTests } from '@vscode/test-electron';
 import { createVSIX } from '@vscode/vsce';
@@ -40,6 +40,76 @@ async function progress(extra = {}) {
     path.join(output, 'execution.json'),
     JSON.stringify({ phase, version: config.version, ...extra }, null, 2),
   );
+}
+
+/** 관측 자식이 함께 종료되어도 마지막 DOM 증거를 미완료 결과로 확정한다. */
+async function finalizeUiObservation(scenario, status, error) {
+  if (scenario !== 'first-ui' && scenario !== 'reentry-ui') return;
+  const prefix = `ui-transitions-${scenario}-`;
+  for (const name of await readdir(output)) {
+    if (!name.startsWith(prefix) || !name.endsWith('.jsonl')) continue;
+    const suffix = name.slice(prefix.length, -'.jsonl'.length);
+    const file = path.join(output, `ui-observation-${scenario}-${suffix}.json`);
+    let observation;
+    try {
+      observation = JSON.parse(await readFile(file, 'utf8'));
+    } catch {
+      const raw = await readFile(path.join(output, name), 'utf8');
+      const transitions = [];
+      for (const line of raw.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          transitions.push(JSON.parse(line));
+        } catch {
+          break;
+        }
+      }
+      observation = { status: 'running', transitions, recoveredFromRaw: true };
+    }
+    if (observation.status !== 'running') continue;
+    await writeFile(
+      file,
+      JSON.stringify({ ...observation, status, error }, null, 2),
+    );
+  }
+}
+
+/** 선택한 시나리오의 자기 프로필을 쓰는 VS Code 창만 중단한다. */
+function cancelSession(profile, launchedAt) {
+  if (process.platform !== 'win32') return false;
+  const command =
+    '$profilePath=$env:CODOCS_CANCEL_PROFILE; Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "Code.exe" -and $_.CommandLine -and $_.CommandLine.Contains($profilePath) -and $_.CommandLine -notmatch "--type=" } | Select-Object ProcessId,@{Name="CreatedAt";Expression={if ($_.CreationDate) {$_.CreationDate.ToUniversalTime().ToString("o")}}} | ConvertTo-Json -Compress';
+  const listing = spawnSync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-Command', command],
+    {
+      env: { ...process.env, CODOCS_CANCEL_PROFILE: profile },
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 10000,
+    },
+  );
+  if (listing.error || listing.status !== 0)
+    throw listing.error ?? new Error(listing.stderr);
+  const parsed = JSON.parse(listing.stdout.replace(/^\uFEFF/u, '') || '[]');
+  const rows = Array.isArray(parsed) ? parsed : [parsed];
+  let killed = false;
+  for (const row of rows) {
+    const createdAt = Date.parse(row.CreatedAt);
+    if (!Number.isFinite(createdAt) || createdAt < launchedAt) continue;
+    const result = spawnSync(
+      'taskkill',
+      ['/PID', String(row.ProcessId), '/T', '/F'],
+      {
+        encoding: 'utf8',
+        windowsHide: true,
+      },
+    );
+    if (result.error || result.status !== 0)
+      throw result.error ?? new Error(result.stderr);
+    killed = true;
+  }
+  return killed;
 }
 
 /** 같은 설치 경로와 runTests launcher로 1창 기준, 같은 프로젝트 2창, 다른 프로젝트 2창을 잰다. */
@@ -469,8 +539,11 @@ try {
             report: performanceReport,
           });
         } else {
-          const repeats =
-            scenario === 'startup' ? config.settings.targets.startup : 1;
+          const repeats = ['startup', 'first-ui', 'reentry-ui'].includes(
+            scenario,
+          )
+            ? config.settings.targets[scenario]
+            : 1;
           for (let iteration = 0; iteration < repeats; iteration++) {
             const scenarioRoot = path.join(
               config.temporary,
@@ -529,7 +602,32 @@ try {
             await persistPerformanceReport(performanceReport, output);
             await writeFile(process.argv[2], JSON.stringify(config));
             const launchStarted = clockSnapshot();
+            let cancellationMonitor;
+            let hostCancelled = false;
             try {
+              cancellationMonitor = setInterval(
+                /** 제품 Promise와 별도로 이 시나리오의 취소를 감시한다. */ () => {
+                  if (hostCancelled) return;
+                  try {
+                    const control = JSON.parse(
+                      readFileSync(
+                        path.join(output, 'cancel-scenarios.json'),
+                        'utf8',
+                      ),
+                    );
+                    if (control.scenarios?.includes(scenario)) {
+                      hostCancelled = cancelSession(
+                        scenarioProfile,
+                        Date.parse(launchStarted.wallTime),
+                      );
+                    }
+                  } catch (error) {
+                    if (error.code !== 'ENOENT')
+                      log.write(`scenario cancellation: ${error}\n`);
+                  }
+                },
+                200,
+              );
               await runTests({
                 vscodeExecutablePath: runtime.executable,
                 extensionDevelopmentPath: harness,
@@ -544,6 +642,7 @@ try {
                   CODOCS_PERFORMANCE_WINDOW_ID: `${scenario}/${iteration}/window-1`,
                   CODOCS_PERFORMANCE_LAUNCH_STARTED:
                     JSON.stringify(launchStarted),
+                  CODOCS_PERFORMANCE_OBSERVER_NODE: process.execPath,
                 },
                 stdout: log,
                 stderr: log,
@@ -556,9 +655,22 @@ try {
                   '--disable-telemetry',
                   '--disable-experiments',
                   '--new-window',
+                  ...(scenario === 'first-ui' || scenario === 'reentry-ui'
+                    ? ['--remote-debugging-port=0', '--locale=en']
+                    : []),
                 ],
               });
             } finally {
+              clearInterval(cancellationMonitor);
+              if (hostCancelled)
+                await writeFile(
+                  path.join(output, `scenario-cancelled-${scenario}.json`),
+                  JSON.stringify({
+                    scenario,
+                    iteration,
+                    profile: scenarioProfile,
+                  }),
+                );
               const samplePath = path.join(
                 output,
                 `scenario-samples-${scenario}-${iteration}-main.jsonl`,
@@ -606,7 +718,7 @@ try {
             if (
               scenario !== 'edit-indexing' &&
               performanceReport.scenarios[scenario].completed <
-                (scenario === 'startup'
+                (['startup', 'first-ui', 'reentry-ui'].includes(scenario)
                   ? iteration + 1
                   : config.settings.targets[scenario])
             )
@@ -632,11 +744,24 @@ try {
         } catch (detailError) {
           if (detailError.code !== 'ENOENT') throw detailError;
         }
+        if (
+          existsSync(path.join(output, `scenario-cancelled-${scenario}.json`))
+        )
+          cancelled = true;
+        if (scenario === 'first-ui' || scenario === 'reentry-ui') {
+          const processOutput = await readFile(
+            path.join(output, 'process.log'),
+            'utf8',
+          );
+          if (/CodeWindow: renderer process gone/u.test(processOutput))
+            scenarioError = `renderer process gone\n${scenarioError}`;
+        }
         // 확장 Host가 먼저 저장한 원시 표본을 보존한다.
         performanceReport = JSON.parse(
           await readFile(path.join(output, 'performance.json'), 'utf8'),
         );
         scenarioStatus = cancelled ? 'cancelled' : 'failed';
+        await finalizeUiObservation(scenario, scenarioStatus, scenarioError);
         recordPerformanceSample(performanceReport, scenario, {
           status: scenarioStatus,
           error: scenarioError,
