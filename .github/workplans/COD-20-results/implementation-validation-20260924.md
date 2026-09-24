@@ -2,7 +2,7 @@
 
 ## 판정
 
-같은 구현 소스에서 생성한 VSIX를 Windows의 VS Code 1.100.0과 검증 시작 시 고정한 정식 버전 1.139.0에 설치했다. 기능 검사는 각각 **51/51 통과**, **45/51 통과**였다. 두 버전의 대표 성능 시나리오와 네 종류의 실행 수명·정리는 모두 통과했다. 1.139.0의 잠금 파일 감시 `EBUSY` 기능 실패 6건과 현재 호스트의 실제 symlink 생성 `EPERM` 때문에 전체 검사와 최신 버전 지원 검증은 **통과로 판정하지 않는다**.
+같은 구현 소스에서 생성한 VSIX를 Windows의 VS Code 1.100.0과 검증 시작 시 고정한 정식 버전 1.139.0에 설치했다. 기능 검사는 각각 **51/51 통과**, **45/51 통과**였다. 두 버전의 대표 성능 시나리오와 네 종류의 실행 수명·정리는 모두 통과했다. 사용자는 현재 **구현 작업의 완료와 PR #17 병합을 승인**했다. 다만 1.139.0의 잠금 파일 조건 기능 실패 6건과 현재 호스트의 실제 symlink 생성 `EPERM` 때문에 전체 검사와 최신 버전 지원 검증은 **통과로 판정하지 않는다**.
 
 사용자 지시에 따라 API 100회 예열·1000회 측정 등 **정식 설정은 그대로 유지**하되, 이 구현 작업에서 통계 오차를 줄이기 위한 전체 반복 벤치마크는 수행하지 않았다. 시작했던 1.100.0 정식 설정 실행은 지원되는 취소 요청으로 종료했고, 완료된 212개 API 표본과 1개 취소 표본을 원본 그대로 보존했다. 이 실행은 **취소된 부분 진단**이며 200회짜리 완료 벤치마크가 아니다. 두 버전의 대표 smoke는 구현 경로 검증이며, 표본 수가 달라 버전 간 성능 우열이나 p95 목표 충족을 결론 내릴 수 없다.
 
@@ -22,6 +22,8 @@
 | 버전 고정      | 2026-09-24 10:23:32.7802894 KST에 공식 stable resolver가 `1.139.0` 반환. [원본 영수증](raw/checks/stable-resolution.json.raw). 이 실행 중 latest를 다시 해석하지 않았다.                                                                               |
 
 Intent/3은 API 요청별 내구 진행과 전체 실행 취소·부분 보고서 정리를 보완했다. Intent/4는 사용자 지시로 구현 검증 범위만 축소했다. [최종 실행 packet 원본](raw/intent/runtime-packet-intent-4.yaml.raw)과 [범위 수정 원본](raw/intent/revision-intent-4.yaml.raw)을 보존했으며, source 기본 설정은 바꾸지 않았다. 이전 구현 결과는 각각 잠정 후보였고 symlink 환경 실패를 숨기지 않았다.
+
+사용자의 완료·게시·병합 지시는 [intent/5 수정 기록](raw/intent/revision-intent-5.yaml.raw)과 [전달 packet](raw/intent/runtime-packet-intent-5.yaml.raw)에, 중단 후 같은 작업 공간에서 이어서 진행한 사실은 [intent/6 수정 기록](raw/intent/revision-intent-6.yaml.raw)과 [재개 packet](raw/intent/runtime-packet-intent-6.yaml.raw)에 남겼다. 두 수정은 앞선 원시 검증 결과를 통과로 재분류하지 않는다.
 
 두 대표 실행의 일반 corpus SHA-256은 모두 `45775d59c8d078e8a5150557d7d7720ef94db79ac19a7981171f284a793ea4f6`이고 API 전용 고정 corpus SHA-256은 모두 `67e8ae46a8034eebfad927957b14d957c4006809afce60f6ede638dec1c12023`이다. 각 시나리오의 독립 가변 fixture 해시는 원본 `performance.json`의 `hashes.corpora`에 남는다. VSIX ZIP SHA-256은 패키징마다 다르지만, 기능 두 실행·취소 실행·대표 두 실행의 **추출 payload 26개 파일 경로와 내용 SHA-256이 전부 같다**. [VSIX payload 대조](vsix-payload-manifest.json). VSIX 바이너리, 임시 프로필, 사용자 데이터는 결과 커밋에 넣지 않았다.
 
@@ -74,7 +76,7 @@ API는 `executeHoverProvider` 호출 직전부터 반환까지 측정하고, 반
 
 ## 실패·미실시와 후속 처리
 
-1.139.0 기능 실패 ID는 `partial-scan`, `unconfirmed-reference`, `unexpected-server-exit`, `restart-budget-recovery`, `diagnostics-recheck-recovery`, `rapid-edit-restart-diagnostics`이다. 잠금 fixture의 `partial/.codocs/unreadable.yaml`을 감시할 때 `EBUSY`가 발생하고 후속 복구 검사가 연쇄 실패한다. 같은 소스의 1.100.0은 51/51 통과했다. [재현·후속 등록 준비](follow-up-ebusy.md)에 실패 로그와 기대 결과를 묶었다. 외부 작업 등록은 **대기**이며 등록되었다고 표시하지 않는다.
+일반 Hover·원문 링크 기능은 통과했다. 다만 1.139.0에서 잠금 fixture의 `partial/.codocs/unreadable.yaml`을 감시할 때 `EBUSY`가 관측되고 `partial-scan`, `unconfirmed-reference`, `unexpected-server-exit`, `restart-budget-recovery`, `diagnostics-recheck-recovery`, `rapid-edit-restart-diagnostics` 검사가 실패했다. 같은 소스의 1.100.0은 51/51 통과했다. 1.139.0의 이 여섯 실패를 모두 한 원인의 연쇄로 확정할 근거는 아직 없다. fixture 잠금이 감시에 미치는 영향, 제품·런타임 호환성, 이번 변경의 회귀를 분리해야 하며, **변경 전 기준 소스를 같은 1.139.0에서 재현하는 검사**가 필요하다. 일반 Hover·링크의 근본 결함으로 확정하지 않는다. [재현·후속 조사](follow-up-ebusy.md)에 실패 로그, 기대 결과와 분리 절차를 묶었다. 별도 수정은 대기 중이며 외부 작업을 등록했다고 표시하지 않는다.
 
 Windows 호스트의 실제 symlink 생성 `EPERM`은 `pnpm check`의 기존 45개 실패와 별도 build-consumer 1개 실패를 설명한다. 머신 설정을 바꾸거나 mock/junction으로 대체하지 않았다. 따라서 집계 검사를 통과로 기록하지 않는다. 두 버전의 설치 VSIX 대표 시나리오 통과와 전체 저장소 검사 실패를 구분한다.
 
