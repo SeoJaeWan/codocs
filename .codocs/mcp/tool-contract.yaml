@@ -25,4 +25,4 @@ definition: |
 
   [[조회]]의 중복 제거 후 ID 개수처럼 입력 처리 뒤 판단하는 조건은 원본 배열의 길이 제한으로 바꾸지 않는다.
   스키마로 표현할 수 없는 의미 조건은 도구 설명에 안내하고 공통 검증에서 확인한다. SDK가 앞서 검증하더라도 [[도구 결과]]의 입력 오류 표현을 유지한다.
-  여섯 도구의 입력 스키마는 [공통 스키마](../../packages/mcp/src/tool-input/index.ts)에서 정의한다. 실제 실행 등록은 list/get/refresh 세 도구만 [stdio 서버](../../packages/mcp/src/server/index.ts)에 둔다.
+  여섯 도구의 입력 스키마는 [공통 스키마](../../packages/mcp/src/tool-input/index.ts)에서 정의한다. 실제 실행 등록은 list/get/refresh/validate 네 도구를 [stdio 서버](../../packages/mcp/src/server/index.ts)에 둔다.

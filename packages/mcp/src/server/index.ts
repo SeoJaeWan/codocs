@@ -67,6 +67,14 @@ export function createCodocsServer(session: WorkspaceQuerySession): Server {
         execute: handlers.codocsRefresh.bind(handlers),
       },
     ],
+    [
+      'codocs_validate',
+      {
+        description:
+          '프로젝트 전체 또는 .codocs YAML 파일 하나의 문서 진단을 조회합니다.',
+        execute: handlers.codocsValidate.bind(handlers),
+      },
+    ],
   ]);
   const server = new Server(
     { name: 'codocs', version: '0.0.0' },

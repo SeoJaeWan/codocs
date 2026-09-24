@@ -62,6 +62,7 @@ const listSchema = z.strictObject({
   status: z.enum(documentStatuses).optional(),
 });
 const getSchema = z.strictObject({ ids: z.array(z.string().min(1)) });
+const validateSchema = z.strictObject({ path: z.string().optional() });
 const writeSchema = z.discriminatedUnion('mode', [
   z.strictObject({
     mode: z.literal('create'),
@@ -82,7 +83,7 @@ export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_list', listSchema],
   ['codocs_get', getSchema],
   ['codocs_refresh', z.strictObject({})],
-  ['codocs_validate', z.strictObject({ path: z.string().optional() })],
+  ['codocs_validate', validateSchema],
   [
     'codocs_guide',
     z.strictObject({
@@ -131,6 +132,16 @@ export function parseGetInput(input: unknown): { ids: string[] } | undefined {
   return ids.length >= 1 && ids.length <= 20 ? { ids } : undefined;
 }
 
+/** 선택 경로를 입력 그대로 보존하며 알 수 없는 속성은 거부한다. */
+export function parseValidateInput(
+  input: unknown,
+): { path?: string } | undefined {
+  if (!dataOnly(input)) return undefined;
+  const result = validateSchema.safeParse(input);
+  if (!result.success) return undefined;
+  return result.data.path === undefined ? {} : { path: result.data.path };
+}
+
 /** 입력 필드와 기존 문서 구조를 확인하되 사용자 필드를 보존한다. */
 export function acceptsToolInput(
   name: CodocsToolName,
@@ -139,6 +150,8 @@ export function acceptsToolInput(
   if (!dataOnly(input)) return false;
   if (name === 'codocs_get') return parseGetInput(input) !== undefined;
   if (name === 'codocs_list') return parseListInput(input) !== undefined;
+  if (name === 'codocs_validate')
+    return parseValidateInput(input) !== undefined;
   const result = codocsInputSchemas.get(name)!.safeParse(input);
   if (!result.success) return false;
   if (name !== 'codocs_write') return true;
