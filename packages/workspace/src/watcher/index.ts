@@ -1,35 +1,45 @@
-/* eslint-disable codocs/korean-jsdoc, jsdoc/require-jsdoc -- 감시 이벤트 콜백은 선언 함수가 아니다. */
-import chokidar, { type FSWatcher } from 'chokidar';
+import chokidar, { type FSWatcher, type ChokidarOptions } from 'chokidar';
 import {
   watch as watchDirectory,
   type FSWatcher as DirectoryWatcher,
 } from 'node:fs';
+import { lstat } from 'node:fs/promises';
 import path from 'node:path';
+import { containsWorkspacePath } from '../loader/observations.js';
+import { resolveWorkspacePath } from '../paths/index.js';
+import { workspaceTargetKinds } from '../paths/domain-values.js';
 import {
   workspaceLifecycleStates,
   type WorkspaceReadiness,
 } from '../lifecycle/index.js';
-import { codocsDirectoryName } from '../project-root/index.js';
+import {
+  codocsDirectoryName,
+  resolveProjectRoot,
+} from '../project-root/index.js';
 
 /** 하나의 병합된 파일 변경 알림이다. */
 export interface WorkspaceChangeBatch {
   paths: readonly string[];
 }
-
+type ContentIdentity = { dev: number; ino: number } | null;
 /** 변화 감지 실패 후 사용자가 직접 호출할 복구 방법이다. */
 export const watcherRecoveryGuidance =
   '파일 감시가 중단되었습니다. 원인을 확인한 뒤 codocs_refresh를 실행하세요.';
 
-/** YAML 원문이나 Catalog를 보유하지 않는 파일 변화 신호원이다. */
+/** YAML이나 snapshot 없이 경로 신호·대상별 준비·배치 수명만 관리한다. */
 export class WorkspaceWatcher {
+  readonly #observe:
+    ((kind: string, detail: Record<string, unknown>) => void) | undefined;
   readonly #root: string;
   readonly #listeners = new Set<(batch: WorkspaceChangeBatch) => void>();
-  #rootWatcher: FSWatcher | undefined;
+  readonly #connections = new Set<FSWatcher>();
+  readonly #directoryRegistrations = new Map<
+    string,
+    { watcher: FSWatcher; ready: Promise<void> }
+  >();
+  readonly #waiters = new Map<FSWatcher, () => void>();
   #entryWatcher: DirectoryWatcher | undefined;
   #contentWatcher: FSWatcher | undefined;
-  #targetWatcher: FSWatcher | undefined;
-  readonly #targetParents = new Set<string>();
-  readonly #targetPaths = new Set<string>();
   #pending = new Set<string>();
   #timer: ReturnType<typeof setTimeout> | undefined;
   #state: WorkspaceReadiness = {
@@ -38,283 +48,491 @@ export class WorkspaceWatcher {
   };
   #recoveryUsed = false;
   #closed = false;
+  #epoch = 0;
   #starting: Promise<void> | undefined;
-  #reopening = false;
+  #reconnecting: Promise<void> | undefined;
+  #openingContent = false;
+  #reopenRequested = false;
+  #reopening: Promise<void> | undefined;
+  #contentIdentity: ContentIdentity | undefined;
+  readonly #retiring = new Set<Promise<void>>();
+  #closing: Promise<void> | undefined;
 
-  /** 선택한 실제 프로젝트 경로를 감시 대상으로 고정한다. */
-  constructor(projectRoot: string) {
+  /** 선택한 프로젝트 경로를 고정하며 시작 전에 구독을 허용한다. */
+  constructor(
+    projectRoot: string,
+    observe?: (kind: string, detail: Record<string, unknown>) => void,
+  ) {
+    this.#observe = observe;
     this.#root = path.resolve(projectRoot);
   }
-
   /** 원인과 수동 복구 안내를 포함한 현재 준비 상태다. */
   get readiness(): WorkspaceReadiness {
     return { ...this.#state };
   }
-
   /** 마지막 수동 복구 이후 자동 재연결 시도 횟수다. */
   get automaticRecoveryAttempts(): 0 | 1 {
     return this.#recoveryUsed ? 1 : 0;
   }
-
+  /** 이미 감지했으나 아직 배치로 전달하지 않은 변경의 유무다. */
+  get hasPendingChanges(): boolean {
+    return this.#pending.size > 0;
+  }
   /** 변화 배치를 구독하고 해제 함수를 반환한다. */
   subscribe(listener: (batch: WorkspaceChangeBatch) => void): () => void {
-    this.#listeners.add(listener);
-    return () => this.#listeners.delete(listener);
+    if (!this.#closed) this.#listeners.add(listener);
+    return /** 해당 구독자만 이후 배치에서 제외한다. */ () => {
+      this.#listeners.delete(listener);
+    };
   }
-
+  /** 배치 타이머를 기다리지 않고 현재 수집한 변경을 구독자에게 전달한다. */
+  drain(): void {
+    if (this.#timer) clearTimeout(this.#timer);
+    this.#timer = undefined;
+    const paths = [...this.#pending].sort();
+    this.#pending.clear();
+    if (!this.#closed && paths.length)
+      for (const listener of this.#listeners) listener({ paths });
+  }
   /** 같은 경로의 다중 이벤트를 하나의 배치로 합친다. */
   #signal(changed: string): void {
     if (this.#closed) return;
     this.#pending.add(path.resolve(changed));
-    if (this.#timer) clearTimeout(this.#timer);
-    this.#timer = setTimeout(() => {
-      this.#timer = undefined;
-      const paths = [...this.#pending].sort();
-      this.#pending.clear();
-      if (paths.length)
-        for (const listener of this.#listeners) listener({ paths });
-    }, 50);
+    if (!this.#timer) this.#timer = setTimeout(() => this.drain(), 50);
+  }
+  /** 이전 연결 또는 종료 이후의 비동기 완료를 구분한다. */
+  #active(epoch: number): boolean {
+    return !this.#closed && epoch === this.#epoch;
+  }
+  /** 공개 ready/error 이벤트와 세션 취소로 대상별 준비를 확인한다. */
+  #connect(
+    paths: string | string[],
+    options: ChokidarOptions,
+    epoch: number,
+    onChange: (event: string, changed: string) => void,
+    initialSignals = false,
+  ): { watcher: FSWatcher; ready: Promise<void> } {
+    const watcher = chokidar.watch(paths, {
+      ignoreInitial: false,
+      awaitWriteFinish: false,
+      ...options,
+    });
+    this.#connections.add(watcher);
+    let prepared = false;
+    watcher.on(
+      'all',
+      /** 수집한 변경과 연결 상태를 현재 작업에 반영한다. */ (
+        event,
+        changed,
+      ) => {
+        if ((prepared || initialSignals) && this.#active(epoch))
+          onChange(event, changed);
+      },
+    );
+    const ready = new Promise<void>(
+      /** ready·error·취소 중 먼저 도착한 결과로 준비 대기를 끝낸다. */ (
+        resolve,
+        reject,
+      ) => {
+        /** 종료·연결 교체는 ready 이벤트가 없어도 대기를 끝낸다. */
+        const cancel = (): void => {
+          this.#observe?.('watcher-cancelled', { folder: this.#root });
+          cleanup();
+          resolve();
+        };
+        /** 일회성 준비 구독과 취소 핸들을 정리한다. */
+        const cleanup = (): void => {
+          this.#waiters.delete(watcher);
+          watcher.off('ready', success);
+          watcher.off('error', failure);
+        };
+        /** 등록 이후의 실제 이벤트만 소비자에게 전달한다. */
+        const success = (): void => {
+          this.#observe?.('watcher-connection-ready', { folder: this.#root });
+          prepared = true;
+          cleanup();
+          resolve();
+        };
+        /** 등록 오류를 무한 대기로 남기지 않는다. */
+        const failure = (error: unknown): void => {
+          this.#observe?.('watcher-error', {
+            folder: this.#root,
+            error: String(error),
+          });
+          cleanup();
+          reject(error instanceof Error ? error : new Error(String(error)));
+        };
+        this.#waiters.set(watcher, cancel);
+        watcher.once('ready', success);
+        watcher.once('error', failure);
+      },
+    );
+    watcher.on(
+      'error',
+      /** 현재 연결에서 난 오류만 자동 복구에 전달한다. */ (error) => {
+        if (prepared && this.#active(epoch))
+          void this.#recover(error).catch((failure: unknown) =>
+            this.#fail(failure),
+          );
+      },
+    );
+    return { watcher, ready };
+  }
+  /** 이미 시작한 동적 하위 감시의 준비와 준비 중 추가된 등록까지 기다린다. */
+  async settle(): Promise<void> {
+    while (!this.#closed) {
+      const connections = [...this.#directoryRegistrations.values()];
+      await Promise.all(connections.map((connection) => connection.ready));
+      const current = [...this.#directoryRegistrations.values()];
+      if (
+        current.length === connections.length &&
+        current.every((connection, index) => connection === connections[index])
+      )
+        return;
+    }
   }
 
-  /** 두 watcher를 시작해 프로젝트의 .codocs 교체와 내부 변경을 함께 감지한다. */
-  async #open(): Promise<void> {
-    const codocsPath = path.join(this.#root, codocsDirectoryName);
-    const rootWatcher = chokidar.watch(this.#root, {
-      depth: 1,
-      ignoreInitial: true,
-      persistent: true,
-      usePolling: true,
-      interval: 100,
-    });
-    const contentWatcher = chokidar.watch(codocsPath, {
-      ignoreInitial: true,
-      persistent: true,
-      followSymlinks: true,
-      awaitWriteFinish: false,
-    });
-    const targetWatcher = this.#targetParents.size
-      ? chokidar.watch([...this.#targetParents], {
-          depth: 0,
-          ignoreInitial: true,
-          awaitWriteFinish: false,
-        })
-      : undefined;
-    this.#rootWatcher = rootWatcher;
-    this.#contentWatcher = contentWatcher;
-    this.#targetWatcher = targetWatcher;
-    this.#entryWatcher = watchDirectory(this.#root, (_event, filename) => {
-      if (filename?.toString() !== codocsDirectoryName) return;
-      this.#signal(codocsPath);
-      void this.#reopenContent().catch(() => undefined);
-    });
-    const failure = (error: unknown): void => {
-      if (this.#state.state === workspaceLifecycleStates.ready)
-        void this.#recover(error).catch(() => undefined);
-    };
-    rootWatcher.on('error', failure);
-    this.#entryWatcher.on('error', failure);
-    contentWatcher.on('error', failure);
-    targetWatcher?.on('error', failure);
-    rootWatcher.on('all', (event, changed) => {
-      if (path.resolve(changed) === codocsPath) {
-        this.#signal(changed);
-        if (event === 'addDir' || event === 'unlinkDir')
-          void this.#reopenContent().catch(failure);
+  /** 루트 보완 감시가 먼저 발견한 새 하위 폴더도 독립 ready 이후 재확인한다. */
+  async #prepareDirectory(directory: string, epoch: number): Promise<void> {
+    if (!this.#active(epoch)) return;
+    const selected = await resolveProjectRoot({ cwd: this.#root });
+    if (!selected.success) return;
+    const checked = await resolveWorkspacePath(selected.root, directory);
+    if (!checked.success || checked.kind !== workspaceTargetKinds.directory)
+      return;
+    let connection = this.#directoryRegistrations.get(directory);
+    if (!connection) {
+      connection = this.#connect(
+        directory,
+        { followSymlinks: false },
+        epoch,
+        (_event, changed) => this.#signal(changed),
+        true,
+      );
+      this.#directoryRegistrations.set(directory, connection);
+    }
+    await connection.ready;
+    if (this.#active(epoch)) this.#signal(directory);
+  }
+
+  /** 디렉터리 식별자로 같은 경로의 실제 교체를 구분한다. */
+  async #readContentIdentity(): Promise<ContentIdentity | undefined> {
+    const selected = await resolveProjectRoot({ cwd: this.#root });
+    if (!selected.success) return undefined;
+    try {
+      const result = await lstat(path.join(this.#root, codocsDirectoryName));
+      return result.isDirectory() && !result.isSymbolicLink()
+        ? { dev: result.dev, ino: result.ino }
+        : undefined;
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+  /** 루트 교체 감시와 내용 감시를 연결하고 모든 대상의 준비를 기다린다. */
+  async #open(epoch: number): Promise<void> {
+    const selected = await resolveProjectRoot({ cwd: this.#root });
+    if (!selected.success) throw new Error('Workspace root is unavailable');
+    const codocs = path.join(this.#root, codocsDirectoryName);
+    this.#contentIdentity = await this.#readContentIdentity();
+    if (!this.#active(epoch)) return;
+    this.#openingContent = true;
+    const root = this.#connect(
+      this.#root,
+      {
+        usePolling: true,
+        interval: 100,
+        followSymlinks: false,
+        /** 프로젝트 밖 파일은 루트 보완 감시의 재귀 탐색에 포함하지 않는다. */
+        ignored: (candidate) =>
+          path.resolve(candidate) !== this.#root &&
+          !containsWorkspacePath(codocs, path.resolve(candidate)),
+      },
+      epoch,
+      /** 보완 감시가 먼저 발견한 하위 폴더를 등록하고 기존 신호도 보존한다. */ (
+        event,
+        changed,
+      ) => {
+        if (path.resolve(changed) === codocs)
+          void this.#reopenContent(epoch).catch((error: unknown) =>
+            this.#fail(error),
+          );
+        else if (containsWorkspacePath(codocs, path.resolve(changed))) {
+          this.#signal(changed);
+          if (event === 'addDir')
+            void this.#prepareDirectory(changed, epoch)
+              .catch((error: unknown) => this.#recover(error))
+              .catch((error: unknown) => this.#fail(error));
+          else if (event === 'unlinkDir') {
+            const previous = this.#directoryRegistrations.get(changed);
+            this.#directoryRegistrations.delete(changed);
+            if (previous)
+              void this.#retire(previous.watcher).catch((error: unknown) =>
+                this.#fail(error),
+              );
+          }
+        }
+      },
+    );
+    const content =
+      this.#contentIdentity !== undefined
+        ? this.#connect(
+            codocs,
+            { followSymlinks: false },
+            epoch,
+            /** 일반 .codocs 내용의 변화만 현재 세대에 전달한다. */
+            (event, changed) => {
+              if (
+                path.resolve(changed) === codocs &&
+                (event === 'addDir' || event === 'unlinkDir')
+              )
+                void this.#reopenContent(epoch).catch((error: unknown) =>
+                  this.#fail(error),
+                );
+              else this.#signal(changed);
+            },
+          )
+        : undefined;
+    this.#contentWatcher = content?.watcher;
+    this.#entryWatcher = watchDirectory(
+      this.#root,
+      /** 감시가 수집한 경로를 현재 연결 세대에 전달한다. */ (
+        _event,
+        filename,
+      ) => {
+        if (filename?.toString() === codocsDirectoryName)
+          void this.#reopenContent(epoch).catch((error: unknown) =>
+            this.#fail(error),
+          );
+      },
+    );
+    this.#entryWatcher.on(
+      'error',
+      /** 현재 연결에서 난 오류만 자동 복구에 전달한다. */ (error) => {
+        if (this.#active(epoch))
+          void this.#recover(error).catch((failure: unknown) =>
+            this.#fail(failure),
+          );
+      },
+    );
+    try {
+      await Promise.all([root.ready, content?.ready]);
+    } finally {
+      this.#openingContent = false;
+    }
+    if (!this.#active(epoch)) return;
+    if (this.#reopenRequested) {
+      this.#reopenRequested = false;
+      await this.#reopenContent(epoch);
+    }
+  }
+  /** 실제 .codocs 교체만 재연결하고 준비 이후 하위 범위 재확인을 요청한다. */
+  #reopenContent(epoch: number): Promise<void> {
+    if (!this.#active(epoch)) return Promise.resolve();
+    if (this.#openingContent) {
+      this.#reopenRequested = true;
+      return Promise.resolve();
+    }
+    if (this.#reopening) {
+      this.#reopenRequested = true;
+      return this.#reopening;
+    }
+    const operation = (
+      /** 수집한 변경과 연결 상태를 현재 작업에 반영한다. */ async (): Promise<void> => {
+        do {
+          this.#reopenRequested = false;
+          const identity = await this.#readContentIdentity();
+          if (!this.#active(epoch)) return;
+          if (
+            identity === this.#contentIdentity ||
+            (identity !== null &&
+              identity !== undefined &&
+              this.#contentIdentity !== null &&
+              this.#contentIdentity !== undefined &&
+              identity.dev === this.#contentIdentity.dev &&
+              identity.ino === this.#contentIdentity.ino)
+          )
+            continue;
+          for (const [directory, connection] of this.#directoryRegistrations) {
+            await this.#retire(connection.watcher);
+            this.#directoryRegistrations.delete(directory);
+          }
+          const current = this.#contentWatcher;
+          if (current) await this.#retire(current);
+          if (!this.#active(epoch)) return;
+          const codocs = path.join(this.#root, codocsDirectoryName);
+          this.#contentWatcher = undefined;
+          if (identity !== undefined) {
+            const next = this.#connect(
+              codocs,
+              { followSymlinks: false },
+              epoch,
+              /** 다시 연결한 일반 .codocs 내용의 변화를 전달한다. */
+              (event, changed) => {
+                if (
+                  path.resolve(changed) === codocs &&
+                  (event === 'addDir' || event === 'unlinkDir')
+                )
+                  void this.#reopenContent(epoch).catch((error: unknown) =>
+                    this.#fail(error),
+                  );
+                else this.#signal(changed);
+              },
+            );
+            this.#contentWatcher = next.watcher;
+            await next.ready;
+          }
+          if (!this.#active(epoch)) return;
+          this.#contentIdentity = identity;
+          this.#signal(codocs);
+        } while (this.#reopenRequested && this.#active(epoch));
       }
-    });
-    contentWatcher.on('all', (_event, changed) => this.#signal(changed));
-    targetWatcher?.on('all', (_event, changed) => this.#signalTarget(changed));
-    /** 시작 중 오류를 무한한 ready 대기로 남기지 않는다. */
-    const ready = (watcher: FSWatcher): Promise<void> =>
-      new Promise<void>((resolve, reject) => {
-        watcher.once('ready', resolve);
-        watcher.once('error', reject);
-      });
+    )().catch((error: unknown) => this.#recover(error));
+    this.#reopening = operation;
+    void operation
+      .finally(() => {
+        if (this.#reopening === operation) this.#reopening = undefined;
+      })
+      .catch((error: unknown) => this.#fail(error));
+    return operation;
+  }
+  /** 개별 연결 교체도 ready 대기를 취소하고 자원 집합에서 제거한다. */
+  async #retire(watcher: FSWatcher): Promise<void> {
+    this.#waiters.get(watcher)?.();
+    this.#connections.delete(watcher);
+    const closing = watcher.close();
+    this.#retiring.add(closing);
+    try {
+      await closing;
+    } finally {
+      this.#retiring.delete(closing);
+    }
+  }
+
+  /** 모든 연결과 준비 대기를 정리한다. */
+  async #disconnect(): Promise<void> {
+    for (const cancel of this.#waiters.values()) cancel();
+    const entry = this.#entryWatcher;
+    this.#entryWatcher = undefined;
+    const entryClosed = entry
+      ? new Promise<void>(
+          /** OS 감시 close 이벤트까지 정리를 기다린다. */ (resolve) => {
+            entry.once('close', resolve);
+            entry.close();
+          },
+        )
+      : Promise.resolve();
+    this.#directoryRegistrations.clear();
+    const connections = [...this.#connections];
+    this.#connections.clear();
     await Promise.all([
-      ready(rootWatcher),
-      ready(contentWatcher),
-      ...(targetWatcher ? [ready(targetWatcher)] : []),
+      entryClosed,
+      ...connections.map((watcher) => watcher.close()),
+      ...this.#retiring,
     ]);
   }
-
-  /** 연결 대상이나 그 조상 변화만 query에 전달한다. */
-  #signalTarget(changed: string): void {
-    const candidate = path.resolve(changed);
-    for (const target of this.#targetPaths) {
-      if (
-        candidate === target ||
-        target.startsWith(candidate + path.sep) ||
-        candidate.startsWith(target + path.sep)
-      ) {
-        this.#signal(candidate);
-        return;
-      }
-    }
-  }
-
-  /** 스캔이 확인한 연결 대상의 부모를 감시해 삭제 후 재생성도 감지한다. */
-  async trackTargets(realPaths: readonly string[]): Promise<void> {
-    const codocsPath = path.join(this.#root, codocsDirectoryName);
-    const ready: Promise<void>[] = [];
-    for (const realPath of realPaths) {
-      if (realPath.startsWith(codocsPath + path.sep)) continue;
-      const target = path.resolve(realPath);
-      this.#targetPaths.add(target);
-      let parent = path.dirname(target);
-      while (parent !== path.dirname(parent)) {
-        if (this.#targetParents.has(parent)) {
-          parent = path.dirname(parent);
-          continue;
-        }
-        this.#targetParents.add(parent);
-        if (this.#targetWatcher) this.#targetWatcher.add(parent);
-        else {
-          const targetWatcher = chokidar.watch(parent, {
-            depth: 0,
-            ignoreInitial: true,
-            awaitWriteFinish: false,
-          });
-          targetWatcher.on('all', (_event, changed) =>
-            this.#signalTarget(changed),
-          );
-          targetWatcher.on('error', (error) => {
-            void this.#recover(error).catch(() => undefined);
-          });
-          this.#targetWatcher = targetWatcher;
-          ready.push(
-            new Promise<void>((resolve) =>
-              targetWatcher.once('ready', resolve),
-            ),
-          );
-        }
-        parent = path.dirname(parent);
-      }
-    }
-    await Promise.all(ready);
-  }
-
-  /** .codocs 교체 후 새 트리를 다시 감시한다. */
-  async #reopenContent(): Promise<void> {
-    const current = this.#contentWatcher;
-    if (!current || this.#closed || this.#reopening) return;
-    this.#reopening = true;
-    try {
-      await current.close();
-      if (this.#closed) return;
-      const next = chokidar.watch(path.join(this.#root, codocsDirectoryName), {
-        ignoreInitial: true,
-        followSymlinks: true,
-        awaitWriteFinish: false,
-      });
-      next.on('all', (_event, changed) => this.#signal(changed));
-      next.on('error', (error) => {
-        void this.#recover(error).catch(() => undefined);
-      });
-      this.#contentWatcher = next;
-      await new Promise<void>((resolve) => next.once('ready', resolve));
-      this.#signal(path.join(this.#root, codocsDirectoryName));
-    } finally {
-      this.#reopening = false;
-    }
-  }
-
-  /** 처음 한 번 감시를 시작한다. */
+  /** 처음 한 번 시작하며 종료된 신호원은 다시 열지 않는다. */
   start(): Promise<void> {
-    if (this.#starting) return this.#starting;
-    this.#starting = this.#open()
-      .then(() => {
-        if (!this.#closed)
-          this.#state = { state: workspaceLifecycleStates.ready, ready: true };
-      })
-      .catch(async (error: unknown) => this.#recover(error));
+    if (this.#closed) return Promise.resolve();
+    this.#starting ??= this.#open(this.#epoch)
+      .then(
+        /** 시작이 끝나도 종료되거나 복구 중인 상태를 덮어쓰지 않는다. */ () => {
+          if (
+            !this.#closed &&
+            this.#state.state === workspaceLifecycleStates.starting
+          ) {
+            this.#state = {
+              state: workspaceLifecycleStates.ready,
+              ready: true,
+            };
+            this.#observe?.('watcher-ready', { folder: this.#root });
+          }
+        },
+      )
+      .catch((error: unknown) => this.#recover(error));
     return this.#starting;
   }
-
-  /** 감시 실패 시 자동 재연결을 정확히 한 번 시도한다. */
+  /** 오류 한 번에 자동 재연결을 한 번만 허용한다. */
   async #recover(error: unknown): Promise<void> {
-    if (
-      this.#closed ||
-      this.#state.state === workspaceLifecycleStates.recovering
-    )
-      return;
-    const cause = error instanceof Error ? error.message : String(error);
+    if (this.#closed || this.#reconnecting) return;
     if (this.#recoveryUsed) {
-      this.#state = {
-        state: workspaceLifecycleStates.failed,
-        ready: false,
-        cause,
-        guidance: watcherRecoveryGuidance,
-      };
+      this.#fail(error);
       return;
     }
     this.#recoveryUsed = true;
-    this.#state = {
-      state: workspaceLifecycleStates.recovering,
-      ready: false,
-      cause,
-    };
-    try {
-      this.#entryWatcher?.close();
-      await Promise.all([
-        this.#rootWatcher?.close(),
-        this.#contentWatcher?.close(),
-        this.#targetWatcher?.close(),
-      ]);
-      await this.#open();
-      this.#state = { state: workspaceLifecycleStates.ready, ready: true };
+    await this.#reconnect();
+    if (this.#state.ready)
       this.#signal(path.join(this.#root, codocsDirectoryName));
-    } catch (failure: unknown) {
-      this.#state = {
-        state: workspaceLifecycleStates.failed,
-        ready: false,
-        cause: failure instanceof Error ? failure.message : String(failure),
-        guidance: watcherRecoveryGuidance,
-      };
-    }
   }
-
-  /** 수동 refresh의 재연결을 시도하며 자동 복구 횟수를 다시 허용한다. */
-  async refresh(): Promise<WorkspaceReadiness> {
-    if (this.#closed) return this.readiness;
-    this.#recoveryUsed = false;
-    this.#state = { state: workspaceLifecycleStates.recovering, ready: false };
-    try {
-      this.#entryWatcher?.close();
-      await Promise.all([
-        this.#rootWatcher?.close(),
-        this.#contentWatcher?.close(),
-        this.#targetWatcher?.close(),
-      ]);
-      await this.#open();
-      this.#state = { state: workspaceLifecycleStates.ready, ready: true };
-    } catch (error: unknown) {
+  /** 실제 오류의 원인과 수동 복구 안내를 보존한다. */
+  #fail(error: unknown): void {
+    if (!this.#closed)
       this.#state = {
         state: workspaceLifecycleStates.failed,
         ready: false,
         cause: error instanceof Error ? error.message : String(error),
         guidance: watcherRecoveryGuidance,
       };
+  }
+  /** 재연결 중 close 또는 이전 연결 완료가 자원을 부활시키지 못하게 한다. */
+  #reconnect(): Promise<void> {
+    if (this.#reconnecting) return this.#reconnecting;
+    const epoch = ++this.#epoch;
+    this.#state = { state: workspaceLifecycleStates.recovering, ready: false };
+    const operation = (
+      /** 수집한 변경과 연결 상태를 현재 작업에 반영한다. */ async (): Promise<void> => {
+        try {
+          await this.#disconnect();
+          if (!this.#active(epoch)) return;
+          await this.#open(epoch);
+          if (this.#active(epoch))
+            this.#state = {
+              state: workspaceLifecycleStates.ready,
+              ready: true,
+            };
+          if (this.#state.ready)
+            this.#observe?.('watcher-ready', {
+              folder: this.#root,
+              recovery: true,
+            });
+        } catch (error: unknown) {
+          this.#fail(error);
+        }
+      }
+    )();
+    this.#reconnecting = operation;
+    void operation
+      .then(() => {
+        if (this.#reconnecting === operation) this.#reconnecting = undefined;
+      })
+      .catch((error: unknown) => this.#fail(error));
+    return operation;
+  }
+  /** 수동 복구는 자동 복구 기회를 되돌리고 모든 감시 연결을 준비한다. */
+  async refresh(): Promise<WorkspaceReadiness> {
+    if (!this.#closed) {
+      this.#recoveryUsed = false;
+      await this.#reconnect();
     }
     return this.readiness;
   }
-
-  /** 타이머와 OS 감시자를 닫는다. */
-  async close(): Promise<void> {
+  /** 준비 대기·타이머·구독·모든 OS 연결을 종료한다. */
+  close(): Promise<void> {
+    if (this.#closing) return this.#closing;
     this.#closed = true;
+    this.#epoch++;
+    this.#state = { state: workspaceLifecycleStates.closed, ready: false };
     if (this.#timer) clearTimeout(this.#timer);
     this.#pending.clear();
     this.#listeners.clear();
-    this.#entryWatcher?.close();
-    await Promise.all([
-      this.#rootWatcher?.close(),
-      this.#contentWatcher?.close(),
-      this.#targetWatcher?.close(),
-    ]);
-    this.#state = { state: workspaceLifecycleStates.closed, ready: false };
+    this.#closing = this.#disconnect().then(async () => {
+      await Promise.all([this.#starting, this.#reconnecting, this.#reopening]);
+      await Promise.all([...this.#retiring]);
+    });
+    return this.#closing;
   }
 }
-
-/** 경로를 선택한 뒤 신호원을 시작한다. */
+/** 독립 신호원이 필요한 소비자를 위해 시작과 준비까지 완료한다. */
 export async function createWorkspaceWatcher(
   projectRoot: string,
 ): Promise<WorkspaceWatcher> {

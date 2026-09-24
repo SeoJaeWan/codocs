@@ -116,11 +116,17 @@ const plugin = {
             });
         }
         return {
+          /** import 선언의 패키지 경계를 검사한다. */
           ImportDeclaration: (node) => check(node, node.source),
+          /** named export 선언의 패키지 경계를 검사한다. */
           ExportNamedDeclaration: (node) => check(node, node.source),
+          /** 전체 export 선언의 패키지 경계를 검사한다. */
           ExportAllDeclaration: (node) => check(node, node.source),
+          /** 동적 import 표현식의 패키지 경계를 검사한다. */
           ImportExpression: (node) => check(node, node.source),
+          /** TypeScript import type의 패키지 경계를 검사한다. */
           TSImportType: (node) => check(node, node.argument),
+          /** require 호출의 패키지 경계를 검사한다. */
           CallExpression: (node) => {
             if (
               node.callee.type === 'Identifier' &&

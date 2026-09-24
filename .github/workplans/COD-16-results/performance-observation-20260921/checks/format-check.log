@@ -1,0 +1,27 @@
+
+> codocs@0.0.0 format:check /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001
+> prettier . --check
+
+Checking formatting...
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-1000/cod14-performance.json
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-1000/cod14-performance.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-child-crash-diagnostic/cod14-performance.json
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-child-crash-diagnostic/cod14-performance.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-comparison/cod14-performance.json
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-comparison/cod14-performance.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-diagnostic/cod14-performance.json
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-diagnostic/cod14-performance.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-sigint-diagnostic/cod14-performance.json
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/core-sigint-diagnostic/cod14-performance.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/functional-current.json
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/functional-minimum.json
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/hover-child-crash-diagnostic-v2.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/hover-diagnostic.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/hover-full.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/hover-interrupt-diagnostic.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/hover-progress-diagnostic.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/hover-sigint-diagnostic-v2.md
+[warn] .github/workplans/COD-16-results/performance-observation-20260921/hover-sigterm-diagnostic-v2.md
+[warn] tools/performance/progress.test.mjs
+[warn] Code style issues found in 20 files. Run Prettier with --write to fix.
+ ELIFECYCLE  Command failed with exit code 1.

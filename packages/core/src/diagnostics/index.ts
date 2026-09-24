@@ -102,6 +102,8 @@ export const catalogDiagnosticCodes = {
   unconfirmedReference: 'unconfirmed_reference',
   /** 확정 경로 대상에 문서 오류가 있을 때 연결을 유지하며 경고한다. */
   referenceTargetError: 'reference_target_error',
+  /** 확정 대상의 문서 상태가 폐기일 때 등장마다 경고한다. */
+  deprecatedReference: 'deprecated_reference',
 } as const;
 /** 색인 계층이 소유하는 고정 문구다. */
 export const catalogDiagnosticMessages = {
@@ -112,6 +114,7 @@ export const catalogDiagnosticMessages = {
   selfReference: '같은 발견 문서를 자기 참조할 수 없습니다.',
   unconfirmedReference: '스캔이 불완전하여 참조 대상을 확정할 수 없습니다.',
   referenceTargetError: '확정 참조 대상에 문서 오류가 있습니다.',
+  deprecatedReference: '폐기 상태의 문서를 참조하고 있습니다.',
 } as const;
 /** 상수에서 도출한 색인 진단 코드다. */
 export type CatalogDiagnosticCode =
@@ -148,6 +151,10 @@ export type ChangePlanDiagnosticCode =
   (typeof changePlanDiagnosticCodes)[keyof typeof changePlanDiagnosticCodes];
 /** 조회 투영에서 외부 계약으로 정규화하는 진단 코드다. @domainValues */
 export const queryDiagnosticCodes = {
+  /** 검증 경로가 프로젝트 상대 .codocs YAML 파일이 아니면 반환한다. */
+  invalidPath: 'invalid_path',
+  /** 검증 대상 파일에 접근하지 못하면 반환한다. */
+  fileAccessFailed: 'file_access_failed',
   /** 전체 요청의 ID 배열이나 크기가 계약과 다르면 반환한다. */
   invalidInput: 'invalid_input',
   /** 완전한 Catalog에 요청한 ID가 없으면 반환한다. */
@@ -159,6 +166,9 @@ export const queryDiagnosticCodes = {
 } as const;
 /** 조회 투영이 추가하는 고정 진단 문구다. */
 export const queryDiagnosticMessages = {
+  invalidPath: '프로젝트 상대 .codocs YAML 파일 경로 하나를 지정하세요.',
+  fileNotFound: '검증할 파일이 없습니다.',
+  fileAccessFailed: '검증할 파일을 읽을 수 없습니다.',
   invalidInput: '조회 입력이 올바르지 않습니다.',
   notFound: '요청한 ID의 문서가 없습니다.',
   referenceNotFound: '참조 이름에 해당하는 문서가 없습니다.',
@@ -206,3 +216,15 @@ export interface Diagnostic<Code extends string = DiagnosticCode> {
   fieldPath?: FieldPath;
   range?: SourceRange;
 }
+
+/** 요청 실패는 개별 문서의 진단과 구분하여 공통 error로 전달한다. */
+export interface RequestFailure<Code extends string = string> {
+  success: false;
+  error: Diagnostic<Code>;
+}
+
+/** 요청 처리 성공과 실패를 같은 의미의 분기 타입으로 전달한다. */
+export type RequestResult<
+  Success extends { success: true },
+  Failure extends RequestFailure = RequestFailure,
+> = Success | Failure;

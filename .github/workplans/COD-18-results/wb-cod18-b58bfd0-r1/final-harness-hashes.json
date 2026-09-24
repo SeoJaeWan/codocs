@@ -1,0 +1,9 @@
+{
+  "run.mjs": "6f47a415fb68ff5ea932558e9e5463a84548d3d6a677a4cbadf96b5535adeef3",
+  "extension-test.cjs": "a16ed9af38b0c0bca717117bb0c797224a7db7f56bcdb74e3145fcbcf46274d2",
+  "cod18.cjs": "1a864299d9cd089d89e8952d2380ca144ed34224e13a40442d851a2b0fd9b79b",
+  "acceptance.cjs": "a7bc34d003bbe7e7586cde1ff656df03a6f55b49c6d2b78d7de547736ad34927",
+  "acceptance.test.mjs": "fbbdf1c3abf58f8135ae239258d0bea6d945986403b366f5c72dc41f2a7e4d36",
+  "check-command.mjs": "f67d00218b8d4b7bc5ab1a5a12c0b3fbc6d983c7fcffb7fee4eb1f347a264b29",
+  "export-ui-evidence.mjs": "4242230550e2fb36b1baf3db4206f696363edf848fa0183021b6de558387c838"
+}

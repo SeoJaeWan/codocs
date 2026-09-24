@@ -1,16 +1,14 @@
-/* eslint-disable codocs/korean-jsdoc -- Vitest의 인라인 콜백은 선언 함수가 아니다. */
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  realpath,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
+import { createLink as symlink } from '../test-support/links.js';
+import { ioFailures } from '../test-support/file-system.js';
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
+});
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
@@ -24,6 +22,7 @@ beforeEach(
   },
 );
 afterEach(async () => {
+  ioFailures.clear();
   await rm(fixture, { recursive: true, force: true });
 });
 
@@ -183,25 +182,45 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
         root: { startCwd: child, projectRoot: fixture },
       });
     });
-    it('루트가 폴더 링크이면 논리 선택 경로와 확인한 실제 경로를 구분한다', /** 루트가 폴더 링크이면 논리 선택 경로와 확인한 실제 경로를 구분한다. */ async () => {
+    it('선택한 루트가 정션이면 대상을 프로젝트로 선택하지 않는다', async () => {
       const alias = path.join(fixture, '별칭');
       const target = path.join(fixture, '실제');
       await mkdir(target);
-      await symlink(target, alias, 'dir');
+      await symlink(target, alias, 'junction');
       const input = { cwd: fixture, project: alias };
       expect(await resolveProjectRoot(input)).toMatchObject({
-        success: true,
-        root: {
-          projectRoot: alias,
-          realPath: await realpath(target),
-          codocsPath: path.join(alias, '.codocs'),
-        },
+        success: false,
+        projectRoot: alias,
+        diagnostics: [
+          {
+            code: workspaceDiagnosticCodes.unsupportedWorkspaceLink,
+            path: alias,
+          },
+        ],
       });
+    });
+    it('선택 루트의 중간 정션과 연결된 시작 cwd도 거부한다', async () => {
+      const target = path.join(fixture, '실제');
+      const alias = path.join(fixture, '별칭');
+      await mkdir(path.join(target, 'child'), { recursive: true });
+      await symlink(target, alias, 'junction');
+      for (const input of [
+        { cwd: fixture, project: path.join('별칭', 'child') },
+        { cwd: alias, project: 'child' },
+        { cwd: path.join(alias, 'child'), project: '../..' },
+        { cwd: path.join(alias, 'child') },
+      ])
+        expect(await resolveProjectRoot(input)).toMatchObject({
+          success: false,
+          diagnostics: [
+            { code: workspaceDiagnosticCodes.unsupportedWorkspaceLink },
+          ],
+        });
     });
     it('루트 읽기와 탐색 권한이 없으면 빈 프로젝트가 아닌 실제 접근 실패를 반환한다', /** 루트 읽기와 탐색 권한이 없으면 빈 프로젝트가 아닌 실제 접근 실패를 반환한다. */ async () => {
       const restricted = path.join(fixture, 'restricted');
       await mkdir(restricted);
-      await chmod(restricted, 0);
+      ioFailures.set(restricted, { operations: ['access'], code: 'EACCES' });
       const input = { cwd: restricted };
       try {
         expect(await resolveProjectRoot(input)).toEqual({
@@ -218,7 +237,7 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
           ],
         });
       } finally {
-        await chmod(restricted, 0o700);
+        ioFailures.clear();
       }
     });
     it('공백과 한글이 있는 루트를 선택하면 입력 이름을 trim하거나 변환하지 않는다', /** 공백과 한글이 있는 루트를 선택하면 입력 이름을 trim하거나 변환하지 않는다. */ async () => {

@@ -5,7 +5,7 @@ domains:
 definition: |
   ## 목적과 범위
 
-  TypeScript 코드의 명명·타입·함수 설명과 모듈 경계를 통일하는 규칙이다.
+  TypeScript와 ESM JavaScript 코드의 명명·타입·함수 설명과 모듈 경계를 통일하는 규칙이다.
   소스와 테스트의 위치는 [[폴더 컨벤션]]을 따른다.
 
   ## 이름과 함수 설명

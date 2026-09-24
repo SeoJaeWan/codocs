@@ -1,8 +1,32 @@
 {
-  "name": "@codocs/vscode",
+  "name": "codocs",
+  "displayName": "Codocs",
+  "description": "Connect code in a workspace to its local .codocs knowledge files.",
   "version": "0.0.0",
   "private": true,
+  "publisher": "codocs",
   "type": "module",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:codocs.restartLanguageServers"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "codocs.restartLanguageServers",
+        "title": "Codocs: Restart Language Servers"
+      }
+    ]
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -13,6 +37,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "node ../../tools/build/build.mjs build"
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "1.95.0"
   },
   "files": [
     "dist"

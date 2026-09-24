@@ -8,6 +8,8 @@ definition: |
   기능 구현은 src/기능/index.ts에 두고 테스트는 같은 폴더의 기능.test.ts에 둔다.
   예를 들어 string-mapping은 src/string-mapping/index.ts와 src/string-mapping/string-mapping.test.ts로 구성한다.
   작은 기능은 index.ts에 직접 작성하고 커지면 같은 폴더의 보조 파일로 분리한다.
+  실제 VS Code 기능 테스트는 packages/vscode/src/integration/extension.test.cjs에 모으고 Extension Host에서 실행한다. 테스트용 공통 준비·mock은 소유 패키지의 test-support에 두며 배포 빌드에서 제외한다. 패키지 전용 실행기는 해당 패키지에, 공유 실행 도구는 tools/test/runtime에 둔다.
+  공통 테스트 보조 코드는 tools/test/support, 테스트 수집 실행기는 tools/test/run.mjs에 둔다. 빌드와 배포 검사는 tools/build/check, 커밋·스테이징 도구는 tools/git에서 관리한다. 공유 Node·pnpm 확인은 tools/toolchain.mjs가 담당한다. pnpm check의 검사 순서는 package.json에서 조합하며 별도 tools/check 실행기를 두지 않는다.
 
   ## 프로젝트 문서
 

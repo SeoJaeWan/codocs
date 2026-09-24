@@ -1,0 +1,58 @@
+{
+  "at": "2026-09-22T06:39:19.445Z",
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "v24.21.0",
+  "playwright": "1.63.0",
+  "implementationBaseCommit": "d9bbe14862000bb27a69cbcbfb13ff777b85b7df",
+  "vsixSha256": "7984667d377cc5d69bc76397227d94c8009ce2586556beaeb721c586d163b654",
+  "stats": {
+    "startTime": "2026-09-22T06:39:19.792Z",
+    "duration": 669558.675,
+    "expected": 72,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "projects": {
+    "vscode-1.95.0": {
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0
+    },
+    "vscode-1.136.1": {
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "retries": 0,
+  "background": {
+    "count": 72,
+    "samples": 6077,
+    "presented": 0,
+    "focused": 0,
+    "focusEvents": 0,
+    "visibleFinal": 0,
+    "singletonViolations": 0,
+    "recoveredEvaluationErrors": 26
+  },
+  "captureCount": 0,
+  "evidenceErrors": [],
+  "changedSources": [],
+  "vsixUnchanged": true,
+  "sourceHashes": {
+    "tools/ui-tests/background.mjs": "b59c5522cb56baa10ca1acba35b295e84b5c4c881a03154d12b14a271abfd319",
+    "tools/ui-tests/background.test.mjs": "4b0aa0f95702365c45d700fb37e8ad2301d87b6b2fc99c1d88f048acbb25fe55",
+    "tools/ui-tests/evidence.mjs": "ea4ed360500f3b85a2163b58c8b3eb2c5702de282847222d7172d859dc15ea19",
+    "tools/ui-tests/evidence.test.mjs": "697c997618fc75d0316a1a7bcb6d4d051e30b301a4ad0ae936ce6f7dfbb12217",
+    "tools/ui-tests/fixtures.mjs": "fd4a305ed9a903a654fc7d06258c680b96f0c04f6da7778281849ea339ac2824",
+    "tools/ui-tests/navigation.ui.spec.mjs": "18ac2e6fe92ca2637de540a30026205c51827e2f9f7466f3f0acb4f63e1a0b3c",
+    "tools/ui-tests/playwright.config.mjs": "c758a7dfe14f6d2efac7908e141350924ccc10d16c9b9a58c39b0485655db95e",
+    "tools/ui-tests/run.mjs": "086778d75380e35f5d457bf9cf7414218f5eb5ebe498f900c69ff96f01d66d9c",
+    "tools/ui-tests/runtime.mjs": "f20e30ef96dd4005f378f7fcf293bb93f44aeb334df83b099547ae2b2c6f5349",
+    "tools/ui-tests/runtime.test.mjs": "c0dadf9e2727c13e376494bfe29e68098f7f2814abd7fc9941e2178b09057caa",
+    "tools/ui-tests/observer/index.cjs": "2b908aa3ff8dc0ec0b68c82a75fb005b9ee3b514c5fd0634bb84282681581de2",
+    "tools/ui-tests/observer/package.json": "f127e49a1138dc8adc3cf4ed2bd55944715ddad23b13080adaf2bc67a087ecc1"
+  }
+}

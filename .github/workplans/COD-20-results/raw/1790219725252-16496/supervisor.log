@@ -1,0 +1,35 @@
+ INFO  Files included in the VSIX:
+codocs.vsix
+├─ [Content_Types].xml 
+├─ extension.vsixmanifest 
+└─ extension/
+   ├─ package.json [1.08 KB]
+   └─ dist/
+      ├─ index.cjs [816.67 KB]
+      ├─ index.cjs.map [1.41 MB]
+      ├─ index.d.ts [0.4 KB]
+      ├─ index.d.ts.map [0.31 KB]
+      ├─ client-manager/ (2 files) [3.97 KB]
+      ├─ diagnostic-status/ (2 files) [2.45 KB]
+      ├─ docs/ (1 file) [16.78 KB]
+      ├─ examples/ (2 files) [0.54 KB]
+      ├─ open-source/ (2 files) [3.62 KB]
+      ├─ package-assembly/ (2 files) [0.38 KB]
+      ├─ performance-observation/ (2 files) [0.47 KB]
+      ├─ server/ (2 files) [4.84 MB]
+      ├─ vscode-client/ (2 files) [2.65 KB]
+      └─ workspace-routing/ (2 files) [1.46 KB]
+
+=> Run vsce ls --tree to see all included files.
+
+ DONE  Packaged: C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod20-dom-20260924-int-001\.workbench\vscode-tests\1790219725252-16496\codocs.vsix (26 files, 1.21 MB)
+Exit code:   0
+Exit code:   0
+Exit code:   0
+Exit code:   0
+Exit code:   0
+Exit code:   0
+Exit code:   0
+Exit code:   0
+Exit code:   0
+Exit code:   0
