@@ -1,0 +1,40 @@
+
+> codocs@0.0.0 check /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003
+> node tools/check/run.mjs all
+
+Checking formatting...
+All matched files use Prettier code style!
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003
+
+
+ Test Files  31 passed (31)
+      Tests  753 passed (753)
+   Start at  10:42:54
+   Duration  3.42s (tests 64%, transform 19%, import 17%, worker 1%)
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003
+
+
+ Test Files  2 passed (2)
+      Tests  81 passed (81)
+   Start at  10:42:58
+   Duration  15.17s (tests 95%, import 4%, transform 1%)
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003
+
+ ❯ tools/build-checks/build-checks.test.ts (32 tests | 2 failed) 22387ms
+   ❯ 빌드된 패키지의 외부 소비자 계약 (32)
+     ❯ 공개 JS와 선언 파일 소비 (8)
+       × 이름 참조 공개 JS 소비자가 추출·색인·갱신·rename 계획과 실제 파일 상태를 확인한다 115ms
+     ❯ tarball 소비와 내부 경로 차단 (2)
+       × 이름 참조 tarball 소비자가 공개 JS·d.ts와 내부 subpath 거부를 실행한다 129ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 30 passed (32)
+   Start at  10:43:14
+   Duration  22.55s (tests 100%)
+
+ ELIFECYCLE  Command failed with exit code 1.

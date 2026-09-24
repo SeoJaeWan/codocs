@@ -1,0 +1,13 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "eslint",
+    "tools/extension-host",
+    "--max-warnings=0"
+  ],
+  "startedAt": "2026-09-22T02:05:07.026Z",
+  "durationMilliseconds": 1501,
+  "code": 0,
+  "signal": null
+}

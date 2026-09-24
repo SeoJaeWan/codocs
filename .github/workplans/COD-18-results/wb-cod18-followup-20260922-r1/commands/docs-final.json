@@ -1,0 +1,9 @@
+{
+  "command": [
+    "node",
+    ".github/workplans/COD-18-results/wb-cod18-followup-20260922-r1/docs-check.mjs"
+  ],
+  "code": 0,
+  "durationMs": 264,
+  "log": "docs-final.log"
+}

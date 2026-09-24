@@ -1,0 +1,151 @@
+{
+  "kind": "actual-vscode-hover-performance",
+  "packageKind": "installed-vsix",
+  "vscode": {
+    "requestedVersion": null,
+    "version": "1.136.1",
+    "architecture": "arm64",
+    "executable": "/Applications/Visual Studio Code.app/Contents/MacOS/Code",
+    "runtimeRoot": "/Applications/Visual Studio Code.app/Contents/MacOS",
+    "downloadedThisRun": false
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "cpu": "Apple M1 Pro",
+    "cpuCount": 10,
+    "memoryBytes": 17179869184,
+    "runnerNode": "v24.21.0",
+    "fileCache": "OS file cache was not forcibly cleared",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": {
+    "seed": 16018,
+    "projectDocumentCount": 20,
+    "queryableDocumentCount": 17,
+    "invalidDocumentCount": 1,
+    "collisionDocumentCount": 2,
+    "collisionIdCount": 1,
+    "referenceCount": 1,
+    "longDefinitionCount": 7,
+    "documentBytes": {
+      "total": 11958,
+      "minimum": 77,
+      "median": 101,
+      "maximum": 1523
+    },
+    "documentCharacters": {
+      "total": 6278,
+      "minimum": 77,
+      "median": 93,
+      "maximum": 723
+    },
+    "codeInput": {
+      "utf8Bytes": 221,
+      "utf16CodeUnits": 221,
+      "lines": 17,
+      "identifiers": 17,
+      "identifierPattern": "perfTerm0000",
+      "requestPositionSelection": "32-bit LCG(seed=16018), state % queryableDocumentCount, line index at character 5"
+    }
+  },
+  "artifacts": {
+    "sourceCommit": "1c07daf547de71fe143484a347db5a3108bce3f4",
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/.workbench/artifacts/codocs-perf-001.vsix",
+    "vsixBytes": 1204654,
+    "vsixSha256": "0b87dde191785f49113d604ff9cc09f737d6accd1257bc16d218f202bf856c4f",
+    "extensionBundleSha256": "59d7275545238dbc7b7006a16ecdbc1467a9506bb862d00931f0c4a154d06955",
+    "serverBundleSha256": "3757ca4e63e20fedd80d64c5d3c59a7686bfc60c847d739db4fe44affdf87d0c",
+    "vscodeSourceSha256": "f29f2281d86eaca089526891207270b497bfd9d2be4a505707323075fac0d761",
+    "languageServerSourceSha256": "83547fe075fd9dcd5cf22302f0483b48982efe86212093263f537ecf5745cdae"
+  },
+  "install": {
+    "extensionRoot": "/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/c16-runtime-5bL4zU/extensions/codocs.codocs-0.0.0",
+    "stdout": "Installing extensions...\nExtension 'codocs-perf-001.vsix' was successfully installed.\n",
+    "stderr": "(node:88849) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code --trace-deprecation ...` to show where the warning was created)\n"
+  },
+  "exitCode": 0,
+  "stdout": "\u001b[90m[main 2026-09-21T07:37:37.568Z]\u001b[0m StorageMainService: creating application shared storage\n\u001b[90m[main 2026-09-21T07:37:37.773Z]\u001b[0m [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)\n\u001b[90m[main 2026-09-21T07:37:37.773Z]\u001b[0m [shared storage] Initializing fallback application storage (path: in-memory)\n\u001b[90m[main 2026-09-21T07:37:37.885Z]\u001b[0m [shared storage] Fallback application storage initialized with 3 items\n\u001b[90m[main 2026-09-21T07:37:38.687Z]\u001b[0m update#setState idle\n[AgentHost:renderer] Acquiring MessagePort to agent host...\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=undefined conversationKey=undefined modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/NmM5ZWM4YjUtZGM3ZC00ZTI2LTg2ZjEtZmM4NDEyM2Q1YTQ0\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/NmM5ZWM4YjUtZGM3ZC00ZTI2LTg2ZjEtZmM4NDEyM2Q1YTQ0\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n\u001b[90m[main 2026-09-21T07:37:39.384Z]\u001b[0m AgentHostProcessManager: agent host started\nStarted local extension host with pid 89133.\n[AgentHost:renderer] MessagePort acquired, creating client...\nLoading development extension at /var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/c16-runtime-5bL4zU/extensions/codocs.codocs-0.0.0\nSettings Sync: Account status changed from uninitialized to unavailable\n[AgentHost:renderer] Protocol connection established; clientId=12c867c3-df85-46bc-ae9a-88b920b691be\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] Clearing authentication for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] Clearing authentication for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/NmM5ZWM4YjUtZGM3ZC00ZTI2LTg2ZjEtZmM4NDEyM2Q1YTQ0\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n\u001b[90m[main 2026-09-21T07:37:40.296Z]\u001b[0m Extension host with pid 89133 exited with code: 0, signal: unknown.\n",
+  "stderr": "(node:88850) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code --trace-deprecation ...` to show where the warning was created)\n\u001b[91m[main 2026-09-21T07:37:39.684Z]\u001b[0m [AgentHost:stderr] (node:89130) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code Helper --trace-deprecation ...` to show where the warning was created)\n\n",
+  "evidence": {
+    "vscodeVersion": "1.136.1",
+    "extensionIdentifier": "codocs.codocs",
+    "extensionActive": true,
+    "extensionHost": {
+      "node": "v24.18.1",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M1 Pro"
+    },
+    "workspaceFolderCount": 1,
+    "serverCount": 1,
+    "performance": {
+      "warmupRuns": 1,
+      "queryRuns": 1,
+      "targetMilliseconds": 100,
+      "readinessAttempts": 1,
+      "warmups": [
+        {
+          "run": 0,
+          "index": 8,
+          "durationMilliseconds": 7.071042000000034,
+          "success": true
+        }
+      ],
+      "samples": [
+        {
+          "run": 0,
+          "index": 13,
+          "durationMilliseconds": 6.489874999999984,
+          "success": true
+        }
+      ],
+      "measurementBoundary": "vscode.executeHoverProvider 호출 직전부터 Promise 완료까지. 정확성 확인·보고 직렬화는 요청 시간 밖.",
+      "successfulLatencySampleCount": 1,
+      "medianMilliseconds": 6.489874999999984,
+      "p95Milliseconds": 6.489874999999984,
+      "maximumMilliseconds": 6.489874999999984,
+      "accuracyFailureCount": 0,
+      "failures": [],
+      "memory": {
+        "beforeReadiness": {
+          "rss": 149504000,
+          "heapTotal": 39370752,
+          "heapUsed": 33931764,
+          "external": 7351540,
+          "arrayBuffers": 0
+        },
+        "afterReadiness": {
+          "rss": 160071680,
+          "heapTotal": 47923200,
+          "heapUsed": 42928576,
+          "external": 7760888,
+          "arrayBuffers": 0
+        },
+        "afterWarmup": {
+          "rss": 160268288,
+          "heapTotal": 48185344,
+          "heapUsed": 43090436,
+          "external": 7765468,
+          "arrayBuffers": 0
+        },
+        "afterMeasured": {
+          "rss": 160366592,
+          "heapTotal": 48185344,
+          "heapUsed": 43192348,
+          "external": 7772895,
+          "arrayBuffers": 0
+        }
+      },
+      "eventLoopDelay": {
+        "minimumMilliseconds": 9.633792,
+        "medianMilliseconds": 11.067391,
+        "p95Milliseconds": 29.605887,
+        "maximumMilliseconds": 44.400639
+      },
+      "passed": true
+    }
+  },
+  "status": "completed"
+}

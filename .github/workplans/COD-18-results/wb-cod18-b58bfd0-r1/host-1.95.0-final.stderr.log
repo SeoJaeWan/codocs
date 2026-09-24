@@ -1,0 +1,25 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: 1.138.0
+7debcd0e2acdea1c52de81bf9ee1620444407dda
+arm64
+
++ actual - expected
+
++ '1.138.0'
+- '1.95.0'
+     ^
+
+    at file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/run.mjs:855:14
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '1.138.0',
+  expected: '1.95.0',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0

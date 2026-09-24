@@ -1,0 +1,192 @@
+file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/extension-host/run.mjs:998
+      throw new Error(
+            ^
+
+Error: VS Code exited with null (SIGKILL)
+[90m[main 2026-09-21T11:13:44.935Z][0m StorageMainService: creating application shared storage
+[90m[main 2026-09-21T11:13:45.091Z][0m [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)
+[90m[main 2026-09-21T11:13:45.091Z][0m [shared storage] Initializing fallback application storage (path: in-memory)
+[90m[main 2026-09-21T11:13:45.167Z][0m [shared storage] Fallback application storage initialized with 3 items
+[90m[main 2026-09-21T11:13:45.903Z][0m update#setState idle
+[AgentHost:renderer] Acquiring MessagePort to agent host...
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey=undefined conversationKey=undefined modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[90m[main 2026-09-21T11:13:46.096Z][0m AgentHostProcessManager: agent host started
+[AgentHost:renderer] MessagePort acquired, creating client...
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/ZDBiZjI2MjMtNjUwNy00MGQyLWExZjQtODJhZDBmM2E2ODI4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+Started local extension host with pid 24973.
+[AgentHost:renderer] Protocol connection established; clientId=43cb8243-4136-4960-a295-01da3652df25
+[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] Clearing authentication for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] Clearing authentication for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[AgentHost] No token resolved for resource: https://api.github.com
+[AgentHost] No token resolved for resource: https://api.github.com/repos
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/ZDBiZjI2MjMtNjUwNy00MGQyLWExZjQtODJhZDBmM2E2ODI4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+Loading development extension at /var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/c16-runtime-HLMkGy/extensions/codocs.codocs-0.0.0
+Settings Sync: Account status changed from uninitialized to unavailable
+[ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/ZDBiZjI2MjMtNjUwNy00MGQyLWExZjQtODJhZDBmM2E2ODI4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false
+
+[91m[main 2026-09-21T11:13:46.391Z][0m [AgentHost:stderr] (node:24970) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code Helper --trace-deprecation ...` to show where the warning was created)
+
+(node:24739) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `Code --trace-deprecation ...` to show where the warning was created)
+Unknown channel: agentHostClientByokLm
+Unknown channel: agentHostClientProxy
+Unknown channel: agentHostClientProxy
+Unknown channel: agentHostClientProxy
+
+
+null !== 0
+
+Preserved failure evidence: /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/.workbench/evidence/host-1.136.1-performance-1789989223942-24726
+    at file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/extension-host/run.mjs:998:13 {
+  [cause]: AssertionError [ERR_ASSERTION]: VS Code exited with null (SIGKILL)
+  [90m[main 2026-09-21T11:13:44.935Z][0m StorageMainService: creating application shared storage
+  [90m[main 2026-09-21T11:13:45.091Z][0m [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)
+  [90m[main 2026-09-21T11:13:45.091Z][0m [shared storage] Initializing fallback application storage (path: in-memory)
+  [90m[main 2026-09-21T11:13:45.167Z][0m [shared storage] Fallback application storage initialized with 3 items
+  [90m[main 2026-09-21T11:13:45.903Z][0m update#setState idle
+  [AgentHost:renderer] Acquiring MessagePort to agent host...
+  [ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey=undefined conversationKey=undefined modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+  [90m[main 2026-09-21T11:13:46.096Z][0m AgentHostProcessManager: agent host started
+  [AgentHost:renderer] MessagePort acquired, creating client...
+  [ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/ZDBiZjI2MjMtNjUwNy00MGQyLWExZjQtODJhZDBmM2E2ODI4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+  Started local extension host with pid 24973.
+  [AgentHost:renderer] Protocol connection established; clientId=43cb8243-4136-4960-a295-01da3652df25
+  [AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] Clearing authentication for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] Clearing authentication for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [AgentHost] No token resolved for resource: https://api.github.com
+  [AgentHost] No token resolved for resource: https://api.github.com/repos
+  [ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/ZDBiZjI2MjMtNjUwNy00MGQyLWExZjQtODJhZDBmM2E2ODI4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+  Loading development extension at /var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/c16-runtime-HLMkGy/extensions/codocs.codocs-0.0.0
+  Settings Sync: Account status changed from uninitialized to unavailable
+  [ChatModelSelection] event=no-model-at-toolbar-build surface="workbench" sessionKey="local" conversationKey="vscode-chat-session://local/ZDBiZjI2MjMtNjUwNy00MGQyLWExZjQtODJhZDBmM2E2ODI4" modelTarget=undefined storageKey="chat.currentLanguageModel.panel" widgetViewKind="view"
+  [AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false
+
+  [91m[main 2026-09-21T11:13:46.391Z][0m [AgentHost:stderr] (node:24970) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+  (Use `Code Helper --trace-deprecation ...` to show where the warning was created)
+
+  (node:24739) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+  (Use `Code --trace-deprecation ...` to show where the warning was created)
+  Unknown channel: agentHostClientByokLm
+  Unknown channel: agentHostClientProxy
+  Unknown channel: agentHostClientProxy
+  Unknown channel: agentHostClientProxy
+
+
+  null !== 0
+
+      at file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/tools/extension-host/run.mjs:955:14
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+}
+
+Node.js v24.21.0

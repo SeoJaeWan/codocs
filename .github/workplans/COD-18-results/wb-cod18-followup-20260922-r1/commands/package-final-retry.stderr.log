@@ -1,0 +1,2 @@
+ WARNING  A 'repository' field is missing from the 'package.json' manifest file.
+Use --allow-missing-repository to bypass.

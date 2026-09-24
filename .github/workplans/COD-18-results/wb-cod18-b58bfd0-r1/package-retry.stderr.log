@@ -1,0 +1,10 @@
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 53, reused 52, downloaded 0, added 0
+Progress: resolved 106, reused 98, downloaded 0, added 0
+Progress: resolved 190, reused 179, downloaded 0, added 0
+Progress: resolved 290, reused 281, downloaded 0, added 0
+[WARN] 3 deprecated subdependencies found: glob@11.1.0, prebuild-install@7.1.3, whatwg-encoding@3.1.1
+Packages: +295
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 303, reused 295, downloaded 0, added 1, done
+ ERROR  Manifest missing field: engines

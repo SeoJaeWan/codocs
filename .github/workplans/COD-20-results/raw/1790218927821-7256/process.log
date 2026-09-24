@@ -1,0 +1,36 @@
+Installing extensions...
+Extension 'codocs.vsix' was successfully installed.
+
+Warning: 'disable-experiments' is not in the list of known options, but still passed to Electron/Chromium.
+Warning: 'cached-data' is not in the list of known options, but still passed to Electron/Chromium.
+[main 2026-09-24T03:02:27.827Z] update#setState disabled
+[main 2026-09-24T03:02:27.828Z] update#ctor - updates are disabled by the environment
+[main 2026-09-24T03:02:27.859Z] Error: Error mutex already exists
+    at Fu.S (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/main.js:125:18317)
+Started local extension host with pid 21788.
+ComputeTargetPlatform: win32-x64
+ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+Loading development extension at c:\Users\sjw73\AppData\Local\Temp\codocs-vscode-4W33y9\test-harness
+Settings Sync: Account status changed from uninitialized to unavailable
+Uncaught TypeError: Failed to fetch dynamically imported module: vscode-file://vscode-app/c:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/.workbench/vscode-cache/win32-x64-1.100.0/vscode-win32-x64-archive-1.100.0/resources/app/out/vs/workbench/services/textMate/browser/backgroundTokenization/worker/textMateTokenizationWorker.workerMain.js#TextMateWorker
+Extension host (LocalProcess pid: 21788) is unresponsive.
+UNRESPONSIVE extension host: starting to profile NOW
+Extension host (LocalProcess pid: 21788) is responsive.
+UNRESPONSIVE extension host: received responsive event and cancelling profiling session
+Extension host (LocalProcess pid: 21788) is unresponsive.
+UNRESPONSIVE extension host: starting to profile NOW
+Extension host (LocalProcess pid: 21788) is responsive.
+UNRESPONSIVE extension host: received responsive event and cancelling profiling session
+Extension host (LocalProcess pid: 21788) is unresponsive.
+UNRESPONSIVE extension host: starting to profile NOW
+Extension host (LocalProcess pid: 21788) is responsive.
+UNRESPONSIVE extension host: received responsive event and cancelling profiling session
+Extension host (LocalProcess pid: 21788) is unresponsive.
+UNRESPONSIVE extension host: starting to profile NOW
+Extension host (LocalProcess pid: 21788) is responsive.
+UNRESPONSIVE extension host: received responsive event and cancelling profiling session
+Extension host (LocalProcess pid: 21788) is unresponsive.
+UNRESPONSIVE extension host: starting to profile NOW
+Extension host (LocalProcess pid: 21788) is responsive.
+UNRESPONSIVE extension host: received responsive event and cancelling profiling session
+[main 2026-09-24T03:04:12.155Z] Extension host with pid 21788 exited with code: 0, signal: unknown.
