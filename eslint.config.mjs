@@ -6,6 +6,12 @@ import codocs from './tools/development-checks/eslint-rules.mjs';
 
 export default defineConfig(
   {
+    linterOptions: {
+      noInlineConfig: true,
+      reportUnusedDisableDirectives: 'error',
+    },
+  },
+  {
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
@@ -90,6 +96,26 @@ export default defineConfig(
           ],
         },
       ],
+    },
+  },
+  {
+    files: ['**/*.{js,mjs,cjs}'],
+    plugins: { codocs },
+    rules: {
+      'codocs/korean-jsdoc': 'error',
+    },
+  },
+  {
+    files: ['**/*.test.ts'],
+    rules: {
+      'codocs/korean-jsdoc': 'off',
+      'jsdoc/require-jsdoc': 'off',
+    },
+  },
+  {
+    files: ['packages/vscode/src/client-manager/client-manager.test.ts'],
+    rules: {
+      '@typescript-eslint/unbound-method': 'off',
     },
   },
 );

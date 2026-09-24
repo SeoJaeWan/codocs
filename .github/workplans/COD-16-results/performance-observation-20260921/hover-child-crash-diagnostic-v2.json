@@ -1,0 +1,249 @@
+{
+  "kind": "actual-vscode-hover-performance",
+  "packageKind": "installed-vsix",
+  "status": "partial",
+  "runId": "1789989223942-24726",
+  "vscode": {
+    "requestedVersion": null,
+    "version": "1.136.1"
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "runnerNode": "v24.21.0",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": {
+    "seed": 16018,
+    "projectDocumentCount": 1000,
+    "queryableDocumentCount": 980,
+    "invalidDocumentCount": 10,
+    "collisionDocumentCount": 10,
+    "collisionIdCount": 5,
+    "referenceCount": 10,
+    "longDefinitionCount": 10,
+    "documentBytes": {
+      "total": 115150,
+      "minimum": 77,
+      "median": 101,
+      "maximum": 1523
+    },
+    "documentCharacters": {
+      "total": 99390,
+      "minimum": 77,
+      "median": 93,
+      "maximum": 723
+    },
+    "codeInput": {
+      "utf8Bytes": 12740,
+      "utf16CodeUnits": 12740,
+      "lines": 980,
+      "identifiers": 980,
+      "identifierPattern": "perfTerm0000",
+      "requestPositionSelection": "32-bit LCG(seed=16018), state % queryableDocumentCount, line index at character 5"
+    }
+  },
+  "artifacts": {
+    "sourceCommit": "1c07daf547de71fe143484a347db5a3108bce3f4",
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/.workbench/artifacts/codocs-perf-001.vsix",
+    "vsixSha256": "0b87dde191785f49113d604ff9cc09f737d6accd1257bc16d218f202bf856c4f",
+    "extensionBundleSha256": "59d7275545238dbc7b7006a16ecdbc1467a9506bb862d00931f0c4a154d06955",
+    "serverBundleSha256": "3757ca4e63e20fedd80d64c5d3c59a7686bfc60c847d739db4fe44affdf87d0c"
+  },
+  "performance": {
+    "targetMilliseconds": 100,
+    "warmupRuns": 100,
+    "queryRuns": 1,
+    "readinessAttempts": 1,
+    "attemptedReadiness": 1,
+    "completedReadiness": 1,
+    "readiness": [
+      {
+        "phase": "performance:readiness-request-complete",
+        "at": "2026-09-21T11:13:59.883Z",
+        "run": 1,
+        "index": 0,
+        "durationMilliseconds": 12610.595042,
+        "success": true,
+        "hoverCount": 1
+      }
+    ],
+    "memory": {
+      "before-readiness": {
+        "rss": 148029440,
+        "heapTotal": 38649856,
+        "heapUsed": 29752800,
+        "external": 6894102,
+        "arrayBuffers": 0
+      },
+      "after-readiness": {
+        "rss": 146997248,
+        "heapTotal": 53411840,
+        "heapUsed": 33218484,
+        "external": 6744458,
+        "arrayBuffers": 0
+      }
+    },
+    "eventLoopDelay": {
+      "phases": {
+        "before-readiness": {
+          "count": 0,
+          "minimumMilliseconds": null,
+          "medianMilliseconds": null,
+          "p95Milliseconds": null,
+          "maximumMilliseconds": null
+        },
+        "after-readiness": {
+          "count": 1168,
+          "minimumMilliseconds": 9.560064,
+          "medianMilliseconds": 11.075583,
+          "p95Milliseconds": 11.124735,
+          "maximumMilliseconds": 46.596095
+        }
+      }
+    },
+    "progressIntegrity": "recovered",
+    "attemptedWarmupRuns": 2,
+    "completedWarmupRuns": 1,
+    "attemptedMeasuredRuns": 0,
+    "completedMeasuredRuns": 0,
+    "warmups": [
+      {
+        "run": 0,
+        "index": 277,
+        "durationMilliseconds": 12345.215540999998,
+        "success": true,
+        "cancelled": false
+      }
+    ],
+    "samples": [],
+    "pending": {
+      "phase": "performance:warmup-request-start",
+      "run": 1,
+      "index": 744,
+      "elapsedWaitingMs": 142
+    },
+    "successfulLatencySampleCount": 0,
+    "medianMilliseconds": null,
+    "p95Milliseconds": null,
+    "maximumMilliseconds": null,
+    "accuracyFailureCount": 0,
+    "cancelledCount": 0,
+    "passed": false,
+    "failure": "VS Code exited with null (SIGKILL)\n\u001b[90m[main 2026-09-21T11:13:44.935Z]\u001b[0m StorageMainService: creating application shared storage\n\u001b[90m[main 2026-09-21T11:13:45.091Z]\u001b[0m [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)\n\u001b[90m[main 2026-09-21T11:13:45.091Z]\u001b[0m [shared storage] Initializing fallback application storage (path: in-memory)\n\u001b[90m[main 2026-09-21T11:13:45.167Z]\u001b[0m [shared storage] Fallback application storage initialized with 3 items\n\u001b[90m[main 2026-09-21T11:13:45.903Z]\u001b[0m update#setState idle\n[AgentHost:renderer] Acquiring MessagePort to agent host...\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=undefined conversationKey=undefined modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n\u001b[90m[main 2026-09-21T11:13:46.096Z]\u001b[0m AgentHostProcessManager: agent host started\n[AgentHost:renderer] MessagePort acquired, creating client...\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/ZDBiZjI2MjMtNjUwNy00MGQyLWExZjQtODJhZDBmM2E2ODI4\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\nStarted local extension host with pid 24973.\n[AgentHost:renderer] Protocol connection established; clientId=43cb8243-4136-4960-a295-01da3652df25\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] Clearing authentication for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] Clearing authentication for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/ZDBiZjI2MjMtNjUwNy00MGQyLWExZjQtODJhZDBmM2E2ODI4\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\nLoading development extension at /var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/c16-runtime-HLMkGy/extensions/codocs.codocs-0.0.0\nSettings Sync: Account status changed from uninitialized to unavailable\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/ZDBiZjI2MjMtNjUwNy00MGQyLWExZjQtODJhZDBmM2E2ODI4\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n\n\u001b[91m[main 2026-09-21T11:13:46.391Z]\u001b[0m [AgentHost:stderr] (node:24970) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code Helper --trace-deprecation ...` to show where the warning was created)\n\n(node:24739) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code --trace-deprecation ...` to show where the warning was created)\nUnknown channel: agentHostClientByokLm\nUnknown channel: agentHostClientProxy\nUnknown channel: agentHostClientProxy\nUnknown channel: agentHostClientProxy\n\n\nnull !== 0\n",
+    "progress": [
+      {
+        "phase": "run:start",
+        "at": "2026-09-21T11:13:46.964Z",
+        "vscodeVersion": "1.136.1"
+      },
+      {
+        "phase": "performance:resources",
+        "at": "2026-09-21T11:13:46.970Z",
+        "boundary": "before-readiness",
+        "memory": {
+          "rss": 148029440,
+          "heapTotal": 38649856,
+          "heapUsed": 29752800,
+          "external": 6894102,
+          "arrayBuffers": 0
+        },
+        "eventLoop": {
+          "count": 0,
+          "minimumMilliseconds": null,
+          "medianMilliseconds": null,
+          "p95Milliseconds": null,
+          "maximumMilliseconds": null
+        }
+      },
+      {
+        "phase": "performance:start",
+        "at": "2026-09-21T11:13:46.975Z",
+        "requestedWarmups": 100,
+        "requestedMeasured": 1
+      },
+      {
+        "phase": "activate-extension:start",
+        "at": "2026-09-21T11:13:46.976Z"
+      },
+      {
+        "phase": "activate-extension:ready",
+        "at": "2026-09-21T11:13:47.226Z",
+        "workspaceFolders": 1,
+        "serverProcesses": 1
+      },
+      {
+        "phase": "performance:readiness-request-start",
+        "at": "2026-09-21T11:13:47.272Z",
+        "run": 1,
+        "index": 0,
+        "startedAt": "2026-09-21T11:13:47.272Z"
+      },
+      {
+        "phase": "performance:readiness-request-complete",
+        "at": "2026-09-21T11:13:59.883Z",
+        "run": 1,
+        "index": 0,
+        "durationMilliseconds": 12610.595042,
+        "success": true,
+        "hoverCount": 1
+      },
+      {
+        "phase": "performance:resources",
+        "at": "2026-09-21T11:13:59.883Z",
+        "boundary": "after-readiness",
+        "memory": {
+          "rss": 146997248,
+          "heapTotal": 53411840,
+          "heapUsed": 33218484,
+          "external": 6744458,
+          "arrayBuffers": 0
+        },
+        "eventLoop": {
+          "count": 1168,
+          "minimumMilliseconds": 9.560064,
+          "medianMilliseconds": 11.075583,
+          "p95Milliseconds": 11.124735,
+          "maximumMilliseconds": 46.596095
+        }
+      },
+      {
+        "phase": "performance:index-ready",
+        "at": "2026-09-21T11:13:59.884Z",
+        "readinessAttempts": 1
+      },
+      {
+        "phase": "performance:warmup-request-start",
+        "at": "2026-09-21T11:13:59.884Z",
+        "run": 0,
+        "index": 277,
+        "position": {
+          "line": 277,
+          "character": 5
+        },
+        "startedAt": "2026-09-21T11:13:59.884Z"
+      },
+      {
+        "phase": "performance:warmup-request-complete",
+        "at": "2026-09-21T11:14:12.230Z",
+        "run": 0,
+        "index": 277,
+        "durationMilliseconds": 12345.215540999998,
+        "success": true,
+        "cancelled": false
+      },
+      {
+        "phase": "performance:warmup-request-start",
+        "at": "2026-09-21T11:14:12.230Z",
+        "run": 1,
+        "index": 744,
+        "position": {
+          "line": 744,
+          "character": 5
+        },
+        "startedAt": "2026-09-21T11:14:12.230Z"
+      }
+    ]
+  }
+}

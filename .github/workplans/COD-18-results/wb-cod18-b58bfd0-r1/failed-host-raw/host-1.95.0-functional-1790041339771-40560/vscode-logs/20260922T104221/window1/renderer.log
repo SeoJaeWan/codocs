@@ -1,0 +1,11 @@
+2026-09-22 10:42:22.634 [info] Loading development extension at /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/runtime-b58hV9/extensions/codocs.codocs-0.0.0
+2026-09-22 10:42:23.205 [info] Started local extension host with pid 41095.
+2026-09-22 10:42:25.710 [error] [network] #2: https://az764295.vo.msecnd.net/extensions/chat.json - error GET Failed to fetch
+2026-09-22 10:42:25.710 [warning] Failed to fetch chat participant registry Failed to fetch
+2026-09-22 10:42:41.328 [error] AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+	at verifyHoverAndOpenSource (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:301:10)
+	at async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:403:25)
+	at async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:817:9)

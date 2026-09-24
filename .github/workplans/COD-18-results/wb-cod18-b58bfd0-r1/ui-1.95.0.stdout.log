@@ -1,0 +1,874 @@
+{
+  "kind": "actual-vscode-extension-host",
+  "packageKind": "installed-vsix",
+  "vscode": {
+    "requestedVersion": "1.95.0",
+    "version": "1.95.0",
+    "architecture": "arm64",
+    "executable": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0/Visual Studio Code.app/Contents/MacOS/Electron",
+    "runtimeRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/vscode/1.95.0",
+    "downloadedThisRun": false
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "cpu": "Apple M1 Pro",
+    "cpuCount": 10,
+    "memoryBytes": 17179869184,
+    "runnerNode": "v24.21.0",
+    "fileCache": "OS file cache was not forcibly cleared",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": null,
+  "artifacts": {
+    "sourceCommit": "66686f70c254675e7263912604e90298d556f98d",
+    "productSourceCommit": "66686f70c254675e7263912604e90298d556f98d",
+    "harnessState": "content hashes captured before Host; harness may be uncommitted",
+    "harnessHashes": {
+      "run.mjs": "1baac7c07fec9c24062dba5274ec6a5ca29228bf790236465203d514f1c828cc",
+      "extension-test.cjs": "a16ed9af38b0c0bca717117bb0c797224a7db7f56bcdb74e3145fcbcf46274d2",
+      "cod18.cjs": "7f1392a6a825178919b313dd39c8cb4176e0591abd3a47dcce969d64c1dabc8d",
+      "request-outcome.cjs": "495679cedec30d662ac2cb9c701168acfc3e63b56daf469079f1760a801e6a06"
+    },
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/cod18.vsix",
+    "vsixBytes": 1225758,
+    "vsixSha256": "8924a77e7b92f837354d5248580b7bf2e9b89250bfc8401b5ed9921c16803628",
+    "extensionBundleSha256": "a842268fc4b12efdf851f0b65dee0640d5b2c5aa3a6367acd52ab2e7723f0ca6",
+    "serverBundleSha256": "1b0676e32e41b1ee658038b96f1333e0fd5a7ab414c88653305c6e6f6cf5c95d",
+    "vscodeSourceSha256": "f29f2281d86eaca089526891207270b497bfd9d2be4a505707323075fac0d761",
+    "languageServerSourceSha256": "83547fe075fd9dcd5cf22302f0483b48982efe86212093263f537ecf5745cdae"
+  },
+  "install": {
+    "extensionRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.rMvNCKy/e/codocs.codocs-0.0.0",
+    "stdout": "Installing extensions...\nExtension 'cod18.vsix' was successfully installed.\n",
+    "stderr": ""
+  },
+  "exitCode": 0,
+  "stdout": "\u001b[90m[main 2026-09-22T01:46:21.389Z]\u001b[0m update#setState idle\nLoading development extension at /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.rMvNCKy/e/codocs.codocs-0.0.0\nStarted local extension host with pid 44629.\n\u001b[90m[main 2026-09-22T01:46:51.391Z]\u001b[0m update#setState checking for updates\n\u001b[90m[main 2026-09-22T01:46:51.519Z]\u001b[0m update#setState downloading\n\u001b[90m[main 2026-09-22T01:47:43.916Z]\u001b[0m update#setState downloaded\n\u001b[90m[main 2026-09-22T01:47:43.918Z]\u001b[0m update#setState ready\n\u001b[90m[main 2026-09-22T01:50:07.264Z]\u001b[0m Extension host with pid 44629 exited with code: 0, signal: unknown.\n",
+  "stderr": "2026-09-22 10:46:22.081 Code Helper (Renderer)[44364:2017595] CoreText note: Client requested name \".NewYork-Regular\", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[NSFont systemFontOfSize:].\n2026-09-22 10:46:22.081 Code Helper (Renderer)[44364:2017595] CoreText note: Set a breakpoint on CTFontLogSystemFontNameRequest to debug.\n[network] #2: https://az764295.vo.msecnd.net/extensions/chat.json - error GET Failed to fetch\nFailed to fetch chat participant registry {}\n2026-09-22 10:47:29.135 Electron[44359:2017437] TSM AdjustCapsLockLEDForKeyTransitionHandling - _ISSetPhysicalKeyboardCapsLockLED Inhibit\n2026-09-22 10:47:34.641 Electron[44359:2017458] Download completed to: file:///Users/seojaewan/Library/Caches/com.microsoft.VSCode.ShipIt/update.sZjreOS/VSCode-darwin-arm64.zip\n\u001b[91m[main 2026-09-22T01:47:45.056Z]\u001b[0m webContents#will-navigate: Prevented webcontent navigation\n\u001b[91m[main 2026-09-22T01:47:57.126Z]\u001b[0m webContents#will-navigate: Prevented webcontent navigation\n",
+  "evidence": {
+    "vscodeVersion": "1.95.0",
+    "method": "interactive UI session; acceptance is recorded separately from editor telemetry",
+    "events": [
+      {
+        "at": "2026-09-22T01:47:29.133Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 3,
+              "character": 5
+            },
+            "end": {
+              "line": 3,
+              "character": 5
+            },
+            "active": {
+              "line": 3,
+              "character": 5
+            },
+            "anchor": {
+              "line": 3,
+              "character": 5
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:48:21.071Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:48:21.081Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T01:48:31.817Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:48:31.824Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/ui-source.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T01:48:31.826Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 3,
+              "character": 5
+            },
+            "end": {
+              "line": 3,
+              "character": 5
+            },
+            "active": {
+              "line": 3,
+              "character": 5
+            },
+            "anchor": {
+              "line": 3,
+              "character": 5
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:48:38.954Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/ui-source.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 4,
+              "character": 6
+            },
+            "end": {
+              "line": 4,
+              "character": 6
+            },
+            "active": {
+              "line": 4,
+              "character": 6
+            },
+            "anchor": {
+              "line": 4,
+              "character": 6
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:48:58.699Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:48:58.727Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/source.java",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T01:49:04.594Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/source.java",
+        "selections": [
+          {
+            "start": {
+              "line": 1,
+              "character": 13
+            },
+            "end": {
+              "line": 1,
+              "character": 13
+            },
+            "active": {
+              "line": 1,
+              "character": 13
+            },
+            "anchor": {
+              "line": 1,
+              "character": 13
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:04.612Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/source.java",
+        "selections": [
+          {
+            "start": {
+              "line": 1,
+              "character": 12
+            },
+            "end": {
+              "line": 1,
+              "character": 12
+            },
+            "active": {
+              "line": 1,
+              "character": 12
+            },
+            "anchor": {
+              "line": 1,
+              "character": 12
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:25.723Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:49:25.731Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T01:49:37.030Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 1
+            },
+            "end": {
+              "line": 0,
+              "character": 1
+            },
+            "active": {
+              "line": 0,
+              "character": 1
+            },
+            "anchor": {
+              "line": 0,
+              "character": 1
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.037Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 2
+            },
+            "end": {
+              "line": 0,
+              "character": 2
+            },
+            "active": {
+              "line": 0,
+              "character": 2
+            },
+            "anchor": {
+              "line": 0,
+              "character": 2
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.040Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 3
+            },
+            "end": {
+              "line": 0,
+              "character": 3
+            },
+            "active": {
+              "line": 0,
+              "character": 3
+            },
+            "anchor": {
+              "line": 0,
+              "character": 3
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.042Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 4
+            },
+            "end": {
+              "line": 0,
+              "character": 4
+            },
+            "active": {
+              "line": 0,
+              "character": 4
+            },
+            "anchor": {
+              "line": 0,
+              "character": 4
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.044Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 5
+            },
+            "end": {
+              "line": 0,
+              "character": 5
+            },
+            "active": {
+              "line": 0,
+              "character": 5
+            },
+            "anchor": {
+              "line": 0,
+              "character": 5
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.045Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 6
+            },
+            "end": {
+              "line": 0,
+              "character": 6
+            },
+            "active": {
+              "line": 0,
+              "character": 6
+            },
+            "anchor": {
+              "line": 0,
+              "character": 6
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.047Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 7
+            },
+            "end": {
+              "line": 0,
+              "character": 7
+            },
+            "active": {
+              "line": 0,
+              "character": 7
+            },
+            "anchor": {
+              "line": 0,
+              "character": 7
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.049Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 8
+            },
+            "end": {
+              "line": 0,
+              "character": 8
+            },
+            "active": {
+              "line": 0,
+              "character": 8
+            },
+            "anchor": {
+              "line": 0,
+              "character": 8
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.051Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 9
+            },
+            "end": {
+              "line": 0,
+              "character": 9
+            },
+            "active": {
+              "line": 0,
+              "character": 9
+            },
+            "anchor": {
+              "line": 0,
+              "character": 9
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.052Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 10
+            },
+            "end": {
+              "line": 0,
+              "character": 10
+            },
+            "active": {
+              "line": 0,
+              "character": 10
+            },
+            "anchor": {
+              "line": 0,
+              "character": 10
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.058Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 11
+            },
+            "end": {
+              "line": 0,
+              "character": 11
+            },
+            "active": {
+              "line": 0,
+              "character": 11
+            },
+            "anchor": {
+              "line": 0,
+              "character": 11
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.059Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 12
+            },
+            "end": {
+              "line": 0,
+              "character": 12
+            },
+            "active": {
+              "line": 0,
+              "character": 12
+            },
+            "anchor": {
+              "line": 0,
+              "character": 12
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.061Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 13
+            },
+            "end": {
+              "line": 0,
+              "character": 13
+            },
+            "active": {
+              "line": 0,
+              "character": 13
+            },
+            "anchor": {
+              "line": 0,
+              "character": 13
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.063Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 14
+            },
+            "end": {
+              "line": 0,
+              "character": 14
+            },
+            "active": {
+              "line": 0,
+              "character": 14
+            },
+            "anchor": {
+              "line": 0,
+              "character": 14
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.064Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 15
+            },
+            "end": {
+              "line": 0,
+              "character": 15
+            },
+            "active": {
+              "line": 0,
+              "character": 15
+            },
+            "anchor": {
+              "line": 0,
+              "character": 15
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.065Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 16
+            },
+            "end": {
+              "line": 0,
+              "character": 16
+            },
+            "active": {
+              "line": 0,
+              "character": 16
+            },
+            "anchor": {
+              "line": 0,
+              "character": 16
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.066Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 17
+            },
+            "end": {
+              "line": 0,
+              "character": 17
+            },
+            "active": {
+              "line": 0,
+              "character": 17
+            },
+            "anchor": {
+              "line": 0,
+              "character": 17
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.073Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 18
+            },
+            "end": {
+              "line": 0,
+              "character": 18
+            },
+            "active": {
+              "line": 0,
+              "character": 18
+            },
+            "anchor": {
+              "line": 0,
+              "character": 18
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.079Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 0,
+              "character": 19
+            },
+            "end": {
+              "line": 0,
+              "character": 19
+            },
+            "active": {
+              "line": 0,
+              "character": 19
+            },
+            "anchor": {
+              "line": 0,
+              "character": 19
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.090Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selections": [
+          {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 0
+            },
+            "active": {
+              "line": 1,
+              "character": 0
+            },
+            "anchor": {
+              "line": 1,
+              "character": 0
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:37.171Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:49:37.178Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/source.java",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": false
+      },
+      {
+        "at": "2026-09-22T01:49:37.179Z",
+        "kind": "selection",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/source.java",
+        "selections": [
+          {
+            "start": {
+              "line": 1,
+              "character": 12
+            },
+            "end": {
+              "line": 1,
+              "character": 12
+            },
+            "active": {
+              "line": 1,
+              "character": 12
+            },
+            "anchor": {
+              "line": 1,
+              "character": 12
+            }
+          }
+        ]
+      },
+      {
+        "at": "2026-09-22T01:49:47.709Z",
+        "kind": "editor"
+      },
+      {
+        "at": "2026-09-22T01:49:47.716Z",
+        "kind": "editor",
+        "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-mT0IY0/parent/nested/.codocs/%EC%98%88%EC%95%BD.yaml",
+        "selection": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 0
+          },
+          "active": {
+            "line": 0,
+            "character": 0
+          },
+          "anchor": {
+            "line": 0,
+            "character": 0
+          }
+        },
+        "dirty": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+
+> codocs@0.0.0 test:run /Users/seojaewan/Desktop/dev/codocs-worktrees/pr13-delivery-20260921/delivery
+> node tools/check/run.mjs test:run
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/pr13-delivery-20260921/delivery
+
+ ❯ packages/workspace/src/watcher/watcher.test.ts (14 tests | 1 failed) 6954ms
+   ❯ createWorkspaceWatcher 파일 변화 신호 (14)
+     ❯ 내부 문서의 생성·수정·삭제 신호 (5)
+       × nested/deep/alpha.yaml 파일을 생성하면 해당 절대 경로를 전달한다 5011ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/workspace/src/watcher/watcher.test.ts > createWorkspaceWatcher 파일 변화 신호 > 내부 문서의 생성·수정·삭제 신호 > nested/deep/alpha.yaml 파일을 생성하면 해당 절대 경로를 전달한다
+AssertionError: expected [] to include '/Users/seojaewan/Desktop/dev/codocs-w…'
+ ❯ vi.waitFor.timeout packages/workspace/src/watcher/watcher.test.ts:61:46
+     59|         await writeFile(target, 'id: alpha\n');
+     60|
+     61|         await vi.waitFor(() => expect(paths).toContain(target), {
+       |                                              ^
+     62|           timeout: 5_000,
+     63|         });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 26 passed (27)
+      Tests  1 failed | 674 passed (675)
+   Start at  21:41:42
+   Duration  7.49s (tests 70%, transform 15%, import 14%)
+
+ ELIFECYCLE  Command failed with exit code 1.

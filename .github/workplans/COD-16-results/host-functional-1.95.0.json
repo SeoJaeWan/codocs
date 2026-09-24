@@ -1,0 +1,98 @@
+{
+  "kind": "actual-vscode-extension-host",
+  "packageKind": "installed-vsix",
+  "vscode": {
+    "requestedVersion": "1.95.0",
+    "version": "1.95.0",
+    "architecture": "arm64",
+    "executable": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-380d487-r1/task-005/.workbench/vscode/1.95.0/Visual Studio Code.app/Contents/MacOS/Electron",
+    "runtimeRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-380d487-r1/task-005/.workbench/vscode/1.95.0",
+    "downloadedThisRun": false
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "cpu": "Apple M1 Pro",
+    "cpuCount": 10,
+    "memoryBytes": 17179869184,
+    "runnerNode": "v24.21.0",
+    "fileCache": "OS file cache was not forcibly cleared",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": null,
+  "artifacts": {
+    "sourceCommit": "576778c81dea536d8ba4119667390ff1ca9be92e",
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-380d487-r1/task-005/.workbench/artifacts/cod16-final.vsix",
+    "vsixBytes": 1204654,
+    "vsixSha256": "e025f2340aa1f0621ccfcbab1614afc9b8eb850b78cc27b89740d33a860953ad",
+    "extensionBundleSha256": "59d7275545238dbc7b7006a16ecdbc1467a9506bb862d00931f0c4a154d06955",
+    "serverBundleSha256": "3757ca4e63e20fedd80d64c5d3c59a7686bfc60c847d739db4fe44affdf87d0c",
+    "vscodeSourceSha256": "f29f2281d86eaca089526891207270b497bfd9d2be4a505707323075fac0d761",
+    "languageServerSourceSha256": "83547fe075fd9dcd5cf22302f0483b48982efe86212093263f537ecf5745cdae"
+  },
+  "install": {
+    "extensionRoot": "/var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/c16-runtime-g9ZRnH/extensions/codocs.codocs-0.0.0",
+    "stdout": "Installing extensions...\nExtension 'cod16-final.vsix' was successfully installed.\n",
+    "stderr": ""
+  },
+  "exitCode": 0,
+  "stdout": "\u001b[90m[main 2026-09-21T06:16:22.473Z]\u001b[0m update#setState idle\nStarted local extension host with pid 47725.\nLoading development extension at /var/folders/kj/1s172w6533qbdm0cv61t9d700000gn/T/c16-runtime-g9ZRnH/extensions/codocs.codocs-0.0.0\n\u001b[90m[main 2026-09-21T06:16:29.163Z]\u001b[0m Extension host with pid 47725 exited with code: 0, signal: unknown.\n",
+  "stderr": "2026-09-21 15:16:23.226 Code Helper (Renderer)[47489:809846] CoreText note: Client requested name \".NewYork-Regular\", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[NSFont systemFontOfSize:].\n2026-09-21 15:16:23.226 Code Helper (Renderer)[47489:809846] CoreText note: Set a breakpoint on CTFontLogSystemFontNameRequest to debug.\n[network] #2: https://az764295.vo.msecnd.net/extensions/chat.json - error GET Failed to fetch\nFailed to fetch chat participant registry {}\nError: Unexpected SIGPIPE\n\tat process.<anonymous> (file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-380d487-r1/task-005/.workbench/vscode/1.95.0/Visual%20Studio%20Code.app/Contents/Resources/app/out/bootstrap-fork.js:3:11831)\n\tat process.emit (node:events:519:28)\n",
+  "evidence": {
+    "vscodeVersion": "1.95.0",
+    "extensionIdentifier": "codocs.codocs",
+    "extensionActive": true,
+    "extensionHost": {
+      "node": "v20.18.0",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M1 Pro"
+    },
+    "workspaceFolderCount": 4,
+    "serverCount": 4,
+    "hoverAndOpenSource": {
+      "reservationRange": {
+        "start": {
+          "line": 1,
+          "character": 2
+        },
+        "end": {
+          "line": 1,
+          "character": 13
+        }
+      },
+      "returnZoneRange": {
+        "start": {
+          "line": 1,
+          "character": 13
+        },
+        "end": {
+          "line": 1,
+          "character": 24
+        }
+      },
+      "generatedCommandTrusted": true,
+      "nearestWorkspaceOnly": true,
+      "openedUri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-380d487-r1/task-005/.workbench/fixtures/cod16-host-CrSNTI/parent/nested/.codocs/%ED%95%9C%EA%B8%80%20%EC%9B%90%EB%AC%B8/%EB%B0%98%EB%82%A9%20%EA%B5%AC%EC%97%AD.yaml",
+      "crlfAndUnicodePathOpened": true,
+      "existingTabReused": true,
+      "dirtyYamlPreserved": true,
+      "dirtySelectionPreservedOnRevisionMismatch": true,
+      "defaultDefinitionProviderPreserved": true
+    },
+    "manualRestartReplacedAllProcesses": true,
+    "unsavedDocument": {
+      "version": 2,
+      "textPreservedAfterRestart": true,
+      "dirtyAfterRestart": true,
+      "diskUnchanged": true
+    },
+    "missingCodocsNotGenerated": true,
+    "createdAndChangedCodocsObservedWithoutProcessLoss": true,
+    "automaticRestartsObserved": 3,
+    "repeatedCrashStoppedOneServer": true,
+    "manualRecoveryRestoredAllServers": true,
+    "crashedPids": [47972, 47985, 47988, 47991]
+  }
+}

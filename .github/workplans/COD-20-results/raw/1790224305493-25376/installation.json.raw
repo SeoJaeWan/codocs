@@ -1,0 +1,7 @@
+{
+  "archive": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\.workbench\\vscode-tests\\1790224305493-25376\\codocs.vsix",
+  "sha256": "1b3168fb21496d44a21fa94bcb950cc0098761a7f651e04ab4080ef405e42a76",
+  "extension": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-P9TGPx\\extensions\\codocs.codocs-0.0.0",
+  "stdout": "Installing extensions...\nExtension 'codocs.vsix' was successfully installed.\n",
+  "stderr": "(node:22828) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code --trace-deprecation ...` to show where the warning was created)\n"
+}

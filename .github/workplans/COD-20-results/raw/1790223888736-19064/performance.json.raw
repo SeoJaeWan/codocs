@@ -1,0 +1,4765 @@
+{
+  "schema": "codocs-ide-performance/v1",
+  "runId": "1790223888736-19064",
+  "status": "complete",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "hostname": "sjw",
+    "cpus": [
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H",
+      "12th Gen Intel(R) Core(TM) i5-12500H"
+    ],
+    "totalMemoryBytes": 16802754560,
+    "node": "v24.21.0",
+    "vscodeVersion": "1.100.0",
+    "process": {
+      "pid": 19064,
+      "ppid": 24740
+    },
+    "vscodeCache": {
+      "path": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\.workbench\\vscode-cache",
+      "sharedImmutable": false,
+      "validation": "version/platform/arch receipt and full runtime SHA-256 under cache lock"
+    }
+  },
+  "hashes": {
+    "source": "af819c687af42e2cf7333289378c3ee31ad849e3c4d17414daf9a0c29095646a",
+    "vsix": "0acdc55610dbb56e9ca42104f42c17f4d20c275e0ea204f457380445bdd47896",
+    "data": "45775d59c8d078e8a5150557d7d7720ef94db79ac19a7981171f284a793ea4f6",
+    "corpora": {
+      "startup/0": "45775d59c8d078e8a5150557d7d7720ef94db79ac19a7981171f284a793ea4f6",
+      "api/0": "67e8ae46a8034eebfad927957b14d957c4006809afce60f6ede638dec1c12023",
+      "first-ui/0": "6671b72e027c1b002c53b8ca91d3e494ef7f2f145bbee31e3c2fd82d086127a8",
+      "reentry-ui/0": "44acc378df590ce9579eb4f1705e28795b688ff8716c6d6e3634023c245ed17e",
+      "save/0": "c2a3737a133361d38406cc0e8539b1a98d12c07d5d561d2ae3122d336f13b5f7",
+      "external/0": "d89e5efbd6456db25af4a3ce54e48057e822f53e1cea409cd0b67527f6178947",
+      "edit-indexing/0": "ad85d4e7c51e42b9345c0cf891653b7cd6fd75efd872f3603bdf72f010ba7e27",
+      "edit-ready/0": "8fba721335fdf13855126db583db0055331b15415d583138e790c5056c717505",
+      "multiwindow/baseline/a": "956b63961638bcfb577254885356384697b46d12bf386201b2205ea52c14fa27",
+      "multiwindow/baseline/b": "956b63961638bcfb577254885356384697b46d12bf386201b2205ea52c14fa27",
+      "multiwindow/same/a": "956b63961638bcfb577254885356384697b46d12bf386201b2205ea52c14fa27",
+      "multiwindow/same/b": "956b63961638bcfb577254885356384697b46d12bf386201b2205ea52c14fa27",
+      "multiwindow/distinct/a": "956b63961638bcfb577254885356384697b46d12bf386201b2205ea52c14fa27",
+      "multiwindow/distinct/b": "2eec8036d25c6c340654f1706e933f35c8368a42110dfdda942349fe7f698c4e"
+    }
+  },
+  "settings": {
+    "seed": 20260924,
+    "apiWarmup": 0,
+    "propagationPollMs": 50,
+    "targets": {
+      "startup": 1,
+      "api": 1,
+      "first-ui": 1,
+      "reentry-ui": 1,
+      "save": 1,
+      "external": 1,
+      "edit-indexing": 1,
+      "edit-ready": 1,
+      "multiwindow": 1
+    }
+  },
+  "command": "pnpm test:vscode -- --mode performance --scenario all --vscode-version 1.100.0 --config .workbench/implementation-smoke-min.json",
+  "startedAt": "2026-09-24T04:24:48.757Z",
+  "progress": {
+    "scenario": "multiwindow",
+    "state": "complete",
+    "phase": "performance-multiwindow",
+    "startedAt": "2026-09-24T04:29:02.288Z",
+    "observedAt": "2026-09-24T04:31:22.177Z",
+    "elapsedMs": 139889,
+    "pid": 23836
+  },
+  "events": [
+    {
+      "kind": "scenario-prepared",
+      "scenario": "startup",
+      "iteration": 0,
+      "corpusHash": "45775d59c8d078e8a5150557d7d7720ef94db79ac19a7981171f284a793ea4f6",
+      "at": "2026-09-24T04:26:01.023Z"
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:04.629Z",
+        "monotonicMs": 1401.7123,
+        "timeOrigin": 1790223963229.916,
+        "pid": 11688
+      },
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\startup\\0\\workspace"
+        ]
+      },
+      "rssBytes": 156717056,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:07.318Z",
+        "monotonicMs": 78260.1002,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:04.835Z",
+        "monotonicMs": 140.4182,
+        "timeOrigin": 1790223964696.208,
+        "pid": 452
+      },
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\startup\\0\\workspace"
+      },
+      "rssBytes": 99409920,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:07.318Z",
+        "monotonicMs": 78260.5225,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:04.848Z",
+        "monotonicMs": 152.6545,
+        "timeOrigin": 1790223964696.208,
+        "pid": 452
+      },
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\startup\\0\\workspace",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100110336,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:07.318Z",
+        "monotonicMs": 78260.5445,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:05.737Z",
+        "monotonicMs": 1041.0068,
+        "timeOrigin": 1790223964696.208,
+        "pid": 452
+      },
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\startup\\0\\workspace"
+      },
+      "rssBytes": 129564672,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:07.318Z",
+        "monotonicMs": 78260.5509,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:05.754Z",
+        "monotonicMs": 1057.7498,
+        "timeOrigin": 1790223964696.208,
+        "pid": 452
+      },
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\startup\\0\\workspace"
+      },
+      "rssBytes": 130441216,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:07.318Z",
+        "monotonicMs": 78260.5557,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:05.755Z",
+        "monotonicMs": 1058.8429,
+        "timeOrigin": 1790223964696.208,
+        "pid": 452
+      },
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\startup\\0\\workspace"
+      },
+      "rssBytes": 130400256,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:07.318Z",
+        "monotonicMs": 78260.5605,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:06.885Z",
+        "monotonicMs": 2189.6882,
+        "timeOrigin": 1790223964696.208,
+        "pid": 452
+      },
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\startup\\0\\workspace",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 157200384,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:07.318Z",
+        "monotonicMs": 78260.5702,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "scenario-prepared",
+      "scenario": "api",
+      "iteration": 0,
+      "corpusHash": "67e8ae46a8034eebfad927957b14d957c4006809afce60f6ede638dec1c12023",
+      "at": "2026-09-24T04:26:08.417Z"
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:11.498Z",
+        "monotonicMs": 1039.0974,
+        "timeOrigin": 1790223970458.411,
+        "pid": 10724
+      },
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\api\\0\\workspace"
+        ]
+      },
+      "rssBytes": 149307392,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:25.580Z",
+        "monotonicMs": 96522.0206,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:11.693Z",
+        "monotonicMs": 147.975,
+        "timeOrigin": 1790223971545.018,
+        "pid": 2268
+      },
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\api\\0\\workspace"
+      },
+      "rssBytes": 100880384,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:25.581Z",
+        "monotonicMs": 96522.7691,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:11.706Z",
+        "monotonicMs": 160.403,
+        "timeOrigin": 1790223971545.018,
+        "pid": 2268
+      },
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\api\\0\\workspace",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 101560320,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:25.581Z",
+        "monotonicMs": 96522.7902,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:12.506Z",
+        "monotonicMs": 960.4611,
+        "timeOrigin": 1790223971545.018,
+        "pid": 2268
+      },
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\api\\0\\workspace"
+      },
+      "rssBytes": 132820992,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:25.581Z",
+        "monotonicMs": 96522.8001,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:12.522Z",
+        "monotonicMs": 976.0293,
+        "timeOrigin": 1790223971545.018,
+        "pid": 2268
+      },
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\api\\0\\workspace"
+      },
+      "rssBytes": 133177344,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:25.581Z",
+        "monotonicMs": 96522.8085,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:12.523Z",
+        "monotonicMs": 976.9657,
+        "timeOrigin": 1790223971545.018,
+        "pid": 2268
+      },
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\api\\0\\workspace"
+      },
+      "rssBytes": 133185536,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:25.581Z",
+        "monotonicMs": 96522.8165,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:13.699Z",
+        "monotonicMs": 2153.2257,
+        "timeOrigin": 1790223971545.018,
+        "pid": 2268
+      },
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\api\\0\\workspace",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 160399360,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:25.581Z",
+        "monotonicMs": 96522.8273,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "scenario-prepared",
+      "scenario": "first-ui",
+      "iteration": 0,
+      "corpusHash": "6671b72e027c1b002c53b8ca91d3e494ef7f2f145bbee31e3c2fd82d086127a8",
+      "at": "2026-09-24T04:26:26.761Z"
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:30.250Z",
+        "monotonicMs": 1377.5442,
+        "timeOrigin": 1790223988871.284,
+        "pid": 13900
+      },
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\first-ui\\0\\workspace"
+        ]
+      },
+      "rssBytes": 159772672,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:48.747Z",
+        "monotonicMs": 119689.3515,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:30.503Z",
+        "monotonicMs": 180.4997,
+        "timeOrigin": 1790223990324.112,
+        "pid": 23528
+      },
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\first-ui\\0\\workspace"
+      },
+      "rssBytes": 102023168,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:48.747Z",
+        "monotonicMs": 119689.5336,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:30.518Z",
+        "monotonicMs": 194.7141,
+        "timeOrigin": 1790223990324.112,
+        "pid": 23528
+      },
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\first-ui\\0\\workspace",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 102756352,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:48.747Z",
+        "monotonicMs": 119689.5401,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:31.208Z",
+        "monotonicMs": 884.8029,
+        "timeOrigin": 1790223990324.112,
+        "pid": 23528
+      },
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\first-ui\\0\\workspace"
+      },
+      "rssBytes": 131633152,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:48.747Z",
+        "monotonicMs": 119689.5437,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:31.381Z",
+        "monotonicMs": 1056.9623,
+        "timeOrigin": 1790223990324.112,
+        "pid": 23528
+      },
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\first-ui\\0\\workspace"
+      },
+      "rssBytes": 132448256,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:48.747Z",
+        "monotonicMs": 119689.547,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:31.381Z",
+        "monotonicMs": 1057.7184,
+        "timeOrigin": 1790223990324.112,
+        "pid": 23528
+      },
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\first-ui\\0\\workspace"
+      },
+      "rssBytes": 132460544,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:48.747Z",
+        "monotonicMs": 119689.55,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:32.510Z",
+        "monotonicMs": 2185.9818,
+        "timeOrigin": 1790223990324.112,
+        "pid": 23528
+      },
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\first-ui\\0\\workspace",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 159563776,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:26:48.747Z",
+        "monotonicMs": 119689.5543,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "scenario-prepared",
+      "scenario": "reentry-ui",
+      "iteration": 0,
+      "corpusHash": "44acc378df590ce9579eb4f1705e28795b688ff8716c6d6e3634023c245ed17e",
+      "at": "2026-09-24T04:26:49.878Z"
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:53.599Z",
+        "monotonicMs": 199.6087,
+        "timeOrigin": 1790224013401.823,
+        "pid": 15020
+      },
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\reentry-ui\\0\\workspace"
+      },
+      "rssBytes": 100278272,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:15.227Z",
+        "monotonicMs": 146169.4006,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:53.618Z",
+        "monotonicMs": 217.6558,
+        "timeOrigin": 1790224013401.823,
+        "pid": 15020
+      },
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\reentry-ui\\0\\workspace",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100954112,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:15.227Z",
+        "monotonicMs": 146169.4117,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:54.437Z",
+        "monotonicMs": 1036.2212,
+        "timeOrigin": 1790224013401.823,
+        "pid": 15020
+      },
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\reentry-ui\\0\\workspace"
+      },
+      "rssBytes": 129830912,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:15.227Z",
+        "monotonicMs": 146169.4157,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:54.583Z",
+        "monotonicMs": 1181.7643,
+        "timeOrigin": 1790224013401.823,
+        "pid": 15020
+      },
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\reentry-ui\\0\\workspace"
+      },
+      "rssBytes": 130891776,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:15.227Z",
+        "monotonicMs": 146169.4189,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:54.583Z",
+        "monotonicMs": 1182.6092,
+        "timeOrigin": 1790224013401.823,
+        "pid": 15020
+      },
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\reentry-ui\\0\\workspace"
+      },
+      "rssBytes": 130904064,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:15.227Z",
+        "monotonicMs": 146169.4219,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:55.707Z",
+        "monotonicMs": 2305.7772,
+        "timeOrigin": 1790224013401.823,
+        "pid": 15020
+      },
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\reentry-ui\\0\\workspace",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 157818880,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:15.227Z",
+        "monotonicMs": 146169.4265,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:26:53.337Z",
+        "monotonicMs": 1389.0914,
+        "timeOrigin": 1790224011948.889,
+        "pid": 8476
+      },
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\reentry-ui\\0\\workspace"
+        ]
+      },
+      "rssBytes": 158130176,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:15.228Z",
+        "monotonicMs": 146169.8333,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "scenario-prepared",
+      "scenario": "save",
+      "iteration": 0,
+      "corpusHash": "c2a3737a133361d38406cc0e8539b1a98d12c07d5d561d2ae3122d336f13b5f7",
+      "at": "2026-09-24T04:27:16.470Z"
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:20.333Z",
+        "monotonicMs": 132.2248,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace"
+      },
+      "rssBytes": 99299328,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.0227,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:20.346Z",
+        "monotonicMs": 144.8204,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100073472,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.0542,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:21.341Z",
+        "monotonicMs": 1139.5199,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace"
+      },
+      "rssBytes": 129564672,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.0641,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:21.395Z",
+        "monotonicMs": 1193.6303,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace"
+      },
+      "rssBytes": 130392064,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.0716,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:21.398Z",
+        "monotonicMs": 1196.242,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace"
+      },
+      "rssBytes": 130371584,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.0783,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:22.547Z",
+        "monotonicMs": 2345.6288,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 157188096,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.0875,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:38.089Z",
+        "monotonicMs": 17887.5179,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace",
+        "full": false,
+        "initial": false,
+        "previousCatalogVersion": 1
+      },
+      "rssBytes": 278454272,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.0952,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:38.163Z",
+        "monotonicMs": 17961.8707,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace",
+        "status": "complete",
+        "catalogVersion": 2,
+        "initial": false,
+        "documents": 1000
+      },
+      "rssBytes": 280305664,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.1024,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-cancelled",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:53.264Z",
+        "monotonicMs": 33062.8402,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace"
+      },
+      "rssBytes": 273248256,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.1088,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-cancelled",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:53.265Z",
+        "monotonicMs": 33063.8576,
+        "timeOrigin": 1790224040211.799,
+        "pid": 7860
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace"
+      },
+      "rssBytes": 273248256,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.533Z",
+        "monotonicMs": 184475.1149,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:20.158Z",
+        "monotonicMs": 1501.7096,
+        "timeOrigin": 1790224038656.836,
+        "pid": 9788
+      },
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\save\\0\\workspace"
+        ]
+      },
+      "rssBytes": 156758016,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:27:53.534Z",
+        "monotonicMs": 184475.7998,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "scenario-prepared",
+      "scenario": "external",
+      "iteration": 0,
+      "corpusHash": "d89e5efbd6456db25af4a3ce54e48057e822f53e1cea409cd0b67527f6178947",
+      "at": "2026-09-24T04:27:54.787Z"
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:58.432Z",
+        "monotonicMs": 1456.4758,
+        "timeOrigin": 1790224076973.494,
+        "pid": 25168
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace"
+        ]
+      },
+      "rssBytes": 159952896,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.1822,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:58.664Z",
+        "monotonicMs": 147.5863,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace"
+      },
+      "rssBytes": 99352576,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.6899,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:58.675Z",
+        "monotonicMs": 157.675,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100089856,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.7032,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:59.571Z",
+        "monotonicMs": 1053.604,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace"
+      },
+      "rssBytes": 129286144,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.7103,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:59.588Z",
+        "monotonicMs": 1070.3216,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace"
+      },
+      "rssBytes": 130027520,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.7168,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:27:59.589Z",
+        "monotonicMs": 1071.6659,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace"
+      },
+      "rssBytes": 129986560,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.723,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:00.703Z",
+        "monotonicMs": 2185.6916,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 156864512,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.7313,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:12.072Z",
+        "monotonicMs": 13554.1932,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace",
+        "full": false,
+        "initial": false,
+        "previousCatalogVersion": 1
+      },
+      "rssBytes": 159215616,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.7381,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:26.867Z",
+        "monotonicMs": 28349.3242,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace"
+      },
+      "rssBytes": 164286464,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.7439,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:26.989Z",
+        "monotonicMs": 28471.6689,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace"
+      },
+      "rssBytes": 164933632,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.7496,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:26.990Z",
+        "monotonicMs": 28472.2829,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace",
+        "recovery": true
+      },
+      "rssBytes": 164937728,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.779,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:34.020Z",
+        "monotonicMs": 35502.3879,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace",
+        "status": "complete",
+        "catalogVersion": 2,
+        "initial": false,
+        "documents": 1000
+      },
+      "rssBytes": 166637568,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.7862,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:34.022Z",
+        "monotonicMs": 35503.9273,
+        "timeOrigin": 1790224078523.999,
+        "pid": 9020
+      },
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\external\\0\\workspace",
+        "full": true,
+        "initial": false,
+        "previousCatalogVersion": 2
+      },
+      "rssBytes": 166662144,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:49.063Z",
+        "monotonicMs": 240005.793,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "scenario-prepared",
+      "scenario": "edit-indexing",
+      "iteration": 0,
+      "corpusHash": "ad85d4e7c51e42b9345c0cf891653b7cd6fd75efd872f3603bdf72f010ba7e27",
+      "at": "2026-09-24T04:28:50.221Z"
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:53.356Z",
+        "monotonicMs": 1049.1576,
+        "timeOrigin": 1790224132308.132,
+        "pid": 11096
+      },
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-indexing\\0\\workspace"
+        ]
+      },
+      "rssBytes": 149262336,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:54.617Z",
+        "monotonicMs": 245559.2976,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:53.560Z",
+        "monotonicMs": 143.3533,
+        "timeOrigin": 1790224133422.397,
+        "pid": 23756
+      },
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-indexing\\0\\workspace"
+      },
+      "rssBytes": 101019648,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:54.617Z",
+        "monotonicMs": 245559.6661,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:53.573Z",
+        "monotonicMs": 154.8655,
+        "timeOrigin": 1790224133422.397,
+        "pid": 23756
+      },
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-indexing\\0\\workspace",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 101707776,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:54.617Z",
+        "monotonicMs": 245559.6751,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:54.375Z",
+        "monotonicMs": 956.7417,
+        "timeOrigin": 1790224133422.397,
+        "pid": 23756
+      },
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-indexing\\0\\workspace"
+      },
+      "rssBytes": 130555904,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:54.617Z",
+        "monotonicMs": 245559.6784,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-cancelled",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:54.379Z",
+        "monotonicMs": 960.7092,
+        "timeOrigin": 1790224133422.397,
+        "pid": 23756
+      },
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-indexing\\0\\workspace"
+      },
+      "rssBytes": 130555904,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:28:54.617Z",
+        "monotonicMs": 245559.6811,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "scenario-prepared",
+      "scenario": "edit-ready",
+      "iteration": 0,
+      "corpusHash": "8fba721335fdf13855126db583db0055331b15415d583138e790c5056c717505",
+      "at": "2026-09-24T04:28:55.750Z"
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:59.520Z",
+        "monotonicMs": 151.3836,
+        "timeOrigin": 1790224139370.137,
+        "pid": 20460
+      },
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-ready\\0\\workspace"
+      },
+      "rssBytes": 99364864,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:02.257Z",
+        "monotonicMs": 253199.2976,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:59.536Z",
+        "monotonicMs": 165.9113,
+        "timeOrigin": 1790224139370.137,
+        "pid": 20460
+      },
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-ready\\0\\workspace",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100130816,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:02.257Z",
+        "monotonicMs": 253199.3074,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:00.420Z",
+        "monotonicMs": 1050.2065,
+        "timeOrigin": 1790224139370.137,
+        "pid": 20460
+      },
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-ready\\0\\workspace"
+      },
+      "rssBytes": 128966656,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:02.257Z",
+        "monotonicMs": 253199.311,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:00.603Z",
+        "monotonicMs": 1233.0077,
+        "timeOrigin": 1790224139370.137,
+        "pid": 20460
+      },
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-ready\\0\\workspace"
+      },
+      "rssBytes": 129978368,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:02.257Z",
+        "monotonicMs": 253199.3139,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:00.605Z",
+        "monotonicMs": 1234.6326,
+        "timeOrigin": 1790224139370.137,
+        "pid": 20460
+      },
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-ready\\0\\workspace"
+      },
+      "rssBytes": 129990656,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:02.257Z",
+        "monotonicMs": 253199.3168,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:01.756Z",
+        "monotonicMs": 2386.0644,
+        "timeOrigin": 1790224139370.137,
+        "pid": 20460
+      },
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-ready\\0\\workspace",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 156753920,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:02.257Z",
+        "monotonicMs": 253199.3217,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:28:59.286Z",
+        "monotonicMs": 1418.8186,
+        "timeOrigin": 1790224137871.246,
+        "pid": 24144
+      },
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\edit-ready\\0\\workspace"
+        ]
+      },
+      "rssBytes": 157433856,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:02.257Z",
+        "monotonicMs": 253199.5501,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:07.556Z",
+        "monotonicMs": 140.6447,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a"
+      },
+      "rssBytes": 99422208,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2575,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:07.572Z",
+        "monotonicMs": 155.0167,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100200448,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2675,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:08.398Z",
+        "monotonicMs": 981.5068,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a"
+      },
+      "rssBytes": 129318912,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2711,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:08.593Z",
+        "monotonicMs": 1176.109,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a"
+      },
+      "rssBytes": 130822144,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2741,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:08.594Z",
+        "monotonicMs": 1177.021,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a"
+      },
+      "rssBytes": 130793472,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2771,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:09.712Z",
+        "monotonicMs": 2295.0742,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 157655040,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2819,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:20.710Z",
+        "monotonicMs": 13293.7068,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a",
+        "full": false,
+        "initial": false,
+        "previousCatalogVersion": 1
+      },
+      "rssBytes": 163233792,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2853,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:20.777Z",
+        "monotonicMs": 13360.324,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a",
+        "status": "complete",
+        "catalogVersion": 2,
+        "initial": false,
+        "documents": 1000
+      },
+      "rssBytes": 164339712,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2886,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-cancelled",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:31.999Z",
+        "monotonicMs": 24582.3084,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a"
+      },
+      "rssBytes": 159006720,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2916,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-cancelled",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:32.000Z",
+        "monotonicMs": 24583.1702,
+        "timeOrigin": 1790224147416.839,
+        "pid": 14204
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a"
+      },
+      "rssBytes": 159006720,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.2946,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:07.328Z",
+        "monotonicMs": 1455.9311,
+        "timeOrigin": 1790224145871.151,
+        "pid": 24332
+      },
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a"
+        ]
+      },
+      "rssBytes": 156274688,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:29:32.215Z",
+        "monotonicMs": 283160.4608,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "multiwindow-memory",
+      "phase": "baseline",
+      "uniquePids": [
+        14204,
+        24332
+      ],
+      "rssByPid": {
+        "14204": 159006720,
+        "24332": 156274688
+      },
+      "totalRssBytes": 315281408,
+      "method": "last lifecycle RSS per unique Extension Host/server PID"
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:37.470Z",
+        "monotonicMs": 1988.3062,
+        "timeOrigin": 1790224175482.005,
+        "pid": 11336
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+        ]
+      },
+      "rssBytes": 155365376,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.779Z",
+        "monotonicMs": 327724.3873,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:37.669Z",
+        "monotonicMs": 143.7217,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 99528704,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.0064,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:37.680Z",
+        "monotonicMs": 153.9832,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100253696,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.0208,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:38.765Z",
+        "monotonicMs": 1238.9602,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 128704512,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.0263,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:38.963Z",
+        "monotonicMs": 1436.7049,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 129568768,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.0308,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:38.965Z",
+        "monotonicMs": 1438.2919,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 129576960,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.0353,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:40.447Z",
+        "monotonicMs": 2920.3495,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 156237824,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.0435,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:40.586Z",
+        "monotonicMs": 3059.3329,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+        "full": false,
+        "initial": false,
+        "previousCatalogVersion": 1
+      },
+      "rssBytes": 158674944,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.0492,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:00.476Z",
+        "monotonicMs": 22949.9898,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+        "status": "complete",
+        "catalogVersion": 2,
+        "initial": false,
+        "documents": 1000
+      },
+      "rssBytes": 277401600,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.0543,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-cancelled",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:16.515Z",
+        "monotonicMs": 38988.1983,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 272998400,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.059,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-cancelled",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:16.516Z",
+        "monotonicMs": 38989.4245,
+        "timeOrigin": 1790224177526.423,
+        "pid": 4912
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 272998400,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.780Z",
+        "monotonicMs": 327725.064,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:37.697Z",
+        "monotonicMs": 142.3229,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 99639296,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.0707,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:37.709Z",
+        "monotonicMs": 153.3943,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100339712,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.0926,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:38.784Z",
+        "monotonicMs": 1228.2383,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 129105920,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.0994,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:38.977Z",
+        "monotonicMs": 1421.1825,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 130097152,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.1045,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:38.978Z",
+        "monotonicMs": 1421.9289,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 130105344,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.1095,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:40.455Z",
+        "monotonicMs": 2899.1915,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 157294592,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.1164,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:49.465Z",
+        "monotonicMs": 11908.9411,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+        "full": false,
+        "initial": false,
+        "previousCatalogVersion": 1
+      },
+      "rssBytes": 162996224,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.1221,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:55.635Z",
+        "monotonicMs": 18078.6716,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+        "status": "complete",
+        "catalogVersion": 2,
+        "initial": false,
+        "documents": 1000
+      },
+      "rssBytes": 163647488,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.1274,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-cancelled",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:04.028Z",
+        "monotonicMs": 26471.9691,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 156811264,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.1322,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-cancelled",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:04.030Z",
+        "monotonicMs": 26473.606,
+        "timeOrigin": 1790224177566.483,
+        "pid": 23368
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+      },
+      "rssBytes": 156811264,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.1368,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:29:37.500Z",
+        "monotonicMs": 1959.5801,
+        "timeOrigin": 1790224175541.697,
+        "pid": 3896
+      },
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a"
+        ]
+      },
+      "rssBytes": 156778496,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:30:16.782Z",
+        "monotonicMs": 327727.5185,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "multiwindow-memory",
+      "phase": "same",
+      "uniquePids": [
+        11336,
+        4912,
+        23368,
+        3896
+      ],
+      "rssByPid": {
+        "3896": 156778496,
+        "4912": 272998400,
+        "11336": 155365376,
+        "23368": 156811264
+      },
+      "totalRssBytes": 741953536,
+      "method": "last lifecycle RSS per unique Extension Host/server PID"
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:23.422Z",
+        "monotonicMs": 2209.0642,
+        "timeOrigin": 1790224221212.99,
+        "pid": 14392
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a"
+        ]
+      },
+      "rssBytes": 157327360,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.124Z",
+        "monotonicMs": 393066.7596,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:23.661Z",
+        "monotonicMs": 191.3622,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a"
+      },
+      "rssBytes": 99618816,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.368,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:23.676Z",
+        "monotonicMs": 205.5358,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100286464,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.3867,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:24.698Z",
+        "monotonicMs": 1227.496,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a"
+      },
+      "rssBytes": 128872448,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.3931,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:24.924Z",
+        "monotonicMs": 1453.7927,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a"
+      },
+      "rssBytes": 129949696,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.398,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:24.925Z",
+        "monotonicMs": 1454.7023,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a"
+      },
+      "rssBytes": 129957888,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.4032,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:26.402Z",
+        "monotonicMs": 2931.6936,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 157405184,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.4109,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:38.344Z",
+        "monotonicMs": 14873.4562,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a",
+        "full": false,
+        "initial": false,
+        "previousCatalogVersion": 1
+      },
+      "rssBytes": 157487104,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.4164,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:53.029Z",
+        "monotonicMs": 29558.7346,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a"
+      },
+      "rssBytes": 164294656,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.4214,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:53.196Z",
+        "monotonicMs": 29725.8285,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a"
+      },
+      "rssBytes": 164573184,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.4265,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:53.198Z",
+        "monotonicMs": 29727.1041,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a",
+        "recovery": true
+      },
+      "rssBytes": 164577280,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.4335,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:59.533Z",
+        "monotonicMs": 36063.0226,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a",
+        "status": "complete",
+        "catalogVersion": 2,
+        "initial": false,
+        "documents": 1000
+      },
+      "rssBytes": 166744064,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.4392,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:59.534Z",
+        "monotonicMs": 36063.9087,
+        "timeOrigin": 1790224223470.834,
+        "pid": 24960
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a",
+        "full": true,
+        "initial": false,
+        "previousCatalogVersion": 2
+      },
+      "rssBytes": 166686720,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.138Z",
+        "monotonicMs": 393080.4444,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "server-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:23.536Z",
+        "monotonicMs": 159.6612,
+        "timeOrigin": 1790224223380.926,
+        "pid": 11276
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-b"
+      },
+      "rssBytes": 99516416,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.141Z",
+        "monotonicMs": 393083.173,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-start",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:23.557Z",
+        "monotonicMs": 179.5102,
+        "timeOrigin": 1790224223380.926,
+        "pid": 11276
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-b",
+        "full": true,
+        "initial": true,
+        "previousCatalogVersion": 0
+      },
+      "rssBytes": 100245504,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.141Z",
+        "monotonicMs": 393083.1958,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:24.617Z",
+        "monotonicMs": 1239.764,
+        "timeOrigin": 1790224223380.926,
+        "pid": 11276
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-b"
+      },
+      "rssBytes": 128987136,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.141Z",
+        "monotonicMs": 393083.2035,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:24.862Z",
+        "monotonicMs": 1484.0627,
+        "timeOrigin": 1790224223380.926,
+        "pid": 11276
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-b"
+      },
+      "rssBytes": 130670592,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.141Z",
+        "monotonicMs": 393083.209,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "watcher-ready",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:24.863Z",
+        "monotonicMs": 1484.9049,
+        "timeOrigin": 1790224223380.926,
+        "pid": 11276
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-b"
+      },
+      "rssBytes": 130682880,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.141Z",
+        "monotonicMs": 393083.2138,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "index-published",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:26.337Z",
+        "monotonicMs": 2958.8693,
+        "timeOrigin": 1790224223380.926,
+        "pid": 11276
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "detail": {
+        "folder": "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-b",
+        "status": "complete",
+        "catalogVersion": 1,
+        "initial": true,
+        "documents": 1000
+      },
+      "rssBytes": 157429760,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.141Z",
+        "monotonicMs": 393083.2217,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "extension-activate",
+      "occurred": {
+        "wallTime": "2026-09-24T04:30:23.315Z",
+        "monotonicMs": 2127.184,
+        "timeOrigin": 1790224221188.475,
+        "pid": 18052
+      },
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "detail": {
+        "folders": [
+          "c:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-b"
+        ]
+      },
+      "rssBytes": 156332032,
+      "observationMethod": "opt-in synchronous JSONL at lifecycle boundary",
+      "received": {
+        "wallTime": "2026-09-24T04:31:22.144Z",
+        "monotonicMs": 393086.3399,
+        "timeOrigin": 1790223889057.674,
+        "pid": 23836
+      }
+    },
+    {
+      "kind": "multiwindow-memory",
+      "phase": "distinct",
+      "uniquePids": [
+        14392,
+        24960,
+        11276,
+        18052
+      ],
+      "rssByPid": {
+        "11276": 157429760,
+        "14392": 157327360,
+        "18052": 156332032,
+        "24960": 166686720
+      },
+      "totalRssBytes": 637775872,
+      "method": "last lifecycle RSS per unique Extension Host/server PID"
+    }
+  ],
+  "scenarios": {
+    "startup": {
+      "target": 1,
+      "attempted": 1,
+      "completed": 1,
+      "incorrect": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "incomplete": 0,
+      "missing": 0,
+      "samples": [
+        {
+          "status": "completed",
+          "durationMs": 5850.80810546875,
+          "start": {
+            "wallTime": "2026-09-24T04:26:01.035Z",
+            "monotonicMs": 71977.4141,
+            "timeOrigin": 1790223889057.674,
+            "pid": 23836
+          },
+          "end": {
+            "wallTime": "2026-09-24T04:26:06.885Z",
+            "monotonicMs": 2189.6882,
+            "timeOrigin": 1790223964696.208,
+            "pid": 452
+          },
+          "extensionHostPid": 11688,
+          "serverPid": 452,
+          "folder": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\startup\\0\\workspace",
+          "clockMapping": "timeOrigin + monotonicMs on the same host",
+          "clockUncertaintyMs": null,
+          "observationMethod": "opt-in product lifecycle JSONL; synchronous write after occurrence clock"
+        }
+      ]
+    },
+    "api": {
+      "target": 1,
+      "attempted": 1,
+      "completed": 1,
+      "incorrect": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "incomplete": 0,
+      "missing": 0,
+      "samples": [
+        {
+          "status": "completed",
+          "durationMs": 11509.0634,
+          "request": {
+            "id": "normal0068",
+            "category": "normal",
+            "line": 0
+          },
+          "begin": {
+            "wallTime": "2026-09-24T04:26:13.732Z",
+            "monotonicMs": 3272.9969,
+            "timeOrigin": 1790223970458.411,
+            "pid": 10724
+          },
+          "end": {
+            "wallTime": "2026-09-24T04:26:25.241Z",
+            "monotonicMs": 14782.0603,
+            "timeOrigin": 1790223970458.411,
+            "pid": 10724
+          },
+          "validation": {
+            "id": true,
+            "body": true,
+            "sourceLink": true
+          },
+          "readiness": {
+            "wallTime": "2026-09-24T04:26:13.699Z",
+            "monotonicMs": 2153.2257,
+            "timeOrigin": 1790223971545.018,
+            "pid": 2268
+          },
+          "warmupCount": 0,
+          "configuration": {
+            "seed": 20260924,
+            "apiWarmup": 0,
+            "propagationPollMs": 50,
+            "targets": {
+              "startup": 1,
+              "api": 1,
+              "first-ui": 1,
+              "reentry-ui": 1,
+              "save": 1,
+              "external": 1,
+              "edit-indexing": 1,
+              "edit-ready": 1,
+              "multiwindow": 1
+            }
+          }
+        }
+      ]
+    },
+    "first-ui": {
+      "target": 1,
+      "attempted": 1,
+      "completed": 1,
+      "incorrect": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "incomplete": 0,
+      "missing": 0,
+      "samples": [
+        {
+          "status": "completed",
+          "scenario": "first-ui",
+          "iteration": 0,
+          "attempt": 0,
+          "durationMs": 17761.79999999702,
+          "loadingObserved": true,
+          "loadingDurationMs": 16827,
+          "entry": {
+            "kind": "entry",
+            "x": 462,
+            "y": 443,
+            "windowId": "first-ui/0/window-1",
+            "target": "normal0001",
+            "generation": 1,
+            "monotonicMs": 3163.2000000029802,
+            "timeOrigin": 1790223987465.9
+          },
+          "loading": {
+            "kind": "dom",
+            "armed": true,
+            "entered": true,
+            "popup": {
+              "open": true,
+              "loading": true,
+              "body": "",
+              "rows": [
+                {
+                  "hasContents": true,
+                  "contentsText": "Loading...",
+                  "body": "Loading..."
+                }
+              ],
+              "rowCount": 1,
+              "target": "normal0001",
+              "structureSupported": true
+            },
+            "observationOverheadMs": 0.10000000149011612,
+            "windowId": "first-ui/0/window-1",
+            "target": "normal0001",
+            "generation": 1,
+            "monotonicMs": 4098,
+            "timeOrigin": 1790223987465.9
+          },
+          "complete": {
+            "kind": "dom",
+            "armed": true,
+            "entered": true,
+            "popup": {
+              "open": true,
+              "loading": false,
+              "body": "normal0001\n\nExpected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001",
+              "rows": [
+                {
+                  "hasContents": true,
+                  "contentsText": "normal0001\nExpected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj현재 ID: normal0001도메인: performance원문 열기이 문서를 참조\nreferences0001\n\n",
+                  "body": "normal0001\n\nExpected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001"
+                }
+              ],
+              "rowCount": 1,
+              "target": "normal0001",
+              "structureSupported": true
+            },
+            "observationOverheadMs": 0.10000000149011612,
+            "windowId": "first-ui/0/window-1",
+            "target": "normal0001",
+            "generation": 1,
+            "monotonicMs": 20925,
+            "timeOrigin": 1790223987465.9
+          },
+          "launchToRequestAgeMs": 3853.5205078125,
+          "clockUncertaintyMs": null,
+          "capability": {
+            "supported": true,
+            "timeResolutionMs": 0.10000000149011612,
+            "observerScope": "target Monaco editor subtree",
+            "loadingSelector": ".hover-row > .hover-contents exact Loading...",
+            "requestedLocale": "en",
+            "documentLanguage": "en"
+          },
+          "readiness": [],
+          "windowId": "first-ui/0/window-1",
+          "targetId": "E88109156B0178C98129C926C1DFF3B6",
+          "target": "normal0001",
+          "expectedBody": "Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for project-firstui-normal0001. Expected body for proj"
+        }
+      ]
+    },
+    "reentry-ui": {
+      "target": 1,
+      "attempted": 1,
+      "completed": 1,
+      "incorrect": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "incomplete": 0,
+      "missing": 0,
+      "samples": [
+        {
+          "status": "completed",
+          "scenario": "reentry-ui",
+          "iteration": 0,
+          "attempt": 1,
+          "durationMs": 4289.10000000149,
+          "loadingObserved": true,
+          "loadingDurationMs": 3363.6999999955297,
+          "entry": {
+            "kind": "entry",
+            "x": 462,
+            "y": 443,
+            "windowId": "reentry-ui/0/window-1",
+            "target": "normal0001",
+            "generation": 2,
+            "monotonicMs": 19933.19999999553,
+            "timeOrigin": 1790224010623.4
+          },
+          "loading": {
+            "kind": "dom",
+            "armed": true,
+            "entered": true,
+            "popup": {
+              "open": true,
+              "loading": true,
+              "body": "",
+              "rows": [
+                {
+                  "hasContents": true,
+                  "contentsText": "Loading...",
+                  "body": "Loading..."
+                }
+              ],
+              "rowCount": 1,
+              "target": "normal0001",
+              "structureSupported": true
+            },
+            "observationOverheadMs": 0.10000000149011612,
+            "windowId": "reentry-ui/0/window-1",
+            "target": "normal0001",
+            "generation": 2,
+            "monotonicMs": 20858.60000000149,
+            "timeOrigin": 1790224010623.4
+          },
+          "complete": {
+            "kind": "dom",
+            "armed": true,
+            "entered": true,
+            "popup": {
+              "open": true,
+              "loading": false,
+              "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001",
+              "rows": [
+                {
+                  "hasContents": true,
+                  "contentsText": "normal0001\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo현재 ID: normal0001도메인: performance원문 열기이 문서를 참조\nreferences0001\n\n",
+                  "body": "normal0001\n\nExpected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo\n\n현재 ID: normal0001\n\n도메인: performance\n\n원문 열기\n\n이 문서를 참조\n\nreferences0001"
+                }
+              ],
+              "rowCount": 1,
+              "target": "normal0001",
+              "structureSupported": true
+            },
+            "observationOverheadMs": 0.10000000149011612,
+            "windowId": "reentry-ui/0/window-1",
+            "target": "normal0001",
+            "generation": 2,
+            "monotonicMs": 24222.29999999702,
+            "timeOrigin": 1790224010623.4
+          },
+          "launchToRequestAgeMs": 20666.794677734375,
+          "clockUncertaintyMs": null,
+          "capability": {
+            "supported": true,
+            "timeResolutionMs": 0.10000000149011612,
+            "observerScope": "target Monaco editor subtree",
+            "loadingSelector": ".hover-row > .hover-contents exact Loading...",
+            "requestedLocale": "en",
+            "documentLanguage": "en"
+          },
+          "readiness": [],
+          "windowId": "reentry-ui/0/window-1",
+          "targetId": "C483B4171789BB8F8F080DD6ACDA9B3B",
+          "target": "normal0001",
+          "expectedBody": "Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body for project-reentryui-normal0001. Expected body fo"
+        }
+      ]
+    },
+    "save": {
+      "target": 1,
+      "attempted": 1,
+      "completed": 1,
+      "incorrect": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "incomplete": 0,
+      "missing": 0,
+      "samples": [
+        {
+          "status": "completed",
+          "durationMs": 18929.032300000003,
+          "start": {
+            "wallTime": "2026-09-24T04:27:34.302Z",
+            "monotonicMs": 15645.8282,
+            "timeOrigin": 1790224038656.836,
+            "pid": 9788
+          },
+          "end": {
+            "wallTime": "2026-09-24T04:27:53.231Z",
+            "monotonicMs": 34574.8605,
+            "timeOrigin": 1790224038656.836,
+            "pid": 9788
+          },
+          "token": "cod20-save-0-1790224042597",
+          "queries": [
+            {
+              "begin": {
+                "wallTime": "2026-09-24T04:27:34.302Z",
+                "monotonicMs": 15646.2152,
+                "timeOrigin": 1790224038656.836,
+                "pid": 9788
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:27:38.102Z",
+                "monotonicMs": 19445.5906,
+                "timeOrigin": 1790224038656.836,
+                "pid": 9788
+              },
+              "found": false
+            },
+            {
+              "begin": {
+                "wallTime": "2026-09-24T04:27:38.160Z",
+                "monotonicMs": 19503.7119,
+                "timeOrigin": 1790224038656.836,
+                "pid": 9788
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:27:53.231Z",
+                "monotonicMs": 34574.8605,
+                "timeOrigin": 1790224038656.836,
+                "pid": 9788
+              },
+              "found": true
+            }
+          ],
+          "alreadyReflected": false,
+          "pollIntervalMs": 50
+        }
+      ]
+    },
+    "external": {
+      "target": 1,
+      "attempted": 1,
+      "completed": 1,
+      "incorrect": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "incomplete": 0,
+      "missing": 0,
+      "samples": [
+        {
+          "status": "completed",
+          "durationMs": 47984.950600000004,
+          "start": {
+            "wallTime": "2026-09-24T04:28:00.736Z",
+            "monotonicMs": 3760.1591,
+            "timeOrigin": 1790224076973.494,
+            "pid": 25168
+          },
+          "end": {
+            "wallTime": "2026-09-24T04:28:48.721Z",
+            "monotonicMs": 51745.1097,
+            "timeOrigin": 1790224076973.494,
+            "pid": 25168
+          },
+          "token": "cod20-external-0-1790224080729",
+          "queries": [
+            {
+              "begin": {
+                "wallTime": "2026-09-24T04:28:00.736Z",
+                "monotonicMs": 3760.4623,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:28:12.022Z",
+                "monotonicMs": 15046.9083,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "found": false
+            },
+            {
+              "begin": {
+                "wallTime": "2026-09-24T04:28:12.078Z",
+                "monotonicMs": 15102.122,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:28:19.684Z",
+                "monotonicMs": 22708.4662,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "found": false
+            },
+            {
+              "begin": {
+                "wallTime": "2026-09-24T04:28:19.736Z",
+                "monotonicMs": 22760.972,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:28:26.858Z",
+                "monotonicMs": 29882.2709,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "found": false
+            },
+            {
+              "begin": {
+                "wallTime": "2026-09-24T04:28:26.909Z",
+                "monotonicMs": 29933.6636,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:28:33.976Z",
+                "monotonicMs": 37000.0509,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "found": false
+            },
+            {
+              "begin": {
+                "wallTime": "2026-09-24T04:28:34.028Z",
+                "monotonicMs": 37053.0457,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:28:48.721Z",
+                "monotonicMs": 51745.1097,
+                "timeOrigin": 1790224076973.494,
+                "pid": 25168
+              },
+              "found": true
+            }
+          ],
+          "alreadyReflected": false,
+          "pollIntervalMs": 50
+        }
+      ]
+    },
+    "edit-indexing": {
+      "target": 1,
+      "attempted": 1,
+      "completed": 1,
+      "incorrect": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "incomplete": 0,
+      "missing": 0,
+      "samples": [
+        {
+          "status": "completed",
+          "durationMs": 54.71769999999992,
+          "start": {
+            "wallTime": "2026-09-24T04:28:53.787Z",
+            "monotonicMs": 1479.9771,
+            "timeOrigin": 1790224132308.132,
+            "pid": 11096
+          },
+          "end": {
+            "wallTime": "2026-09-24T04:28:53.842Z",
+            "monotonicMs": 1534.6948,
+            "timeOrigin": 1790224132308.132,
+            "pid": 11096
+          },
+          "token": "cod20-edit-edit-indexing-0",
+          "version": 2,
+          "classification": "during-index",
+          "indexInterval": {
+            "start": {
+              "wallTime": "2026-09-24T04:28:53.573Z",
+              "monotonicMs": 154.8655,
+              "timeOrigin": 1790224133422.397,
+              "pid": 23756
+            },
+            "end": null
+          }
+        }
+      ]
+    },
+    "edit-ready": {
+      "target": 1,
+      "attempted": 1,
+      "completed": 1,
+      "incorrect": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "incomplete": 0,
+      "missing": 0,
+      "samples": [
+        {
+          "status": "completed",
+          "durationMs": 7.26070000000027,
+          "start": {
+            "wallTime": "2026-09-24T04:29:01.770Z",
+            "monotonicMs": 3902.6946,
+            "timeOrigin": 1790224137871.246,
+            "pid": 24144
+          },
+          "end": {
+            "wallTime": "2026-09-24T04:29:01.778Z",
+            "monotonicMs": 3909.9553,
+            "timeOrigin": 1790224137871.246,
+            "pid": 24144
+          },
+          "token": "cod20-edit-edit-ready-0",
+          "version": 2,
+          "classification": "after-index",
+          "indexInterval": {
+            "start": {
+              "wallTime": "2026-09-24T04:28:59.536Z",
+              "monotonicMs": 165.9113,
+              "timeOrigin": 1790224139370.137,
+              "pid": 20460
+            },
+            "end": {
+              "wallTime": "2026-09-24T04:29:01.756Z",
+              "monotonicMs": 2386.0644,
+              "timeOrigin": 1790224139370.137,
+              "pid": 20460
+            }
+          }
+        }
+      ]
+    },
+    "multiwindow": {
+      "target": 1,
+      "attempted": 1,
+      "completed": 1,
+      "incorrect": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "incomplete": 0,
+      "missing": 0,
+      "samples": [
+        {
+          "status": "completed",
+          "durationMs": 139872.1383,
+          "stages": [
+            {
+              "status": "completed",
+              "durationMs": 21981.579899999997,
+              "phase": "baseline",
+              "windowRole": "a",
+              "extensionHostPid": 24332,
+              "serverPid": 14204,
+              "folder": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\baseline\\project-a",
+              "start": {
+                "wallTime": "2026-09-24T04:29:09.773Z",
+                "monotonicMs": 3901.3627,
+                "timeOrigin": 1790224145871.151,
+                "pid": 24332
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:29:31.755Z",
+                "monotonicMs": 25882.9426,
+                "timeOrigin": 1790224145871.151,
+                "pid": 24332
+              },
+              "queries": [
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:29:09.774Z",
+                    "monotonicMs": 3901.9499,
+                    "timeOrigin": 1790224145871.151,
+                    "pid": 24332
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:29:20.739Z",
+                    "monotonicMs": 14867.1663,
+                    "timeOrigin": 1790224145871.151,
+                    "pid": 24332
+                  },
+                  "found": false
+                },
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:29:20.796Z",
+                    "monotonicMs": 14924.1794,
+                    "timeOrigin": 1790224145871.151,
+                    "pid": 24332
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:29:31.755Z",
+                    "monotonicMs": 25882.9426,
+                    "timeOrigin": 1790224145871.151,
+                    "pid": 24332
+                  },
+                  "found": true
+                }
+              ]
+            },
+            {
+              "status": "completed",
+              "durationMs": 35764.5474,
+              "phase": "same",
+              "windowRole": "a",
+              "extensionHostPid": 11336,
+              "serverPid": 4912,
+              "folder": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+              "start": {
+                "wallTime": "2026-09-24T04:29:40.543Z",
+                "monotonicMs": 5061.1291,
+                "timeOrigin": 1790224175482.005,
+                "pid": 11336
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:30:16.307Z",
+                "monotonicMs": 40825.6765,
+                "timeOrigin": 1790224175482.005,
+                "pid": 11336
+              },
+              "queries": [
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:29:40.543Z",
+                    "monotonicMs": 5061.6367,
+                    "timeOrigin": 1790224175482.005,
+                    "pid": 11336
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:29:52.862Z",
+                    "monotonicMs": 17380.7201,
+                    "timeOrigin": 1790224175482.005,
+                    "pid": 11336
+                  },
+                  "found": false
+                },
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:29:52.916Z",
+                    "monotonicMs": 17433.9174,
+                    "timeOrigin": 1790224175482.005,
+                    "pid": 11336
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:30:00.410Z",
+                    "monotonicMs": 24927.8879,
+                    "timeOrigin": 1790224175482.005,
+                    "pid": 11336
+                  },
+                  "found": false
+                },
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:30:00.471Z",
+                    "monotonicMs": 24988.9969,
+                    "timeOrigin": 1790224175482.005,
+                    "pid": 11336
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:30:16.307Z",
+                    "monotonicMs": 40825.6765,
+                    "timeOrigin": 1790224175482.005,
+                    "pid": 11336
+                  },
+                  "found": true
+                }
+              ]
+            },
+            {
+              "status": "completed",
+              "durationMs": 23484.3681,
+              "phase": "same",
+              "windowRole": "b",
+              "extensionHostPid": 3896,
+              "serverPid": 23368,
+              "folder": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\same\\project-a",
+              "start": {
+                "wallTime": "2026-09-24T04:29:40.542Z",
+                "monotonicMs": 5001.1329,
+                "timeOrigin": 1790224175541.697,
+                "pid": 3896
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:30:04.027Z",
+                "monotonicMs": 28485.501,
+                "timeOrigin": 1790224175541.697,
+                "pid": 3896
+              },
+              "queries": [
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:29:40.542Z",
+                    "monotonicMs": 5001.4201,
+                    "timeOrigin": 1790224175541.697,
+                    "pid": 3896
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:29:49.496Z",
+                    "monotonicMs": 13954.7546,
+                    "timeOrigin": 1790224175541.697,
+                    "pid": 3896
+                  },
+                  "found": false
+                },
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:29:49.547Z",
+                    "monotonicMs": 14005.571,
+                    "timeOrigin": 1790224175541.697,
+                    "pid": 3896
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:29:55.599Z",
+                    "monotonicMs": 20058.3043,
+                    "timeOrigin": 1790224175541.697,
+                    "pid": 3896
+                  },
+                  "found": false
+                },
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:29:55.655Z",
+                    "monotonicMs": 20113.9246,
+                    "timeOrigin": 1790224175541.697,
+                    "pid": 3896
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:30:04.027Z",
+                    "monotonicMs": 28485.501,
+                    "timeOrigin": 1790224175541.697,
+                    "pid": 3896
+                  },
+                  "found": true
+                }
+              ]
+            },
+            {
+              "status": "completed",
+              "durationMs": 44008.527799999996,
+              "phase": "distinct",
+              "windowRole": "a",
+              "extensionHostPid": 14392,
+              "serverPid": 24960,
+              "folder": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-a",
+              "start": {
+                "wallTime": "2026-09-24T04:30:26.466Z",
+                "monotonicMs": 5252.8718,
+                "timeOrigin": 1790224221212.99,
+                "pid": 14392
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:31:10.475Z",
+                "monotonicMs": 49261.3996,
+                "timeOrigin": 1790224221212.99,
+                "pid": 14392
+              },
+              "queries": [
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:30:26.467Z",
+                    "monotonicMs": 5253.2581,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:30:38.298Z",
+                    "monotonicMs": 17084.9334,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "found": false
+                },
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:30:38.359Z",
+                    "monotonicMs": 17145.3728,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:30:44.864Z",
+                    "monotonicMs": 23651.1207,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "found": false
+                },
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:30:44.923Z",
+                    "monotonicMs": 23709.4842,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:30:52.829Z",
+                    "monotonicMs": 31615.5023,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "found": false
+                },
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:30:52.879Z",
+                    "monotonicMs": 31665.5599,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:30:59.486Z",
+                    "monotonicMs": 38272.2398,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "found": false
+                },
+                {
+                  "begin": {
+                    "wallTime": "2026-09-24T04:30:59.537Z",
+                    "monotonicMs": 38323.1783,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "end": {
+                    "wallTime": "2026-09-24T04:31:10.475Z",
+                    "monotonicMs": 49261.3996,
+                    "timeOrigin": 1790224221212.99,
+                    "pid": 14392
+                  },
+                  "found": true
+                }
+              ]
+            },
+            {
+              "status": "completed",
+              "durationMs": 55345.701100000006,
+              "phase": "distinct",
+              "windowRole": "b",
+              "extensionHostPid": 18052,
+              "serverPid": 11276,
+              "folder": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-1EwRic\\scenarios\\multiwindow\\distinct\\project-b",
+              "start": {
+                "wallTime": "2026-09-24T04:30:26.463Z",
+                "monotonicMs": 5274.5767,
+                "timeOrigin": 1790224221188.475,
+                "pid": 18052
+              },
+              "end": {
+                "wallTime": "2026-09-24T04:31:21.806Z",
+                "monotonicMs": 60620.2778,
+                "timeOrigin": 1790224221188.475,
+                "pid": 18052
+              },
+              "validation": {
+                "isolated": true,
+                "expectedProjectId": "project-multib"
+              }
+            }
+          ],
+          "begin": {
+            "wallTime": "2026-09-24T04:29:02.289Z",
+            "monotonicMs": 253231.4231,
+            "timeOrigin": 1790223889057.674,
+            "pid": 23836
+          },
+          "end": {
+            "wallTime": "2026-09-24T04:31:22.161Z",
+            "monotonicMs": 393103.5614,
+            "timeOrigin": 1790223889057.674,
+            "pid": 23836
+          },
+          "memoryAttribution": "latest RSS per unique Extension Host/server PID in each phase"
+        }
+      ]
+    }
+  },
+  "errors": [],
+  "observationOverhead": [
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "pid": 11688,
+      "primaryRecordOverheadMs": 3.212299999999914,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "pid": 452,
+      "primaryRecordOverheadMs": 3.2901999999999987,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "pid": 452,
+      "primaryRecordOverheadMs": 0.766900000000021,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "pid": 452,
+      "primaryRecordOverheadMs": 0.4249999999999545,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "pid": 452,
+      "primaryRecordOverheadMs": 0.47680000000013933,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "pid": 452,
+      "primaryRecordOverheadMs": 0.3351000000000113,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/startup/0",
+      "windowId": "startup/0/window-1",
+      "pid": 452,
+      "primaryRecordOverheadMs": 0.49929999999994834,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "pid": 10724,
+      "primaryRecordOverheadMs": 2.1877999999999247,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "pid": 2268,
+      "primaryRecordOverheadMs": 1.981599999999986,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "pid": 2268,
+      "primaryRecordOverheadMs": 1.0229000000000212,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "pid": 2268,
+      "primaryRecordOverheadMs": 0.3870999999999185,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "pid": 2268,
+      "primaryRecordOverheadMs": 0.3591000000000122,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "pid": 2268,
+      "primaryRecordOverheadMs": 0.3261999999999716,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/api/0",
+      "windowId": "api/0/window-1",
+      "pid": 2268,
+      "primaryRecordOverheadMs": 0.4942999999998392,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "pid": 13900,
+      "primaryRecordOverheadMs": 2.6279000000001815,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "pid": 23528,
+      "primaryRecordOverheadMs": 2.6071000000000026,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "pid": 23528,
+      "primaryRecordOverheadMs": 0.8088999999999942,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "pid": 23528,
+      "primaryRecordOverheadMs": 0.4472000000000662,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "pid": 23528,
+      "primaryRecordOverheadMs": 0.34140000000002146,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "pid": 23528,
+      "primaryRecordOverheadMs": 0.3109999999999218,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/first-ui/0",
+      "windowId": "first-ui/0/window-1",
+      "pid": 23528,
+      "primaryRecordOverheadMs": 0.49830000000019936,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "pid": 15020,
+      "primaryRecordOverheadMs": 4.4162000000000035,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "pid": 15020,
+      "primaryRecordOverheadMs": 1.3706999999999994,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "pid": 15020,
+      "primaryRecordOverheadMs": 0.5443000000000211,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "pid": 15020,
+      "primaryRecordOverheadMs": 0.38009999999985666,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "pid": 15020,
+      "primaryRecordOverheadMs": 0.306400000000167,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "pid": 15020,
+      "primaryRecordOverheadMs": 0.4634000000000924,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/reentry-ui/0",
+      "windowId": "reentry-ui/0/window-1",
+      "pid": 8476,
+      "primaryRecordOverheadMs": 1.0780999999999494,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 3.7745000000000175,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 0.6836000000000126,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 1.2565999999999349,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 0.9862000000000535,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 1.5453999999999724,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 0.4238000000000284,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 0.5509999999994761,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 0.4375,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-cancelled",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 0.7004000000015367,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-cancelled",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 7860,
+      "primaryRecordOverheadMs": 0.30760000000009313,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/save/0",
+      "windowId": "save/0/window-1",
+      "pid": 9788,
+      "primaryRecordOverheadMs": 1.0554999999999382,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 25168,
+      "primaryRecordOverheadMs": 1.1539000000000215,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 1.942700000000002,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.806699999999978,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.42210000000000036,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.3634999999999309,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.9290000000000873,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.4884999999999309,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.4555999999993219,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.3629000000000815,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.3827000000019325,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.27300000000104774,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.9204000000027008,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/external/0",
+      "windowId": "external/0/window-1",
+      "pid": 9020,
+      "primaryRecordOverheadMs": 0.28399999999965075,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "pid": 11096,
+      "primaryRecordOverheadMs": 1.1397000000001754,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "pid": 23756,
+      "primaryRecordOverheadMs": 1.9224999999999852,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "pid": 23756,
+      "primaryRecordOverheadMs": 0.773399999999981,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "pid": 23756,
+      "primaryRecordOverheadMs": 0.44449999999994816,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-cancelled",
+      "sessionId": "1790223888736-19064/edit-indexing/0",
+      "windowId": "edit-indexing/0/window-1",
+      "pid": 23756,
+      "primaryRecordOverheadMs": 0.4377999999999247,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "pid": 20460,
+      "primaryRecordOverheadMs": 3.819199999999995,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "pid": 20460,
+      "primaryRecordOverheadMs": 1.3785000000000025,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "pid": 20460,
+      "primaryRecordOverheadMs": 0.45050000000014734,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "pid": 20460,
+      "primaryRecordOverheadMs": 0.43449999999984357,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "pid": 20460,
+      "primaryRecordOverheadMs": 0.6776999999999589,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "pid": 20460,
+      "primaryRecordOverheadMs": 0.6627000000003136,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/edit-ready/0",
+      "windowId": "edit-ready/0/window-1",
+      "pid": 24144,
+      "primaryRecordOverheadMs": 1.3354999999999109,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 2.303200000000004,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 1.0696000000000083,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 0.5040000000000191,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 0.38229999999998654,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 0.40820000000007894,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 0.4636000000000422,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 0.5959000000002561,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 0.9359999999996944,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-cancelled",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 0.5793999999987136,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-cancelled",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 14204,
+      "primaryRecordOverheadMs": 0.24730000000272412,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/multiwindow/baseline/a",
+      "windowId": "multiwindow/baseline/a",
+      "pid": 24332,
+      "primaryRecordOverheadMs": 0.8864000000000942,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 11336,
+      "primaryRecordOverheadMs": 0.9203999999999724,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 2.3597000000000037,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 0.6978000000000009,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 0.4318000000000666,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 0.6468000000002121,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 0.30709999999999127,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 0.5002999999996973,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 0.8024999999997817,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 1.0771999999997206,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-cancelled",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 0.7918999999965308,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-cancelled",
+      "sessionId": "1790223888736-19064/multiwindow/same/a",
+      "windowId": "multiwindow/same/a",
+      "pid": 4912,
+      "primaryRecordOverheadMs": 0.4164999999993597,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 2.542599999999993,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 0.7284999999999968,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 0.41020000000003165,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 0.3317000000001826,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 0.27719999999999345,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 0.5187999999998283,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 0.8482999999996537,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 0.5956999999980326,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-cancelled",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 0.5729999999966822,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-cancelled",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 23368,
+      "primaryRecordOverheadMs": 0.6971000000012282,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/multiwindow/same/b",
+      "windowId": "multiwindow/same/b",
+      "pid": 3896,
+      "primaryRecordOverheadMs": 1.495300000000043,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 14392,
+      "primaryRecordOverheadMs": 0.9967999999998938,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 3.6036,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.9440000000000168,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.6119000000001051,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.36410000000000764,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.3341000000000349,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.8379999999997381,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.724900000001071,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 4.370600000002014,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.5648000000001048,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.528599999997823,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.4676000000035856,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/a",
+      "windowId": "multiwindow/distinct/a",
+      "pid": 24960,
+      "primaryRecordOverheadMs": 0.7862000000022817,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "server-start",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "pid": 11276,
+      "primaryRecordOverheadMs": 3.2682000000000073,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-start",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "pid": 11276,
+      "primaryRecordOverheadMs": 0.9224000000000103,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "pid": 11276,
+      "primaryRecordOverheadMs": 1.1304000000000087,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-connection-ready",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "pid": 11276,
+      "primaryRecordOverheadMs": 0.37970000000018445,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "watcher-ready",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "pid": 11276,
+      "primaryRecordOverheadMs": 0.28160000000002583,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "index-published",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "pid": 11276,
+      "primaryRecordOverheadMs": 0.4620999999997366,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    },
+    {
+      "kind": "extension-activate",
+      "sessionId": "1790223888736-19064/multiwindow/distinct/b",
+      "windowId": "multiwindow/distinct/b",
+      "pid": 18052,
+      "primaryRecordOverheadMs": 1.408799999999701,
+      "method": "occurrence clock, JSON serialization, synchronous primary JSONL append"
+    }
+  ],
+  "finishedAt": "2026-09-24T04:31:25.770Z"
+}

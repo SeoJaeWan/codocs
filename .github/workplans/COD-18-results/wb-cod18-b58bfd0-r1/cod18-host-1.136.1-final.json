@@ -1,0 +1,1227 @@
+{
+  "kind": "actual-vscode-extension-host",
+  "packageKind": "installed-vsix",
+  "vscode": {
+    "requestedVersion": null,
+    "version": "1.136.1",
+    "architecture": "arm64",
+    "executable": "/Applications/Visual Studio Code.app/Contents/MacOS/Code",
+    "runtimeRoot": "/Applications/Visual Studio Code.app/Contents/MacOS",
+    "downloadedThisRun": false
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "cpu": "Apple M1 Pro",
+    "cpuCount": 10,
+    "memoryBytes": 17179869184,
+    "runnerNode": "v24.21.0",
+    "fileCache": "OS file cache was not forcibly cleared",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": null,
+  "artifacts": {
+    "provenance": {
+      "productSourceCommit": "66686f70c254675e7263912604e90298d556f98d",
+      "harnessHashes": {
+        "run.mjs": "6f47a415fb68ff5ea932558e9e5463a84548d3d6a677a4cbadf96b5535adeef3",
+        "extension-test.cjs": "a16ed9af38b0c0bca717117bb0c797224a7db7f56bcdb74e3145fcbcf46274d2",
+        "cod18.cjs": "1a864299d9cd089d89e8952d2380ca144ed34224e13a40442d851a2b0fd9b79b",
+        "acceptance.cjs": "7b44e47d97645884598522c014c89e10ce7c1ffc151de3ce83b00be27f91c8c2",
+        "request-outcome.cjs": "495679cedec30d662ac2cb9c701168acfc3e63b56daf469079f1760a801e6a06"
+      },
+      "vsixSha256": "8924a77e7b92f837354d5248580b7bf2e9b89250bfc8401b5ed9921c16803628",
+      "extensionBundleSha256": "a842268fc4b12efdf851f0b65dee0640d5b2c5aa3a6367acd52ab2e7723f0ca6",
+      "serverBundleSha256": "1b0676e32e41b1ee658038b96f1333e0fd5a7ab414c88653305c6e6f6cf5c95d",
+      "workspaceFixtureSha256": "cf96bb531498c332b3e0e774429fe30cf1b0c0f69db54210c6020a2aa29e724b",
+      "vscodeVersion": "1.136.1",
+      "runtimeTemporaryRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.r3CI35m",
+      "fixtureRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa",
+      "capturedBeforeHost": true
+    },
+    "sourceCommit": "66686f70c254675e7263912604e90298d556f98d",
+    "productSourceCommit": "66686f70c254675e7263912604e90298d556f98d",
+    "harnessState": "content hashes captured before Host; harness may be uncommitted",
+    "harnessHashes": {
+      "run.mjs": "6f47a415fb68ff5ea932558e9e5463a84548d3d6a677a4cbadf96b5535adeef3",
+      "extension-test.cjs": "a16ed9af38b0c0bca717117bb0c797224a7db7f56bcdb74e3145fcbcf46274d2",
+      "cod18.cjs": "1a864299d9cd089d89e8952d2380ca144ed34224e13a40442d851a2b0fd9b79b",
+      "acceptance.cjs": "7b44e47d97645884598522c014c89e10ce7c1ffc151de3ce83b00be27f91c8c2",
+      "request-outcome.cjs": "495679cedec30d662ac2cb9c701168acfc3e63b56daf469079f1760a801e6a06"
+    },
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/cod18.vsix",
+    "vsixBytes": 1225758,
+    "vsixSha256": "8924a77e7b92f837354d5248580b7bf2e9b89250bfc8401b5ed9921c16803628",
+    "extensionBundleSha256": "a842268fc4b12efdf851f0b65dee0640d5b2c5aa3a6367acd52ab2e7723f0ca6",
+    "serverBundleSha256": "1b0676e32e41b1ee658038b96f1333e0fd5a7ab414c88653305c6e6f6cf5c95d",
+    "vscodeSourceSha256": "f29f2281d86eaca089526891207270b497bfd9d2be4a505707323075fac0d761",
+    "languageServerSourceSha256": "83547fe075fd9dcd5cf22302f0483b48982efe86212093263f537ecf5745cdae"
+  },
+  "install": {
+    "extensionRoot": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.r3CI35m/e/codocs.codocs-0.0.0",
+    "stdout": "Installing extensions...\nExtension 'cod18.vsix' was successfully installed.\n",
+    "stderr": "(node:53001) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code --trace-deprecation ...` to show where the warning was created)\n"
+  },
+  "exitCode": 0,
+  "acceptance": [
+    {
+      "ac": "AC-001",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-001",
+          "name": "CRLF quoted escape/folded/self/malformed and missing reference ranges",
+          "status": "pass",
+          "evidence": [
+            {
+              "range": [
+                {
+                  "line": 2,
+                  "character": 26
+                },
+                {
+                  "line": 2,
+                  "character": 35
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"_LzHmibhIMVOw5mA3b8RfBOfqtBzxiUy\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 5,
+                  "character": 4
+                },
+                {
+                  "line": 5,
+                  "character": 13
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"_LzHmibhIMVOw5mA3b8RfBOfqtBzxiUy\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 6,
+                  "character": 5
+                },
+                {
+                  "line": 6,
+                  "character": 17
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"YOp9uj3Efsv29nxbVMPpKK8wvku-xmOY\"}]"
+              }
+            }
+          ],
+          "durationMilliseconds": 100,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-001",
+          "name": "LF UTF-16 repeated/domain/field boundaries",
+          "status": "pass",
+          "evidence": [
+            {
+              "range": [
+                {
+                  "line": 2,
+                  "character": 16
+                },
+                {
+                  "line": 2,
+                  "character": 25
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"-DQhLaMr8dLIaoetH2aLvuf7xA_HJYQ4\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 2,
+                  "character": 26
+                },
+                {
+                  "line": 2,
+                  "character": 38
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"SRepmilj9oDdeEqkosUiTzO_7qpCIuSC\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 2,
+                  "character": 39
+                },
+                {
+                  "line": 2,
+                  "character": 48
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"-DQhLaMr8dLIaoetH2aLvuf7xA_HJYQ4\"}]"
+              }
+            },
+            {
+              "range": [
+                {
+                  "line": 3,
+                  "character": 12
+                },
+                {
+                  "line": 3,
+                  "character": 21
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"-DQhLaMr8dLIaoetH2aLvuf7xA_HJYQ4\"}]"
+              }
+            }
+          ],
+          "durationMilliseconds": 23,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-001",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "protocol syntax cases exercised; visible UI range matrix not exhaustive",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-002",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-002",
+          "name": "unsaved replacement/insertion/deletion latest ranges",
+          "status": "pass",
+          "evidence": [
+            {
+              "range": [
+                {
+                  "line": 4,
+                  "character": 2
+                },
+                {
+                  "line": 4,
+                  "character": 11
+                }
+              ],
+              "target": {
+                "$mid": 1,
+                "path": "codocs.openSource",
+                "scheme": "command",
+                "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"V8jgZIOF04Kd0KNBjqSuvfYpFgZdemtp\"}]"
+              }
+            }
+          ],
+          "durationMilliseconds": 22,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-002",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "close/cancellation/controlled async race not exercised through actual UI",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-003",
+      "status": "fail",
+      "checks": [
+        {
+          "ac": "AC-003",
+          "name": "ambiguous YAML body has no target; each Hover candidate opens",
+          "status": "fail",
+          "error": "AssertionError [ERR_ASSERTION]: individual candidate links must open, unlike source text\n+ actual - expected\n\n  [\n+   false,\n+   false\n-   true,\n-   true\n  ]\n\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:242:14\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:197:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+          "durationMilliseconds": 129,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-003",
+          "name": "relationship-only code Hover link opens referenced document",
+          "status": "fail",
+          "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:607:14\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:590:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+          "durationMilliseconds": 14,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-003",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "actual source click and each rendered Hover click require UI evidence",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-004",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-004",
+          "name": "content revision change opens from existing token",
+          "status": "pass",
+          "evidence": {
+            "existingTokenOpened": true
+          },
+          "durationMilliseconds": 110,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-004",
+          "name": "confirmed move updates existing token",
+          "status": "pass",
+          "evidence": {
+            "moved": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/moved.yaml"
+          },
+          "durationMilliseconds": 163,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-004",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "visible cached Hover/DocumentLink refresh requires UI evidence",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-005",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-005",
+          "name": "delete and old path reuse cannot open unrelated document",
+          "status": "pass",
+          "evidence": {
+            "oldTokenRejected": true
+          },
+          "durationMilliseconds": 217,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-005",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "visible stale click and no-popup observation require UI evidence",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-006",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-006",
+          "name": "absent YAML hover/link removed; source and broken diagnostic remain",
+          "status": "pass",
+          "evidence": [
+            {
+              "severity": "Error",
+              "message": "Invalid input: expected array, received undefined",
+              "range": [
+                {
+                  "line": 0,
+                  "character": 0
+                },
+                {
+                  "line": 5,
+                  "character": 0
+                }
+              ],
+              "source": "codocs",
+              "code": "missing_required_field"
+            },
+            {
+              "severity": "Error",
+              "message": "참조 이름에 해당하는 문서가 없습니다.",
+              "range": [
+                {
+                  "line": 4,
+                  "character": 2
+                },
+                {
+                  "line": 4,
+                  "character": 11
+                }
+              ],
+              "source": "codocs",
+              "code": "reference_not_found"
+            }
+          ],
+          "durationMilliseconds": 3,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-006",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "visible no-popup observation requires UI evidence",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-007",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-007",
+          "name": "duplicate top retains auxiliary and disambiguated paths",
+          "status": "pass",
+          "evidence": {
+            "markdown": "### ID 충돌\n\n**충돌 문서**\n\n- [같은 이름 — 동일 · cod18/duplicate\\-a\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22iX6CnSSIXKUbUAUOcJ_aWjhtspYhE5k9%22%7D%5D)\n- [같은 이름 — 동일 · cod18/duplicate\\-b\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22Nn1r3VXJ79xYzyFU6XSXff1Xv-od_LRX%22%7D%5D)\n\n**오류**\n\n- 같은 ID를 가진 발견 경로가 여러 개입니다\\.\n- 같은 도메인에 같은 이름을 가진 문서가 여러 개입니다\\.\n- 같은 ID를 가진 발견 경로가 여러 개입니다\\.\n- 같은 도메인에 같은 이름을 가진 문서가 여러 개입니다\\.\n\n---\n\n**함께 매칭된 용어**\n\n- [보조 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22J5nrk8RvMzvLr72jWdbVNZsH-UqJK_62%22%7D%5D)"
+          },
+          "durationMilliseconds": 112,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-007",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "same-name without-domain YAML case and same-domain code case exercised; actual UI not exercised",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-008",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-008",
+          "name": "current plus duplicate alias suppresses notice; previous-only remains",
+          "status": "pass",
+          "evidence": {
+            "current": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22H5gSToThu3nKDEgqNfWFu3SwuB4u7-YH%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+            "previous": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22H5gSToThu3nKDEgqNfWFu3SwuB4u7-YH%22%7D%5D)\n\n> 이전 ID입니다. 현재 ID: current\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+            "auxiliaryCurrent": "### 보조 후보\n\nauxiliary body\n\n**현재 ID:** `auxiliary`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22gp4uV61t_Q53liUDvt22tCL8TY5u4aR1%22%7D%5D)\n\n**함께 매칭된 용어**\n\n- [현재 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22H5gSToThu3nKDEgqNfWFu3SwuB4u7-YH%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+            "auxiliaryPrevious": "### 보조 후보\n\nauxiliary body\n\n**현재 ID:** `auxiliary`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22gp4uV61t_Q53liUDvt22tCL8TY5u4aR1%22%7D%5D)\n\n**함께 매칭된 용어**\n\n- [현재 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22H5gSToThu3nKDEgqNfWFu3SwuB4u7-YH%22%7D%5D) \\(이전 ID입니다\\.\\)\n\n**오류**\n\n- Invalid input: expected array, received undefined"
+          },
+          "durationMilliseconds": 127,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-008",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "same-identifier different-position mixed current/previous combination not exercised",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-009",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-009",
+          "name": "alias-duplicate YAML diagnostic remains; only that Hover cause is hidden",
+          "status": "pass",
+          "evidence": {
+            "markdown": "### 별칭 오류\n\nbody\n\n**현재 ID:** `invalid-alias`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Finvalid-alias.java%22%2C%22token%22%3A%227k2Q0ypWMHcrkX2MZYK8XbucP7OP1sWy%22%7D%5D)\n\n**오류**\n\n- 빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다\\.",
+            "diagnostics": [
+              {
+                "severity": "Error",
+                "message": "빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다.",
+                "range": [
+                  {
+                    "line": 3,
+                    "character": 10
+                  },
+                  {
+                    "line": 3,
+                    "character": 13
+                  }
+                ],
+                "source": "codocs",
+                "code": "invalid_field_value"
+              },
+              {
+                "severity": "Warning",
+                "message": "이전 ID가 현재 ID와 같습니다.",
+                "range": [
+                  {
+                    "line": 5,
+                    "character": 8
+                  },
+                  {
+                    "line": 5,
+                    "character": 21
+                  }
+                ],
+                "source": "codocs",
+                "code": "invalid_field_value"
+              }
+            ]
+          },
+          "durationMilliseconds": 115,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-009",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "protocol case exercised; actual visible diagnostics/hover not exercised",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-010",
+      "status": "skip",
+      "checks": [
+        {
+          "ac": "AC-010",
+          "name": "YAML new/existing/dirty tab top and disk preservation",
+          "status": "pass",
+          "evidence": {
+            "top": true,
+            "diskPreserved": true,
+            "tabsPreserved": true
+          },
+          "durationMilliseconds": 104,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-010",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "actual rendered code/YAML link click requires UI evidence",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-011",
+      "status": "fail",
+      "checks": [
+        {
+          "ac": "AC-011",
+          "name": "deprecated occurrence warning/link retained and state refreshed",
+          "status": "fail",
+          "error": "TypeError: Cannot read properties of undefined (reading 'target')\n\tat open (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:80:20)\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:372:26\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:342:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+          "durationMilliseconds": 176,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-011",
+          "name": "ordinary/previous-only/ambiguous references have no deprecated warning",
+          "status": "pass",
+          "evidence": [
+            {
+              "severity": "Error",
+              "message": "Invalid input: expected array, received undefined",
+              "range": [
+                {
+                  "line": 0,
+                  "character": 0
+                },
+                {
+                  "line": 3,
+                  "character": 0
+                }
+              ],
+              "source": "codocs",
+              "code": "missing_required_field"
+            },
+            {
+              "severity": "Warning",
+              "message": "확정 참조 대상에 문서 오류가 있습니다.",
+              "range": [
+                {
+                  "line": 2,
+                  "character": 13
+                },
+                {
+                  "line": 2,
+                  "character": 22
+                }
+              ],
+              "source": "codocs",
+              "code": "reference_target_error"
+            },
+            {
+              "severity": "Error",
+              "message": "참조 이름에 해당하는 문서가 여러 개입니다.",
+              "range": [
+                {
+                  "line": 2,
+                  "character": 23
+                },
+                {
+                  "line": 2,
+                  "character": 32
+                }
+              ],
+              "source": "codocs",
+              "code": "reference_ambiguous"
+            }
+          ],
+          "durationMilliseconds": 120,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-011",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "ordinary/alias/ambiguous negative cases exercised; unconfirmed negative case not exercised",
+          "durationMilliseconds": 0
+        }
+      ]
+    },
+    {
+      "ac": "AC-012",
+      "status": "fail",
+      "checks": [
+        {
+          "ac": "AC-012",
+          "name": "invalid current ID name reference survives content revision",
+          "status": "fail",
+          "error": "AssertionError [ERR_ASSERTION]: valid name reference must not require valid current ID after content change\n\nfalse !== true\n\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:418:14\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:389:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+          "durationMilliseconds": 280,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-012",
+          "name": "partial scan preserves confirmed candidate information",
+          "status": "fail",
+          "error": "AssertionError [ERR_ASSERTION]: confirmed candidate must remain usable in partial observation\n\nfalse !== true\n\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:453:14\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:426:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+          "durationMilliseconds": 121,
+          "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+        },
+        {
+          "ac": "AC-012",
+          "name": "remaining acceptance coverage",
+          "status": "skip",
+          "reason": "preparing/failed controlled host states not induced",
+          "durationMilliseconds": 0
+        },
+        {
+          "ac": "AC-012",
+          "name": "native JavaScript definition",
+          "status": "pass",
+          "durationMilliseconds": 2
+        }
+      ]
+    }
+  ],
+  "stdout": "\u001b[90m[main 2026-09-22T01:56:44.699Z]\u001b[0m StorageMainService: creating application shared storage\n\u001b[90m[main 2026-09-22T01:56:44.888Z]\u001b[0m [shared storage] Creating shared storage database at ':memory:' (wasCreated: true)\n\u001b[90m[main 2026-09-22T01:56:44.888Z]\u001b[0m [shared storage] Initializing fallback application storage (path: in-memory)\n\u001b[90m[main 2026-09-22T01:56:45.002Z]\u001b[0m [shared storage] Fallback application storage initialized with 3 items\n\u001b[90m[main 2026-09-22T01:56:45.003Z]\u001b[0m update#setState disabled\n\u001b[90m[main 2026-09-22T01:56:45.003Z]\u001b[0m update#ctor - updates are disabled by the environment\n[AgentHost:renderer] Acquiring MessagePort to agent host...\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=undefined conversationKey=undefined modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n\u001b[90m[main 2026-09-22T01:56:46.034Z]\u001b[0m AgentHostProcessManager: agent host started\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/NDZjODY4ZTUtMWY5Yi00ZWM4LTkyMTEtNzJlZWRmNjJkZDlm\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n[AgentHost:renderer] MessagePort acquired, creating client...\nStarted local extension host with pid 53465.\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/NDZjODY4ZTUtMWY5Yi00ZWM4LTkyMTEtNzJlZWRmNjJkZDlm\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\nLoading development extension at /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.r3CI35m/e/codocs.codocs-0.0.0\n[AgentHost:renderer] Protocol connection established; clientId=57581215-634e-4459-8c03-2d5ad02d4006\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] Clearing authentication for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\nSettings Sync: Account status changed from uninitialized to unavailable\n[AgentHost] Clearing authentication for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[AgentHost] No token resolved for resource: https://api.github.com/repos\n[ChatModelSelection] event=no-model-at-toolbar-build surface=\"workbench\" sessionKey=\"local\" conversationKey=\"vscode-chat-session://local/NDZjODY4ZTUtMWY5Yi00ZWM4LTkyMTEtNzJlZWRmNjJkZDlm\" modelTarget=undefined storageKey=\"chat.currentLanguageModel.panel\" widgetViewKind=\"view\"\n[AccountPolicyGate] apply: state=inactive, reason=undefined, isRestricted=false\n\u001b[90m[main 2026-09-22T01:56:54.355Z]\u001b[0m Extension host with pid 53465 exited with code: 0, signal: unknown.\n",
+  "stderr": "\u001b[91m[main 2026-09-22T01:56:46.389Z]\u001b[0m [AgentHost:stderr] (node:53464) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `Code Helper --trace-deprecation ...` to show where the warning was created)\n\nUnknown channel: agentHostClientByokLm\nUnknown channel: agentHostClientProxy\nUnknown channel: agentHostClientProxy\nError: Unexpected SIGPIPE\n\tat process.<anonymous> (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/bootstrap-fork.js:407:1691)\n\tat process.emit (node:events:509:28)\n",
+  "evidence": {
+    "vscodeVersion": "1.136.1",
+    "extensionIdentifier": "codocs.codocs",
+    "extensionActive": true,
+    "extensionHost": {
+      "node": "v24.18.1",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "cpu": "Apple M1 Pro"
+    },
+    "workspaceFolderCount": 4,
+    "serverCount": 4,
+    "hoverAndOpenSource": {
+      "reservationRange": {
+        "start": {
+          "line": 1,
+          "character": 2
+        },
+        "end": {
+          "line": 1,
+          "character": 13
+        }
+      },
+      "returnZoneRange": {
+        "start": {
+          "line": 1,
+          "character": 13
+        },
+        "end": {
+          "line": 1,
+          "character": 24
+        }
+      },
+      "generatedCommandTrusted": true,
+      "nearestWorkspaceOnly": true,
+      "openedUri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/%ED%95%9C%EA%B8%80%20%EC%9B%90%EB%AC%B8/%EB%B0%98%EB%82%A9%20%EA%B5%AC%EC%97%AD.yaml",
+      "crlfAndUnicodePathOpened": true,
+      "existingTabReused": true,
+      "dirtyYamlPreserved": true,
+      "dirtySelectionResetToTop": true,
+      "defaultDefinitionProviderPreserved": true
+    },
+    "manualRestartReplacedAllProcesses": true,
+    "unsavedDocument": {
+      "version": 2,
+      "textPreservedAfterRestart": true,
+      "dirtyAfterRestart": true,
+      "diskUnchanged": true
+    },
+    "missingCodocsNotGenerated": true,
+    "createdAndChangedCodocsObservedWithoutProcessLoss": true,
+    "automaticRestartsObserved": 3,
+    "repeatedCrashStoppedOneServer": true,
+    "manualRecoveryRestoredAllServers": true,
+    "crashedPids": [53740, 53753, 53756, 53759],
+    "cod18": [
+      {
+        "ac": "AC-001",
+        "name": "CRLF quoted escape/folded/self/malformed and missing reference ranges",
+        "status": "pass",
+        "evidence": [
+          {
+            "range": [
+              {
+                "line": 2,
+                "character": 26
+              },
+              {
+                "line": 2,
+                "character": 35
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"_LzHmibhIMVOw5mA3b8RfBOfqtBzxiUy\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 5,
+                "character": 4
+              },
+              {
+                "line": 5,
+                "character": 13
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"_LzHmibhIMVOw5mA3b8RfBOfqtBzxiUy\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 6,
+                "character": 5
+              },
+              {
+                "line": 6,
+                "character": 17
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/syntax.yaml\",\"token\":\"YOp9uj3Efsv29nxbVMPpKK8wvku-xmOY\"}]"
+            }
+          }
+        ],
+        "durationMilliseconds": 100,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-001",
+        "name": "LF UTF-16 repeated/domain/field boundaries",
+        "status": "pass",
+        "evidence": [
+          {
+            "range": [
+              {
+                "line": 2,
+                "character": 16
+              },
+              {
+                "line": 2,
+                "character": 25
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"-DQhLaMr8dLIaoetH2aLvuf7xA_HJYQ4\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 2,
+                "character": 26
+              },
+              {
+                "line": 2,
+                "character": 38
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"SRepmilj9oDdeEqkosUiTzO_7qpCIuSC\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 2,
+                "character": 39
+              },
+              {
+                "line": 2,
+                "character": 48
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"-DQhLaMr8dLIaoetH2aLvuf7xA_HJYQ4\"}]"
+            }
+          },
+          {
+            "range": [
+              {
+                "line": 3,
+                "character": 12
+              },
+              {
+                "line": 3,
+                "character": 21
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"-DQhLaMr8dLIaoetH2aLvuf7xA_HJYQ4\"}]"
+            }
+          }
+        ],
+        "durationMilliseconds": 23,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-010",
+        "name": "YAML new/existing/dirty tab top and disk preservation",
+        "status": "pass",
+        "evidence": {
+          "top": true,
+          "diskPreserved": true,
+          "tabsPreserved": true
+        },
+        "durationMilliseconds": 104,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-002",
+        "name": "unsaved replacement/insertion/deletion latest ranges",
+        "status": "pass",
+        "evidence": [
+          {
+            "range": [
+              {
+                "line": 4,
+                "character": 2
+              },
+              {
+                "line": 4,
+                "character": 11
+              }
+            ],
+            "target": {
+              "$mid": 1,
+              "path": "codocs.openSource",
+              "scheme": "command",
+              "query": "[{\"sourceUri\":\"file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/source.yaml\",\"token\":\"V8jgZIOF04Kd0KNBjqSuvfYpFgZdemtp\"}]"
+            }
+          }
+        ],
+        "durationMilliseconds": 22,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-003",
+        "name": "ambiguous YAML body has no target; each Hover candidate opens",
+        "status": "fail",
+        "error": "AssertionError [ERR_ASSERTION]: individual candidate links must open, unlike source text\n+ actual - expected\n\n  [\n+   false,\n+   false\n-   true,\n-   true\n  ]\n\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:242:14\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:197:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+        "durationMilliseconds": 129,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-004",
+        "name": "content revision change opens from existing token",
+        "status": "pass",
+        "evidence": {
+          "existingTokenOpened": true
+        },
+        "durationMilliseconds": 110,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-004",
+        "name": "confirmed move updates existing token",
+        "status": "pass",
+        "evidence": {
+          "moved": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/.workbench/fixtures/cod16-host-CJoNIa/parent/nested/.codocs/cod18/moved.yaml"
+        },
+        "durationMilliseconds": 163,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-005",
+        "name": "delete and old path reuse cannot open unrelated document",
+        "status": "pass",
+        "evidence": {
+          "oldTokenRejected": true
+        },
+        "durationMilliseconds": 217,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-006",
+        "name": "absent YAML hover/link removed; source and broken diagnostic remain",
+        "status": "pass",
+        "evidence": [
+          {
+            "severity": "Error",
+            "message": "Invalid input: expected array, received undefined",
+            "range": [
+              {
+                "line": 0,
+                "character": 0
+              },
+              {
+                "line": 5,
+                "character": 0
+              }
+            ],
+            "source": "codocs",
+            "code": "missing_required_field"
+          },
+          {
+            "severity": "Error",
+            "message": "참조 이름에 해당하는 문서가 없습니다.",
+            "range": [
+              {
+                "line": 4,
+                "character": 2
+              },
+              {
+                "line": 4,
+                "character": 11
+              }
+            ],
+            "source": "codocs",
+            "code": "reference_not_found"
+          }
+        ],
+        "durationMilliseconds": 3,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-011",
+        "name": "deprecated occurrence warning/link retained and state refreshed",
+        "status": "fail",
+        "error": "TypeError: Cannot read properties of undefined (reading 'target')\n\tat open (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:80:20)\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:372:26\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:342:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+        "durationMilliseconds": 176,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-012",
+        "name": "invalid current ID name reference survives content revision",
+        "status": "fail",
+        "error": "AssertionError [ERR_ASSERTION]: valid name reference must not require valid current ID after content change\n\nfalse !== true\n\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:418:14\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:389:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+        "durationMilliseconds": 280,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-012",
+        "name": "partial scan preserves confirmed candidate information",
+        "status": "fail",
+        "error": "AssertionError [ERR_ASSERTION]: confirmed candidate must remain usable in partial observation\n\nfalse !== true\n\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:453:14\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:426:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+        "durationMilliseconds": 121,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-007",
+        "name": "duplicate top retains auxiliary and disambiguated paths",
+        "status": "pass",
+        "evidence": {
+          "markdown": "### ID 충돌\n\n**충돌 문서**\n\n- [같은 이름 — 동일 · cod18/duplicate\\-a\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22iX6CnSSIXKUbUAUOcJ_aWjhtspYhE5k9%22%7D%5D)\n- [같은 이름 — 동일 · cod18/duplicate\\-b\\.yaml](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22Nn1r3VXJ79xYzyFU6XSXff1Xv-od_LRX%22%7D%5D)\n\n**오류**\n\n- 같은 ID를 가진 발견 경로가 여러 개입니다\\.\n- 같은 도메인에 같은 이름을 가진 문서가 여러 개입니다\\.\n- 같은 ID를 가진 발견 경로가 여러 개입니다\\.\n- 같은 도메인에 같은 이름을 가진 문서가 여러 개입니다\\.\n\n---\n\n**함께 매칭된 용어**\n\n- [보조 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Fduplicates.java%22%2C%22token%22%3A%22J5nrk8RvMzvLr72jWdbVNZsH-UqJK_62%22%7D%5D)"
+        },
+        "durationMilliseconds": 112,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-008",
+        "name": "current plus duplicate alias suppresses notice; previous-only remains",
+        "status": "pass",
+        "evidence": {
+          "current": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22H5gSToThu3nKDEgqNfWFu3SwuB4u7-YH%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+          "previous": "### 현재 후보\n\ncurrent body\n\n**현재 ID:** `current`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22H5gSToThu3nKDEgqNfWFu3SwuB4u7-YH%22%7D%5D)\n\n> 이전 ID입니다. 현재 ID: current\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+          "auxiliaryCurrent": "### 보조 후보\n\nauxiliary body\n\n**현재 ID:** `auxiliary`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22gp4uV61t_Q53liUDvt22tCL8TY5u4aR1%22%7D%5D)\n\n**함께 매칭된 용어**\n\n- [현재 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22H5gSToThu3nKDEgqNfWFu3SwuB4u7-YH%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined",
+          "auxiliaryPrevious": "### 보조 후보\n\nauxiliary body\n\n**현재 ID:** `auxiliary`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22gp4uV61t_Q53liUDvt22tCL8TY5u4aR1%22%7D%5D)\n\n**함께 매칭된 용어**\n\n- [현재 후보](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Faliases.java%22%2C%22token%22%3A%22H5gSToThu3nKDEgqNfWFu3SwuB4u7-YH%22%7D%5D) \\(이전 ID입니다\\.\\)\n\n**오류**\n\n- Invalid input: expected array, received undefined"
+        },
+        "durationMilliseconds": 127,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-009",
+        "name": "alias-duplicate YAML diagnostic remains; only that Hover cause is hidden",
+        "status": "pass",
+        "evidence": {
+          "markdown": "### 별칭 오류\n\nbody\n\n**현재 ID:** `invalid-alias`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Finvalid-alias.java%22%2C%22token%22%3A%227k2Q0ypWMHcrkX2MZYK8XbucP7OP1sWy%22%7D%5D)\n\n**오류**\n\n- 빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다\\.",
+          "diagnostics": [
+            {
+              "severity": "Error",
+              "message": "빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다.",
+              "range": [
+                {
+                  "line": 3,
+                  "character": 10
+                },
+                {
+                  "line": 3,
+                  "character": 13
+                }
+              ],
+              "source": "codocs",
+              "code": "invalid_field_value"
+            },
+            {
+              "severity": "Warning",
+              "message": "이전 ID가 현재 ID와 같습니다.",
+              "range": [
+                {
+                  "line": 5,
+                  "character": 8
+                },
+                {
+                  "line": 5,
+                  "character": 21
+                }
+              ],
+              "source": "codocs",
+              "code": "invalid_field_value"
+            }
+          ]
+        },
+        "durationMilliseconds": 115,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "NFR-004",
+        "name": "external Markdown is escaped and only generated command trusted",
+        "status": "pass",
+        "evidence": {
+          "markdown": "### \\[escape\\]\\(command:evil\\)\n\n\\<script\\>alert\\(1\\)\\</script\\> \\[evil\\]\\(command:evil\\)\n\n**현재 ID:** `escape-term`\n\n[원문 열기](command:codocs.openSource?%5B%7B%22sourceUri%22%3A%22file%3A%2F%2F%2FUsers%2Fseojaewan%2FDesktop%2Fdev%2Fcodocs-worktrees%2Fwb-cod18-b58bfd0-r1%2Ftask-003%2F.workbench%2Ffixtures%2Fcod16-host-CJoNIa%2Fparent%2Fnested%2Fescape.java%22%2C%22token%22%3A%226_qzHQfVkOwtHAe2bcv0Lj-s3mr_kiJN%22%7D%5D)\n\n**오류**\n\n- Invalid input: expected array, received undefined"
+        },
+        "durationMilliseconds": 109,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-003",
+        "name": "relationship-only code Hover link opens referenced document",
+        "status": "fail",
+        "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n\tat /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:607:14\n\tat async scenario (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:32:24)\n\tat async runCod18 (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/cod18.cjs:590:3)\n\tat async runFunctional (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:393:17)\n\tat async Object.run (/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-b58bfd0-r1/task-003/tools/extension-host/extension-test.cjs:957:11)",
+        "durationMilliseconds": 14,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-011",
+        "name": "ordinary/previous-only/ambiguous references have no deprecated warning",
+        "status": "pass",
+        "evidence": [
+          {
+            "severity": "Error",
+            "message": "Invalid input: expected array, received undefined",
+            "range": [
+              {
+                "line": 0,
+                "character": 0
+              },
+              {
+                "line": 3,
+                "character": 0
+              }
+            ],
+            "source": "codocs",
+            "code": "missing_required_field"
+          },
+          {
+            "severity": "Warning",
+            "message": "확정 참조 대상에 문서 오류가 있습니다.",
+            "range": [
+              {
+                "line": 2,
+                "character": 13
+              },
+              {
+                "line": 2,
+                "character": 22
+              }
+            ],
+            "source": "codocs",
+            "code": "reference_target_error"
+          },
+          {
+            "severity": "Error",
+            "message": "참조 이름에 해당하는 문서가 여러 개입니다.",
+            "range": [
+              {
+                "line": 2,
+                "character": 23
+              },
+              {
+                "line": 2,
+                "character": 32
+              }
+            ],
+            "source": "codocs",
+            "code": "reference_ambiguous"
+          }
+        ],
+        "durationMilliseconds": 120,
+        "method": "installed-host-provider-and-command; not actual UI click/cache evidence"
+      },
+      {
+        "ac": "AC-001",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "protocol syntax cases exercised; visible UI range matrix not exhaustive",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-002",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "close/cancellation/controlled async race not exercised through actual UI",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-003",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "actual source click and each rendered Hover click require UI evidence",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-004",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "visible cached Hover/DocumentLink refresh requires UI evidence",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-005",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "visible stale click and no-popup observation require UI evidence",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-006",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "visible no-popup observation requires UI evidence",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-007",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "same-name without-domain YAML case and same-domain code case exercised; actual UI not exercised",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-008",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "same-identifier different-position mixed current/previous combination not exercised",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-009",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "protocol case exercised; actual visible diagnostics/hover not exercised",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-010",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "actual rendered code/YAML link click requires UI evidence",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-011",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "ordinary/alias/ambiguous negative cases exercised; unconfirmed negative case not exercised",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-012",
+        "name": "remaining acceptance coverage",
+        "status": "skip",
+        "reason": "preparing/failed controlled host states not induced",
+        "durationMilliseconds": 0
+      },
+      {
+        "ac": "AC-012",
+        "name": "native JavaScript definition",
+        "status": "pass",
+        "durationMilliseconds": 2
+      }
+    ]
+  }
+}

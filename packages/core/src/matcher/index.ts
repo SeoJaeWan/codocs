@@ -52,8 +52,8 @@ export interface CodeMatchEvidence {
 
 /** 코드에서 발견한 문서 후보다. 후보 하나에 모든 위치·ID 근거를 보존한다. */
 export interface CodeMatchCandidate {
-  id: string;
-  documentId: string;
+  id?: string;
+  documentId?: string;
   path: string;
   name?: string;
   domains: readonly string[];
@@ -382,8 +382,8 @@ function compareEvidence(
   );
 }
 
-/** 현재·이전, 연속 토큰 수, 표기 일치만 매칭의 의미 우선순위로 비교한다. */
-function compareEvidencePriority(
+/** 현재·이전, 연속 토큰 수, 표기 일치만 매칭의 의미 우선순위로 비교한다. 동률이면 0을 반환한다. */
+export function compareEvidencePriority(
   left: CodeMatchEvidence,
   right: CodeMatchEvidence,
 ): number {
@@ -516,11 +516,12 @@ export function matchCode(
     const document = matches[0]?.document;
     if (!document) continue;
     const evidence = mergeEvidence(matches);
-    const documentId = document.id ?? evidence[0]?.sourceId;
-    if (!documentId) continue;
+    const documentId = indexedIds(document).find(
+      /** 유효한 현재 ID만 후보의 문서 ID로 제공한다. */ (indexed) =>
+        indexed.kind === matcherEvidenceKinds.current,
+    )?.id;
     candidates.push({
-      id: documentId,
-      documentId,
+      ...(documentId !== undefined ? { id: documentId, documentId } : {}),
       path: document.path,
       ...(document.name !== undefined ? { name: document.name } : {}),
       domains: [...document.domains],
@@ -546,7 +547,8 @@ export function matchCode(
           return leftEvidence.range.start - rightEvidence.range.start;
       }
       return (
-        left.id.localeCompare(right.id) || left.path.localeCompare(right.path)
+        (left.id ?? '').localeCompare(right.id ?? '') ||
+        left.path.localeCompare(right.path)
       );
     },
   );

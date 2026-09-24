@@ -1,0 +1,14 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "tools/extension-host/progress.test.mjs",
+    "tools/extension-host/report.test.mjs",
+    "tools/extension-host/request-outcome.test.mjs",
+    "tools/extension-host/acceptance.test.mjs"
+  ],
+  "startedAt": "2026-09-22T02:03:56.360Z",
+  "durationMilliseconds": 311,
+  "code": 0,
+  "signal": null
+}

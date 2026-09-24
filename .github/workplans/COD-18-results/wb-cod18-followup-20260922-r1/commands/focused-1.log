@@ -1,0 +1,263 @@
+
+> codocs@0.0.0 test:run /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+> node tools/check/run.mjs test:run packages/workspace/src/query packages/language-server packages/vscode packages/core/src/catalog packages/core/src/query --reporter=default
+
+
+ RUN  v5.0.0 /Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001
+
+ ✓ packages/vscode/src/client-manager/client-manager.test.ts (7 tests) 4ms
+ ✓ packages/core/src/catalog/catalog.test.ts (74 tests) 46ms
+ ✓ packages/core/src/query/query.test.ts (48 tests) 41ms
+ ✓ packages/workspace/src/query/snapshot.test.ts (6 tests) 93ms
+ ✓ packages/language-server/src/hover/hover.test.ts (26 tests) 20ms
+ ✓ packages/vscode/src/open-source/open-source.test.ts (15 tests) 9ms
+✘ [ERROR] Could not resolve "@codocs/core"
+
+    packages/language-server/src/hover/index.ts:12:7:
+      12 │ } from '@codocs/core';
+         ╵        ~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/core/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/core" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+✘ [ERROR] Could not resolve "@codocs/core"
+
+    packages/language-server/src/server-session/index.ts:9:7:
+      9 │ } from '@codocs/core';
+        ╵        ~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/core/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/core" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+✘ [ERROR] Could not resolve "@codocs/workspace"
+
+    packages/language-server/src/server-session/index.ts:20:7:
+      20 │ } from '@codocs/workspace';
+         ╵        ~~~~~~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/workspace/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/workspace" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+✘ [ERROR] Could not resolve "@codocs/core"
+
+    packages/language-server/src/hover/index.ts:12:7:
+      12 │ } from '@codocs/core';
+         ╵        ~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/core/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/core" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+ ✓ packages/vscode/src/vscode-client/vscode-client.test.ts (8 tests) 8ms
+✘ [ERROR] Could not resolve "@codocs/core"
+
+    packages/language-server/src/server-session/index.ts:9:7:
+      9 │ } from '@codocs/core';
+        ╵        ~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/core/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/core" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+✘ [ERROR] Could not resolve "@codocs/workspace"
+
+    packages/language-server/src/server-session/index.ts:20:7:
+      20 │ } from '@codocs/workspace';
+         ╵        ~~~~~~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/workspace/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/workspace" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+✘ [ERROR] Could not resolve "@codocs/core"
+
+    packages/language-server/src/server-session/index.ts:9:7:
+      9 │ } from '@codocs/core';
+        ╵        ~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/core/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/core" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+✘ [ERROR] Could not resolve "@codocs/workspace"
+
+    packages/language-server/src/server-session/index.ts:20:7:
+      20 │ } from '@codocs/workspace';
+         ╵        ~~~~~~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/workspace/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/workspace" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+✘ [ERROR] Could not resolve "@codocs/core"
+
+    packages/language-server/src/hover/index.ts:12:7:
+      12 │ } from '@codocs/core';
+         ╵        ~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/core/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/core" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+ ✓ packages/language-server/src/document-sync/document-sync.test.ts (6 tests) 5ms
+✘ [ERROR] Could not resolve "@codocs/core"
+
+    packages/language-server/src/hover/index.ts:12:7:
+      12 │ } from '@codocs/core';
+         ╵        ~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/core/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/core" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+✘ [ERROR] Could not resolve "@codocs/core"
+
+    packages/language-server/src/server-session/index.ts:9:7:
+      9 │ } from '@codocs/core';
+        ╵        ~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/core/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/core" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+✘ [ERROR] Could not resolve "@codocs/workspace"
+
+    packages/language-server/src/server-session/index.ts:20:7:
+      20 │ } from '@codocs/workspace';
+         ╵        ~~~~~~~~~~~~~~~~~~~
+
+  The module "./dist/index.js" was not found on the file system:
+
+    packages/language-server/node_modules/@codocs/workspace/package.json:9:16:
+      9 │       "import": "./dist/index.js"
+        ╵                 ~~~~~~~~~~~~~~~~~
+
+  You can mark the path "@codocs/workspace" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+
+ ❯ packages/language-server/src/server/server-process.test.ts (4 tests | 4 failed) 254ms
+   ❯ language server stdio 프로세스 (4)
+     × 복수 후보 false인 YAML의 링크·resolve·진단을 실제 프로세스에서 최신 버전으로 갱신한다 54ms
+     × 복수 후보 true인 YAML의 링크·resolve·진단을 실제 프로세스에서 최신 버전으로 갱신한다 81ms
+     × initialize·전체 문서 변경·현재 매칭·shutdown을 실제 LSP 프레임으로 처리한다 56ms
+     × 다중 루트·catalog 생명주기와 재시작 뒤 최신 원문을 실제 프로세스에서 처리한다 61ms
+ ✓ packages/vscode/src/workspace-routing/workspace-routing.test.ts (3 tests) 3ms
+ ✓ packages/vscode/src/package-assembly/package-assembly.test.ts (2 tests) 3ms
+ ✓ packages/language-server/src/navigation/navigation.test.ts (3 tests) 3ms
+ ❯ packages/language-server/src/server-session/live-navigation.test.ts (12 tests | 1 failed) 416ms
+   ❯ live YAML과 디스크 대상의 연결 (12)
+     ✓ 감시가 상태 변경을 게시하면 수동 refresh 없이 폐기 경고를 갱신한다 193ms
+     ✓ 중첩 workspace의 참조는 가장 가까운 출처 색인에서 링크와 진단을 조회한다 70ms
+     ✓ 줄바꿈 "\n"에서 미저장 참조의 UTF-16 범위와 폐기 경고를 보존한다 28ms
+     ✓ 줄바꿈 "\r\n"에서 미저장 참조의 UTF-16 범위와 폐기 경고를 보존한다 9ms
+     × 동명 후보가 복수이면 본문 링크 없이 도메인과 경로로 구분한 개별 Hover 링크를 보존한다 22ms
+     ✓ edit 뒤에는 이전 본문 링크를 적용하지 않는다 10ms
+     ✓ close 뒤에는 이전 본문 링크를 적용하지 않는다 7ms
+     ✓ cancel 뒤에는 이전 본문 링크를 적용하지 않는다 7ms
+     ✓ 표시 뒤 대상 content 변경을 최신 관측으로 확인한다 15ms
+     ✓ 표시 뒤 대상 move 변경을 최신 관측으로 확인한다 17ms
+     ✓ 표시 뒤 대상 delete 변경을 최신 관측으로 확인한다 17ms
+     ✓ 표시 뒤 대상 reuse 변경을 최신 관측으로 확인한다 18ms
+ ✓ packages/workspace/src/query/candidate.test.ts (21 tests) 682ms
+ ✓ packages/language-server/src/server-session/server-session.test.ts (12 tests) 605ms
+ ✓ packages/workspace/src/query/query.test.ts (56 tests) 2294ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/language-server/src/server/server-process.test.ts > language server stdio 프로세스 > 복수 후보 false인 YAML의 링크·resolve·진단을 실제 프로세스에서 최신 버전으로 갱신한다
+ FAIL  packages/language-server/src/server/server-process.test.ts > language server stdio 프로세스 > 복수 후보 true인 YAML의 링크·resolve·진단을 실제 프로세스에서 최신 버전으로 갱신한다
+ FAIL  packages/language-server/src/server/server-process.test.ts > language server stdio 프로세스 > initialize·전체 문서 변경·현재 매칭·shutdown을 실제 LSP 프레임으로 처리한다
+ FAIL  packages/language-server/src/server/server-process.test.ts > language server stdio 프로세스 > 다중 루트·catalog 생명주기와 재시작 뒤 최신 원문을 실제 프로세스에서 처리한다
+Error: Build failed with 3 errors:
+packages/language-server/src/hover/index.ts:12:7: ERROR: Could not resolve "@codocs/core"
+packages/language-server/src/server-session/index.ts:9:7: ERROR: Could not resolve "@codocs/core"
+packages/language-server/src/server-session/index.ts:20:7: ERROR: Could not resolve "@codocs/workspace"
+ ❯ failureErrorWithLog node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1752:15
+ ❯ node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1211:25
+ ❯ node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1163:52
+ ❯ buildResponseToResult node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1209:7
+ ❯ node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1236:16
+ ❯ responseCallbacks.<computed> node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:886:9
+ ❯ handleIncomingPacket node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:941:12
+ ❯ Socket.readFromStdout node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:864:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  packages/language-server/src/server-session/live-navigation.test.ts > live YAML과 디스크 대상의 연결 > 동명 후보가 복수이면 본문 링크 없이 도메인과 경로로 구분한 개별 Hover 링크를 보존한다
+AssertionError: expected { Object (uri) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "uri": "file:///Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod18-followup-20260922-r1/followup-001/.workbench/fixtures/live-FRQQTQ/.codocs/other.yaml",
+}
+
+ ❯ packages/language-server/src/server-session/live-navigation.test.ts:181:7
+    179|         (JSON.parse(decodeURIComponent(query)) as unknown[])[0],
+    180|       ),
+    181|     ).toBeNull();
+       |       ^
+    182|   });
+    183|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+
+ Test Files  2 failed | 14 passed (16)
+      Tests  5 failed | 298 passed (303)
+   Start at  11:57:33
+   Duration  3.23s (tests 43%, transform 36%, import 20%, worker 1%)
+
+  Transform  transforming modules took 3.73s · 36% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+ ELIFECYCLE  Command failed with exit code 1.

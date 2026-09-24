@@ -1,0 +1,14 @@
+{
+  "command": [
+    "node",
+    "tools/extension-host/run.mjs",
+    "--vsix",
+    ".workbench/cod18-followup-final.vsix",
+    "--ui",
+    "--report",
+    ".workbench/followup-evidence/ui-default-report.json"
+  ],
+  "code": 0,
+  "durationMs": 258909,
+  "log": "ui-default.log"
+}
