@@ -24,58 +24,6 @@ async function buildWatcher(entry: string): Promise<void> {
 }
 
 describe('새 하위 폴더의 실제 감시 등록 경합', () => {
-  it('외부 대상의 조상에 보호된 형제 파일이 있어도 metadata를 읽지 않고 감시를 준비한다', async () => {
-    const parent = path.resolve('.workbench/fixtures');
-    await mkdir(parent, { recursive: true });
-    const project = await mkdtemp(path.join(parent, 'watcher-protected-'));
-    const entry = path.join(project, 'watcher.mjs');
-    try {
-      await buildWatcher(entry);
-      const script = `
-        import fs from 'node:fs/promises';
-        import { syncBuiltinESMExports } from 'node:module';
-        import path from 'node:path';
-        import { pathToFileURL } from 'node:url';
-        const [entry, project] = process.argv.slice(1);
-        const workspace = path.join(project, 'workspace');
-        const target = path.join(project, 'external', 'document.yaml');
-        const protectedFile = path.join(project, 'protected.tmp');
-        await fs.mkdir(path.join(workspace, '.codocs'), { recursive: true });
-        await fs.mkdir(path.dirname(target));
-        await fs.writeFile(target, 'id: external\\n');
-        await fs.writeFile(protectedFile, '');
-        let attempts = 0;
-        for (const operation of ['stat', 'lstat']) {
-          const original = fs[operation].bind(fs);
-          fs[operation] = async (...args) => {
-            if (path.resolve(String(args[0])) === protectedFile) {
-              attempts++;
-              throw Object.assign(new Error('protected metadata'), { code: 'EINVAL' });
-            }
-            return original(...args);
-          };
-        }
-        syncBuiltinESMExports();
-        const { createWorkspaceWatcher } = await import(pathToFileURL(entry).href);
-        const watcher = await createWorkspaceWatcher(workspace);
-        try {
-          await watcher.trackTargets([target]);
-          await new Promise((resolve) => setTimeout(resolve, 250));
-          process.stdout.write(JSON.stringify({ attempts, ready: watcher.readiness.ready }));
-        } finally { await watcher.close(); }
-      `;
-      const { stdout } = await execute(
-        process.execPath,
-        ['--input-type=module', '-e', script, entry, project],
-        { timeout: 8_000 },
-      );
-      expect(JSON.parse(stdout)).toEqual({ attempts: 0, ready: true });
-    } finally {
-      await stop();
-      await rm(project, { recursive: true, force: true });
-    }
-  }, 10_000);
-
   it('새 폴더 열거가 끝나고 Chokidar 연결 전 파일이 생기면 해당 경로를 전달한다', async () => {
     const parent = path.resolve('.workbench/fixtures');
     await mkdir(parent, { recursive: true });

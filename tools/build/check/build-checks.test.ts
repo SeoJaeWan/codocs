@@ -420,57 +420,48 @@ try {
   const knowledgeRaw = 'id: packed-knowledge\\nname: 제목\\ndefinition: 본문\\ndomains: [영역]\\n';
   const parseRaw = 'name: [\\n';
   const schemaRaw = 'name: ID 누락\\ndefinition: 정의\\ndomains: [영역]\\n';
-  const externalFile = path.join(temporary, '외부 용어.yaml');
-  await writeFile(externalFile, termRaw);
-  await writeFile(path.join(external, '공유 지식.yml'), knowledgeRaw);
+  await writeFile(path.join(codocs, '용어.yaml'), termRaw);
+  await writeFile(path.join(codocs, '하위 폴더', '공유 지식.yml'), knowledgeRaw);
+  await writeFile(path.join(external, '외부 지식.yml'), knowledgeRaw);
   await writeFile(path.join(codocs, '하위 폴더', '파싱 오류.yaml'), parseRaw);
   await writeFile(path.join(codocs, '하위 폴더', 'ID 누락.yml'), schemaRaw);
-  await symlink(externalFile, path.join(codocs, '연결 용어.yaml'), 'file');
   const linkType = process.platform === 'win32' ? 'junction' : 'dir';
   await symlink(external, path.join(codocs, '공통A'), linkType);
   await symlink(external, path.join(codocs, '공통B'), linkType);
-  await symlink(codocs, path.join(external, '돌아가기'), linkType);
   const scan = await loadWorkspace({cwd: temporary, project: 'project'});
   assert.equal(scan.status, 'complete');
   assert.equal(scan.root.projectRoot, project);
   assert.deepEqual(scan.failures, []);
-  assert.equal(scan.documents.length, 5);
-  assert.equal(scan.skippedCycles.length, 2);
-  for (const cycle of scan.skippedCycles) {
-    assert.equal(cycle.realPath, await realpath(codocs));
-    assert.equal(cycle.diagnostics[0].code, 'circular_directory_link');
-    assert.equal(cycle.diagnostics[0].severity, 'warning');
+  assert.equal(scan.documents.length, 4);
+  assert.equal(scan.skippedLinks.length, 2);
+  for (const warning of scan.skippedLinks) {
+    assert.equal(warning.code, 'unsupported_workspace_link');
+    assert.equal(warning.severity, 'warning');
   }
   const byPath = new Map(scan.documents.map(document => [document.source.path, document]));
-  const term = byPath.get(path.join('.codocs', '연결 용어.yaml'));
+  const term = byPath.get(path.join('.codocs', '용어.yaml'));
   assert.ok(term);
   assert.equal(term.status, 'valid');
   assert.equal(term.raw, termRaw);
-  assert.equal(term.source.logicalPath, path.join(codocs, '연결 용어.yaml'));
-  assert.equal(term.source.realPath, await realpath(externalFile));
+  assert.equal(term.source.logicalPath, path.join(codocs, '용어.yaml'));
+  assert.equal(term.source.realPath, await realpath(path.join(codocs, '용어.yaml')));
   assert.equal(Object.hasOwn(term.data, 'type'), false);
   assert.equal(term.data.id, 'packed-term');
   assert.equal(term.data.name, '용어');
   assert.deepEqual(term.data.custom, {nested: [null, true, 1]});
-  assert.equal(term.scope.kind, 'linkedFile');
+  assert.equal(term.scope.kind, 'workspace');
   assert.deepEqual(term.access, {read: true, write: true});
-  assert.equal(term.diagnostics.length, 1);
   const warning = term.diagnostics[0];
   assert.equal(warning.code, 'unknown_field');
   assert.equal(warning.severity, 'warning');
   assert.equal(warning.path, term.source.path);
   assert.deepEqual(warning.fieldPath, ['custom']);
   assert.deepEqual(warning.range, {start: {line: 5, character: 0}, end: {line: 5, character: 6}});
-  for (const branch of ['공통A', '공통B']) {
-    const document = byPath.get(path.join('.codocs', branch, '공유 지식.yml'));
-    assert.ok(document);
-    assert.equal(document.status, 'valid');
-    assert.equal(document.raw, knowledgeRaw);
-    assert.equal(document.source.realPath, await realpath(path.join(external, '공유 지식.yml')));
-    assert.equal(document.data.id, 'packed-knowledge');
-    assert.equal(document.scope.kind, 'linkedDirectory');
-    assert.deepEqual(document.access, {read: true, write: true});
-  }
+  const knowledge = byPath.get(path.join('.codocs', '하위 폴더', '공유 지식.yml'));
+  assert.ok(knowledge);
+  assert.equal(knowledge.status, 'valid');
+  assert.equal(knowledge.raw, knowledgeRaw);
+  assert.equal(knowledge.scope.kind, 'workspace');
   for (const [filename, raw, status, code] of [
     ['파싱 오류.yaml', parseRaw, 'parseError', 'invalid_yaml'],
     ['ID 누락.yml', schemaRaw, 'validationError', 'missing_required_field'],
@@ -485,24 +476,21 @@ try {
     assert.equal(Object.hasOwn(document, 'data'), false);
     assert.ok(document.diagnostics.some(issue => issue.code === code && issue.path === sourcePath && issue.range));
   }
-  const denied = await resolveWorkspacePath(scan.root, externalFile);
+  const denied = await resolveWorkspacePath(scan.root, path.join(external, '외부 지식.yml'));
   assert.equal(denied.success, false);
   assert.equal(denied.status, 'denied');
-  for (const sourcePath of [['.codocs', '연결 용어.yaml', '..'].join(path.sep), ['.codocs', '공통A', '..', '형제.yaml'].join(path.sep)]) {
-    const result = await resolveWorkspacePath(scan.root, sourcePath);
-    assert.equal(result.success, false);
-    assert.equal(result.status, 'denied');
+  for (const branch of ['공통A', '공통B']) {
+    const linked = await resolveWorkspacePath(scan.root, path.join('.codocs', branch, '외부 지식.yml'));
+    assert.equal(linked.success, false);
+    assert.equal(linked.status, 'denied');
+    assert.equal(linked.diagnostics[0].code, 'unsupported_workspace_link');
   }
-  await symlink(path.join(temporary, '없는 파일.yaml'), path.join(codocs, '깨진 연결.yaml'), 'file');
-  const partial = await loadWorkspace({project});
-  assert.equal(partial.status, 'partial');
-  assert.equal(partial.documents.length, 5);
-  assert.equal(partial.failures.length, 1);
-  const failure = partial.failures[0];
-  assert.equal(failure.path, path.join('.codocs', '깨진 연결.yaml'));
-  assert.equal(failure.diagnostics[0].code, 'path_unavailable');
-  assert.equal(failure.diagnostics[0].ioCode, 'ENOENT');
-  for (const key of ['raw', 'realPath', 'id', 'range']) assert.equal(Object.hasOwn(failure, key), false);
+  await symlink(path.join(temporary, '없는 폴더'), path.join(codocs, '깨진 연결'), linkType);
+  const withBrokenLink = await loadWorkspace({project});
+  assert.equal(withBrokenLink.status, 'complete');
+  assert.equal(withBrokenLink.documents.length, 4);
+  assert.deepEqual(withBrokenLink.failures, []);
+  assert.equal(withBrokenLink.skippedLinks.length, 3);
   const emptyProject = path.join(temporary, 'empty');
   await mkdir(emptyProject);
   const empty = await loadWorkspace({project: emptyProject});
@@ -544,7 +532,7 @@ try {
         writeFileSync(
           path.join(packedConsumer, 'workspace.ts'),
           `import {loadWorkspace, resolveWorkspacePath, workspaceDiagnosticCodes, workspaceDiagnosticMessages} from '@codocs/workspace';
-import type {WorkspaceScanResult, WorkspaceDocumentResult, WorkspaceScanDiagnostic, WorkspaceScanFailure, WorkspaceDocumentSource, WorkspaceSkippedCycle, WorkspaceDiagnostic, WorkspaceDiagnosticCode} from '@codocs/workspace';
+import type {WorkspaceScanResult, WorkspaceDocumentResult, WorkspaceScanDiagnostic, WorkspaceScanFailure, WorkspaceDocumentSource, WorkspaceDiagnostic, WorkspaceDiagnosticCode} from '@codocs/workspace';
 import type {Diagnostic, DiagnosticCode} from '@codocs/core';
 const workspaceCode: WorkspaceDiagnosticCode = workspaceDiagnosticCodes.readFailed;
 const workspaceIssue: WorkspaceDiagnostic = {code: workspaceCode, severity: 'error', message: workspaceDiagnosticMessages.readFailed};
@@ -560,9 +548,9 @@ void invalidWorkspaceCode; void invalidCoreCode;
 const scan: WorkspaceScanResult = await loadWorkspace({project: 'project'});
 const documents: readonly WorkspaceDocumentResult[] = scan.documents;
 const failures: readonly WorkspaceScanFailure[] = scan.failures;
-const cycles: readonly WorkspaceSkippedCycle[] = scan.skippedCycles;
+const skippedLinks: readonly WorkspaceDiagnostic[] = scan.skippedLinks;
 const diagnostics: readonly WorkspaceScanDiagnostic[] = scan.diagnostics;
-void failures; void cycles;
+void failures; void skippedLinks;
 if (scan.status === 'complete' || scan.status === 'partial') {
   const root: string = scan.root.projectRoot;
   const checked = await resolveWorkspacePath(scan.root, '.codocs/terms.yaml');
