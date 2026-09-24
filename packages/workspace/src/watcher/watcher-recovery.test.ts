@@ -1,0 +1,416 @@
+import type { EventEmitter } from 'node:events';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { workspaceLifecycleStates } from '../lifecycle/index.js';
+
+// OS 감지의 신뢰성이 아닌 오류 알림 이후의 공개 상태와 배치 계약을 격리한다.
+const fake = vi.hoisted(() => ({
+  watchers: [] as (EventEmitter & {
+    close: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  })[],
+  failNext: false,
+  manualReady: false,
+  contentIdentity: undefined as { dev: number; ino: number } | undefined,
+  statCalls: 0,
+}));
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    lstat: async (...args: Parameters<typeof actual.lstat>) => {
+      fake.statCalls += 1;
+      return fake.contentIdentity
+        ? {
+            ...fake.contentIdentity,
+            isDirectory: () => true,
+            isSymbolicLink: () => false,
+          }
+        : actual.lstat(...args);
+    },
+  };
+});
+
+vi.mock('chokidar', async () => {
+  const events = await import('node:events');
+  return {
+    default: {
+      watch: () => {
+        const watcher = Object.assign(new events.EventEmitter(), {
+          close: vi.fn(() => Promise.resolve()),
+          add: () => undefined,
+        });
+        fake.watchers.push(watcher);
+        const fail = fake.failNext;
+        fake.failNext = false;
+        if (!fake.manualReady)
+          queueMicrotask(() =>
+            watcher.emit(fail ? 'error' : 'ready', new Error('watch failed')),
+          );
+        return watcher;
+      },
+    },
+  };
+});
+
+import {
+  createWorkspaceWatcher,
+  watcherRecoveryGuidance,
+  WorkspaceWatcher,
+} from './index.js';
+
+let project: string;
+let watcher: WorkspaceWatcher | undefined;
+
+beforeEach(async () => {
+  fake.watchers.length = 0;
+  fake.failNext = false;
+  fake.manualReady = false;
+  fake.contentIdentity = undefined;
+  fake.statCalls = 0;
+  const parent = path.resolve('.workbench/fixtures');
+  await mkdir(parent, { recursive: true });
+  project = await mkdtemp(path.join(parent, 'watcher-recovery-'));
+});
+
+afterEach(async () => {
+  try {
+    await watcher?.close();
+  } finally {
+    vi.useRealTimers();
+    watcher = undefined;
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+describe('WorkspaceWatcher 신호 병합과 구독 수명', () => {
+  it('초기 연결 중 .codocs 알림이 오면 준비 중인 내용 감시자를 닫지 않는다', async () => {
+    const codocs = path.join(project, '.codocs');
+    await mkdir(codocs);
+    fake.manualReady = true;
+    fake.contentIdentity = { dev: 1, ino: 1 };
+    const starting = createWorkspaceWatcher(project);
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(2));
+    const contentWatcher = fake.watchers[1]!;
+
+    fake.watchers[0]!.emit('all', 'addDir', codocs);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    for (const connection of fake.watchers) connection.emit('ready');
+    watcher = await starting;
+
+    expect(watcher.readiness).toEqual({
+      state: workspaceLifecycleStates.ready,
+      ready: true,
+    });
+    expect(fake.watchers).toHaveLength(2);
+    expect(contentWatcher.close).not.toHaveBeenCalled();
+  });
+
+  it('같은 .codocs 디렉터리 알림이 겹치면 내용 감시자를 다시 열지 않는다', async () => {
+    const codocs = path.join(project, '.codocs');
+    await mkdir(codocs);
+    fake.contentIdentity = { dev: 1, ino: 1 };
+    watcher = await createWorkspaceWatcher(project);
+    const contentWatcher = fake.watchers[1]!;
+    const initialStatCalls = fake.statCalls;
+
+    fake.watchers[0]!.emit('all', 'addDir', codocs);
+    contentWatcher.emit('all', 'addDir', codocs);
+    await vi.waitFor(() => expect(fake.statCalls).toBe(initialStatCalls + 1));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(fake.watchers).toHaveLength(2);
+    expect(contentWatcher.close).not.toHaveBeenCalled();
+  });
+
+  it('같은 경로의 변경 알림이 한 배치에 모이면 경로를 한 번만 전달한다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    const listener = vi.fn();
+    watcher.subscribe(listener);
+    const target = path.join(project, '.codocs', 'alpha.yaml');
+    vi.useFakeTimers();
+
+    fake.watchers.at(-1)!.emit('all', 'add', target);
+    fake.watchers.at(-1)!.emit('all', 'change', target);
+    await vi.advanceTimersByTimeAsync(50);
+
+    expect(listener).toHaveBeenCalledExactlyOnceWith({ paths: [target] });
+  });
+
+  it('구독을 해제하면 이후 변경 배치를 해당 구독자에게 전달하지 않는다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    const listener = vi.fn();
+    const unsubscribe = watcher.subscribe(listener);
+    const activeListener = vi.fn();
+    watcher.subscribe(activeListener);
+    const target = path.join(project, '.codocs', 'alpha.yaml');
+    vi.useFakeTimers();
+
+    unsubscribe();
+    fake.watchers.at(-1)!.emit('all', 'change', target);
+    await vi.advanceTimersByTimeAsync(50);
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(activeListener).toHaveBeenCalledExactlyOnceWith({ paths: [target] });
+  });
+
+  it('배치가 대기 중일 때 종료하면 감시자를 닫고 대기 알림을 취소한다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    const listener = vi.fn();
+    watcher.subscribe(listener);
+    const target = path.join(project, '.codocs', 'alpha.yaml');
+    vi.useFakeTimers();
+    fake.watchers.at(-1)!.emit('all', 'change', target);
+
+    await watcher.close();
+    await vi.advanceTimersByTimeAsync(50);
+
+    expect(watcher.readiness).toEqual({
+      state: workspaceLifecycleStates.closed,
+      ready: false,
+    });
+    expect(listener).not.toHaveBeenCalled();
+    for (const connection of fake.watchers)
+      expect(connection.close).toHaveBeenCalled();
+  });
+});
+
+describe('WorkspaceWatcher 감시 오류 복구', () => {
+  it('최초 감시 연결에서 오류가 나면 자동 복구 후 준비 완료 상태를 반환한다', async () => {
+    fake.failNext = true;
+
+    watcher = await createWorkspaceWatcher(project);
+
+    expect(watcher.readiness).toEqual({
+      state: workspaceLifecycleStates.ready,
+      ready: true,
+    });
+    expect(watcher.automaticRecoveryAttempts).toBe(1);
+  });
+
+  describe('자동 재연결 성공과 실패', () => {
+    it('감시 오류 뒤 재연결이 성공하면 준비 상태와 재관측 신호를 제공한다', async () => {
+      watcher = await createWorkspaceWatcher(project);
+      const listener = vi.fn();
+      watcher.subscribe(listener);
+
+      fake.watchers[0]!.emit('error', new Error('connection lost'));
+
+      expect(watcher.readiness.state).toBe(workspaceLifecycleStates.recovering);
+      await vi.waitFor(() =>
+        expect(watcher!.readiness).toEqual({
+          state: workspaceLifecycleStates.ready,
+          ready: true,
+        }),
+      );
+      expect(watcher.automaticRecoveryAttempts).toBe(1);
+      await vi.waitFor(() =>
+        expect(listener).toHaveBeenCalledWith({
+          paths: [path.join(project, '.codocs')],
+        }),
+      );
+    });
+
+    it('자동 재연결도 실패하면 실패 원인과 수동 복구 안내를 제공한다', async () => {
+      watcher = await createWorkspaceWatcher(project);
+      fake.failNext = true;
+
+      fake.watchers[0]!.emit('error', new Error('connection lost'));
+
+      await vi.waitFor(() =>
+        expect(watcher!.readiness).toEqual({
+          state: workspaceLifecycleStates.failed,
+          ready: false,
+          cause: 'watch failed',
+          guidance: watcherRecoveryGuidance,
+        }),
+      );
+      expect(watcher.automaticRecoveryAttempts).toBe(1);
+    });
+
+    it('자동 복구 성공 후 다시 오류가 나면 추가 재연결 없이 실패를 알린다', async () => {
+      watcher = await createWorkspaceWatcher(project);
+      fake.watchers[0]!.emit('error', new Error('first failure'));
+      await vi.waitFor(() =>
+        expect(watcher!.readiness.state).toBe(workspaceLifecycleStates.ready),
+      );
+      const connectionsBeforeError = [...fake.watchers];
+
+      fake.watchers.at(-1)!.emit('error', new Error('second failure'));
+
+      expect(watcher.readiness).toEqual({
+        state: workspaceLifecycleStates.failed,
+        ready: false,
+        cause: 'second failure',
+        guidance: watcherRecoveryGuidance,
+      });
+      expect(watcher.automaticRecoveryAttempts).toBe(1);
+      expect(fake.watchers).toEqual(connectionsBeforeError);
+    });
+  });
+
+  describe('수동 재연결과 자동 복구 횟수 초기화', () => {
+    it('자동 복구 실패 후 수동 refresh가 성공하면 준비 상태와 자동 복구 기회를 되돌린다', async () => {
+      watcher = await createWorkspaceWatcher(project);
+      fake.failNext = true;
+      fake.watchers[0]!.emit('error', new Error('connection lost'));
+      await vi.waitFor(() =>
+        expect(watcher!.readiness.state).toBe(workspaceLifecycleStates.failed),
+      );
+
+      const readiness = await watcher.refresh();
+
+      expect(readiness).toEqual({
+        state: workspaceLifecycleStates.ready,
+        ready: true,
+      });
+      expect(watcher.automaticRecoveryAttempts).toBe(0);
+    });
+
+    it('수동 refresh의 재연결이 실패하면 원인과 수동 안내를 반환한다', async () => {
+      watcher = await createWorkspaceWatcher(project);
+      fake.failNext = true;
+
+      const readiness = await watcher.refresh();
+
+      expect(readiness).toEqual({
+        state: workspaceLifecycleStates.failed,
+        ready: false,
+        cause: 'watch failed',
+        guidance: watcherRecoveryGuidance,
+      });
+    });
+  });
+});
+
+describe('감시 시작·대상 등록·재연결의 종료 경합', () => {
+  it('start 직후 close하면 늦은 루트 확인이 감시자를 만들지 않는다', async () => {
+    watcher = new WorkspaceWatcher(project);
+    const starting = watcher.start();
+    await watcher.close();
+    await starting;
+    expect(fake.watchers).toHaveLength(0);
+    expect(watcher.readiness.state).toBe(workspaceLifecycleStates.closed);
+  });
+
+  it('최초 ready 대기 중 close하면 ready 없이도 시작 대기와 모든 연결을 정리한다', async () => {
+    fake.manualReady = true;
+    watcher = new WorkspaceWatcher(project);
+    const starting = watcher.start();
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(2));
+    await watcher.close();
+    await starting;
+    for (const connection of fake.watchers)
+      expect(connection.close).toHaveBeenCalled();
+    expect(watcher.readiness.state).toBe(workspaceLifecycleStates.closed);
+  });
+
+  it('수동 재연결 ready 대기 중 close하면 닫힌 상태를 ready로 되돌리지 않는다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    fake.manualReady = true;
+    const reconnecting = watcher.refresh();
+    await vi.waitFor(() => expect(fake.watchers.length).toBeGreaterThan(2));
+    await watcher.close();
+    expect(await reconnecting).toEqual({
+      state: workspaceLifecycleStates.closed,
+      ready: false,
+    });
+    for (const connection of fake.watchers) {
+      connection.emit('ready');
+      expect(connection.close).toHaveBeenCalled();
+    }
+    expect(watcher.readiness.state).toBe(workspaceLifecycleStates.closed);
+  });
+
+  it('전달 전 배치를 drain하면 같은 경로를 한 번 전달하고 타이머를 비운다', async () => {
+    watcher = await createWorkspaceWatcher(project);
+    const listener = vi.fn();
+    watcher.subscribe(listener);
+    const target = path.join(project, '.codocs', 'alpha.yaml');
+    vi.useFakeTimers();
+    fake.watchers[1]!.emit('all', 'change', target);
+    fake.watchers[1]!.emit('all', 'change', target);
+    expect(watcher.hasPendingChanges).toBe(true);
+    watcher.drain();
+    expect(watcher.hasPendingChanges).toBe(false);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(listener).toHaveBeenCalledExactlyOnceWith({ paths: [target] });
+  });
+});
+
+describe('루트 보완 감시의 새 하위 폴더 신호', () => {
+  it('내용 감시가 놓친 하위 폴더를 루트 감시가 발견하면 새 하위 감시를 준비하고 문서 경로를 전달한다', async () => {
+    await mkdir(path.join(project, '.codocs'));
+    watcher = await createWorkspaceWatcher(project);
+    const directory = path.join(project, '.codocs', 'nested');
+    const target = path.join(directory, 'deep', 'alpha.yaml');
+    const listener = vi.fn();
+    watcher.subscribe(listener);
+    fake.manualReady = true;
+    await mkdir(directory, { recursive: true });
+    fake.watchers[0]!.emit('all', 'addDir', directory);
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(3));
+    const subtree = fake.watchers[2]!;
+    subtree.emit('all', 'add', target);
+    subtree.emit('ready');
+    await vi.waitFor(() =>
+      expect(listener).toHaveBeenCalledWith({ paths: [directory, target] }),
+    );
+    const count = fake.watchers.length;
+    fake.watchers[0]!.emit('all', 'addDir', directory);
+    expect(fake.watchers).toHaveLength(count);
+  });
+});
+
+describe('동적 대상 준비의 실패와 종료', () => {
+  it('새 하위 감시 settle 중 close하면 모든 준비 대기를 끝내고 늦은 ready를 무시한다', async () => {
+    await mkdir(path.join(project, '.codocs'));
+    watcher = await createWorkspaceWatcher(project);
+    fake.manualReady = true;
+    await mkdir(path.join(project, '.codocs', 'nested'), { recursive: true });
+    fake.watchers[0]!.emit(
+      'all',
+      'addDir',
+      path.join(project, '.codocs', 'nested'),
+    );
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(3));
+    const settling = watcher.settle();
+    await watcher.close();
+    await settling;
+    for (const connection of fake.watchers) {
+      connection.emit('ready');
+      expect(connection.close).toHaveBeenCalled();
+    }
+    expect(watcher.readiness).toEqual({
+      state: workspaceLifecycleStates.closed,
+      ready: false,
+    });
+  });
+});
+
+describe('교체 감시의 종료 완료', () => {
+  it('이전 내용 감시의 close가 지연되면 전체 종료도 기다리고 새 감시를 만들지 않는다', async () => {
+    fake.contentIdentity = { dev: 1, ino: 1 };
+    watcher = await createWorkspaceWatcher(project);
+    const previous = fake.watchers[1]!;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    previous.close.mockImplementationOnce(() => gate);
+    fake.contentIdentity = { dev: 1, ino: 2 };
+    fake.watchers[0]!.emit('all', 'addDir', path.join(project, '.codocs'));
+    await vi.waitFor(() => expect(previous.close).toHaveBeenCalledOnce());
+    let complete = false;
+    const closing = watcher.close().then(() => {
+      complete = true;
+    });
+    await Promise.resolve();
+    expect(complete).toBe(false);
+    release();
+    await closing;
+    expect(fake.watchers).toHaveLength(2);
+    expect(complete).toBe(true);
+  });
+});

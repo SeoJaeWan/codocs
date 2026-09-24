@@ -1,0 +1,23 @@
+{
+  "platform": "win32",
+  "arch": "x64",
+  "version": "1.100.0",
+  "mode": "performance",
+  "scenario": "all",
+  "phase": "performance-api",
+  "passed": false,
+  "output": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\.workbench\\vscode-tests\\1790219725252-16496",
+  "visualInteraction": true,
+  "packageKind": "installed-vsix",
+  "head": "e720db92b4430f3d6fee59bfbf8555c8cd445ef9",
+  "trackedDiff": "",
+  "cancelRequest": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod20-dom-20260924-int-001\\.workbench\\vscode-tests\\1790219725252-16496\\cancel-run.json",
+  "process": {
+    "reason": "cancelled",
+    "exitCode": null,
+    "cleanup": "taskkill-tree",
+    "residualProcesses": 0
+  },
+  "error": "Error: 테스트 실행 cancelled (null)\n    at main (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/packages/vscode/test-runner/run.mjs:177:13)\n    at async file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod20-dom-20260924-int-001/packages/vscode/test-runner/run.mjs:274:3",
+  "cleaned": true
+}

@@ -1,0 +1,6 @@
+{
+  "command": ["pnpm", "format:check"],
+  "code": 0,
+  "durationMs": 17884,
+  "log": "format-final.log"
+}

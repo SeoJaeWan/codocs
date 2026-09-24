@@ -1,0 +1,262 @@
+{
+  "kind": "actual-vscode-hover-performance",
+  "packageKind": "installed-vsix",
+  "status": "interrupted",
+  "runId": "1789989131525-21259",
+  "vscode": {
+    "requestedVersion": null,
+    "version": "1.136.1"
+  },
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "runnerNode": "v24.21.0",
+    "profileIsolation": "new user-data and extensions directories for this run"
+  },
+  "fixture": {
+    "seed": 16018,
+    "projectDocumentCount": 1000,
+    "queryableDocumentCount": 980,
+    "invalidDocumentCount": 10,
+    "collisionDocumentCount": 10,
+    "collisionIdCount": 5,
+    "referenceCount": 10,
+    "longDefinitionCount": 10,
+    "documentBytes": {
+      "total": 115150,
+      "minimum": 77,
+      "median": 101,
+      "maximum": 1523
+    },
+    "documentCharacters": {
+      "total": 99390,
+      "minimum": 77,
+      "median": 93,
+      "maximum": 723
+    },
+    "codeInput": {
+      "utf8Bytes": 12740,
+      "utf16CodeUnits": 12740,
+      "lines": 980,
+      "identifiers": 980,
+      "identifierPattern": "perfTerm0000",
+      "requestPositionSelection": "32-bit LCG(seed=16018), state % queryableDocumentCount, line index at character 5"
+    }
+  },
+  "artifacts": {
+    "sourceCommit": "1c07daf547de71fe143484a347db5a3108bce3f4",
+    "vsixPath": "/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod16-perf-observe-20260921-r1/perf-001/.workbench/artifacts/codocs-perf-001.vsix",
+    "vsixSha256": "0b87dde191785f49113d604ff9cc09f737d6accd1257bc16d218f202bf856c4f",
+    "extensionBundleSha256": "59d7275545238dbc7b7006a16ecdbc1467a9506bb862d00931f0c4a154d06955",
+    "serverBundleSha256": "3757ca4e63e20fedd80d64c5d3c59a7686bfc60c847d739db4fe44affdf87d0c"
+  },
+  "performance": {
+    "targetMilliseconds": 100,
+    "warmupRuns": 100,
+    "queryRuns": 1,
+    "readinessAttempts": 1,
+    "attemptedReadiness": 1,
+    "completedReadiness": 1,
+    "readiness": [
+      {
+        "phase": "performance:readiness-request-complete",
+        "at": "2026-09-21T11:12:26.951Z",
+        "run": 1,
+        "index": 0,
+        "durationMilliseconds": 12117.051792,
+        "success": true,
+        "hoverCount": 1
+      }
+    ],
+    "memory": {
+      "before-readiness": {
+        "rss": 149405696,
+        "heapTotal": 39780352,
+        "heapUsed": 30314680,
+        "external": 7298149,
+        "arrayBuffers": 0
+      },
+      "after-readiness": {
+        "rss": 147750912,
+        "heapTotal": 52772864,
+        "heapUsed": 33389724,
+        "external": 6694715,
+        "arrayBuffers": 0
+      }
+    },
+    "eventLoopDelay": {
+      "phases": {
+        "before-readiness": {
+          "count": 0,
+          "minimumMilliseconds": null,
+          "medianMilliseconds": null,
+          "p95Milliseconds": null,
+          "maximumMilliseconds": null
+        },
+        "after-readiness": {
+          "count": 1123,
+          "minimumMilliseconds": 9.601024,
+          "medianMilliseconds": 11.067391,
+          "p95Milliseconds": 11.116543,
+          "maximumMilliseconds": 39.649279
+        }
+      }
+    },
+    "progressIntegrity": "recovered",
+    "attemptedWarmupRuns": 2,
+    "completedWarmupRuns": 2,
+    "attemptedMeasuredRuns": 0,
+    "completedMeasuredRuns": 0,
+    "warmups": [
+      {
+        "run": 0,
+        "index": 277,
+        "durationMilliseconds": 11652.563709000002,
+        "success": true,
+        "cancelled": false
+      },
+      {
+        "run": 1,
+        "index": 744,
+        "durationMilliseconds": 218.25587499999892,
+        "success": false,
+        "cancelled": true,
+        "error": "Canceled"
+      }
+    ],
+    "samples": [],
+    "pending": null,
+    "successfulLatencySampleCount": 0,
+    "medianMilliseconds": null,
+    "p95Milliseconds": null,
+    "maximumMilliseconds": null,
+    "accuracyFailureCount": 0,
+    "cancelledCount": 1,
+    "passed": false,
+    "failure": "Interrupted by SIGINT",
+    "progress": [
+      {
+        "phase": "run:start",
+        "at": "2026-09-21T11:12:14.533Z",
+        "vscodeVersion": "1.136.1"
+      },
+      {
+        "phase": "performance:resources",
+        "at": "2026-09-21T11:12:14.537Z",
+        "boundary": "before-readiness",
+        "memory": {
+          "rss": 149405696,
+          "heapTotal": 39780352,
+          "heapUsed": 30314680,
+          "external": 7298149,
+          "arrayBuffers": 0
+        },
+        "eventLoop": {
+          "count": 0,
+          "minimumMilliseconds": null,
+          "medianMilliseconds": null,
+          "p95Milliseconds": null,
+          "maximumMilliseconds": null
+        }
+      },
+      {
+        "phase": "performance:start",
+        "at": "2026-09-21T11:12:14.537Z",
+        "requestedWarmups": 100,
+        "requestedMeasured": 1
+      },
+      {
+        "phase": "activate-extension:start",
+        "at": "2026-09-21T11:12:14.538Z"
+      },
+      {
+        "phase": "activate-extension:ready",
+        "at": "2026-09-21T11:12:14.776Z",
+        "workspaceFolders": 1,
+        "serverProcesses": 1
+      },
+      {
+        "phase": "performance:readiness-request-start",
+        "at": "2026-09-21T11:12:14.833Z",
+        "run": 1,
+        "index": 0,
+        "startedAt": "2026-09-21T11:12:14.833Z"
+      },
+      {
+        "phase": "performance:readiness-request-complete",
+        "at": "2026-09-21T11:12:26.951Z",
+        "run": 1,
+        "index": 0,
+        "durationMilliseconds": 12117.051792,
+        "success": true,
+        "hoverCount": 1
+      },
+      {
+        "phase": "performance:resources",
+        "at": "2026-09-21T11:12:26.951Z",
+        "boundary": "after-readiness",
+        "memory": {
+          "rss": 147750912,
+          "heapTotal": 52772864,
+          "heapUsed": 33389724,
+          "external": 6694715,
+          "arrayBuffers": 0
+        },
+        "eventLoop": {
+          "count": 1123,
+          "minimumMilliseconds": 9.601024,
+          "medianMilliseconds": 11.067391,
+          "p95Milliseconds": 11.116543,
+          "maximumMilliseconds": 39.649279
+        }
+      },
+      {
+        "phase": "performance:index-ready",
+        "at": "2026-09-21T11:12:26.951Z",
+        "readinessAttempts": 1
+      },
+      {
+        "phase": "performance:warmup-request-start",
+        "at": "2026-09-21T11:12:26.952Z",
+        "run": 0,
+        "index": 277,
+        "position": {
+          "line": 277,
+          "character": 5
+        },
+        "startedAt": "2026-09-21T11:12:26.952Z"
+      },
+      {
+        "phase": "performance:warmup-request-complete",
+        "at": "2026-09-21T11:12:38.605Z",
+        "run": 0,
+        "index": 277,
+        "durationMilliseconds": 11652.563709000002,
+        "success": true,
+        "cancelled": false
+      },
+      {
+        "phase": "performance:warmup-request-start",
+        "at": "2026-09-21T11:12:38.605Z",
+        "run": 1,
+        "index": 744,
+        "position": {
+          "line": 744,
+          "character": 5
+        },
+        "startedAt": "2026-09-21T11:12:38.605Z"
+      },
+      {
+        "phase": "performance:warmup-request-complete",
+        "at": "2026-09-21T11:12:38.824Z",
+        "run": 1,
+        "index": 744,
+        "durationMilliseconds": 218.25587499999892,
+        "success": false,
+        "cancelled": true,
+        "error": "Canceled"
+      }
+    ]
+  }
+}

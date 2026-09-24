@@ -1,0 +1,42 @@
+id: codocs-query
+name: '조회'
+domains:
+  - 'MCP'
+deprecatedAliases:
+  - id: query
+definition: |
+  codocs_list·codocs_get으로 문서 목록·상세를 조회하는 입력과 외부 응답 필드를 정의한다.
+  정식 도구와 공통 입력 경계는 [[MCP 도구 호출]], 프로젝트 관측과 세션 유지는 [[작업 공간 조회 세션]]에서 확인한다.
+  공통 성공·실패와 scanStatus의 해석은 [[도구 결과]], 목록·상세의 계산 규칙은 [[조회 투영]]에서 확인한다.
+
+  ## list 입력과 결과
+
+  선택 입력은 cursor·domain·kind·status다. type과 limit은 받지 않는다.
+  잘못된 kind·status 열거 값은 입력 오류다. 유효한 조건에 해당하는 문서가 없거나 미등록 domain이면 빈 목록이다.
+
+  [[조회 투영]]에서 계산한 목록을 50개씩 반환하며 마지막 페이지는 남은 수다.
+  items에는 id·name·domains와 작성된 kind/status 및 오류·충돌 표시를 제공하고 본문은 넣지 않는다.
+  충돌 항목은 conflict:true·hasErrors:true와 paths를 제공한다.
+  totalCount는 필터 후 전체 수, returnedCount는 페이지 반환 수, nextCursor는 다음 페이지 토큰이며 마지막에는 null이다.
+
+  [[목록 페이지 조회]]에서 커서·필터를 확인하고 이어 읽을 페이지나 만료 결과를 계산한다.
+
+  ## get 입력과 결과
+
+  필수 ids 배열은 처음 등장한 순서로 중복 제거한 뒤 1~20개여야 한다.
+  빈 배열과 중복 제거 후 초과는 전체 요청 오류이며 일부만 임의 반환하지 않는다.
+  조회·수정의 대상 키는 현재 ID다. ID 변경 뒤에는 최신 목록에서 새 ID를 확인한다.
+
+  results의 정상 항목에는 id·found·document·source.path·revision·references·referencedBy를 제공한다.
+  rawYaml이 필요한 경우와 연결 ID의 포함 기준은 [[조회 투영]]을 적용한다.
+  중복 ID 항목은 found:true·conflict:true·paths와 duplicate_id 진단을 제공한다.
+
+  source.path는 [[발견 경로]]에 해당하는 서버 계산값이며 YAML 속성이 아니다.
+  revision은 [[원문 버전]]에서 정의한 읽기 시점의 값이다.
+  references는 직접 참조하는 문서 ID, referencedBy는 직접 참조받는 문서 ID다.
+  미확인·부재·요청 실패의 표현은 [[도구 결과]]를 적용한다.
+
+  ## 코드와 검증 위치
+
+  대표 함수 createCodocsQueryHandlers와 조회 입력·응답은 [조회 어댑터 구현](../../../packages/mcp/src/query/index.ts)에서 확인한다.
+  입력 검증과 작업 공간 응답 연결 사례는 [인접 테스트](../../../packages/mcp/src/query/query.test.ts)에서 확인한다.
