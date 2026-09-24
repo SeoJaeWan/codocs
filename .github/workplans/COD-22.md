@@ -53,6 +53,15 @@ h2. 구현 중 확인할 사항
 - ID가 없거나 YAML 파싱에 실패한 파일도 경로로 지정해 진단받을 수 있다.
 - 검증 사례: A와 B의 ID가 중복이고 C에는 별개의 YAML 오류가 있을 때, A의 경로로 요청하면 A의 중복 ID 진단과 B의 경로를 반환하고 C의 오류는 포함하지 않는다. path를 생략한 전체 요청에서는 A·B의 중복 ID 문제와 C의 YAML 오류를 모두 확인한다.
 
+## validate 준비 상태와 기존 오류·응답 처리 재사용
+
+- `.codocs/mcp/tool-result.yaml`, `.codocs/workspace/query/workspace-query-session.yaml`, `.codocs/workspace/indexing/index-refresh.yaml`의 기존 계약을 적용한다. MCP에서 탐색·감시 오류를 다시 판정하거나 공통 진단을 별도 제품 오류로 바꾸지 않는다.
+- 전체 탐색이 complete이고 준비·감시 상태가 정상일 때 validate를 허용한다. partial 탐색이나 감시 실패에서는 단일 파일 요청도 차단하며, 기존 workspace의 원인·진단·복구 안내를 보존해 공통 실패 결과로 전달한다.
+- 읽은 파일의 YAML·ID·참조 오류는 탐색 실패와 구분한다. 검증 요청을 정상 처리해 문서 오류를 보고한 경우에는 success:true를 반환한다.
+- 기존 MCP accessState의 canValidate 판단, 공통 입력 스키마·검증, workspace의 진단·준비·실패 처리와 wrapCodocsResult의 응답 포장을 재사용한다. 도구별로 별도 세션이나 색인을 만들지 않는다.
+- 현재 validate는 입력 스키마와 접근 가능 상태 판단만 있으며 실행 handler·서버 등록은 미구현이다. 기존 처리에 validate 실행을 연결하고 필요한 공통 처리를 소유 계층에서 확장한다. canValidate 값만으로 실패 원인을 추측하거나 diagnostics()의 관측 결과를 완성된 validate 응답으로 간주하지 않는다.
+- MCP는 공통 결과를 structuredContent와 같은 내용의 JSON text에 담고 isError를 !success로 설정한다. 기존 오류 코드·메시지·경로·위치·심각도와 복구 안내가 전달 과정에서 보존되는지 검증한다.
+
 ## 문서 기준
 
 현재 계약의 기준 원문은 로컬 `.codocs`다. 문서 역할과 갱신은 [문서 컨벤션](https://github.com/SeoJaeWan/codocs/blob/main/.codocs/development/documentation-convention.yaml)을 따른다.
