@@ -3,6 +3,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const vscode = require('vscode');
+const { recordApiRequest } = require('./api-request-progress.cjs');
 let activeConfig;
 
 /** all 실행에서 한 대기 시나리오만 취소하는 내구 제어 파일이다. */
@@ -231,12 +232,27 @@ async function api(config, extension) {
   const manifest = JSON.parse(fs.readFileSync(session.corpusManifest, 'utf8'));
   const count = manifest.requests.length;
   let incorrect = 0;
-  for (let i = 0; i < config.settings.apiWarmup; i++)
-    await hover(uri, i % count);
+  for (let i = 0; i < config.settings.apiWarmup; i++) {
+    const line = i % count;
+    const request = manifest.requests[line];
+    await recordApiRequest(
+      config,
+      'warmup',
+      i,
+      { id: request.id, line, category: request.category },
+      () => hover(uri, line),
+    );
+  }
   for (let i = 0; i < config.settings.targets.api; i++) {
     const line = i % count;
     const request = manifest.requests[line];
-    const result = await hover(uri, line);
+    const result = await recordApiRequest(
+      config,
+      'measured',
+      i,
+      { id: request.id, line, category: request.category },
+      () => hover(uri, line),
+    );
     const valid = correct(result, request.expected);
     if (!valid) incorrect++;
     const plain = markdownText(result);

@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { watchRunCancellation } from './run-control.mjs';
+import { reconcileApiEvidence } from './api-progress-reconcile.mjs';
 import { runSupervised } from '../../../tools/test/runtime/process.mjs';
 import {
   parseRunnerArgs,
@@ -38,6 +40,7 @@ export async function main(args = process.argv.slice(2)) {
   const cancel = () => controller.abort();
   process.on('SIGINT', cancel);
   process.on('SIGTERM', cancel);
+  let stopControl;
   const result = {
     platform: process.platform,
     arch: process.arch,
@@ -54,6 +57,10 @@ export async function main(args = process.argv.slice(2)) {
   };
   let performanceReport;
   try {
+    stopControl = await watchRunCancellation(output, controller, (request) => {
+      result.cancelRequest = request;
+    });
+    console.log(`VS Code run output: ${output}`);
     const localCacheRoot = path.join(root, '.workbench/vscode-cache');
     const cacheRoot =
       options.mode === 'performance' && process.env.CODOCS_VSCODE_RUNTIME_CACHE
@@ -175,6 +182,7 @@ export async function main(args = process.argv.slice(2)) {
   } catch (error) {
     result.error = error.stack ?? String(error);
   } finally {
+    stopControl?.();
     if (performanceReport) {
       try {
         performanceReport = JSON.parse(
@@ -190,7 +198,14 @@ export async function main(args = process.argv.slice(2)) {
             'utf8',
           ),
         );
-        if (result.passed) performanceReport.progress = progress;
+        if (progress.scenario === 'api')
+          await reconcileApiEvidence(
+            performanceReport,
+            output,
+            progress,
+            controller.signal.aborted,
+          );
+        else if (result.passed) performanceReport.progress = progress;
         else
           reconcileInterruptedScenario(
             performanceReport,
