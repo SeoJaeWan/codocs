@@ -63,10 +63,12 @@ definition: |
   목록의 partial 미확인 항목 진단과 전체 재구성 중 `index_not_ready` 실패는 세션의 공통 결과에서 만든다. 전송 계층은 이를 다시 분류하지 않는다.
   validate는 같은 complete 색인의 전체 또는 단일 발견 경로 진단을 사용한다. 경로를 지정하면 실제 일반 YAML 파일 접근을 확인하고 해당 경로가 색인에 없으면 준비 중으로 반환한다. 경로 확인 동안 색인·refresh·감시 상태가 바뀌면 이전 관측의 진단을 반환하지 않는다.
   세션의 조회 결과가 있다는 사실은 실제 파일 저장이나 감시 연결의 성공을 대신하지 않는다.
+  write는 최초 관측과 complete·감시·수동 refresh 준비 상태를 확인한 뒤 [[저장]]의 단일 파일 반영을 호출한다. 실패와 무변경은 색인 재관측 없이 반환한다. 저장됐으면 같은 세션에서 저장 경로의 캐시 세대를 무효화하고 해당 원문 버전이 게시됐는지 확인한다.
+  첫 게시 실패에만 저장 경로를 추가 한 번 재관측한다. 후속 watcher 배치를 포함한 게시 완료를 확인하며 경과 시간만으로 실패 처리하지 않는다. 닫힌 세션의 결과는 게시하지 않고 이미 저장한 파일은 다시 쓰지 않는다.
 
   명시적 IDE 성능 관측은 실제 동기화 시작과 원자적 #publish 경계에서 발생한다. 최초 완료 색인은 complete 게시와 모든 관련 감시 준비를 함께 확인하며, partial·failed 게시를 성공 완료로 바꾸지 않는다. 관측은 조회·refresh·파일 읽기를 시작하지 않는다.
 
   ## 코드와 검증 위치
 
-  대표 자료형 WorkspaceQuerySession의 references·onDidChangeSnapshot·captureCandidate·confirmCandidate·releaseCandidate·closeDocument와 createWorkspaceQuerySession은 [담당 구현](../../../packages/workspace/src/query/index.ts)에서 확인한다.
+  대표 자료형 WorkspaceQuerySession의 write·references·onDidChangeSnapshot·captureCandidate·confirmCandidate·releaseCandidate·closeDocument와 createWorkspaceQuerySession은 [담당 구현](../../../packages/workspace/src/query/index.ts)에서 확인한다.
   관련 계약의 사례는 [인접 테스트](../../../packages/workspace/src/query/query.test.ts)에서 확인한다.

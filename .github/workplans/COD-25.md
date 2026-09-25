@@ -73,7 +73,7 @@ h2. 구현 중 확인할 사항
 - Codocs 파일 감지와 색인 복구 (codocs-index-lifecycle)
   ** 조회 참조: {{{"type":"wiki","project_id":"seojaewan/codosc","wiki_id":"01a09980-8466-7f3b-b7ae-bcbc54e1d66e","revision":"01a09980-8466-7222-97c6-4a9d5bbf97cf"}}}
 
-2026-09-13 최초 계획을 바탕으로 현재 로컬 `.codocs` 계약에 따라 진행하는 실행 작업이다. 아직 구현·성능·호환성 검증을 완료한 상태가 아니다.
+2026-09-13 최초 계획을 바탕으로 현재 로컬 `.codocs` 계약에 따라 진행하는 실행 작업이다. TASK-001의 구현과 검증 증거는 아래 실행 기록에서 추적한다.
 
 ## Jira
 
@@ -96,3 +96,10 @@ h2. 구현 중 확인할 사항
 - 실제 MCP 요청과 파일 IO로 ID 변경 후 이전 ID 추가, 중복 방지·message 보존, 과거 ID 재사용을 검증한다.
 - 새 현재 ID 충돌·revision 불일치·저장 실패 시 ID 또는 이전 목록만 부분 반영되지 않는지 확인한다.
 - 저장 성공 후 최신 get/list와 매칭 색인을 확인한다. 색인 실패 시 기존 saved/indexUpdated·복구 계약을 유지한다.
+
+## 2026-09-25 실행 기록: TASK-001
+
+- 실행 패킷: `wb-cod25-06e0ff4-73f914/intent/1`, 작업: `TASK-001`, 기준 커밋: `06e0ff431450b84805794e15fdd1cfa334edc6fa`.
+- 한 `WorkspaceQuerySession`에서 MCP `codocs_write`와 조회·색인 게시를 연결했다. 저장 전 기존 revision·ID·경로 검사를 재사용하고, 저장 후 해당 경로의 관측 게시를 확인한다. 실제 색인 오류 뒤에는 해당 경로를 한 번 더 읽고, 두 시도가 실패해도 저장 바이트 기준 revision과 `saved:true`를 유지한다.
+- 명시적 `set.id`는 기존 core 변경 계획을 통해 현재 ID와 이전 ID 목록에 함께 반영한다. 직접 YAML 편집의 이전 ID 관리는 수행하지 않는다. 잠금·공유 FIFO·고정 대기 취소와 저장 후 동명 후보 안내는 위 합의를 유지한다.
+- 실제 파일 IO, 동일 stdio 서버의 SDK 호출, 관측 경합, 정리 오류, 1초 초과 대기, 변경 `.codocs` 파서·catalog를 검증했다. 명령별 결과, 계약별 테스트 연결, 한 차례 발견한 임시 파일 감시 경합의 수정 근거는 [실행 결과](COD-25-results/wb-cod25-06e0ff4-73f914/RESULT.md)에 기록한다.

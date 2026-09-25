@@ -18,6 +18,8 @@ import {
   queryDiagnosticCodes,
   queryDiagnosticMessages,
   scanStatuses,
+  storageDiagnosticCodes,
+  storageDiagnosticMessages,
   type Catalog,
   type CatalogGetResult,
   type CatalogListFilters,
@@ -74,6 +76,11 @@ import {
   workspaceTargetKinds,
 } from '../paths/domain-values.js';
 import { WorkspaceWatcher } from '../watcher/index.js';
+import {
+  saveWorkspaceChange,
+  type WorkspaceStorageOptions,
+  type WorkspaceStorageResult,
+} from '../storage/index.js';
 import {
   codocsDirectoryName,
   resolveProjectRoot,
@@ -174,6 +181,21 @@ export type WorkspaceListResult = RequestResult<
   WorkspaceListSuccess,
   WorkspaceQueryFailure
 >;
+
+/** 저장 결과와 같은 세션에 게시된 색인 상태를 함께 전달한다. */
+export type WorkspaceWriteResult =
+  | (Extract<WorkspaceStorageResult, { success: true }> & {
+      indexUpdated?: boolean;
+    })
+  | (Extract<WorkspaceStorageResult, { success: false }> & {
+      error: Diagnostic<string>;
+    });
+
+/** 실제 파일 연산과 저장 후 관측의 실패·지연만 주입하는 검사 경계다. */
+export interface WorkspaceQuerySessionOptions {
+  storage?: WorkspaceStorageOptions;
+  beforeIndexUpdate?: (attempt: 1 | 2) => Promise<void>;
+}
 
 /** 상세 조회 결과다. */
 export type WorkspaceGetResponse = RequestResult<
@@ -722,10 +744,12 @@ export interface WorkspaceDiagnosticsSnapshot {
 /** 실제 scan과 이전 Catalog를 직렬로 연결하는 process 범위 조회 세션이다. */
 export class WorkspaceQuerySession {
   readonly #input: unknown;
+  readonly #options: WorkspaceQuerySessionOptions;
   readonly #observe:
     ((kind: string, detail: Record<string, unknown>) => void) | undefined;
   #catalog: Catalog | undefined;
   #scan: WorkspaceScanResult | undefined;
+  #latestUsableScan: WorkspaceScanResult | undefined;
   #revisions = new Map<string, string>();
   #completed:
     | { catalog: Catalog; revisions: Map<string, string>; version: number }
@@ -749,15 +773,18 @@ export class WorkspaceQuerySession {
   constructor(
     input: unknown = {},
     observe?: (kind: string, detail: Record<string, unknown>) => void,
+    options: WorkspaceQuerySessionOptions = {},
   ) {
     this.#input = sessionInput(input);
     this.#observe = observe;
+    this.#options = options;
   }
 
   /** .codocs 감시 신호로 진행 중 읽기의 세대를 무효화한다. */
-  #collect(paths: readonly string[]): void {
+  #collect(paths: readonly string[], start = true): void {
     if (this.#closed || !this.#root) return;
     for (const changed of paths) {
+      if (/^\.codocs-write-[^.]+\.tmp$/u.test(path.basename(changed))) continue;
       const scopes: string[] = [];
       if (containsWorkspacePath(this.#root.codocsPath, changed))
         scopes.push(changed);
@@ -776,7 +803,7 @@ export class WorkspaceQuerySession {
         this.#pending.add(scope);
       }
     }
-    if (this.#pending.size && !this.#refreshPromise)
+    if (start && this.#pending.size && !this.#refreshPromise)
       void this.#synchronize(false).catch(() => undefined);
   }
 
@@ -827,12 +854,14 @@ export class WorkspaceQuerySession {
         previousFingerprint !== fingerprint(projectCatalogList(next, {}).items)
       )
         this.#generation++;
-      if (scan.status === scanStatuses.complete)
+      if (scan.status === scanStatuses.complete) {
         this.#completed = {
           catalog: next,
           revisions,
           version: this.#catalogVersion,
         };
+      }
+      this.#latestUsableScan = scan;
     }
     this.#scan = scan;
     this.#observe?.('index-published', {
@@ -866,12 +895,11 @@ export class WorkspaceQuerySession {
     }
     const options = { cache: this.#cache };
     let working: QueryObservations;
-    if (
-      full ||
-      !this.#scan ||
-      this.#scan.status === scanStatuses.failed ||
-      !this.#root
-    ) {
+    const basis =
+      this.#scan?.status === scanStatuses.failed
+        ? this.#latestUsableScan
+        : this.#scan;
+    if (full || !basis || !this.#root) {
       this.#watcher?.drain();
       this.#pending.clear();
       if (this.#root) this.#cache.invalidate(this.#root.codocsPath);
@@ -888,7 +916,7 @@ export class WorkspaceQuerySession {
         this.#cache,
         loaded.observations,
       );
-    } else working = new QueryObservations(this.#root, this.#scan, this.#cache);
+    } else working = new QueryObservations(this.#root, basis, this.#cache);
     while (!this.#closed) {
       await this.#watcher?.settle();
       if (this.#closed) return this.#closedScan();
@@ -999,6 +1027,116 @@ export class WorkspaceQuerySession {
     if (this.#closed) return this.#closedScan();
     if (!this.#scan) return this.#synchronize();
     return this.#scan;
+  }
+
+  /** 실패 진단의 원인·경로를 잃지 않고 공통 요청 실패로 만든다. */
+  #writeFailure(
+    diagnostics: readonly Diagnostic<string>[],
+  ): WorkspaceWriteResult {
+    const error = diagnostics[0] ?? workspaceIndexNotReady().error;
+    return { success: false, saved: false, changed: false, error, diagnostics };
+  }
+
+  /** 저장 경로만 무효화하고 해당 revision이 현재 세션에 게시될 때까지 기다린다. */
+  async #publishSaved(
+    pathName: string,
+    revision: string,
+    attempt: 1 | 2,
+  ): Promise<boolean> {
+    await this.#options.beforeIndexUpdate?.(attempt);
+    if (this.#closed || !this.#root) return false;
+    pathName = discoveryPath(pathName);
+    const logicalPath = path.resolve(this.#root.projectRoot, pathName);
+    this.#collect([logicalPath], false);
+    while (!this.#closed) {
+      const operation =
+        this.#refreshPromise ??
+        (this.#pending.size ? this.#synchronize(false) : undefined);
+      if (!operation) break;
+      await operation;
+      if (this.#closed) return false;
+      if (
+        this.#scan?.status === scanStatuses.complete &&
+        this.#revisions.get(pathName) === revision &&
+        this.#catalog?.documents.has(pathName)
+      )
+        return true;
+    }
+    return false;
+  }
+
+  /** 저장은 한 번만 수행하고 색인 관측 실패에만 범위 재읽기를 추가 한 번 시도한다. */
+  async write(input: unknown): Promise<WorkspaceWriteResult> {
+    if (this.#closed || this.#explicitRefreshPromise)
+      return this.#writeFailure([workspaceIndexNotReady().error]);
+    const scan = await this.#current();
+    if (this.#closed || this.#explicitRefreshPromise)
+      return this.#writeFailure([workspaceIndexNotReady().error]);
+    if (scan.status === scanStatuses.failed)
+      return this.#writeFailure([scanFailure(scan).error]);
+    const watchFailure = this.#watchFailure();
+    if (watchFailure)
+      return this.#writeFailure([this.#watchFailureResult(watchFailure).error]);
+    if (
+      scan.status !== scanStatuses.complete ||
+      this.readiness.state !== workspaceLifecycleStates.ready ||
+      !this.#catalog
+    )
+      return this.#writeFailure([
+        scan.failures[0]?.diagnostics[0] ??
+          scan.diagnostics[0] ??
+          workspaceIndexNotReady().error,
+      ]);
+    const saved = await saveWorkspaceChange(input, scan, this.#options.storage);
+    if (!saved.success) return this.#writeFailure(saved.diagnostics);
+    if (!saved.saved) return saved;
+    let updated = false;
+    let indexError: unknown;
+    for (const attempt of [1, 2] as const) {
+      try {
+        if (
+          await this.#publishSaved(saved.source.path, saved.revision, attempt)
+        ) {
+          updated = true;
+          break;
+        }
+        indexError =
+          this.#scan?.status !== scanStatuses.complete
+            ? this.#scan?.diagnostics[0]
+            : undefined;
+      } catch (error: unknown) {
+        indexError = error;
+        // 저장은 확정됐으므로 색인 복구만 한 번 더 시도한다.
+      }
+      if (this.#closed) break;
+    }
+    if (updated) return { ...saved, indexUpdated: true };
+    const cause =
+      indexError instanceof Error
+        ? indexError.message
+        : typeof indexError === 'object' &&
+            indexError !== null &&
+            'message' in indexError
+          ? String(indexError.message)
+          : this.#closed
+            ? '세션이 종료되었습니다.'
+            : '저장 경로의 원문 버전을 게시하지 못했습니다.';
+    const ioCode = getIoErrorCode(indexError);
+    return {
+      ...saved,
+      indexUpdated: false,
+      diagnostics: [
+        ...saved.diagnostics,
+        {
+          code: storageDiagnosticCodes.indexUpdateFailed,
+          severity: diagnosticSeverities.error,
+          message: storageDiagnosticMessages.indexUpdateFailed,
+          path: saved.source.path,
+          suggestion: `${cause} codocs_refresh로 색인을 다시 구성하세요.`,
+          ...(ioCode === undefined ? {} : { ioCode }),
+        },
+      ],
+    };
   }
 
   /** 감시 연결 및 현재 scan의 준비 상태다. */
@@ -1938,8 +2076,9 @@ export class WorkspaceQuerySession {
 export function createWorkspaceQuerySession(
   input: unknown = {},
   observe?: (kind: string, detail: Record<string, unknown>) => void,
+  options: WorkspaceQuerySessionOptions = {},
 ): WorkspaceQuerySession {
-  return new WorkspaceQuerySession(input, observe);
+  return new WorkspaceQuerySession(input, observe, options);
 }
 
 /** 후보 출처의 경로도 저장된 발견 경로와 같은 표기로 비교한다. */

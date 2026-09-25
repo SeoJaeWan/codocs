@@ -27,6 +27,7 @@ definition: |
   다른 프로세스는 watcher를 통해 갱신한다.
 
   복구에 인위적 대기·파일 재저장·자동 전체 재구성을 추가하지 않는다.
+  재읽기는 저장 경로로 한정하고, 참조·역참조·진단은 그 관측을 포함한 전체 catalog에서 계산한다. watcher의 다른 변경 배치와 겹치면 저장 경로의 게시된 원문 버전까지 확인한다.
   실제 오류로 복구가 실패하면 success:true·saved:true·indexUpdated:false와 저장 revision·진단을 반환하고 refresh를 안내한다.
 
   refresh까지 실패하면 원인에 맞는 수정·재시작을 안내하고 무한 복구를 유도하지 않는다.
