@@ -82,8 +82,6 @@ definition: |
   | reference_ambiguous | 이름·선택 도메인으로 찾은 대상 문서가 여러 개 |
   | revision_conflict | 조회 이후 파일 변경 |
   | file_exists | 생성 대상 경로가 이미 존재 |
-  | write_queue_timeout | 5초 내 쓰기 차례가 오지 않음 |
-  | lock_failed | 잠금 획득·유지 실패 |
   | file_write_failed | 파일 기록·반영 실패 |
   | index_not_ready | 초기 색인 구성·갱신 진행 중 |
   | index_build_failed | 전체 색인 구성 실패 |
