@@ -1,4 +1,4 @@
-# COD-25 — [22] MCP write 실행·후보 안내·저장 후 색인 복구 통합
+# COD-25 — [22] MCP write 실행·저장 후 색인 복구 통합
 
 h2. 목표
 
@@ -9,7 +9,6 @@ h2. 작업 순서와 선행 조건
 권장 순서 22/25 · 3단계 · 상위 COD-3
 
 - [COD-23|https://seojaewan.atlassian.net/browse/COD-23] — 단일 문서 파일 반영·저장 직전 revision·ID·경로 검사
-- [COD-12|https://seojaewan.atlassian.net/browse/COD-12] — 저장 후 이름·제목 일치 후보 계산 구현
 - [COD-13|https://seojaewan.atlassian.net/browse/COD-13] — 파일 변경 감지·증분 색인·refresh 준비 상태 구현
 - [COD-21|https://seojaewan.atlassian.net/browse/COD-21] — 공식 MCP SDK·stdio 실행·요청/응답 스키마 연결
 
@@ -18,7 +17,6 @@ h2. 구현 범위
 - create/update 단일 요청을 기존 변경 계획→저장 직전 최신 revision·ID·경로 검사→파일 반영→직접 색인 갱신에 연결.
 - revision 불일치는 revision_conflict와 success:false·saved:false로 반환하고 최신 문서 재조회와 수정안 재검토를 안내한다. 서버가 revision만 바꿔 기존 수정안을 자동 재적용하지 않는다.
 - 검증 오류/충돌 미저장·경고 저장·유효 무변경 성공·오류 무변경 실패를 실제 파일 기준으로 구현.
-- 문서용 name 후보 계산의 조건·최대3/총수·실패 경고·비차단 연결.
 - 색인 실패 후 단일 파일/영향 참조 자동 복구 추가1회·인위적 대기 없음·초기1초 제한·늦은 결과 폐기.
 - saved/indexUpdated/revision/진단·복구 안내를 보존하고 create 재요청·자동 롤백·무한 복구 금지.
 
@@ -27,7 +25,7 @@ h2. 검증 시나리오와 기대 결과
 - 실제 write의 set/unset 변경·필수 삭제·중복 ID/경로·revision·무변경 모든 분기를 검증한다.
 - 저장 성공/색인 실패를 강제해 success:true saved:true indexUpdated:false와 refresh 안내를 확인한다.
 - 복구 성공·실패·시간초과 뒤 늦은 결과가 새 색인을 덮지 않는지 검증한다.
-- 후보 검사 실패에도 저장 결과를 유지하며 후보0개와 검사실패가 구분된다.
+- 현재 ID 중복과 공통 도메인의 완전히 같은 name은 저장 전 검증에서 차단하고, 도메인이 겹치지 않는 동명 문서는 저장을 허용하며 별도 후보 안내를 반환하지 않는지 확인한다.
 
 h2. 완료 기준과 산출물
 
@@ -38,7 +36,7 @@ h2. 완료 기준과 산출물
 
 h2. 구현 중 확인할 사항
 
-- 저장 직전 최신 상태 검사와 파일 반영, 후보 검사/색인 복구의 정확한 실행 순서를 검증한다.
+- 저장 직전 최신 상태 검사와 파일 반영, 직접 색인 갱신/복구의 정확한 실행 순서를 검증한다.
 
 ## 2026-09-25 합의: 기존 저장 검사로 MCP write 연결
 
@@ -46,6 +44,12 @@ h2. 구현 중 확인할 사항
 - proper-lockfile, 프로세스 간 공유 FIFO 대기열, 실행 순서 보장, 등록 후 5초 대기 취소는 이번 구현 범위에 포함하지 않는다.
 - revision 검사와 파일 교체 사이의 동시 수정 경쟁은 현재 단계에서 수용하며, 이번 작업의 구현·완료 조건으로 해결을 요구하지 않는다.
 - 기존 저장 직전 revision·ID·경로 검사, create 비덮어쓰기, 안전한 파일 반영과 저장 후 색인 갱신·복구는 유지한다. 현재 계약은 main의 `.codocs/workspace/storage/write-coordination.yaml`과 `.codocs/workspace/storage/storage.yaml`을 따른다.
+
+## 2026-09-25 합의: 저장 후 동명 후보 안내 제외
+
+- #9 / COD-12의 취소 결정을 유지한다. COD-12를 선행 조건에서 제거하고, 저장 후 동명 후보 계산·최대 3개와 총수 제공·검사 실패 경고를 구현하지 않는다.
+- 현재 ID 중복과 공통 도메인의 완전히 같은 name은 기존 저장 전 검증에서 차단한다. 도메인이 겹치지 않는 동명 문서는 저장을 허용하며 별도 후보 안내를 제공하지 않는다.
+- 본문 중복 검사는 이번 결정에 포함하지 않는다. 기존 저장 검증의 기준은 main의 `.codocs/core/change-plan/document-change-plan.yaml`과 `.codocs/workspace/storage/storage.yaml`을 따른다.
 
 ## 문서 기준
 
@@ -59,8 +63,6 @@ h2. 구현 중 확인할 사항
 
 - Codocs 단일 문서 쓰기와 revision 계약 (codocs-write-revision)
   ** 조회 참조: {{{"type":"wiki","project_id":"seojaewan/codosc","wiki_id":"01a0997d-0d6a-754a-a977-077ed169524b","revision":"01a0997d-0d6a-7582-acb0-203c7ea2450c"}}}
-- Codocs 저장 후 이름 일치 후보 안내 (codocs-name-match-candidates)
-  ** 조회 참조: {{{"type":"wiki","project_id":"seojaewan/codosc","wiki_id":"01a0997d-129c-7cdf-9811-2c2d98a6c635","revision":"01a0997d-129c-7028-ab57-0395e5531fe3"}}}
 - Codocs 파일 감지와 색인 복구 (codocs-index-lifecycle)
   ** 조회 참조: {{{"type":"wiki","project_id":"seojaewan/codosc","wiki_id":"01a09980-8466-7f3b-b7ae-bcbc54e1d66e","revision":"01a09980-8466-7222-97c6-4a9d5bbf97cf"}}}
 
