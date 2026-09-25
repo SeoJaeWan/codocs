@@ -2,20 +2,21 @@
 
 h2. 목표
 
-한 문서 쓰기를 검증·잠금·안전한 반영·색인·정확한 응답까지 완성한다.
+한 문서 쓰기를 검증·저장 직전 최신 상태 확인·안전한 반영·색인·정확한 응답까지 완성한다.
 
 h2. 작업 순서와 선행 조건
 
 권장 순서 22/25 · 3단계 · 상위 COD-3
 
-- [COD-24|https://seojaewan.atlassian.net/browse/COD-24] — 파일 기반 공유 대기열·proper-lockfile·5초 취소 구현
+- [COD-23|https://seojaewan.atlassian.net/browse/COD-23] — 단일 문서 파일 반영·저장 직전 revision·ID·경로 검사
 - [COD-12|https://seojaewan.atlassian.net/browse/COD-12] — 저장 후 이름·제목 일치 후보 계산 구현
 - [COD-13|https://seojaewan.atlassian.net/browse/COD-13] — 파일 변경 감지·증분 색인·refresh 준비 상태 구현
 - [COD-21|https://seojaewan.atlassian.net/browse/COD-21] — 공식 MCP SDK·stdio 실행·요청/응답 스키마 연결
 
 h2. 구현 범위
 
-- create/update 단일 요청을 대기열→최신 검사→변경 계획→파일 반영→직접 색인 갱신에 연결.
+- create/update 단일 요청을 기존 변경 계획→저장 직전 최신 revision·ID·경로 검사→파일 반영→직접 색인 갱신에 연결.
+- revision 불일치는 revision_conflict와 success:false·saved:false로 반환하고 최신 문서 재조회와 수정안 재검토를 안내한다. 서버가 revision만 바꿔 기존 수정안을 자동 재적용하지 않는다.
 - 검증 오류/충돌 미저장·경고 저장·유효 무변경 성공·오류 무변경 실패를 실제 파일 기준으로 구현.
 - 문서용 name 후보 계산의 조건·최대3/총수·실패 경고·비차단 연결.
 - 색인 실패 후 단일 파일/영향 참조 자동 복구 추가1회·인위적 대기 없음·초기1초 제한·늦은 결과 폐기.
@@ -37,7 +38,14 @@ h2. 완료 기준과 산출물
 
 h2. 구현 중 확인할 사항
 
-- 잠금 보유 범위와 후보 검사/복구의 정확한 실행 순서를 검증한다.
+- 저장 직전 최신 상태 검사와 파일 반영, 후보 검사/색인 복구의 정확한 실행 순서를 검증한다.
+
+## 2026-09-25 합의: 기존 저장 검사로 MCP write 연결
+
+- #21 / COD-24의 잠금·공유 대기열 구현 보류 결정을 적용한다. 해당 구현 완료를 이번 작업의 선행 조건으로 요구하지 않는다.
+- proper-lockfile, 프로세스 간 공유 FIFO 대기열, 실행 순서 보장, 등록 후 5초 대기 취소는 이번 구현 범위에 포함하지 않는다.
+- revision 검사와 파일 교체 사이의 동시 수정 경쟁은 현재 단계에서 수용하며, 이번 작업의 구현·완료 조건으로 해결을 요구하지 않는다.
+- 기존 저장 직전 revision·ID·경로 검사, create 비덮어쓰기, 안전한 파일 반영과 저장 후 색인 갱신·복구는 유지한다. 현재 계약은 main의 `.codocs/workspace/storage/write-coordination.yaml`과 `.codocs/workspace/storage/storage.yaml`을 따른다.
 
 ## 문서 기준
 
@@ -71,7 +79,7 @@ h2. 구현 중 확인할 사항
 - #8 / COD-11의 ID 변경 계획을 MCP write update에 연결한다. 현재 ID 변경과 이전 ID 목록 조정을 동일 문서의 한 번의 저장으로 반영한다.
 - 직전 ID 자동 추가, 기존 항목·message 보존, 중복 추가 방지, 새 현재 ID의 이전 목록 제거 규칙을 적용한다.
 - 직접 YAML 편집은 자동 이력 추가 대상으로 삼지 않는다. MCP를 통한 명시적 ID 변경과 파일 변경 감지를 구분한다.
-- 쓰기 순서 획득 후 최신 revision·ID 충돌을 다시 검사하고 검증 실패 시 원본을 보존한다.
+- 저장 직전 최신 revision·ID 충돌을 다시 검사하고 검증 실패 시 원본을 보존한다.
 - 저장 후 새 현재 ID와 이전 ID가 #7의 규칙으로 매칭되도록 색인을 갱신한다. 이전 ID 자동 관리는 코드 자동 변경을 의미하지 않는다.
 
 ### 추가 완료 조건
