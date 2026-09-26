@@ -153,7 +153,7 @@ export type ChangePlanDiagnosticCode =
 export const queryDiagnosticCodes = {
   /** 검증 경로가 프로젝트 상대 .codocs YAML 파일이 아니면 반환한다. */
   invalidPath: 'invalid_path',
-  /** 검증 대상 파일에 접근하지 못하면 반환한다. */
+  /** 검증 대상 파일이나 배포 가이드 원문에 접근하지 못하면 반환한다. */
   fileAccessFailed: 'file_access_failed',
   /** 전체 요청의 ID 배열이나 크기가 계약과 다르면 반환한다. */
   invalidInput: 'invalid_input',
@@ -169,6 +169,9 @@ export const queryDiagnosticMessages = {
   invalidPath: '프로젝트 상대 .codocs YAML 파일 경로 하나를 지정하세요.',
   fileNotFound: '검증할 파일이 없습니다.',
   fileAccessFailed: '검증할 파일을 읽을 수 없습니다.',
+  /** 배포 가이드 파일 접근에 실패한 경우다. 색인 준비 상태와 무관하다. */
+  guideFileAccessFailed:
+    '배포된 가이드 원문을 읽을 수 없습니다. 패키지 설치 상태를 확인하세요.',
   invalidInput: '조회 입력이 올바르지 않습니다.',
   notFound: '요청한 ID의 문서가 없습니다.',
   referenceNotFound: '참조 이름에 해당하는 문서가 없습니다.',

@@ -1,0 +1,8 @@
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001
+
+
+ Test Files  12 passed (12)
+      Tests  204 passed (204)
+   Start at  00:52:32
+   Duration  20.08s (tests 67%, import 27%, transform 6%)

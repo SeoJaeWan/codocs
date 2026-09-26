@@ -7,6 +7,8 @@ deprecatedAliases:
 definition: |
   codocs_guide가 요청한 주제에 맞는 문서 작성·갱신 안내를 반환하는 기능이다.
   topic을 받아 사용자 가이드의 해당 설명과 예시를 제공한다.
+  성공 응답의 topic은 선택 주제, topics는 전체 주제, content는 Markdown 원문이다.
+  알 수 없는 주제·요청 속성은 invalid_input이며 원문 접근 실패는 file_access_failed다. 파일 실패를 빈 성공이나 색인 준비 오류로 바꾸지 않는다.
 
   ## 제공하는 주제
 
@@ -16,6 +18,10 @@ definition: |
   일반 사용자 가이드의 원문은 docs/guide에 두고 codocs_guide에서도 같은 원문을 제공한다.
   별도 Skill 배포를 요구하지 않는다.
 
+  가이드는 실행 모듈을 기준으로 배포된 원문을 읽으며 프로젝트 색인의 준비 여부에 의존하지 않는다.
+  저장소나 실행 작업 디렉터리의 원문으로 대체하지 않고, 별도 색인 초기화·조회·refresh를 시작하지 않는다.
+  색인 초기화·전체 갱신·실패 상태에서도 완료를 기다리지 않고 작성법과 복구 안내를 제공한다.
+
   ## 주제별 안내 범위
 
   topic은 overview·schema·writing·examples·updating·validation 중 하나다.
@@ -23,7 +29,9 @@ definition: |
   examples는 연결 예시, updating은 [[저장]]의 변경과 폐기, validation은 [[문서 검증 요청]]과 오류 수정 방법을 안내한다.
 
   kind·status의 의미를 안내하고 내용의 합의·적용 상태를 개발 진행도와 구분한다.
-  생성/수정 구분·선택 속성 삭제·revision 충돌 후 재조회와 경고의 확인을 예시로 제공한다.
+  생성/수정 구분·선택 속성 삭제와 경고의 확인을 예시로 제공한다.
+  [[지식을 선택해서 읽고 변경하는 흐름]]을 따라 get으로 읽은 revision을 사용한 set/unset 수정과 validate, 상호 참조 문서의 생성 순서를 안내한다.
+  revision 충돌은 [[저장]]의 재조회·수정안 재검토 절차로 안내하고, 동시 수정의 보장 범위는 [[쓰기 조정]]에 맞춰 설명한다.
   준비 중 상태와 [[저장 후 색인 갱신 실패를 복구하는 절차]]에 따른 처리 중 대기·실제 오류 후 refresh 안내도 포함한다.
 
   YAML 큰따옴표의 백슬래시 처리와 해석된 본문 참조의 escape를 구분해 설명한다.
@@ -34,3 +42,8 @@ definition: |
   ID 변경을 안내할 때는 [[문서 변경 계획]]의 명시적 변경과 직접 편집 경로를 구분한다.
   항목 형식은 [[문서]], 코드 연결의 의미는 [[이전 ID]], 이름 변경 영향은 [[이름 변경 시 기존 참조의 의미 보존]]을 바탕으로 설명한다.
   설명과 예시는 사용자 가이드에 두고 이 문서에서 같은 예시를 따로 관리하지 않는다.
+
+  ## 코드와 검증 위치
+
+  createCodocsGuideHandler와 CodocsGuideResponse는 [가이드 구현](../../../packages/mcp/src/guide/index.ts), 원문·입력 검증은 [인접 테스트](../../../packages/mcp/src/guide/guide.test.ts)에서 확인한다.
+  색인 독립성과 복구 전송은 [MCP 상태 검사](../../../packages/mcp/src/server/state.test.ts), 실제 배포 자산은 [패키지 검사](../../../tools/build/check/build-checks.test.ts)에서 확인한다.

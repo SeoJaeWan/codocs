@@ -1,0 +1,94 @@
+
+> codocs@0.0.0 check C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> pnpm typecheck && pnpm lint && pnpm exec prettier . --check && pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs
+
+
+> codocs@0.0.0 typecheck C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> node tools/build/build.mjs typecheck
+
+
+> codocs@0.0.0 lint C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> eslint . --max-warnings=0
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> codocs@0.0.0 build C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> node tools/build/build.mjs build
+
+
+> codocs@0.0.0 test C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> node tools/test/run.mjs
+
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001
+
+
+ Test Files  51 passed (51)
+      Tests  961 passed (961)
+   Start at  00:57:27
+   Duration  20.76s (tests 74%, import 19%, transform 7%)
+
+✔ Windows 조회에서 부모와 서버 경로가 일치하는 PID만 선택한다 (2.3317ms)
+✔ macOS 조회에서 부모와 서버 경로가 일치하는 PID만 선택한다 (0.3894ms)
+✔ 기능 사례 뒤 변경된 파일만 복원하고 읽기 거부 파일은 보존한다 (99.7378ms)
+✔ 부분 스테이징을 검사하면 커밋 대상만 읽고 사용자 변경을 보존한다 (1991.5823ms)
+warning: in the working copy of 'sample.txt', LF will be replaced by CRLF the next time Git touches it
+✔ lint-staged 자동 수정 후 검사하면 수정된 인덱스를 읽고 비스테이징 줄을 보존한다 (4072.9752ms)
+✔ lint-staged가 수정 후 실패하면 원래 인덱스와 사용자 변경을 복원한다 (3081.9337ms)
+✔ 기능 실패가 발생하면 커밋을 거부하고 사용자 변경을 보존한다 (2123.8544ms)
+✔ 취소가 발생하면 커밋을 거부하고 사용자 변경을 보존한다 (1795.3879ms)
+✔ 검사 도중 사용자가 인덱스를 변경하면 새 변경을 보존하고 커밋을 거부한다 (2170.302ms)
+✔ 검사가 복사본 소스를 변경하면 커밋을 거부하고 원본을 보존한다 (1746.5997ms)
+✔ 실제 Git 훅의 success 결과가 커밋 허용과 사용자 변경 보존에 반영된다 (4308.3714ms)
+✔ 실제 Git 훅의 failure 결과가 커밋 허용과 사용자 변경 보존에 반영된다 (3829.0262ms)
+✔ 실제 Git 훅의 cancel 결과가 커밋 허용과 사용자 변경 보존에 반영된다 (3576.0371ms)
+warning: in the working copy of 'sample.txt', LF will be replaced by CRLF the next time Git touches it
+✔ 자동 수정한 CRLF는 Git clean 규칙으로 정규화하고 미스테이징 줄을 커밋에 넣지 않는다 (2805.7364ms)
+✔ 자동 수정의 줄바꿈 변환이 부분 스테이징과 충돌하면 사용자 변경을 보존하고 실패한다 (3591.7194ms)
+✔ 동일 번호의 오래된 완료 기록과 잘린 줄이 있어도 최신 대기 요청을 분리한다 (41.9536ms)
+✔ 외부 변경 준비 중 중단되면 쓰기가 완료되지 않은 대기를 표시한다 (31.2293ms)
+✔ 중간 진행 기록이 손상되면 부분 결과에 복구 오류를 표시한다 (31.7385ms)
+✔ 느리지만 정확하게 완료된 요청을 p95 표본에 보존한다 (5.8746ms)
+✔ 부분 보고서에 첫 워밍업 시간과 대기 요청 및 실패 이유를 한국어로 표시한다 (2.6625ms)
+✔ 앞 다운로드가 잠금을 놓은 뒤에만 다음 다운로드를 시작한다 (153.2297ms)
+✔ 죽은 프로세스의 잠금은 회수하고 실패한 다운로드도 잠금을 해제한다 (43.5792ms)
+✔ 인자가 없으면 기존 기능 모드와 고정 버전을 선택한다 (2.1628ms)
+✔ 성능 시나리오와 정확한 버전을 선택하고 잘못된 조합은 준비 전에 거부한다 (0.7186ms)
+✔ 공식 stable 응답이 정확한 버전 목록이면 한 버전만 반환한다 (0.5938ms)
+✔ 생성한 천 문서는 배타적이고 파일과 기대 결과 및 요청 순서가 재현된다 (1327.1416ms)
+✔ 취소와 실패는 완료 시간을 꾸미지 않고 JSON과 한국어 부분 보고서에 보존한다 (32.0404ms)
+✔ 대기 중 자식 종료와 취소는 마지막 진행과 미완료 표본을 보존한다 (1.5702ms)
+✔ 조회 간격 변경에 근거가 없으면 설정 파일을 거부한다 (19.9942ms)
+✔ 부모 종료 뒤에도 남은 자손을 찾고 무관한 프로세스는 제외한다 (3.1125ms)
+✔ success 이후 시험 자식 프로세스를 종료한다 (3133.8855ms)
+✔ failure 이후 시험 자식 프로세스를 종료한다 (1723.2167ms)
+✔ timeout 이후 시험 자식 프로세스를 종료한다 (4484.0167ms)
+✔ cancelled 이후 시험 자식 프로세스를 종료한다 (1632.3853ms)
+✔ 제품 대기 제한을 끄면 느린 정상 응답을 보존하고 자식도 정리한다 (3276.9386ms)
+✔ 현재 OS에서 실제 읽기를 거부하고 해제 뒤 원문을 읽는다 (1634.9231ms)
+✔ macOS 권한 준비는 읽기 거부를 확인하고 원래 권한으로 복원한다 (0.7603ms)
+✔ macOS에서 실제 read가 성공하면 준비 실패로 처리하고 권한을 복원한다 (0.3423ms)
+✔ macOS 준비 표시 쓰기가 실패해도 파일 권한을 즉시 복원한다 (0.2666ms)
+✔ Windows 대상 파일이 없으면 잠금 준비 실패를 반환한다 (499.7899ms)
+✔ Windows 공식 실행 파일을 CLI로도 사용한다 (2.3319ms)
+✔ Windows 구형과 중첩된 공식 CLI 레이아웃을 실제 파일로 구별한다 (30.4937ms)
+✔ macOS 공식 앱 실행 파일에서 번들 CLI를 찾는다 (0.6438ms)
+✔ pnpm native wrapper를 Node로 실행할 수 없으면 인접 공식 진입점을 찾고 버전을 검증한다 (292.1074ms)
+✔ 다른 버전 pnpm이 프로젝트 버전을 출력하면 준비 실패로 처리한다 (54.4496ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37167.1569
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001
+
+
+ Test Files  3 passed (3)
+      Tests  117 passed (117)
+   Start at  00:58:27
+   Duration  230.99s (tests 84%, import 16%)

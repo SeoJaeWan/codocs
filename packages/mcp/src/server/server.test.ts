@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { PassThrough } from 'node:stream';
+import { pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -12,8 +13,12 @@ import { createWorkspaceQuerySession } from '@codocs/workspace';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createCodocsQueryHandlers } from '../query/index.js';
 import { startCodocsStdio } from './index.js';
+import { createCodocsGuideHandler } from '../guide/index.js';
 
 const cli = path.resolve('packages/mcp/dist/cli.js');
+const sourceGuide = createCodocsGuideHandler(
+  pathToFileURL(path.resolve('docs/guide') + path.sep),
+);
 let fixture: string;
 let projectA: string;
 let projectB: string;
@@ -261,6 +266,32 @@ function payload(response: unknown): Record<string, unknown> {
 }
 
 describe('빌드 MCP stdio 서버', () => {
+  it.each([
+    {},
+    ...[
+      'overview',
+      'schema',
+      'writing',
+      'examples',
+      'updating',
+      'validation',
+    ].map((topic) => ({ topic })),
+    { topic: 'missing' },
+    { topic: 'schema', extra: true },
+  ])(
+    'guide %j 입력은 실제 stdio와 직접 handler에서 같은 결과를 반환한다',
+    async (input) => {
+      const { client } = await clientFor(projectA);
+      try {
+        const result = payload(
+          await client.callTool({ name: 'codocs_guide', arguments: input }),
+        );
+        expect(result).toEqual(await sourceGuide(input));
+      } finally {
+        await client.close();
+      }
+    },
+  );
   it('초기화 후 쓰기를 포함한 도구를 제공하고 실제 문서를 목록·상세·검증·갱신한다', async () => {
     const { client, transport } = await clientFor(projectA);
     try {
@@ -271,6 +302,7 @@ describe('빌드 MCP stdio 서버', () => {
         'codocs_refresh',
         'codocs_validate',
         'codocs_write',
+        'codocs_guide',
       ]);
       const listed = payload(
         await client.callTool({ name: 'codocs_list', arguments: {} }),
