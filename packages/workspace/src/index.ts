@@ -7,4 +7,5 @@ export * from './paths/index.js';
 export * from './project-root/index.js';
 export * from './query/index.js';
 export * from './revision/index.js';
+export * from './storage/index.js';
 export * from './watcher/index.js';

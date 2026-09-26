@@ -180,6 +180,31 @@ export const queryDiagnosticMessages = {
 /** 상수에서 도출한 조회 진단 코드다. */
 export type QueryDiagnosticCode =
   (typeof queryDiagnosticCodes)[keyof typeof queryDiagnosticCodes];
+/** 파일 저장에서 실제 반영 여부와 함께 반환하는 진단 코드다. @domainValues */
+export const storageDiagnosticCodes = {
+  /** 저장 직전 디스크 원문이 요청의 기준 버전과 다르다. */
+  revisionConflict: 'revision_conflict',
+  /** 생성 대상이 등록 전에 이미 존재하거나 경쟁 중 생성되었다. */
+  fileExists: 'file_exists',
+  /** 임시 기록·닫기·반영·요청 임시 파일 정리에 실패했다. */
+  fileWriteFailed: 'file_write_failed',
+  /** 최신 문서 탐색으로 ID 충돌 여부를 확정할 수 없다. */
+  fileAccessFailed: 'file_access_failed',
+  /** 저장된 파일의 세션 색인 반영 또는 추가 복구가 실패했다. */
+  indexUpdateFailed: 'index_update_failed',
+} as const;
+/** 저장 진단의 고정 문구다. 원인별 후속 안내는 suggestion에 둔다. */
+export const storageDiagnosticMessages = {
+  revisionConflict: '저장 전 원문이 변경되었습니다.',
+  fileExists: '생성 대상 파일이 이미 있습니다.',
+  fileWriteFailed: '파일 저장에 실패했습니다.',
+  cleanupFailed: '파일은 저장되었지만 요청 임시 파일 정리에 실패했습니다.',
+  fileAccessFailed: '저장 전 파일 상태를 확인할 수 없습니다.',
+  indexUpdateFailed: '파일은 저장되었지만 문서 색인을 갱신하지 못했습니다.',
+} as const;
+/** 저장 진단 코드의 원본 값에서 도출한 타입이다. */
+export type StorageDiagnosticCode =
+  (typeof storageDiagnosticCodes)[keyof typeof storageDiagnosticCodes];
 /** core의 파서·스키마 검증·참조 문법·색인이 반환하는 진단 코드다. */
 export type DiagnosticCode =
   | YamlDiagnosticCode
@@ -187,7 +212,8 @@ export type DiagnosticCode =
   | ReferenceDiagnosticCode
   | CatalogDiagnosticCode
   | ChangePlanDiagnosticCode
-  | QueryDiagnosticCode;
+  | QueryDiagnosticCode
+  | StorageDiagnosticCode;
 /** 오류와 경고를 구분하는 공통 심각도다. */
 
 /** 시작 포함·끝 제외인 0 기반 UTF-16 원문 범위다. */
@@ -213,6 +239,7 @@ export interface Diagnostic<Code extends string = DiagnosticCode> {
   severity: DiagnosticSeverity;
   message: string;
   path?: string;
+  suggestion?: string;
   fieldPath?: FieldPath;
   range?: SourceRange;
 }

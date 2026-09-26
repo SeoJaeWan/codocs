@@ -82,14 +82,15 @@ definition: |
   | reference_ambiguous | 이름·선택 도메인으로 찾은 대상 문서가 여러 개 |
   | revision_conflict | 조회 이후 파일 변경 |
   | file_exists | 생성 대상 경로가 이미 존재 |
-  | write_queue_timeout | 5초 내 쓰기 차례가 오지 않음 |
-  | lock_failed | 잠금 획득·유지 실패 |
   | file_write_failed | 파일 기록·반영 실패 |
   | index_not_ready | 초기 색인 구성·갱신 진행 중 |
   | index_build_failed | 전체 색인 구성 실패 |
   | index_update_failed | 저장 후 색인 반영·복구 실패 |
   | cursor_expired | 목록 변경 등으로 커서 만료 |
   | internal_error | 다른 코드로 분류되지 않는 내부 실패 |
+
+  저장 계층의 revision_conflict·file_exists·file_write_failed·file_access_failed와 저장 후 index_update_failed 고정 코드·문구는 [공통 진단 정의](../../../packages/core/src/diagnostics/index.ts)에서 관리한다.
+  file_write_failed는 임시 파일 기록·닫기·반영과 이미 저장된 뒤의 요청 임시 파일 정리 실패에도 사용한다. 저장 여부는 saved와 함께 판단하고 message·suggestion으로 실패 단계를 구분한다.
 
   경고 코드는 unknown_field(사용자 정의 문서 속성), deprecated_reference(폐기 상태 지식 참조)를 사용한다. 오류 코드만으로 저장 여부를 추측하지 않도록 saved·indexUpdated 등 실제 결과 필드를 유지한다.
 
