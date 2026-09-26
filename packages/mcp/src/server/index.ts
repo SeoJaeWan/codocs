@@ -75,6 +75,14 @@ export function createCodocsServer(session: WorkspaceQuerySession): Server {
         execute: handlers.codocsValidate.bind(handlers),
       },
     ],
+    [
+      'codocs_write',
+      {
+        description:
+          '문서 하나를 생성하거나 수정하고 저장 결과와 색인 게시 상태를 반환합니다.',
+        execute: handlers.codocsWrite.bind(handlers),
+      },
+    ],
   ]);
   const server = new Server(
     { name: 'codocs', version: '0.0.0' },
