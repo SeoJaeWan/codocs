@@ -1,0 +1,81 @@
+
+> codocs@0.0.0 check C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> pnpm typecheck && pnpm lint && pnpm exec prettier . --check && pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs
+
+
+> codocs@0.0.0 typecheck C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> node tools/build/build.mjs typecheck
+
+
+> codocs@0.0.0 lint C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> eslint . --max-warnings=0
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> codocs@0.0.0 build C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> node tools/build/build.mjs build
+
+
+> codocs@0.0.0 test C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001
+> node tools/test/run.mjs
+
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001
+
+ ❯ packages/workspace/src/watcher/watcher-registration.test.ts (1 test | 1 failed) 15621ms
+   ❯ 새 하위 폴더의 실제 감시 등록 경합 (1)
+     × 새 폴더 열거가 끝나고 Chokidar 연결 전 파일이 생기면 해당 경로를 전달한다 15616ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/workspace/src/watcher/watcher-registration.test.ts > 새 하위 폴더의 실제 감시 등록 경합 > 새 폴더 열거가 끝나고 Chokidar 연결 전 파일이 생기면 해당 경로를 전달한다
+Error: 감시 자식 실패: Command failed: C:\Program Files\nodejs\node.exe C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\packages\workspace\src\watcher\test-support\registration-child.mjs C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\.workbench\fixtures\watcher-registration-c7NkNI\watcher.mjs C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\.workbench\fixtures\watcher-registration-c7NkNI
+import: 12ms
+start: 769ms
+ready: 825ms
+delivered: 989ms
+closing: 990ms
+closed: 994ms
+
+import: 12ms
+start: 769ms
+ready: 825ms
+delivered: 989ms
+closing: 990ms
+closed: 994ms
+
+ ❯ packages/workspace/src/watcher/watcher-registration.test.ts:47:15
+     45|       } catch (error) {
+     46|         const failure = error as Error & { stderr?: string };
+     47|         throw new Error(
+       |               ^
+     48|           `감시 자식 실패: ${failure.message}\n${failure.stderr ?? ''}`,
+     49|           {
+
+Caused by: Error: Command failed: C:\Program Files\nodejs\node.exe C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\packages\workspace\src\watcher\test-support\registration-child.mjs C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\.workbench\fixtures\watcher-registration-c7NkNI\watcher.mjs C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\.workbench\fixtures\watcher-registration-c7NkNI
+import: 12ms
+start: 769ms
+ready: 825ms
+delivered: 989ms
+closing: 990ms
+closed: 994ms
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: null, killed: true, signal: 'SIGTERM', cmd: 'C:\Program Files\nodejs\node.exe C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\packages\workspace\src\watcher\test-support\registration-child.mjs C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\.workbench\fixtures\watcher-registration-c7NkNI\watcher.mjs C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\.workbench\fixtures\watcher-registration-c7NkNI', stdout: '{"reached":true,"delivered":true}', stderr: 'import: 12ms
+start: 769ms
+ready: 825ms
+delivered: 989ms
+closing: 990ms
+closed: 994ms
+' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 50 passed (51)
+      Tests  1 failed | 959 passed (960)
+   Start at  22:49:31
+   Duration  56.02s (tests 74%, import 17%, transform 8%)
+
+ ELIFECYCLE  Test failed. See above for more details.
+ ELIFECYCLE  Command failed with exit code 1.

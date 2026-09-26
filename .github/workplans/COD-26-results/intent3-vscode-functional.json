@@ -1,0 +1,320 @@
+{
+  "environment": {
+    "vscode": "1.100.0",
+    "node": "20.19.0",
+    "electron": "34.5.1",
+    "platform": "win32",
+    "apiObservation": true,
+    "renderedUi": false,
+    "packageKind": "installed-vsix",
+    "extensionPath": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-o9E2zG\\extensions\\codocs.codocs-0.0.0"
+  },
+  "results": [
+    {
+      "id": "unsaved-code",
+      "title": "미저장 코드 식별자를 바꾸면 새 설명과 원본 디스크를 보존한다",
+      "passed": true,
+      "milliseconds": 1003
+    },
+    {
+      "id": "unsaved-reference",
+      "title": "미저장 참조를 바꾸면 경고를 제거하고 새 링크를 연다",
+      "passed": true,
+      "milliseconds": 1033
+    },
+    {
+      "id": "in-flight-link",
+      "title": "저장 직후 남은 링크는 최신 본문만 연다",
+      "passed": true,
+      "milliseconds": 755
+    },
+    {
+      "id": "hover-content",
+      "title": "코드 호버에 본문과 세 관계별 링크를 제공한다",
+      "passed": true,
+      "milliseconds": 717
+    },
+    {
+      "id": "relation-zone",
+      "title": "원문 열기 반환 명령은 해당 원문의 상단을 연다",
+      "passed": true,
+      "milliseconds": 763
+    },
+    {
+      "id": "relation-auxiliary",
+      "title": "Auxiliary 반환 명령은 해당 원문의 상단을 연다",
+      "passed": true,
+      "milliseconds": 941
+    },
+    {
+      "id": "relation-direct",
+      "title": "Direct 반환 명령은 해당 원문의 상단을 연다",
+      "passed": true,
+      "milliseconds": 865
+    },
+    {
+      "id": "relation-referrer",
+      "title": "Referrer 반환 명령은 해당 원문의 상단을 연다",
+      "passed": true,
+      "milliseconds": 827
+    },
+    {
+      "id": "duplicate-id",
+      "title": "중복 ID 호버는 모든 후보와 보조 링크를 제공한다",
+      "passed": true,
+      "milliseconds": 718
+    },
+    {
+      "id": "previous-id",
+      "title": "이전 ID 호버에 현재 ID와 이전 ID 안내를 제공한다",
+      "passed": true,
+      "milliseconds": 662
+    },
+    {
+      "id": "other-occurrence",
+      "title": "다른 출현의 이전 ID 안내를 유지한다",
+      "passed": true,
+      "milliseconds": 679
+    },
+    {
+      "id": "broken-document",
+      "title": "필수 필드 누락 문서의 오류와 원문 링크를 제공한다",
+      "passed": true,
+      "milliseconds": 757
+    },
+    {
+      "id": "invalid-id",
+      "title": "잘못된 현재 ID의 이전 ID 호버에서 본문과 이동을 보존한다",
+      "passed": true,
+      "milliseconds": 826
+    },
+    {
+      "id": "no-match",
+      "title": "준비 완료 뒤 매칭 없는 코드에 Codocs 호버가 없다",
+      "passed": true,
+      "milliseconds": 752
+    },
+    {
+      "id": "yaml-occurrence-0",
+      "title": "본문·예시 1번째 링크는 대상 상단을 연다",
+      "passed": true,
+      "milliseconds": 830
+    },
+    {
+      "id": "yaml-occurrence-1",
+      "title": "본문·예시 2번째 링크는 대상 상단을 연다",
+      "passed": true,
+      "milliseconds": 831
+    },
+    {
+      "id": "yaml-occurrence-2",
+      "title": "본문·예시 3번째 링크는 대상 상단을 연다",
+      "passed": true,
+      "milliseconds": 902
+    },
+    {
+      "id": "metadata",
+      "title": "메타데이터의 같은 표기에는 링크가 없다",
+      "passed": true,
+      "milliseconds": 785
+    },
+    {
+      "id": "ambiguous-body",
+      "title": "복수 후보의 본문에는 직접 이동 링크가 없다",
+      "passed": true,
+      "milliseconds": 823
+    },
+    {
+      "id": "ambiguous-a",
+      "title": "복수 후보 a 명령은 선택한 원문만 연다",
+      "passed": true,
+      "milliseconds": 901
+    },
+    {
+      "id": "ambiguous-b",
+      "title": "복수 후보 b 명령은 선택한 원문만 연다",
+      "passed": true,
+      "milliseconds": 839
+    },
+    {
+      "id": "invalid-name-link",
+      "title": "잘못된 현재 ID에도 확정한 이름 참조 링크로 이동한다",
+      "passed": true,
+      "milliseconds": 860
+    },
+    {
+      "id": "unsaved-yaml",
+      "title": "미저장 본문의 새 위치 링크를 사용하고 디스크를 보존한다",
+      "passed": true,
+      "milliseconds": 981
+    },
+    {
+      "id": "fresh-hover",
+      "title": "대상 변경 뒤 새 조회에 새 설명과 링크를 제공한다",
+      "passed": true,
+      "milliseconds": 986
+    },
+    {
+      "id": "stale-link",
+      "title": "갱신 완료 후 남은 링크가 최신 본문을 연다",
+      "passed": true,
+      "milliseconds": 1048
+    },
+    {
+      "id": "moved-target",
+      "title": "이동한 대상의 새 링크가 새 경로를 연다",
+      "passed": true,
+      "milliseconds": 1095
+    },
+    {
+      "id": "replaced-target",
+      "title": "삭제된 대상의 남은 링크는 같은 경로의 대체 문서를 열지 않는다",
+      "passed": true,
+      "milliseconds": 708
+    },
+    {
+      "id": "deleted-fresh-hover",
+      "title": "삭제 확인 뒤 새 조회에서 설명과 원문 링크를 제거한다",
+      "passed": true,
+      "milliseconds": 996
+    },
+    {
+      "id": "dirty-target-tab",
+      "title": "기존 탭의 미저장 내용과 디스크를 보존하고 상단으로 이동한다",
+      "passed": true,
+      "milliseconds": 1039
+    },
+    {
+      "id": "partial-scan",
+      "title": "부분 탐색 호버의 안내와 확인한 원문 링크를 유지한다",
+      "passed": true,
+      "milliseconds": 815
+    },
+    {
+      "id": "unconfirmed-reference",
+      "title": "부분 탐색의 미확정 참조에는 폐기 경고나 이동 링크를 제공하지 않는다",
+      "passed": true,
+      "milliseconds": 777
+    },
+    {
+      "id": "deprecated-link",
+      "title": "폐기 참조의 실제 경고 진단과 이동 링크를 함께 제공한다",
+      "passed": true,
+      "milliseconds": 871
+    },
+    {
+      "id": "clear-deprecated",
+      "title": "폐기 상태를 해제하면 게시된 경고를 제거한다",
+      "passed": true,
+      "milliseconds": 947
+    },
+    {
+      "id": "same-previous-id",
+      "title": "현재 ID와 같은 이전 ID는 YAML에만 경고한다",
+      "passed": true,
+      "milliseconds": 976
+    },
+    {
+      "id": "missing-reference",
+      "title": "없는 이름 참조에는 진단만 있고 이동 링크가 없다",
+      "passed": true,
+      "milliseconds": 781
+    },
+    {
+      "id": "nested-workspace",
+      "title": "중첩 코드의 원문은 가장 가까운 작업 공간에 연결한다",
+      "passed": true,
+      "milliseconds": 863
+    },
+    {
+      "id": "native-definition",
+      "title": "TypeScript 정의 provider를 Codocs 원문으로 바꾸지 않는다",
+      "passed": true,
+      "milliseconds": 1563
+    },
+    {
+      "id": "restart-unsaved",
+      "title": "실제 서버 재시작 후 미저장 문서를 다시 동기화한다",
+      "passed": true,
+      "milliseconds": 1543
+    },
+    {
+      "id": "duplicate-name-open",
+      "title": "저장 이름 중복 문서를 열어도 이름 진단을 유지한다",
+      "passed": true,
+      "milliseconds": 828
+    },
+    {
+      "id": "duplicate-name-edit-name",
+      "title": "name 편집으로 이름 충돌을 해소하면 현재 진단만 제거한다",
+      "passed": true,
+      "milliseconds": 935
+    },
+    {
+      "id": "duplicate-name-edit-domain",
+      "title": "domain 편집으로 이름 충돌을 해소하면 현재 진단만 제거한다",
+      "passed": true,
+      "milliseconds": 996
+    },
+    {
+      "id": "duplicate-name-save",
+      "title": "이름 충돌 해소를 저장하면 상대 문서의 진단도 제거한다",
+      "passed": true,
+      "milliseconds": 1085
+    },
+    {
+      "id": "unexpected-server-exit",
+      "title": "전용 서버가 예기치 않게 종료되어도 미저장 최신 문서를 자동 재동기화한다",
+      "passed": true,
+      "milliseconds": 5246
+    },
+    {
+      "id": "restart-budget-recovery",
+      "title": "반복 장애로 자동 재시작을 중단한 뒤 수동 복구하고 미저장 내용을 보존한다",
+      "passed": true,
+      "milliseconds": 18563
+    },
+    {
+      "id": "diagnostics-closed-catalog",
+      "title": "닫힌 지식 파일도 저장 중복과 정확한 위치를 게시한다",
+      "passed": true,
+      "milliseconds": 867
+    },
+    {
+      "id": "diagnostics-live-create",
+      "title": "미저장 ID 편집을 즉시 진단하고 다른 저장 문서에 전파하지 않는다",
+      "passed": true,
+      "milliseconds": 898
+    },
+    {
+      "id": "diagnostics-live-resolve",
+      "title": "저장 중복을 미저장 원문에서 해소하면 현재 밑줄을 제거한다",
+      "passed": true,
+      "milliseconds": 915
+    },
+    {
+      "id": "diagnostics-save",
+      "title": "ID 중복을 저장하면 다른 닫힌 문서의 진단도 갱신한다",
+      "passed": true,
+      "milliseconds": 1022
+    },
+    {
+      "id": "diagnostics-delete",
+      "title": "닫힌 문서 삭제를 확인하면 이전 진단을 제거한다",
+      "passed": true,
+      "milliseconds": 1045
+    },
+    {
+      "id": "diagnostics-recheck-recovery",
+      "title": "실제 읽기 실패와 편집 후 과거 결과를 안내하며 복구해도 다른 workspace 실패를 유지한다",
+      "passed": true,
+      "milliseconds": 2352
+    },
+    {
+      "id": "rapid-edit-restart-diagnostics",
+      "title": "빠른 연속 편집 직후 재시작해도 최신 미저장 원문 진단을 동기화한다",
+      "passed": true,
+      "milliseconds": 2390
+    }
+  ]
+}

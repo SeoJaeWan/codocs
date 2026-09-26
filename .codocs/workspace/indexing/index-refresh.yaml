@@ -83,4 +83,5 @@ definition: |
   itemCount는 필터 없는 list.totalCount이며 충돌 ID는 하나로 세고 목록 식별 불가 파일은 제외한다.
 
   errorCount와 warningCount는 파일 수가 아닌 진단 개수다.
+  countsComplete는 전체 범위 집계 여부이며 complete일 때 true, partial일 때 false다.
   partial이면 부분 완료와 실패 원인을 반환하고 집계가 불완전함을 명시한다. 부분 집계를 complete의 정상 완료 집계처럼 반환하지 않는다.

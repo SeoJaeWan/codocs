@@ -1,5 +1,7 @@
 # COD-26 — [23] MCP refresh·guide와 배포용 작성 가이드·예시 완성
 
+구현과 실행 증거는 [COD-26 검증 기록](COD-26-results/verification.md)에서 확인한다.
+
 h2. 목표
 
 AI와 사용자가 동일한 가이드로 작성·검증·복구할 수 있도록 도구와 배포 문서를 완성한다.
@@ -64,7 +66,7 @@ h2. 구현 중 확인할 사항
 - Codocs 참조와 원문 소유 원칙 (codocs-references)
   ** 조회 참조: {{{"type":"wiki","project_id":"seojaewan/codosc","wiki_id":"01a0997a-cdbc-7c02-ad2e-ebeee3599e54","revision":"01a0997a-cdbc-7d95-a0ea-d4db05c9a7f5"}}}
 
-2026-09-13 최초 계획을 바탕으로 현재 로컬 `.codocs` 계약에 따라 진행하는 실행 작업이다. 아직 구현·성능·호환성 검증을 완료한 상태가 아니다.
+2026-09-13 최초 계획을 바탕으로 현재 로컬 `.codocs` 계약에 따라 진행한 실행 작업이다. 최신 구현·검증 상태와 확인하지 않은 범위는 [COD-26 검증 기록](COD-26-results/verification.md)에서 구분한다.
 
 ## Jira
 

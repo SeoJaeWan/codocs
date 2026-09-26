@@ -57,4 +57,25 @@ describe('새 하위 폴더의 실제 감시 등록 경합', () => {
       await rm(project, { recursive: true, force: true });
     }
   }, 18_000);
+  it('하위 폴더 경로 확인 중 종료하면 늦은 반환 뒤에도 자식이 자연 종료한다', async () => {
+    const parent = path.resolve('.workbench/fixtures');
+    await mkdir(parent, { recursive: true });
+    const project = await mkdtemp(path.join(parent, 'watcher-close-'));
+    const entry = path.join(project, 'watcher.mjs');
+    try {
+      await buildWatcher(entry);
+      const { stdout } = await execute(
+        process.execPath,
+        [child, entry, project, 'close-during-path-check'],
+        { timeout: 15_000 },
+      );
+      expect(JSON.parse(stdout)).toEqual({
+        pathConfirmed: true,
+        closedBeforeRelease: true,
+      });
+    } finally {
+      await stop();
+      await rm(project, { recursive: true, force: true });
+    }
+  }, 18_000);
 });

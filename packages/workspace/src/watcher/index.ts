@@ -200,6 +200,7 @@ export class WorkspaceWatcher {
     const checked = await resolveWorkspacePath(selected.root, directory);
     if (!checked.success || checked.kind !== workspaceTargetKinds.directory)
       return;
+    if (!this.#active(epoch)) return;
     let connection = this.#directoryRegistrations.get(directory);
     if (!connection) {
       connection = this.#connect(
