@@ -431,6 +431,10 @@ try {
   if (entries.length !== 1)
     throw new Error(`설치된 Codocs 확장 경로가 하나여야 합니다: ${entries}`);
   config.extension = path.join(extensions, entries[0]);
+  config.mcpEntry = path.join(config.root, 'packages/mcp/dist/cli.js');
+  config.mcpSha256 = createHash('sha256')
+    .update(await readFile(config.mcpEntry))
+    .digest('hex');
   await writeFile(process.argv[2], JSON.stringify(config));
   await writeFile(
     path.join(output, 'installation.json'),

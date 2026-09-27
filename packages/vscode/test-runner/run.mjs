@@ -103,6 +103,7 @@ export async function main(args = process.argv.slice(2)) {
       configPath,
       JSON.stringify({
         root,
+        nodeExecutable: process.execPath,
         output,
         temporary,
         version: options.version,

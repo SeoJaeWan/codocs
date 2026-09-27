@@ -20,6 +20,7 @@ test('기능 사례 뒤 변경된 파일만 복원하고 읽기 거부 파일은
   await rm(path.join(root, '.codocs/source.yaml'));
   await writeFile(path.join(root, '.codocs/moved.yaml'), 'temporary');
   await writeFile(path.join(root, '.codocs/closed-a.yaml'), 'temporary');
+  await writeFile(path.join(root, '.codocs/mcp-moved.yaml'), 'temporary');
   await restoreWorkspaceFixture(root);
   const after = await stat(unchanged);
   assert.equal(after.mtimeMs, before.mtimeMs);
@@ -35,6 +36,9 @@ test('기능 사례 뒤 변경된 파일만 복원하고 읽기 거부 파일은
     code: 'ENOENT',
   });
   await assert.rejects(readFile(path.join(root, '.codocs/closed-a.yaml')), {
+    code: 'ENOENT',
+  });
+  await assert.rejects(readFile(path.join(root, '.codocs/mcp-moved.yaml')), {
     code: 'ENOENT',
   });
   assert.equal(
