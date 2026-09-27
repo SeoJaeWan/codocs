@@ -13,7 +13,7 @@ Use either integration on its own, or both. Codocs supports projects on local di
 
 ### Installation
 
-Requires **Node.js 24.x**. The registry installation command below will be available after the first publication of 0.0.1.
+Requires **Node.js 24.x**. Install the package in a directory of your choice:
 
 ```sh
 npm install co-documentation@0.0.1
@@ -53,7 +53,7 @@ For example, ask your assistant to “find the definition of an order,” “che
 
 ### Installation
 
-Requires desktop **VS Code 1.100.0 or later**. After the first publication, search for `seojaewan.codocs` in Extensions, or run:
+Requires desktop **VS Code 1.100.0 or later**. Search for `seojaewan.codocs` in Extensions, or run:
 
 ```sh
 code --install-extension seojaewan.codocs@0.0.1

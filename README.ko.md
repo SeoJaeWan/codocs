@@ -13,7 +13,7 @@ Codocs는 로컬 `.codocs` YAML 파일에 작성한 프로젝트 지식을 코�
 
 ### 설치
 
-**Node.js 24.x**가 필요하다. 아래 npm 설치 명령은 0.0.1 최초 게시 후 사용할 수 있다.
+**Node.js 24.x**가 필요하다. 원하는 디렉터리에서 다음 명령으로 설치한다.
 
 ```sh
 npm install co-documentation@0.0.1
@@ -53,7 +53,7 @@ AI 도우미에게 “주문의 정의를 찾아줘”, “프로젝트 문서�
 
 ### 설치
 
-데스크톱 **VS Code 1.100.0 이상**이 필요하다. 최초 게시 후 확장 화면에서 `seojaewan.codocs`를 검색하거나 다음 명령으로 설치한다.
+데스크톱 **VS Code 1.100.0 이상**이 필요하다. 확장 화면에서 `seojaewan.codocs`를 검색하거나 다음 명령으로 설치한다.
 
 ```sh
 code --install-extension seojaewan.codocs@0.0.1
