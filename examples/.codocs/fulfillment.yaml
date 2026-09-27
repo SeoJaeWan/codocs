@@ -1,6 +1,11 @@
-# 가상 프로젝트 예시이며 실제 업무 사실이 아니다.
 id: sample-fulfillment
 name: 가상 주문 처리
-definition: 가상 프로젝트에서 [[가상 주문]]를 확인한 뒤 가상 배송 상태를 기록한다.
 domains:
   - sample-sales
+  - sample-delivery
+kind: procedure
+status: confirmed
+definition: |
+  [[가상 주문]]의 요청 정보를 받아 [[sample-sales:가상 배송\:정책]]으로 접수 가능 여부를 판단한다.
+  허용되면 가상 배송 상태를 기록하고, 허용되지 않으면 접수 거절 이유를 요청자에게 안내한다.
+  이 예시는 가상 업무 절차이며 실제 서비스 규칙이 아니다.

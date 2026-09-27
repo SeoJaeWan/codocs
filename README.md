@@ -21,7 +21,16 @@ pnpm build
 node packages/mcp/dist/cli.js --project ./my-project
 ```
 
-현재 서버가 제공하는 도구는 `codocs_list`, `codocs_get`, `codocs_refresh`다.
+현재 서버는 다음 여섯 도구를 제공한다.
+
+| 도구              | 역할                              |
+| ----------------- | --------------------------------- |
+| `codocs_list`     | 조건과 커서로 문서 목록 조회      |
+| `codocs_get`      | 현재 ID의 원문·참조·revision 조회 |
+| `codocs_refresh`  | 전체 색인 재구성과 복구           |
+| `codocs_validate` | 프로젝트 또는 파일의 진단 확인    |
+| `codocs_write`    | 문서 생성과 revision 기반 수정    |
+| `codocs_guide`    | 색인과 독립된 작성·수정·복구 안내 |
 
 현재 API는 모노레포 내부 패키지에서 사용한다. 공개 npm 패키지나 설치 가능한 VS Code 확장을 전제로 하지 않는다. 패키지의 책임과 계약은 아래 소개 문서에서 확인한다. 공개 API는 각 패키지의 `src/index.ts`에서 확인하고 패키지 루트에서 import한다. 구체적인 입력·출력과 사용 사례는 해당 코드의 JSDoc·타입·인접 테스트에서 확인한다.
 

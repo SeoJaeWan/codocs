@@ -1,0 +1,13 @@
+{
+  "status": "complete",
+  "documents": 76,
+  "failures": 0,
+  "diagnostics": 0,
+  "catalogDocuments": 76
+}
+{
+  "indexPath": ".codocs\\index.yaml",
+  "reachable": 76,
+  "total": 76,
+  "unreachable": []
+}

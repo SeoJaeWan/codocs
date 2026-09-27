@@ -1,0 +1,53 @@
+import {build,stop} from 'esbuild';
+import {readFile,mkdir,mkdtemp,writeFile} from 'node:fs/promises';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import path from 'node:path';
+const output=path.resolve('.workbench/watcher-close');
+await mkdir(output,{recursive:true});
+const entry=path.join(output,'watcher.mjs');
+await build({
+ entryPoints:[path.resolve('packages/workspace/src/watcher/index.ts')],
+ outfile:entry,bundle:true,platform:'node',format:'esm',
+ alias:{'@codocs/core':path.resolve('packages/core/src/index.ts')},
+ banner:{js:"import {createRequire} from 'node:module'; const require=createRequire(import.meta.url);"},
+ plugins:[{name:'hold-path-result-for-diagnosis',setup(builder){
+   builder.onLoad({filter:/workspace[\\/]src[\\/]paths[\\/]index\.ts$/},async args=>{
+     let source=await readFile(args.path,'utf8');
+     source=source.replace('export async function resolveWorkspacePath(', 'async function diagnosticOriginalResolveWorkspacePath(');
+     source+='\nexport async function resolveWorkspacePath(root: ProjectRoot,input: unknown): Promise<WorkspacePathResult> { const result=await diagnosticOriginalResolveWorkspacePath(root,input); await (globalThis as any).__codocsDiagnosticGate?.(input); return result; }\n';
+     return {contents:source,loader:'ts'};
+   });
+ }}],
+});
+await stop();
+const project=await mkdtemp(path.join(output,'project-'));
+const script=path.join(output,'child.mjs');
+await writeFile(script,`import {mkdir} from 'node:fs/promises';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+const [entry,project]=process.argv.slice(2);
+const target=path.join(project,'.codocs','nested');
+await mkdir(path.join(project,'.codocs'));
+let release,enter;
+const held=new Promise(resolve=>release=resolve);
+const entered=new Promise(resolve=>enter=resolve);
+globalThis.__codocsDiagnosticGate=async input=>{if(input===target){enter();await held;}};
+const {WorkspaceWatcher}=await import(pathToFileURL(entry).href);
+let closed=false;
+const watcher=new WorkspaceWatcher(project,(kind)=>{
+ if(closed&&kind==='watcher-connection-ready')process.stdout.write(JSON.stringify({lateConnectionAfterClose:true})+'\\n');
+});
+await watcher.start();
+await mkdir(target);
+await entered;
+await watcher.close();
+closed=true;
+process.stdout.write(JSON.stringify({pathCheckReached:true,closeCompleted:true})+'\\n');
+release();
+`);
+let result;
+try {result=await promisify(execFile)(process.execPath,[script,entry,project],{timeout:5000});}
+catch(error){result={stdout:error.stdout,stderr:error.stderr,code:error.code,killed:error.killed,signal:error.signal};}
+await writeFile(path.join(output,'diagnosis.json'),JSON.stringify(result,null,2));
+console.log(JSON.stringify(result));

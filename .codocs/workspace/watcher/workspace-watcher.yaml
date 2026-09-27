@@ -58,6 +58,7 @@ definition: |
   감시를 종료하면 연결·대기 배치·구독을 정리하고 closed 상태를 제공하며, 이후 변경 신호를 전달하지 않는다.
   종료 promise는 OS 감시의 close와 교체 중인 이전 연결의 종료까지 기다린다. 반복 종료 요청은 같은 완료를 공유하며 소비자는 이 완료 뒤 임시 파일을 정리한다.
   시작·하위 폴더 등록·재연결 중 종료된 경우에도 뒤늦은 준비 완료가 감시 자원을 다시 열거나 ready 상태로 되돌리지 않는다.
+  하위 폴더의 비동기 경로 확인 뒤에는 연결을 만들기 전에 현재 세대와 종료 상태를 다시 확인한다. 종료 전에 시작한 경로 확인이 늦게 끝나도 새 감시 핸들을 등록하지 않는다.
 
   명시적 IDE 성능 관측은 공개 ready/error와 세션 취소·복구의 실제 경계에만 붙는다. watcher-ready는 감시 연결이 준비된 시각이며 색인 게시 시각과 별개다. 관측자는 파일을 탐색하거나 준비 순서를 바꾸지 않는다.
 
@@ -66,3 +67,4 @@ definition: |
   대표 자료형 WorkspaceWatcher와 createWorkspaceWatcher는 [담당 구현](../../../packages/workspace/src/watcher/index.ts)에서 확인한다.
   실제 파일 변경과 디렉터리 교체 신호는 [인접 테스트](../../../packages/workspace/src/watcher/watcher.test.ts)에서 확인한다.
   오류 주입에 따른 재연결·수동 복구 상태는 [복구 테스트](../../../packages/workspace/src/watcher/watcher-recovery.test.ts)에서 확인한다. 오류 주입은 실제 OS 오류의 재현을 대신하지 않는다.
+  실제 하위 폴더 등록과 경로 확인 중 종료의 자식 프로세스 회귀는 [등록 경합 테스트](../../../packages/workspace/src/watcher/watcher-registration.test.ts)에서 확인한다. 종료 회귀는 경로 확인의 실제 반환 경계를 제어하고 close 이후 자식이 자연 종료하는지 검사한다.
