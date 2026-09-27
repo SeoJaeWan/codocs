@@ -2,6 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const vscode = require('vscode');
+const { createHash } = require('node:crypto');
+const { startMcp } = require('./mcp-client.cjs');
 
 /** 등록된 실제 provider·명령을 연결하는 시험 문맥을 만든다. */
 exports.context =
@@ -9,6 +11,46 @@ exports.context =
     config,
   ) {
     const root = path.join(config.temporary, 'workspace');
+    const mcpChildren = [];
+    const observations = [];
+    /** 시험이 만든 MCP만 등록하여 사례 종료 전에 정리한다. */
+    async function mcp(project = root) {
+      const client = await startMcp({
+        node: config.nodeExecutable,
+        entry: config.mcpEntry,
+        project,
+        /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ record: (
+          value,
+        ) => observations.push(value),
+      });
+      mcpChildren.push(client);
+      return client;
+    }
+    /** 파일의 원문과 실제 SHA-256을 같은 관측으로 기록한다. */
+    async function fileEvidence(relative) {
+      const bytes = await fs.readFile(path.join(root, relative));
+      const value = {
+        relative,
+        text: bytes.toString(),
+        revision: createHash('sha256').update(bytes).digest('hex'),
+      };
+      observations.push({ kind: 'file', ...value });
+      return value;
+    }
+    /** EOF 실패는 숨기지 않고 소유 자식만 강제 정리한 뒤 보고한다. */
+    async function closeMcp() {
+      const failures = [];
+      for (const client of mcpChildren.splice(0)) {
+        try {
+          await client.close();
+        } catch (error) {
+          failures.push(error);
+          await client.close('kill');
+        }
+        assert.throws(() => process.kill(client.pid, 0), '소유 MCP 잔류 PID');
+      }
+      if (failures.length) throw new AggregateError(failures, 'MCP 정리 실패');
+    }
     /** 실제 상태가 기대 결과에 도달할 때까지 제한 시간 안에서 다시 조회한다. */
     async function eventually(action, timeout = 15000) {
       const end = Date.now() + timeout;
@@ -181,5 +223,9 @@ exports.context =
       write,
       tabs,
       diagnostics,
+      mcp,
+      closeMcp,
+      observations,
+      fileEvidence,
     };
   };

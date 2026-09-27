@@ -1,12 +1,20 @@
 import { execFile, spawnSync } from 'node:child_process';
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  writeFile,
+} from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { finished } from 'node:stream/promises';
 import { createWriteStream, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { runTests } from '@vscode/test-electron';
-import { createVSIX } from '@vscode/vsce';
+import { packageVSIX } from '../../../tools/build/release.mjs';
+import { installMcp } from '../../../tools/build/verify-release.mjs';
 import {
   prepareVSCodeApplication,
   vscodeVersion,
@@ -342,29 +350,28 @@ async function runMultiwindow({ runtime, harness, extensions, report }) {
 }
 try {
   await progress();
-  await withCacheLock(
-    path.join(config.root, '.workbench/vscode-build.lock'),
-    /** 빌드와 패키징이 끝날 때까지 같은 작업 트리의 동시 빌드를 막는다. */ async () => {
-      const built = spawnSync(
-        process.execPath,
-        ['tools/build/build.mjs', 'build'],
-        { cwd: config.root, encoding: 'utf8', windowsHide: true },
-      );
-      log.write(built.stdout ?? '');
-      log.write(built.stderr ?? '');
-      if (built.error || built.status !== 0)
-        throw built.error ?? new Error(`현재 소스 빌드 실패: ${built.status}`);
-      phase = 'package';
-      await progress();
-      await createVSIX({
-        cwd: path.join(config.root, 'packages/vscode'),
-        packagePath: archive,
-        dependencies: false,
-        allowMissingRepository: true,
-        skipLicense: true,
-      });
-    },
-  );
+  if (config.vsix) {
+    await cp(config.vsix, archive);
+  } else
+    await withCacheLock(
+      path.join(config.root, '.workbench/vscode-build.lock'),
+      /** 빌드와 패키징이 끝날 때까지 같은 작업 트리의 동시 빌드를 막는다. */ async () => {
+        const built = spawnSync(
+          process.execPath,
+          ['tools/build/build.mjs', 'build'],
+          { cwd: config.root, encoding: 'utf8', windowsHide: true },
+        );
+        log.write(built.stdout ?? '');
+        log.write(built.stderr ?? '');
+        if (built.error || built.status !== 0)
+          throw (
+            built.error ?? new Error(`현재 소스 빌드 실패: ${built.status}`)
+          );
+        phase = 'package';
+        await progress();
+        await packageVSIX(config.root, archive);
+      },
+    );
   phase = 'download';
   await progress();
   const runtime = await prepareVSCodeApplication({
@@ -426,11 +433,31 @@ try {
   log.write(installed.stdout);
   log.write(installed.stderr);
   const entries = (await readdir(extensions)).filter((entry) =>
-    entry.startsWith('codocs.codocs-'),
+    entry.startsWith('seojaewan.codocs-'),
   );
   if (entries.length !== 1)
     throw new Error(`설치된 Codocs 확장 경로가 하나여야 합니다: ${entries}`);
   config.extension = path.join(extensions, entries[0]);
+  const installedManifest = JSON.parse(
+    await readFile(path.join(config.extension, 'package.json'), 'utf8'),
+  );
+  if (
+    installedManifest.publisher + '.' + installedManifest.name !==
+      'seojaewan.codocs' ||
+    installedManifest.version !== '0.0.1'
+  )
+    throw new Error('설치된 확장 ID/버전 불일치');
+  config.mcpEntry = config.mcpTgz
+    ? (
+        await installMcp(
+          config.mcpTgz,
+          path.join(config.temporary, 'mcp-consumer'),
+        )
+      ).entry
+    : path.join(config.root, 'packages/mcp/dist/cli.js');
+  config.mcpSha256 = createHash('sha256')
+    .update(await readFile(config.mcpEntry))
+    .digest('hex');
   await writeFile(process.argv[2], JSON.stringify(config));
   await writeFile(
     path.join(output, 'installation.json'),
@@ -441,6 +468,14 @@ try {
           .update(await readFile(archive))
           .digest('hex'),
         extension: config.extension,
+        id: installedManifest.publisher + '.' + installedManifest.name,
+        version: installedManifest.version,
+        mcpTgz: config.mcpTgz,
+        mcpTgzSha256: config.mcpTgz
+          ? createHash('sha256')
+              .update(await readFile(config.mcpTgz))
+              .digest('hex')
+          : null,
         ...installed,
       },
       null,

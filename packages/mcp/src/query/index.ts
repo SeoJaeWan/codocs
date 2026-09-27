@@ -15,12 +15,14 @@ import {
   type WorkspaceQuerySession,
   type WorkspaceRefreshResult,
   type WorkspaceValidationResult,
+  type WorkspaceWriteResult,
 } from '@codocs/workspace';
 import {
   acceptsToolInput,
   parseGetInput,
   parseListInput,
   parseValidateInput,
+  parseWriteInput,
 } from '../tool-input/index.js';
 
 /** MCP 호출자가 조회와 변경 요청의 허용 상태를 판단하는 값이다. */
@@ -53,6 +55,9 @@ export type CodocsGetResponse = WorkspaceGetResponse;
 /** codocs_validate의 공통 결과이며 문서 오류 진단도 요청 성공이다. */
 export type CodocsValidationResponse = WorkspaceValidationResult;
 
+/** codocs_write의 저장 여부와 색인 게시 여부를 구분하는 공통 결과다. */
+export type CodocsWriteResponse = WorkspaceWriteResult;
+
 /** SDK 등록과 독립적으로 직접 호출할 수 있는 조회 handler 모음이다. */
 export interface CodocsQueryHandlers {
   readonly access: CodocsAccessState;
@@ -60,6 +65,7 @@ export interface CodocsQueryHandlers {
   codocsGet(input: unknown): Promise<CodocsGetResponse>;
   codocsValidate(input?: unknown): Promise<CodocsValidationResponse>;
   codocsRefresh(input?: unknown): Promise<WorkspaceRefreshResult>;
+  codocsWrite(input: unknown): Promise<CodocsWriteResponse>;
   refresh(input?: unknown): Promise<WorkspaceRefreshResult>;
 }
 
@@ -148,6 +154,21 @@ export function createCodocsQueryHandlers(
     },
     /** 같은 세션의 명시 refresh로 기존 목록 cursor를 만료한다. */
     codocsRefresh: refresh,
+    /** 형식 오류만 여기서 거부하고 문서 진단은 workspace 변경 계획에서 보존한다. */
+    async codocsWrite(input: unknown): Promise<CodocsWriteResponse> {
+      const parsed = parseWriteInput(input);
+      if (!parsed) {
+        const error = invalidInput().error;
+        return {
+          success: false,
+          saved: false,
+          changed: false,
+          error,
+          diagnostics: [error],
+        };
+      }
+      return session.write(parsed);
+    },
     /** 직접 호출자를 위한 codocsRefresh 별칭이다. */
     refresh,
   };

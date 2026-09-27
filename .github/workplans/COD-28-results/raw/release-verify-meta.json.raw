@@ -1,0 +1,5 @@
+{
+  "command": "pnpm release:verify exact candidate-H9xFk8 tgz VSIX",
+  "seconds": 2.0133696,
+  "exit": 0
+}

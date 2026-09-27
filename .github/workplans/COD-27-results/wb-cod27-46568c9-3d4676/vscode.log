@@ -1,0 +1,6 @@
+
+> codocs@0.0.0 test:vscode C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod27-46568c9-3d4676-task-001
+> node packages/vscode/test-runner/run.mjs
+
+VS Code run output: C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod27-46568c9-3d4676-task-001\.workbench\vscode-tests\1790475645292-8008
+VS Code PASS (complete): C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod27-46568c9-3d4676-task-001\.workbench\vscode-tests\1790475645292-8008

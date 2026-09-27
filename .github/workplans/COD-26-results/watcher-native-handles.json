@@ -1,0 +1,234 @@
+{
+  "pid": 21148,
+  "argv": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\child.mjs",
+    "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\watcher.mjs",
+    "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1"
+  ],
+  "phase": "late1000",
+  "events": [
+    {
+      "at": 35.97810000000001,
+      "kind": "child-phase",
+      "text": "import: 0ms"
+    },
+    {
+      "at": 880.3388,
+      "kind": "child-phase",
+      "text": "start: 845ms"
+    },
+    {
+      "at": 901.6053,
+      "kind": "native-watch",
+      "id": 1,
+      "type": "watch",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1",
+      "stack": "Error\n    at fs.watch (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:16:48)\n    at #open (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:30082:26)\n    at async createWorkspaceWatcher (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:30304:3)\n    at async file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/child.mjs:36:17"
+    },
+    {
+      "at": 907.2086,
+      "kind": "native-watch",
+      "id": 2,
+      "type": "watch",
+      "target": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/project-1/.codocs",
+      "stack": "Error\n    at fs.watch (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:16:48)\n    at createFsWatchInstance (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8342:12)\n    at setFsWatchListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8373:15)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8493:16)\n    at NodeFsHandler._handleDir (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8684:21)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8727:18)\n    at async file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:9087:19\n    at async Promise.all (index 0)"
+    },
+    {
+      "at": 909.7977,
+      "kind": "native-watchFile",
+      "id": 3,
+      "type": "watchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1",
+      "stack": "Error\n    at fs.watchFile (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:17:52)\n    at setFsWatchFileListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8436:16)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8488:16)\n    at NodeFsHandler._handleDir (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8684:21)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8727:18)\n    at async file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:9087:19\n    at async Promise.all (index 0)"
+    },
+    {
+      "at": 911.4172,
+      "kind": "native-watchFile",
+      "id": 4,
+      "type": "watchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs",
+      "stack": "Error\n    at fs.watchFile (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:17:52)\n    at setFsWatchFileListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8436:16)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8488:16)\n    at NodeFsHandler._handleDir (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8684:21)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8727:18)"
+    },
+    {
+      "at": 911.8631,
+      "kind": "child-phase",
+      "text": "ready: 877ms"
+    },
+    {
+      "at": 939.5738,
+      "kind": "native-watch",
+      "id": 5,
+      "type": "watch",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested",
+      "stack": "Error\n    at fs.watch (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:16:48)\n    at createFsWatchInstance (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8342:12)\n    at setFsWatchListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8373:15)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8493:16)\n    at NodeFsHandler._handleDir (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8684:21)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8727:18)"
+    },
+    {
+      "at": 961.3946000000001,
+      "kind": "native-watch",
+      "id": 6,
+      "type": "watch",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested\\deep",
+      "stack": "Error\n    at fs.watch (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:16:48)\n    at createFsWatchInstance (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8342:12)\n    at setFsWatchListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8373:15)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8493:16)\n    at NodeFsHandler._handleDir (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8684:21)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8727:18)"
+    },
+    {
+      "at": 1035.3416,
+      "kind": "native-watchFile",
+      "id": 7,
+      "type": "watchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested",
+      "stack": "Error\n    at fs.watchFile (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:17:52)\n    at setFsWatchFileListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8436:16)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8488:16)\n    at NodeFsHandler._handleDir (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8684:21)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8727:18)"
+    },
+    {
+      "at": 1040.5596,
+      "kind": "native-watch",
+      "id": 8,
+      "type": "watch",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested\\deep\\alpha.yaml",
+      "stack": "Error\n    at fs.watch (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:16:48)\n    at createFsWatchInstance (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8342:12)\n    at setFsWatchListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8373:15)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8493:16)\n    at NodeFsHandler._handleFile (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8549:25)\n    at NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8747:23)"
+    },
+    {
+      "at": 1041.4866,
+      "kind": "native-watchFile",
+      "id": 9,
+      "type": "watchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested\\deep",
+      "stack": "Error\n    at fs.watchFile (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:17:52)\n    at setFsWatchFileListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8436:16)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8488:16)\n    at NodeFsHandler._handleDir (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8684:21)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8727:18)"
+    },
+    {
+      "at": 1041.8597,
+      "kind": "native-watchFile",
+      "id": 10,
+      "type": "watchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested\\deep\\alpha.yaml",
+      "stack": "Error\n    at fs.watchFile (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:17:52)\n    at setFsWatchFileListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8436:16)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8488:16)\n    at NodeFsHandler._handleFile (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8549:25)\n    at NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8747:23)"
+    },
+    {
+      "at": 1075.6652,
+      "kind": "child-phase",
+      "text": "delivered: 1041ms"
+    },
+    {
+      "at": 1076.0768,
+      "kind": "child-phase",
+      "text": "closing: 1041ms"
+    },
+    {
+      "at": 1076.7752,
+      "kind": "native-close-call",
+      "id": 1
+    },
+    {
+      "at": 1077.4652,
+      "kind": "native-unwatchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1"
+    },
+    {
+      "at": 1077.8457,
+      "kind": "native-unwatchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs"
+    },
+    {
+      "at": 1078.079,
+      "kind": "native-unwatchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested"
+    },
+    {
+      "at": 1078.1403,
+      "kind": "native-unwatchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested\\deep"
+    },
+    {
+      "at": 1078.196,
+      "kind": "native-unwatchFile",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested\\deep\\alpha.yaml"
+    },
+    {
+      "at": 1078.4569000000001,
+      "kind": "native-close-call",
+      "id": 2
+    },
+    {
+      "at": 1078.6349,
+      "kind": "native-close-call",
+      "id": 5
+    },
+    {
+      "at": 1078.6938,
+      "kind": "native-close-call",
+      "id": 6
+    },
+    {
+      "at": 1078.7392,
+      "kind": "native-close-call",
+      "id": 8
+    },
+    {
+      "at": 1078.9558,
+      "kind": "native-close-event",
+      "id": 1
+    },
+    {
+      "at": 1079.2783,
+      "kind": "native-close-event",
+      "id": 2
+    },
+    {
+      "at": 1079.3858,
+      "kind": "native-close-event",
+      "id": 5
+    },
+    {
+      "at": 1079.4034,
+      "kind": "native-close-event",
+      "id": 6
+    },
+    {
+      "at": 1079.4127,
+      "kind": "native-close-event",
+      "id": 8
+    },
+    {
+      "at": 1079.5913,
+      "kind": "child-phase",
+      "text": "closed: 1045ms"
+    },
+    {
+      "at": 1089.4208,
+      "kind": "native-watch",
+      "id": 11,
+      "type": "watch",
+      "target": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/project-1/.codocs/nested/deep",
+      "stack": "Error\n    at fs.watch (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:16:48)\n    at createFsWatchInstance (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8342:12)\n    at setFsWatchListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8373:15)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8493:16)\n    at NodeFsHandler._handleDir (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8684:21)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8727:18)\n    at async file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:9087:19\n    at async Promise.all (index 0)"
+    },
+    {
+      "at": 1091.362,
+      "kind": "native-watch",
+      "id": 12,
+      "type": "watch",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested\\deep\\alpha.yaml",
+      "stack": "Error\n    at fs.watch (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/observe-handles.mjs:16:48)\n    at createFsWatchInstance (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8342:12)\n    at setFsWatchListener (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8373:15)\n    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8493:16)\n    at NodeFsHandler._handleFile (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8549:25)\n    at NodeFsHandler._addToNodeFs (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/watcher.mjs:8747:23)"
+    }
+  ],
+  "active": [
+    {
+      "constructor": "Socket"
+    },
+    {
+      "constructor": "Socket"
+    },
+    {
+      "id": 11,
+      "type": "watch",
+      "target": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/.workbench/causality/base-processio-observe-children/project-1/.codocs/nested/deep",
+      "constructor": "FSWatcher"
+    },
+    {
+      "id": 12,
+      "type": "watch",
+      "target": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-processio-observe-children\\project-1\\.codocs\\nested\\deep\\alpha.yaml",
+      "constructor": "FSWatcher"
+    }
+  ],
+  "resources": ["PipeWrap", "PipeWrap", "FSEventWrap", "FSEventWrap"]
+}

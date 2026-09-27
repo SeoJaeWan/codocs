@@ -1,0 +1,296 @@
+[
+  {
+    "sha256": "c44819f4b6a0ef2c8fb3306780db77df55b9ac0358a1c03255b15b6f4e998ee3",
+    "bytes": 28758,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\vscode-tests\\1790514403831-26260\\performance.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "9e904a03f41c5df346856f0e5f470c570485994fc4c1360cf1fb77131f7ebf33",
+    "bytes": 1596,
+    "file": ".github/workplans/COD-28-results/raw/api-performance.md.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "61ed162a850279d3269046d86c3b7a4412f05dc714f9a341ea98d41c31615c8d",
+    "bytes": 6650,
+    "file": ".github/workplans/COD-28-results/raw/api-request-progress.jsonl.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "79fa9d8a58fcea6f6f800f0a79a3db8fa35c9b47c63f6d9fd916680ef37f2a3b",
+    "bytes": 14651,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\vscode-tests\\1790514403831-26260\\result.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "4f10a1b6151eeabf1713793cab57d7740c6d10fef961796db133d900b7658421",
+    "bytes": 150776,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release\\candidate-jvwJPD\\release.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "53253c45e0f181e6e965b77f926ff5640d25a53eba0a7a48e2d1e0f57a091e32",
+    "bytes": 74,
+    "file": ".github/workplans/COD-28-results/raw/check-after-fixture-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "6b5e9cecc3f041195fceaa93e08b3675188df7ba88f86d52c8a5f47f30c841dc",
+    "bytes": 8495,
+    "file": ".github/workplans/COD-28-results/raw/check-after-fixture.log",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "5a20ba73e6b9075f077c814081f8fb029e283137735425702c1a60891cc66250",
+    "bytes": 7323,
+    "file": ".github/workplans/COD-28-results/raw/core-performance.md.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "bc2bbf1344e5991e6672279098a08d3fa41154a3430b27d338c0ee5a70c79fb2",
+    "bytes": 866,
+    "file": ".github/workplans/COD-28-results/raw/environment-findings.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "566c0cee8a803f447313c7cb0d3eebb54670f41eaba3ff90a6214afee299c925",
+    "bytes": 437,
+    "file": ".github/workplans/COD-28-results/raw/functional-final-1.100.0-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "95ee28a34e9f1370cc19d237f4be85df2b5c052af432465a1721f01281f074c1",
+    "bytes": 438,
+    "file": ".github/workplans/COD-28-results/raw/functional-final-1.139.1-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "103b5870b5c09fdcbf81e61787e82b3f124e592ecbc003d323b301c9bd678d39",
+    "bytes": 1051,
+    "file": ".github/workplans/COD-28-results/raw/initial-lint-failure.log",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "2875b74cee69f00cd283cd7ddad0c1622e99c0b49b1cbd174d5bfc1c0d51e034",
+    "bytes": 15847,
+    "file": ".github/workplans/COD-28-results/raw/latest-before-fixture-functional.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "1eb68c6bba5efc151b2788e2834b7d2a34a6395123e2cb46735c174099c71702",
+    "bytes": 10404,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\vscode-tests\\1790513528727-27548\\result.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "70c89fb292c6ce92dc14332d511fe129070dd04092c7219546ba8cb5ad742509",
+    "bytes": 167416,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\vscode-tests\\1790514297141-17172\\functional.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "f7d805859872ef007cb5bbf8573266efcdc489da25334e78f15337f8ad159534",
+    "bytes": 1073,
+    "file": ".github/workplans/COD-28-results/raw/latest-installation.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "6249f79e600bc90fbbafa406771ae122d1323a7555ec724a8e8a6c42969efb9e",
+    "bytes": 821,
+    "file": ".github/workplans/COD-28-results/raw/latest-lifecycle.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "885156e10e4e47798d6eb252df9912496fe60c6c0efbb23fd204533e020489cf",
+    "bytes": 14650,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\vscode-tests\\1790514297141-17172\\result.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "3146801dc6d6db428069ec19931cb9b7ce9befa91688351253c1c68976b94fcf",
+    "bytes": 283,
+    "file": ".github/workplans/COD-28-results/raw/lifecycle-final-1.100.0-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "da03da1d719961d3ef2248bdb3d4a6cecab0b86c5b182d2f4d2068c8685de0d7",
+    "bytes": 282,
+    "file": ".github/workplans/COD-28-results/raw/lifecycle-final-1.139.1-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "e4d752e7026613dc64eb9b7fef43430095698e31f239f4c882c74b1774dd2f85",
+    "bytes": 142,
+    "file": ".github/workplans/COD-28-results/raw/lifecycle-latest-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "c90946c35b7b3c1037d49203c34098b9e8763b78ad259bc37df166199f772fcb",
+    "bytes": 143,
+    "file": ".github/workplans/COD-28-results/raw/lifecycle-min-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "f01e73fffcec1c04f5a6f063a919adb2433e29e5bce70c06f2ec846e89568d2c",
+    "bytes": 2147,
+    "file": ".github/workplans/COD-28-results/raw/lock-probe-latest.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "c38630c96666d49b5aa811913843f65a3eec35d46030ed849f61c9b1a547d42e",
+    "bytes": 171307,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\vscode-tests\\1790514204072-11884\\functional.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "d1a73d2d1d9496c6ff2b45276fedf18cecefae02c840acc48cda882d1012d598",
+    "bytes": 770,
+    "file": ".github/workplans/COD-28-results/raw/minimum-installation.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "8b682fa3a29439694d77e0d16e9e95d2b14d8eee2afef2045e9548e5099f9b1e",
+    "bytes": 821,
+    "file": ".github/workplans/COD-28-results/raw/minimum-lifecycle.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "7deb0d4f4fc1ee458e846314fa1dd3a5020e4b5a3befc02326367b87d6c35b83",
+    "bytes": 14650,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\vscode-tests\\1790514204072-11884\\result.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "610c4fb96042cdb2664c1cd0d95789ec7ef75076620faf4a2e2cfa18163b6452",
+    "bytes": 79,
+    "file": ".github/workplans/COD-28-results/raw/pack-final-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "364bf68b5274f85bcb2cfdc2400a0996520c2e490371e27fa5d6ca2a0f99d50b",
+    "bytes": 340,
+    "file": ".github/workplans/COD-28-results/raw/performance-api-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "9ad7d6681ec90bd87946a1779e29ee669411db5ee40baae0610c6ae97d177fd6",
+    "bytes": 256,
+    "file": ".github/workplans/COD-28-results/raw/performance-config.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "332c7b717922e0542c7e9ad0cf408c20e5351153f2ad90a7b554b16dbe3208ed",
+    "bytes": 338,
+    "file": ".github/workplans/COD-28-results/raw/performance-core-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "81100a2f5ffa5e3e3ce6e7abe075078de087e3678f6afa7c077e5b91efa3c589",
+    "bytes": 720,
+    "file": ".github/workplans/COD-28-results/raw/predecessor-artifact-comparison.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "fa476099368de8ab49917c5c4a5402dd3ee4bdd069a42e98e374fc14d0e84b9d",
+    "bytes": 142,
+    "file": ".github/workplans/COD-28-results/raw/refreeze-payload-comparison.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "87e8614114705fd9bfc80bbe4cdeecbe0ddd8139c574e1c285b39c5861f536a9",
+    "bytes": 78,
+    "file": ".github/workplans/COD-28-results/raw/release-pack-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "619b23fd86dd4cfd03949d8f57247a6cfb556447826e67682e6c3ebc471fd717",
+    "bytes": 113,
+    "file": ".github/workplans/COD-28-results/raw/release-verify-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "467154363453c9ae7f239728a911caebabba0bce6d209acfe75cef9ba1305ec5",
+    "bytes": 167,
+    "file": ".github/workplans/COD-28-results/raw/stable.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "bbc7064e0708796883e162bb425c7ddcbbabde529529a86e6ad55380919417cb",
+    "bytes": 44700,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release-verification\\codocs-release-OXhAHM\\result.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "e676e391fd0e7cfe88c757c34501b6facba0cba8858adafb9f82e56f192c69cb",
+    "bytes": 374,
+    "file": ".github/workplans/COD-28-results/raw/verify-final-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "caa322aa93653b1699f728b0e2df053a396426d9f651111e94744d569ac83948",
+    "bytes": 192,
+    "file": ".github/workplans/COD-28-results/raw/vscode-latest-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "fcd4490fb2a81e27ff773e431aca44a623aefad1b80e2a38a7e7ccca2387e584",
+    "bytes": 192,
+    "file": ".github/workplans/COD-28-results/raw/vscode-min-meta.json.raw",
+    "storage": "tracked evidence"
+  },
+  {
+    "sha256": "89a5fb4fc98c44a579ff5928a0e0dd5b1306c370a03717116cea83d581d74330",
+    "bytes": 1144104,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\performance-core\\cod14-performance.json",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "a0874840e42742c578caf19f98ad5e7f63e0ed23cf9d21c794f8cbd5b25e87a8",
+    "bytes": 782493,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release\\candidate-jvwJPD\\co-documentation-0.0.1.tgz",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "c6fd9d4e142af14c4e5fcd22d5193487faf24d5ab371b02b834d4e21ca1f5f7f",
+    "bytes": 900846,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release\\candidate-jvwJPD\\codocs-0.0.1.vsix",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "359c6d64642c4e13731745b53822433e21642a626cae97c541170164a2779d28",
+    "bytes": 14883,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\runtime-packet.yaml",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "3d828e4cb03665c8a5b0d6f4ae5741a184e9dfdd6b7c24a2df22d3f5efcd2b2b",
+    "bytes": 27363,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\source-prepare.yaml",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "8130417c4adc1c01d2f3563bda61488056b664de73aeffebf01bf0e32480faac",
+    "bytes": 8996,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\source-task.yaml",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "1bfc322d3fa5f83366fc27dc18ca902a68c3b3e7a7539d984ca180540cc02a2c",
+    "bytes": 2641,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\install.log",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "54bb15b270ecb512c5bb92a619a1415f5a11cdfd828509da6698efe397750f9f",
+    "bytes": 236,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\write-race-focused.log",
+    "storage": "ignored local evidence"
+  },
+  {
+    "sha256": "e44451117f144053b8aa3f8c58294c3f25b9c1ba0a47f515a073fee8ba519233",
+    "bytes": 625,
+    "file": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\read-denial-focused.log",
+    "storage": "ignored local evidence"
+  }
+]

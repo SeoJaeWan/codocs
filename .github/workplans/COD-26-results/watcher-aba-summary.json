@@ -1,0 +1,124 @@
+{
+  "workload": {
+    "args": [
+      "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\io-workload.mjs",
+      "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\base-natural-aba\\io",
+      "16",
+      "8000"
+    ],
+    "started": "2026-09-26T15:32:41.537Z",
+    "durationMs": 43476,
+    "status": 0,
+    "signal": null
+  },
+  "outcomes": [
+    {
+      "variant": "observe",
+      "args": [
+        "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\trace.mjs",
+        "base-natural-aba-1-observe",
+        "4",
+        "observe",
+        "4"
+      ],
+      "started": "2026-09-26T15:32:41.564Z",
+      "durationMs": 15416,
+      "status": 0,
+      "signal": null,
+      "outcomes": [
+        {
+          "run": 4,
+          "status": "PASS",
+          "durationMs": 1241
+        },
+        {
+          "run": 1,
+          "status": "FAIL",
+          "durationMs": 15057
+        },
+        {
+          "run": 2,
+          "status": "FAIL",
+          "durationMs": 15059
+        },
+        {
+          "run": 3,
+          "status": "FAIL",
+          "durationMs": 15048
+        }
+      ]
+    },
+    {
+      "variant": "guard",
+      "args": [
+        "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\trace.mjs",
+        "base-natural-aba-2-guard",
+        "4",
+        "guard",
+        "4"
+      ],
+      "started": "2026-09-26T15:32:56.989Z",
+      "durationMs": 3669,
+      "status": 0,
+      "signal": null,
+      "outcomes": [
+        {
+          "run": 2,
+          "status": "PASS",
+          "durationMs": 1405
+        },
+        {
+          "run": 4,
+          "status": "PASS",
+          "durationMs": 1573
+        },
+        {
+          "run": 1,
+          "status": "PASS",
+          "durationMs": 1767
+        },
+        {
+          "run": 3,
+          "status": "PASS",
+          "durationMs": 1705
+        }
+      ]
+    },
+    {
+      "variant": "observe",
+      "args": [
+        "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod26-486f634-8c4a21\\task-001\\.workbench\\causality\\trace.mjs",
+        "base-natural-aba-3-observe",
+        "4",
+        "observe",
+        "4"
+      ],
+      "started": "2026-09-26T15:33:00.663Z",
+      "durationMs": 16922,
+      "status": 0,
+      "signal": null,
+      "outcomes": [
+        {
+          "run": 2,
+          "status": "PASS",
+          "durationMs": 1394
+        },
+        {
+          "run": 3,
+          "status": "PASS",
+          "durationMs": 1388
+        },
+        {
+          "run": 1,
+          "status": "PASS",
+          "durationMs": 1473
+        },
+        {
+          "run": 4,
+          "status": "FAIL",
+          "durationMs": 15034
+        }
+      ]
+    }
+  ]
+}

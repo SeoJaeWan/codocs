@@ -1,3 +1,33 @@
+# COD-28 — 0.0.1 배포 후보 통합과 리뷰 준비
+
+현재 승인 범위는 `co-documentation` MCP와 `seojaewan.codocs` VSIX 0.0.1, MIT 라이선스, 원본 로고, Windows/macOS 실제 설치·기능·정리 검증이다. Linux·WSL·컨테이너·SSH·네트워크 폴더는 지원 검증 범위 밖이다.
+
+- 실행: `wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e`, intent/2
+- 사용자 지시: 완료하면 feature/cod-28 브랜치에 머지하고 푸시하고 리뷰 받기 대기해
+- 실제 대상: 기존 [PR #25](https://github.com/SeoJaeWan/codocs/pull/25)의 `feature/COD-28` → `main`
+- 병합 기준: `078f35aeae4000672c7d5849bbcea284b702f8e0`
+- TASK-001: `fea2375c8c3675f34e4e52f63d7a5e0b002aa7ea`
+- TASK-002: `95a628fc1f2b8772c51c9792e0a2c8edf69f935a`
+- INT-001: `4697a256f36b4afa45cd7a950b2b5f8a424de981`
+- 계획 artifact: `01a0e2a2-e642-78a6-a803-6e1ba0f865d2`
+- 계획 SHA-256: `7c101d8a0ca551da0fcc9a126a87af994676aa6f621ae667c69c6970e2d0f1fc`
+- INT-001 source packet: `253ceacf51d15c8e6234351ce2a7dc06a7a44c5deccafd5209d56b9a55e0453d`
+- INT-001 binding: `b020508dd070a677c33747f6e60cd53c46cc16442dbc6540f6883966031cb067`
+- DELIVERY-001 binding: `287c284a9d13ca08dd2bd5077754681997014f0739705439d9b9fc751a8ac199`
+- intent/2 revision SHA-256: `af6b3c036929725861f9a7ee3e9f57a0e2191c041ed10ff27c491ca072164110`
+
+선행 [통합 결과](COD-28-results/integration.md)는 intent/1 당시의 로컬 검증과 한계를 보존한다. Windows에서 pnpm check(979 Vitest + 50 Node + 117 consumer), 독립 Node 24 설치, VS Code 1.100.0/1.139.1 각각 기능 58/58·lifecycle 4/4를 통과했다. macOS는 당시 미실행이며 원격 CI 통과로 따로 확인해야 한다.
+
+DELIVERY-001은 두 부모 이력을 보존하여 후보를 병합하고 정상 hook 후 기존 feature 브랜치에 push한다. CI는 한 번 고정한 최신 정식 VS Code와 같은 tgz·VSIX 쌍을 양 OS에 전달하고 소스·파일 해시를 확인한 뒤 전체 검사, 독립 MCP, 최소/최신 실제 설치·기능·정리를 실행한다. CI의 새 산출물 해시를 과거 로컬 파일 해시와 같다고 주장하지 않는다. 모든 필수 검사가 통과한 뒤 PR #25에 실제 Actions URL·소스·환경·해시·결과를 기록하고 리뷰 준비 상태로 전환한다. 미실행·실패·스킵은 통과가 아니다.
+
+게시 권한은 별도의 미확인 gate다. npm 이름 조회 결과와 Marketplace verify-pat 성공만으로 게시 권한을 주장하지 않는다. 실제 npm/Marketplace 게시, main 병합, force push, 작업 공간 삭제는 승인 범위 밖이다.
+
+성능의 알려진 한계도 유지한다. 현재 제한 표본 Hover API 중앙값 17.9초·p95 85.9초이며 정식 반복 전체와 macOS 성능 캠페인은 미측정이다. 성능 목표를 달성했다고 표시하거나 이 전달 작업을 최적화로 확대하지 않는다.
+
+## 최초 계획 기록
+
+아래 내용은 2026-09-13 최초 계획의 원문 기록이다. 현재 버전·지원 범위·검증 상태와 전달 권한은 위 intent/2 및 연결된 실행 결과가 우선한다.
+
 # COD-28 — [25] 배포 패키지·VSIX·지원 OS 최종 검증과 릴리스 준비
 
 h2. 목표

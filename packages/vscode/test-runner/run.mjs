@@ -103,6 +103,7 @@ export async function main(args = process.argv.slice(2)) {
       configPath,
       JSON.stringify({
         root,
+        nodeExecutable: process.execPath,
         output,
         temporary,
         version: options.version,
@@ -110,6 +111,8 @@ export async function main(args = process.argv.slice(2)) {
         scenario: options.scenario,
         settings,
         cacheRoot,
+        vsix: options.vsix ? path.resolve(options.vsix) : null,
+        mcpTgz: options.mcpTgz ? path.resolve(options.mcpTgz) : null,
       }),
     );
     result.head = spawnSync(

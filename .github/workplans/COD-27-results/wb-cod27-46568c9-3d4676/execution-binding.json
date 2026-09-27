@@ -1,0 +1,249 @@
+{
+  "task_id": "TASK-001",
+  "run_id": "wb-cod27-46568c9-3d4676",
+  "execution_plan_id": "wb-cod27-46568c9-3d4676/plan/1",
+  "task_packet_digest": "8e3ee142cda6ee08205a2457ea2505f630b7e14a4c1fa83f31097256463b787f",
+  "kind": "implementation",
+  "title": "MCP·IDE 다중 프로세스 경계 검증",
+  "objective": "기존 테스트를 재사용하고 전파·격리·실제 저장 경합·독립 종료만 추가하여 재현 가능한 OS별 증거를 남긴다.",
+  "execution_profile": {
+    "model": "gpt-6-sol",
+    "reasoning_effort": "high",
+    "rationale": "실제 FS 경합과 MCP/IDE 수명·fixture 복원의 연결을 함께 판단해야 하지만 기존 주입·실행 기반이 있다.",
+    "escalation": "none"
+  },
+  "depends_on": [],
+  "assigned_worktree": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod27-46568c9-3d4676-task-001",
+  "branch": "codex/wb-cod27-46568c9-3d4676/task-001",
+  "base_selector": {
+    "kind": "exact_commit",
+    "value": "46568c9feda16739604096b738a915632f58c697"
+  },
+  "inputs": [
+    {
+      "kind": "memory_artifact",
+      "ref": {
+        "type": "artifact",
+        "project_id": "seojaewan/codosc",
+        "work_item_key": "COD-27",
+        "folder": "analysis",
+        "artifact_id": "01a0e069-60c4-7957-b75e-d805d3ad87c2"
+      },
+      "sha256": "0f9f943cbedcb719634f77d4046523fd221a5b27fccf1cc27bc02b66d9cbd0ba"
+    },
+    {
+      "kind": "codocs",
+      "source_path": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.codocs/development/test-convention.yaml",
+      "sha256": "b690fd9bcb1120efbc49ccbe49c95bf3bcc209263d4d3c447ba905bd99597088",
+      "constraint": "기존 조건·실행 경계 재사용, 실제 IO/IDE, 결정적 경합, 과거 증거 구분."
+    },
+    {
+      "kind": "codocs",
+      "source_path": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.codocs/development/folder-convention.yaml",
+      "sha256": "c86df12cd645ecc5f925cdce16ed39286a8d088e2ed80e9a77c63fe76fb13986",
+      "constraint": "IDE 사례는 extension.test.cjs, test-support는 패키지 소유·배포 제외."
+    },
+    {
+      "kind": "codocs",
+      "source_path": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.codocs/development/development-environment.yaml",
+      "sha256": "449f989a679b0f6d9de0e033d1f8c3dee7c5e4d8c7ec9e72610d1d4b78294529",
+      "constraint": "Node 24, pnpm 고정 설치, 정상 커밋 훅 및 기존 check/IDE/lifecycle 명령."
+    },
+    {
+      "kind": "codocs",
+      "source_path": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.codocs/development/release.yaml",
+      "sha256": "6df0dd5b82b7b53ca6deffaa4c976d94764a0d5a924e9336408866a19f5a6ac0",
+      "constraint": "Windows/macOS 같은 후보 실제 검증, 기능과 성능 분리, 미실행을 통과로 처리하지 않음."
+    },
+    {
+      "kind": "codocs",
+      "source_path": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.codocs/workspace/storage/write-coordination.yaml",
+      "sha256": "45d309a22f79b46790b52189d0bc585959addb27e16442ec76c84c91e2699690",
+      "constraint": "create 비덮어쓰기, 실패 원본 보존; 잠금/FIFO/5초 취소·조건부 원자적 update 미제공."
+    },
+    {
+      "kind": "codocs",
+      "source_path": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.codocs/workspace/indexing/index-refresh.yaml",
+      "sha256": "987808980c5bedcdb75e3b7454bfffa886dd657ec72fdcc555f332b51ebd182b",
+      "constraint": "독립 색인, watcher로 변경 반영, 전체 탐색 실패와 감시 실패 제한 조회 구분."
+    },
+    {
+      "kind": "repository",
+      "source_path": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.github/workplans/COD-27.md",
+      "sha256": "79360a9b518957c4fc8f43596e913de4e539f7a43b395a8c9d94b07c8ab754d2"
+    }
+  ],
+  "owned_paths": [
+    "packages/mcp/src/server/write-race.test.ts",
+    "packages/mcp/src/test-support/write-race-*.mjs",
+    "packages/vscode/src/integration/extension.test.cjs",
+    "packages/vscode/src/integration/index.cjs",
+    "packages/vscode/src/integration/test-support/mcp-*.cjs",
+    "packages/vscode/src/integration/test-support/mcp-*.mjs",
+    "packages/vscode/src/integration/test-support/context.cjs",
+    "packages/vscode/src/integration/test-support/fixtures.mjs",
+    "packages/vscode/src/integration/test-support/workspace-fixture.mjs",
+    "packages/vscode/src/integration/test-support/workspace-fixture.test.mjs",
+    "packages/vscode/test-runner/host.mjs",
+    "packages/vscode/test-runner/run.mjs",
+    ".codocs/development/test-convention.yaml",
+    ".codocs/development/release.yaml",
+    ".github/workplans/COD-27.md",
+    ".github/workplans/COD-27-results/**"
+  ],
+  "forbidden_paths": [
+    "위 owned_paths 밖의 tracked 파일",
+    "제품 core/workspace/language-server 구현 및 MCP CLI/server 구현",
+    "성능 실행기·성능 계획·일반 가이드·의존성/lockfile·Git 훅·CI workflow",
+    "다른 checkout과 사용자 데이터; Wiki/provider 문서; 외부 서비스 변경"
+  ],
+  "shared_surfaces": [
+    "root formatter/lint/build는 전체 checkout을 읽거나 dist를 생성한다. task 외 tracked 변경을 만들지 않는다.",
+    "test-convention/release는 의미가 바뀌거나 검증 책임의 안내가 필요한 경우만 수정한다. PR 진행은 .github/workplans에 기록한다. 문서 ID/name과 index는 바꾸지 않는다.",
+    "제품 계약 위반이 재현되면 근거를 남긴다. owned 범위 밖 제품 수정은 패킷 개정 후 수행하며 테스트 기대값을 완화해 숨기지 않는다."
+  ],
+  "runtime_resources": [
+    "전용 worktree의 node_modules/dist/.workbench; 외부 실행별 temp 디렉터리",
+    "시나리오별 MCP child PID와 project, 별도 IPC 또는 .codocs 밖 atomic mailbox",
+    "task-local VS Code cache/profile/extensions와 기존 runSupervised의 소유 process tree",
+    "Windows 개발 호스트; 같은 후보의 macOS 실행 환경/증거는 검증 단계의 필수 선행 조건"
+  ],
+  "implementation_notes": [
+    "각 IDE 시나리오의 기존 restart 및 fixture 쓰기 뒤 MCP와 해당 workspace Hover의 준비를 확인한다. MCP 종료 후 fixture를 복원한다.",
+    "외부 runner의 Node 경로를 config로 전달한다. Extension Host process.execPath를 독립 Node로 가정하지 않는다.",
+    "beforeApply는 최종 revision/ID 검사 이전이다. revision_conflict에만 사용하고 same-path create/update의 최종 경쟁은 operations.link/rename 직전 양 child 도달로 제어한다. 원래 FS 연산을 한 번 실행해 실제 결과를 전달한다.",
+    "계측 child는 .mjs와 임시 소스 bundle을 사용하고 core/workspace alias를 명시한다. production build에 test-support를 넣거나 public hook을 추가하지 않는다.",
+    "EOF 정상 종료는 직접 소유 child의 stdin과 exit 관측으로 증명한다. SDK close의 2초 후 signal escalation 및 language-server 전용 kill helper를 혼동하지 않는다.",
+    "기존 fixture는 의도된 진단이 있다. 대상/기준 진단을 비교하고 새 임시 파일을 명시적으로 정리한다. 실패/취소 시 gate 정리, client/child 종료, 감독기 정리 후 fixture 삭제 순서를 지킨다.",
+    "공개 함수·복잡한 helper의 한국어 JSDoc, 독립 한국어 테스트 이름, 실제 입력/검증 가시성을 유지한다.",
+    "입력 문서 경로/sha256/제약은 inputs에 보존했다. worker checkout의 동일 상대 경로를 읽고 해시 및 의미를 확인한다."
+  ],
+  "focused_checks": [
+    "기존 server/authoring/state 및 신규 write-race 사례",
+    "새 MCP lifecycle helper와 변경한 fixture 복원 회귀",
+    "기존 설치 VSIX의 전체 기능 사례에 포함된 새 전파·격리·종료"
+  ],
+  "broader_checks": [
+    "pnpm check 전체",
+    "실제 설치 VS Code 기능",
+    "공용 lifecycle/잔류 프로세스 검사",
+    "문서 변경 시 제품 파서·검증기·색인과 참조 도달성",
+    "최종 후보의 Windows/macOS 동일 명령"
+  ],
+  "verification_commands": [
+    "pnpm install --frozen-lockfile",
+    "pnpm build",
+    "pnpm exec vitest run packages/mcp/src/server/server.test.ts packages/mcp/src/server/authoring.test.ts packages/mcp/src/server/state.test.ts packages/mcp/src/server/write-race.test.ts",
+    "pnpm check",
+    "pnpm test:vscode",
+    "node packages/vscode/test-runner/lifecycle.mjs",
+    "git diff --check"
+  ],
+  "expected_failure_before_implementation": "기존 baseline의 실패를 요구하지 않는다. 신규 경계가 아직 관찰되지 않는 coverage gap이며, 새 회귀가 결함을 발견하면 해당 실패 조건과 실제 파일/프로세스 증거를 기록한다.",
+  "commit_policy": "task_local_required",
+  "completion_contract": {
+    "clean_worktree": true,
+    "result_sha_required": true,
+    "verification": "모든 수락 기준 충족 시 verified. macOS 증거나 필수 검사가 없으면 완료로 선언하지 않으며 provisional candidate는 합격을 대신하지 않는다."
+  },
+  "repository_id": "github.com/SeoJaeWan/codocs",
+  "git_common_dir": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs/.git",
+  "repository_root": "C:/Users/sjw73/OneDrive/Desktop/dev/codocs",
+  "intent_revision": "wb-cod27-46568c9-3d4676/intent/1",
+  "requirements": [
+    "REQ-1: 같은 프로젝트에 빌드 MCP 두 개와 실제 설치 VSIX IDE를 연결해 독립 색인 전파를 확인한다.",
+    "REQ-2: 동일 ID·다른 본문의 프로젝트에서 변경 후에도 본문·참조·진단·파일이 격리된다.",
+    "REQ-3: 실제 다중 작성자의 revision 충돌 차단·create 비덮어쓰기와 허용된 저장 경쟁을 구분한다.",
+    "REQ-4: 한 MCP 정상/비정상 종료 후 다른 MCP와 IDE가 후속 변경을 관찰한다.",
+    "NFR-1: 실제 IO/프로세스/IDE를 사용하고 준비·요청·파일 해시·종료 증거를 남긴다.",
+    "NFR-2: 같은 최종 후보의 Windows/macOS 결과를 구분하며 미실행은 통과가 아니다."
+  ],
+  "acceptance_conditions": [
+    "AC-1: 각 관찰자의 기준 본문/준비를 확인한 뒤 MCP 저장, 외부 편집, 이동, 삭제 후 재생성을 독립 사례로 실행한다. B get과 IDE provider가 새 본문·경로·참조를 반환하고 MCP revision은 파일 SHA-256과 일치한다. 삭제 상태를 확인한 뒤 재생성한다.",
+    "AC-2: root/nested의 동일 ID·다른 본문을 확인하고 root만 변경한 뒤 nested 본문·참조·진단·바이트 보존을 검사한다. MCP별 project와 실제 IDE workspace를 기록한다.",
+    "AC-3: 다른 작성자의 저장 후 stale revision은 도달 단계에 맞는 change_revision_mismatch/revision_conflict로 거부되고 원본이 보존된다. 양 작성자가 최종 검사 뒤 link에 도달한 same-path create는 뒤 요청이 file_exists로 실패하며 첫 파일이 보존된다.",
+    "AC-4: 양 update가 실제 rename 직전에 도달한 뒤 A 저장/응답→B 저장 순서로 해제한다. 각 저장 revision, 중간/최종 바이트, 이후 양 조회를 기록한다. distinct-path 동일 ID create의 두 파일과 충돌 조회도 기록한다. 이 허용된 경쟁에 덮어쓰기 방지 기준을 추가하지 않는다.",
+    "AC-5: A의 EOF 및 실제 exit code 0으로 정상 종료를 확인하고, 별도 사례에서는 기록된 A만 강제 종료한다. 이후 B 저장/조회와 IDE 새 내용 관찰이 지속된다. SDK close의 강제 종료를 자연 종료로 보고하지 않는다.",
+    "AC-6: 소스/MCP 산출물/VSIX 식별자, OS·Node·클라이언트, 프로세스/프로젝트 대응, 준비·요청·응답·해시·종료·정리 오류와 명령을 기록한다. 같은 최종 후보의 양 OS 필수 결과 및 소유 프로세스 잔류 0을 확인해야 verified 완료다."
+  ],
+  "invariants": [
+    "INV-1: 기존 기능·stdio·배포 검사를 재사용한다. 같은 공개 전파 시나리오를 MCP-only와 IDE suite에 중복 작성하지 않는다.",
+    "INV-2: 정상 전파에 refresh/restart를 사용하지 않는다. SDK connect/stderr ready 대신 실제 get/list/Hover 기준 본문을 준비 장벽으로 쓴다.",
+    "INV-3: 경쟁은 실제 경계 도달/해제 신호로 제어한다. 고정 sleep으로 순서를 추측하지 않으며 polling 종료 제한은 성능 기준이 아니다.",
+    "INV-4: saved/revision/indexUpdated를 구분하고 이미 저장한 create를 재시도하거나 자동 rollback하지 않는다.",
+    "INV-5: 잠금·FIFO·5초 대기 취소·조건부 원자적 update·프로젝트 전체 ID 원자성은 범위 밖이다. 성능 측정도 제외한다.",
+    "INV-6: 전체 탐색 실패와 감시 실패의 제한적 이전 색인 조회를 구분한다. 늦은 읽기의 최신 결과 덮어쓰기와 종료 후 게시를 허용하지 않는다.",
+    "INV-7: 소유 자원만 정리하고 자연 종료와 강제 정리를 구분한다. test-support는 배포 산출물에서 제외한다."
+  ],
+  "decisions": [
+    "DEC-1 accepted: 기존 extension.test.cjs와 VS Code build/install/runTests/감독/결과 기록을 확장한다. 새 독립 IDE runner는 만들지 않는다.",
+    "DEC-2 accepted: 저장 경쟁은 기존 createWorkspaceQuerySession의 storage 옵션과 createCodocsServer로 만든 계측 child에서 실제 FS wrapper를 제어한다. 제품 CLI 검증과 계측 child 증거를 구분한다.",
+    "DEC-3 accepted: 같은 프로젝트는 MCP2+IDE1, 프로젝트 격리는 기존 multi-root의 독립 언어 서버로 검사한다. 독립 IDE 두 창이나 UI 성능을 주장하지 않는다."
+  ],
+  "source_contract_ids": [
+    "REQ-1",
+    "REQ-2",
+    "REQ-3",
+    "REQ-4",
+    "NFR-1",
+    "NFR-2",
+    "AC-1",
+    "AC-2",
+    "AC-3",
+    "AC-4",
+    "AC-5",
+    "AC-6",
+    "INV-1",
+    "INV-2",
+    "INV-3",
+    "INV-4",
+    "INV-5",
+    "INV-6",
+    "INV-7",
+    "DEC-1",
+    "DEC-2",
+    "DEC-3"
+  ],
+  "source_plan_ref": {
+    "type": "artifact",
+    "project_id": "seojaewan/codosc",
+    "work_item_key": "COD-27",
+    "folder": "plan",
+    "artifact_id": "01a0e097-351b-7c31-9988-dca3f4dde18b"
+  },
+  "source_plan_digest": "af7c163c6be6b15861343047929a9947aceb08a21a1edbb4f8e99df7c79547e1",
+  "execution_binding_digest": "9c471be1b5f315f524d6172ea5db21d9ff5d211f14653262e14fd1dd85c8f2f2",
+  "resume_state": null,
+  "environment": {
+    "package_manager": "pnpm@10.34.5",
+    "frozen_install_command": "pnpm install --frozen-lockfile",
+    "ignored_file_requirements": [
+      "각 task checkout에서 node_modules와 dist를 새로 준비한다. 기존 checkout의 무시 파일을 복사하거나 최신 산출물로 간주하지 않는다."
+    ],
+    "symlink_requirements": [],
+    "services": [],
+    "shared_caches": [
+      "pnpm store는 도구가 조정한다. VS Code 캐시·프로필·extensions·시험 파일·출력은 task-local .workbench 및 실행별 임시 경로로 격리한다."
+    ],
+    "preflight": [
+      "현재 호스트의 gpt-6-sol/high는 제공됨. 실제 실행 시 모델·런타임·base 존재를 재확인한다.",
+      "계획은 실행/커밋 권한을 새로 부여하지 않는다. execute 승인에 task-local commit 권한이 포함되어야 한다.",
+      "계획한 worktree는 아직 없다. 생성 시 관리형 worktree 도구를 우선하고 실제 경로가 배정 경로와 다르면 실행 전 패킷을 다시 바인딩한다.",
+      "macOS 검증 장소는 미확보다. Windows 구현은 가능하나 완료 검증은 같은 후보의 macOS 실행 증거가 올 때까지 미완료다. 이 계획은 push/CI trigger를 허가하지 않는다."
+    ]
+  },
+  "delivery_policy": {
+    "merge_local": false,
+    "push": false,
+    "pull_request": false,
+    "handoff": "manual"
+  },
+  "execution_authority": "User 2026-09-27 explicitly requested execute-task after saving this plan: implement, verify, and one normal-hook task-local commit authorized by invoked skill. Do not push, merge, publish, or edit coordinator checkout.",
+  "normalization_record": [
+    "Inherited repository identity/common-dir/environment/delivery from plan.",
+    "Mapped *_contract into requirements/acceptance_conditions/invariants/decisions, preserved all source fields and IDs.",
+    "Derived initial intent_revision from run_id. Source plan and source packet unchanged.",
+    "Managed worktree creation is preferred. Worker must stop before file edits and report actual managed path for mechanical binding revision if assigned path differs. No production policy change.",
+    "User invocation supplies execute and task-local commit authority; no second approval required."
+  ]
+}

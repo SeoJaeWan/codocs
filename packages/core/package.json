@@ -1,6 +1,6 @@
 {
   "name": "@codocs/core",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "exports": {
@@ -23,5 +23,10 @@
     "pluralize": "8.0.0",
     "yaml": "2.9.1",
     "zod": "4.6.5"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SeoJaeWan/codocs.git"
   }
 }

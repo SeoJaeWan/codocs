@@ -20,6 +20,10 @@ import {
   codocsJsonInputSchema,
   type CodocsToolName,
 } from '../tool-input/index.js';
+import {
+  createCodocsGuideHandler,
+  type CodocsGuideResponse,
+} from '../guide/index.js';
 
 /** 요청 처리 결과의 공통 성공·실패 형태다. */
 export interface CodocsToolResult {
@@ -35,8 +39,16 @@ export function wrapCodocsResult(result: CodocsToolResult): CallToolResult {
   };
 }
 
-/** 한 세션을 공유하는 SDK 서버와 실행 handler를 연결한다. 세션 종료는 호출자가 소유한다. */
-export function createCodocsServer(session: WorkspaceQuerySession): Server {
+/** 한 세션을 공유하는 SDK 서버와 실행 handler를 연결한다. 세션 종료는 호출자가 소유한다.
+ * @param session 조회와 변경이 공유할 프로젝트 세션이다.
+ * @param guide 가이드 원문 경계다. 생략하면 배포된 자산을 읽는다.
+ */
+export function createCodocsServer(
+  session: WorkspaceQuerySession,
+  guide: (
+    input?: unknown,
+  ) => Promise<CodocsGuideResponse> = createCodocsGuideHandler(),
+): Server {
   const handlers: CodocsQueryHandlers = createCodocsQueryHandlers(session);
   const executionRegistry = new Map<
     CodocsToolName,
@@ -75,9 +87,25 @@ export function createCodocsServer(session: WorkspaceQuerySession): Server {
         execute: handlers.codocsValidate.bind(handlers),
       },
     ],
+    [
+      'codocs_write',
+      {
+        description:
+          '문서 하나를 생성하거나 수정하고 저장 결과와 색인 게시 상태를 반환합니다.',
+        execute: handlers.codocsWrite.bind(handlers),
+      },
+    ],
+    [
+      'codocs_guide',
+      {
+        description:
+          '색인 준비 상태와 무관하게 문서 작성·수정·검증 가이드를 제공합니다.',
+        execute: guide,
+      },
+    ],
   ]);
   const server = new Server(
-    { name: 'codocs', version: '0.0.0' },
+    { name: 'co-documentation', version: '0.0.1' },
     { capabilities: { tools: {} } },
   );
   server.setRequestHandler(

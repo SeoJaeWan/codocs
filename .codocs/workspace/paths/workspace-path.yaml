@@ -23,3 +23,4 @@ definition: |
 
   대표 함수 resolveWorkspacePath와 경로 확인 결과는 [담당 구현](../../../packages/workspace/src/paths/index.ts)에서 확인한다.
   관련 계약의 사례는 [인접 테스트](../../../packages/workspace/src/paths/paths.test.ts)에서 확인한다.
+  저장 후보의 누락된 부모를 한 단계씩 생성하고 매 단계 연결·종류를 확인하는 ensureWorkspaceParent도 같은 구현에서 제공한다. update에서는 부모를 생성하지 않는다.
