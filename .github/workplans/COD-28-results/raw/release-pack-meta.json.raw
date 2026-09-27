@@ -1,0 +1,5 @@
+{
+  "seconds": 7.602729,
+  "command": "pnpm release:pack",
+  "exit": 0
+}

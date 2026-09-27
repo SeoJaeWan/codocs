@@ -1,0 +1,5 @@
+{
+  "command": "lifecycle.mjs --vscode-version 1.139.1 --vsix candidate-H9xFk8/codocs-0.0.1.vsix",
+  "seconds": 44.847274,
+  "exit": 0
+}

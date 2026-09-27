@@ -1,0 +1,5 @@
+{
+  "seconds": 117.3476651,
+  "exit": 0,
+  "command": "run.mjs --vscode-version 1.100.0 --vsix candidate-H9xFk8/codocs-0.0.1.vsix --mcp-tgz candidate-H9xFk8/co-documentation-0.0.1.tgz"
+}

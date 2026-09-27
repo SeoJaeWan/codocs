@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { once } from 'node:events';
+import { watch } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import denial from './read-denial.cjs';
 
-test('현재 OS에서 실제 읽기를 거부하고 해제 뒤 원문을 읽는다', /** Windows 잠금 또는 Mac 권한 제한의 실제 읽기 실패와 복원을 확인한다. */ async () => {
+test('현재 OS에서 읽기만 거부하고 파일 감시와 해제 뒤 원문을 보존한다', /** Windows 데이터 잠금 또는 Mac 권한 제한이 감시 등록을 방해하지 않는지 확인한다. */ async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'codocs-denial-'));
   const target = path.join(root, 'document.yaml');
   await writeFile(target, 'original');
   let release;
+  let watcher;
   try {
     release = await denial.denyRead(target, path.join(root, 'lock'));
     await assert.rejects(
@@ -17,9 +20,16 @@ test('현재 OS에서 실제 읽기를 거부하고 해제 뒤 원문을 읽는�
       /** 실제 OS의 읽기 거부를 확인한다. */ (error) =>
         ['EACCES', 'EPERM', 'EBUSY'].includes(error.code),
     );
+    watcher = watch(target);
+    const changed = once(watcher, 'change', {
+      signal: AbortSignal.timeout(5000),
+    });
     await release();
     assert.equal(await readFile(target, 'utf8'), 'original');
+    await writeFile(target, 'updated');
+    await changed;
   } finally {
+    watcher?.close();
     await release?.();
     await rm(root, { recursive: true, force: true });
   }
