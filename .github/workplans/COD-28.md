@@ -96,3 +96,9 @@ h2. 구현 중 확인할 사항
 ## Jira
 
 - https://seojaewan.atlassian.net/browse/COD-28
+
+## 최초 게시 전 파일 감시 fixture 보완
+
+공개 README를 정리한 [CI 실행](https://github.com/SeoJaeWan/codocs/actions/runs/36359613943)에서 macOS의 `read-denial.test.mjs`가 대상 파일보다 먼저 도착한 `documents` 디렉터리 이벤트를 받고 실패했다. 직전 README 후보에서도 같은 실패를 확인했다. 로컬 단독 재현에서는 새 임시 디렉터리의 감시 준비 전에 수정한 파일의 이벤트를 놓쳐 제한 시간에 도달했다.
+
+제품 코드는 변경하지 않는다. 읽기 거부 중 native 부모 감시를 등록한 뒤 준비용 파일의 실제 이벤트를 기다리고, 원래 권한과 내용을 복원한 다음 대상 파일 수정 이벤트와 수정 내용을 확인한다. 부모·형제 파일 이벤트는 성공으로 인정하지 않고 기다리며, 기존 5초 제한과 감시·권한·임시 파일 정리는 유지한다. macOS에서 전체 read-denial 검사 묶음을 새 프로세스로 20회 반복해 매회 4개 통과·Windows 전용 1개 스킵을 확인했다. 최종 공개 조건은 보완 커밋과 main 병합 후 동일 산출물의 Windows·macOS CI 통과다.

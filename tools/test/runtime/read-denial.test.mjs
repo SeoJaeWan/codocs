@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { once } from 'node:events';
+import { on } from 'node:events';
 import { watch } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import denial from './read-denial.cjs';
+
+/** 부모·형제 이벤트를 건너뛰고 실제 대상 파일의 감시 이벤트를 기다린다. */
+async function observeFile(watcher, filename) {
+  for await (const [, changed] of on(watcher, 'change', {
+    signal: AbortSignal.timeout(5000),
+  })) {
+    if (changed?.toString() === filename) return;
+  }
+}
 
 test('현재 OS에서 읽기만 거부하고 파일 감시와 해제 뒤 원문을 보존한다', /** Windows 데이터 잠금 또는 Mac 권한 제한이 감시 등록을 방해하지 않는지 확인한다. */ async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'codocs-denial-'));
@@ -24,14 +33,17 @@ test('현재 OS에서 읽기만 거부하고 파일 감시와 해제 뒤 원문�
     );
     // 제품처럼 부모 디렉터리를 감시한다. macOS는 읽기 거부 파일 직접 감시도 거부한다.
     watcher = watch(documents);
+    // 새 디렉터리의 초기 이벤트와 감시 준비를 실제 파일 생성으로 확인한다.
+    await Promise.all([
+      observeFile(watcher, 'watch-ready'),
+      writeFile(path.join(documents, 'watch-ready'), 'ready'),
+    ]);
     await release();
     assert.equal(await readFile(target, 'utf8'), 'original');
-    const changed = once(watcher, 'change', {
-      signal: AbortSignal.timeout(5000),
-    });
-    await writeFile(target, 'updated');
-    const [, filename] = await changed;
-    assert.equal(filename, path.basename(target));
+    await Promise.all([
+      observeFile(watcher, path.basename(target)),
+      writeFile(target, 'updated'),
+    ]);
     assert.equal(await readFile(target, 'utf8'), 'updated');
   } finally {
     watcher?.close();
