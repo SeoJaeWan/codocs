@@ -4,7 +4,11 @@ import { fixtureFiles } from './fixtures.mjs';
 
 const files = fixtureFiles();
 const unreadable = 'partial/.codocs/unreadable.yaml';
-const temporaryFiles = ['.codocs/moved.yaml', '.codocs/closed-a.yaml'];
+const temporaryFiles = [
+  '.codocs/moved.yaml',
+  '.codocs/closed-a.yaml',
+  '.codocs/mcp-moved.yaml',
+];
 
 /** 한 번의 기능 검사 실행에 사용할 기준 작업 공간을 만든다. */
 export async function createWorkspaceFixture(root) {

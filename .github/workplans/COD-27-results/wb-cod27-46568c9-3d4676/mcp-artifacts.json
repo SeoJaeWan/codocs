@@ -1,0 +1,154 @@
+[
+  {
+    "path": "packages/mcp/dist/cli.d.ts",
+    "sha256": "6f77e82bfb5dd3b1015dd92c63e427d505f9bbbdaa041cad6c704f41c553a536"
+  },
+  {
+    "path": "packages/mcp/dist/cli.d.ts.map",
+    "sha256": "07e1bab322fbea936a00ec149ad924a0d46aa4c8de79147e59c11d25bd0ca9e6"
+  },
+  {
+    "path": "packages/mcp/dist/cli.js",
+    "sha256": "720244a970d03b1d9c60f679bc76ec8365d6bf95984cc0d442ef2a4ba02644a6"
+  },
+  {
+    "path": "packages/mcp/dist/cli.js.map",
+    "sha256": "82ec649af5ea1876ecf690290b588121577452ee065f1b2446e41296c531783d"
+  },
+  {
+    "path": "packages/mcp/dist/docs/guide/examples.md",
+    "sha256": "ad9382466d30376e9b7392e8cc6f02e3537075aba91920783f79d28484d7f9de"
+  },
+  {
+    "path": "packages/mcp/dist/docs/guide/README.md",
+    "sha256": "c3dd98bdfc617f7762cb4bac472da651561dc46528d2e3b4c5cec62f7649f696"
+  },
+  {
+    "path": "packages/mcp/dist/docs/guide/schema.md",
+    "sha256": "fc44981f77fe6e0f529cfed97f22174b1d92062b33c3e2fc8312cd2dfc2be4e5"
+  },
+  {
+    "path": "packages/mcp/dist/docs/guide/updating.md",
+    "sha256": "3e32f05819b2f167004c8453ec30d2b6bcdfaccf895c9af481ec078752d8cbcb"
+  },
+  {
+    "path": "packages/mcp/dist/docs/guide/validation.md",
+    "sha256": "310b7d5bfb199522ace5ecedb2a1a5a11d77204e9718b5a5246e4aac425096d9"
+  },
+  {
+    "path": "packages/mcp/dist/docs/guide/writing.md",
+    "sha256": "883004aec73e4268484176da3c0ba188a88048227264e58118884c466e6bc497"
+  },
+  {
+    "path": "packages/mcp/dist/examples/.codocs/fulfillment.yaml",
+    "sha256": "bdec4a05a927cb24f4d187bc625185a5490b042d57098ef954937ad0ee18c37d"
+  },
+  {
+    "path": "packages/mcp/dist/examples/.codocs/order.yaml",
+    "sha256": "974896a933f57a2447286ec8030ffc78334c2eb56daec519e0919f088da406ca"
+  },
+  {
+    "path": "packages/mcp/dist/examples/.codocs/receipt.yaml",
+    "sha256": "71de6b82b412b93165070bbf9fd17d32340705e34671dfd6651b2fe953aa2fb2"
+  },
+  {
+    "path": "packages/mcp/dist/examples/.codocs/shipping-policy.yaml",
+    "sha256": "b904927ab7d4c6af11157103ad520439fba0f16a68439deb5e944e475314a8cb"
+  },
+  {
+    "path": "packages/mcp/dist/guide/domain-values.d.ts",
+    "sha256": "a3f5d76ffd5561fbc0bc5215202bf47bb82bb4f1da715f8d3b8aede52a51dfb7"
+  },
+  {
+    "path": "packages/mcp/dist/guide/domain-values.d.ts.map",
+    "sha256": "e0677f11d75a550fde87af5f5d2e30db88651cb21e8749435c2d81fe97a4cee3"
+  },
+  {
+    "path": "packages/mcp/dist/guide/domain-values.js",
+    "sha256": "bf47ed3b680d94bad11d9c9368f1f79c82429887e3d30ffaee76063ad6203d03"
+  },
+  {
+    "path": "packages/mcp/dist/guide/domain-values.js.map",
+    "sha256": "42554d342a5f88c393a3cebe83cc0d281da56feb9e7cd0d38b4964d2d9ecd6e4"
+  },
+  {
+    "path": "packages/mcp/dist/guide/index.d.ts",
+    "sha256": "9574c3a92a1d27305c336908c08d050de41eea82e3a8d5c3dfc846d81a73a9cf"
+  },
+  {
+    "path": "packages/mcp/dist/guide/index.d.ts.map",
+    "sha256": "13d5730b4bc2a25ae7d794babb1fb5e5e10e2092fe941fa03b70e2f3268c9437"
+  },
+  {
+    "path": "packages/mcp/dist/guide/index.js",
+    "sha256": "f81415f20f3c2025f0672d7c4903dc21c3cbfbbdbe287829cbbaf0c02c3052f3"
+  },
+  {
+    "path": "packages/mcp/dist/guide/index.js.map",
+    "sha256": "3d60df2fa7c815f62d0fe15be89c4b018a762f6044cb1ee07cb0c27a136bc0fc"
+  },
+  {
+    "path": "packages/mcp/dist/index.d.ts",
+    "sha256": "14e16c8a2d835eddd215d99b5d8e24fa8fc7e0d1ca2f778df02282f58f4c2c2a"
+  },
+  {
+    "path": "packages/mcp/dist/index.d.ts.map",
+    "sha256": "b7120fa05bb2638828df5d7e80a6614e75c6082c1695ec4a648d8ad5528f8922"
+  },
+  {
+    "path": "packages/mcp/dist/index.js",
+    "sha256": "9d348494dc6d15492d93de8032327d826fcbf0f3f9da5f344c1eb40e71120068"
+  },
+  {
+    "path": "packages/mcp/dist/index.js.map",
+    "sha256": "dc957c62092ad1a0f5676a4860846e95e42f44cb4f45d09d4c70e4fef0e26afa"
+  },
+  {
+    "path": "packages/mcp/dist/query/index.d.ts",
+    "sha256": "de199ca7a540e5c4c6688f77118f575e79ff56def093c64493f8cb18f4c6155c"
+  },
+  {
+    "path": "packages/mcp/dist/query/index.d.ts.map",
+    "sha256": "0ea4c936ffd6892db14734e80a91702c824283fe12284b3275e26dc79895440c"
+  },
+  {
+    "path": "packages/mcp/dist/query/index.js",
+    "sha256": "501f202c741471f74fbc29e74da76b9a966dae8f1da904fe5307702d3546c327"
+  },
+  {
+    "path": "packages/mcp/dist/query/index.js.map",
+    "sha256": "fa4d228bca439c228c4fd78facb7326ade193606ca49d8b2d0fc4190afa5d9da"
+  },
+  {
+    "path": "packages/mcp/dist/server/index.d.ts",
+    "sha256": "3d54e34a857ee3fc1e169d5c14a66f03a23a5fd95aaaf45885fb250378996ded"
+  },
+  {
+    "path": "packages/mcp/dist/server/index.d.ts.map",
+    "sha256": "acb016029e8254d5c64c3240888581f91f0e9ad99617ece9b3767d89675af890"
+  },
+  {
+    "path": "packages/mcp/dist/server/index.js",
+    "sha256": "271afb84256bfe954d743d6c08ae4bebd95b5a88d55b73ee1aa4a2077df50a75"
+  },
+  {
+    "path": "packages/mcp/dist/server/index.js.map",
+    "sha256": "5164c261883ce07e3172c90fcfbbf2d81fc14ac375d0f86826dcf135492ac4d4"
+  },
+  {
+    "path": "packages/mcp/dist/tool-input/index.d.ts",
+    "sha256": "c5503cc5c109643a801f7d79140e9fabf68abeabe8711915c12d8c1a6fb1e040"
+  },
+  {
+    "path": "packages/mcp/dist/tool-input/index.d.ts.map",
+    "sha256": "8de7949163fe34aeb0104f79d4dca5fe42e0835cb5424cb925657665a37d9813"
+  },
+  {
+    "path": "packages/mcp/dist/tool-input/index.js",
+    "sha256": "490396e3a201e102ddb89ab4531cff34d561bb9b9bebb037a7d7c405ec660163"
+  },
+  {
+    "path": "packages/mcp/dist/tool-input/index.js.map",
+    "sha256": "efb4fe8d77556dc6c4017eb4c6cb5fd6fe1651630dfdf403682ddf250fd1ce88"
+  }
+]

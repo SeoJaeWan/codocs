@@ -21,6 +21,10 @@ exports.run =
       platform: process.platform,
       apiObservation: true,
       renderedUi: false,
+      mcpNodeExecutable: config.nodeExecutable,
+      mcpEntry: config.mcpEntry,
+      mcpSha256: config.mcpSha256,
+      sourceHash: config.sourceHash,
     };
     const extension = vscode.extensions.getExtension('codocs.codocs');
     c.assert.ok(extension, '설치한 VSIX 확장 등록');
@@ -47,6 +51,7 @@ exports.run =
     }
     for (const scenario of scenarios) {
       const started = Date.now();
+      c.observations.length = 0;
       try {
         await vscode.commands.executeCommand('codocs.restartLanguageServers');
         const ready = await c.open('source.java');
@@ -68,10 +73,13 @@ exports.run =
         });
       }
       try {
+        await c.closeMcp();
+        results.at(-1).observations = [...c.observations];
         await resetWorkspace();
         results.at(-1).milliseconds = Date.now() - started;
       } catch (error) {
         const result = results.at(-1);
+        result.observations = [...c.observations];
         result.passed = false;
         result.milliseconds = Date.now() - started;
         result.error = [

@@ -1,0 +1,31 @@
+⋯ Backing up original state…
+✔ Done backing up original state (7c58710)!
+⋯ Running tasks for staged files…
+    *.{js,mjs,cjs,jsx,ts,mts,cts,tsx} — 11 files
+      ⋯ eslint --fix --max-warnings=0
+      ⋯ prettier --write
+    *.{json,jsonc,md,mdx,yaml,yml,css,scss,html,svg} — 15 files
+      ⋯ prettier --write
+
+✔ prettier --write
+✖ eslint --fix --max-warnings=0
+↓ prettier --write
+
+✖ Failed to run tasks for staged files!
+↓ Skipped staging changes from tasks…
+⋯ Reverting to original state because of errors…
+✔ Done reverting to original state!
+⋯ Cleaning up temporary files…
+✔ Done cleaning up temporary files!
+
+✖ eslint --fix --max-warnings=0:
+
+C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod27-46568c9-3d4676-task-001\packages\vscode\src\integration\extension.test.cjs
+  1101:28  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+
+✖ 1 problem (1 error, 0 warnings)
+Error: lint-staged 실패: 커밋을 중단합니다.
+    at checkStaged (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod27-46568c9-3d4676-task-001/tools/git/staged.mjs:64:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod27-46568c9-3d4676-task-001/tools/git/pre-commit.mjs:22:3
+husky - pre-commit script failed (code 1)

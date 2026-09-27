@@ -1,0 +1,216 @@
+{
+  "title": "수정 후보 계산 뒤 다른 작성자가 저장하면 디스크 직전 revision 검사에서 거부하고 파일을 보존한다",
+  "evidence": [
+    {
+      "kind": "environment",
+      "platform": "win32",
+      "node": "v24.21.0",
+      "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-uoS0JD",
+      "bundleSha256": "7901e428cd3659b19e2aacda6b9566a43219d2f67ec366882841c7d8aa1c3977"
+    },
+    {
+      "kind": "process",
+      "actor": "A",
+      "pid": 23420,
+      "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-uoS0JD",
+      "stage": ""
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["a"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "a",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\a.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "a",
+              "name": "A",
+              "definition": "original",
+              "domains": ["test"]
+            },
+            "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "process",
+      "actor": "B",
+      "pid": 25292,
+      "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-uoS0JD",
+      "stage": "beforeApply"
+    },
+    {
+      "kind": "request",
+      "client": 1,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["a"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "a",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\a.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "a",
+              "name": "A",
+              "definition": "original",
+              "domains": ["test"]
+            },
+            "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "file",
+      "relative": ".codocs/a.yaml",
+      "bytes": "id: a\nname: A\ndefinition: original\ndomains: [test]\n",
+      "sha256": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4"
+    },
+    {
+      "kind": "request",
+      "client": 1,
+      "name": "codocs_write",
+      "args": {
+        "mode": "update",
+        "id": "a",
+        "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+        "set": {
+          "definition": "stale B"
+        }
+      }
+    },
+    {
+      "kind": "arrival",
+      "actor": "B",
+      "boundary": "beforeApply",
+      "value": {
+        "actor": "B",
+        "boundary": "beforeApply",
+        "pid": 25292,
+        "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-uoS0JD"
+      }
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_write",
+      "args": {
+        "mode": "update",
+        "id": "a",
+        "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+        "set": {
+          "definition": "writer A"
+        }
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "saved": true,
+        "changed": true,
+        "id": "a",
+        "source": {
+          "path": ".codocs\\a.yaml"
+        },
+        "revision": "3d4bb454a89201f3f871728f78d30f8f83c4a9eb9450000c1de1bee2a45baa42",
+        "warnings": [],
+        "diagnostics": [],
+        "indexUpdated": true
+      }
+    },
+    {
+      "kind": "file",
+      "relative": ".codocs/a.yaml",
+      "bytes": "id: a\nname: A\ndefinition: writer A\ndomains: [test]\n",
+      "sha256": "3d4bb454a89201f3f871728f78d30f8f83c4a9eb9450000c1de1bee2a45baa42"
+    },
+    {
+      "kind": "release",
+      "actor": "B"
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": false,
+        "saved": false,
+        "changed": false,
+        "error": {
+          "code": "revision_conflict",
+          "severity": "error",
+          "message": "저장 전 원문이 변경되었습니다.",
+          "path": ".codocs\\a.yaml",
+          "suggestion": "최신 문서를 다시 읽고 변경을 검토하세요."
+        },
+        "diagnostics": [
+          {
+            "code": "revision_conflict",
+            "severity": "error",
+            "message": "저장 전 원문이 변경되었습니다.",
+            "path": ".codocs\\a.yaml",
+            "suggestion": "최신 문서를 다시 읽고 변경을 검토하세요."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "file",
+      "relative": ".codocs/a.yaml",
+      "bytes": "id: a\nname: A\ndefinition: writer A\ndomains: [test]\n",
+      "sha256": "3d4bb454a89201f3f871728f78d30f8f83c4a9eb9450000c1de1bee2a45baa42"
+    },
+    {
+      "kind": "cleanup",
+      "cleanup": [
+        {
+          "status": "fulfilled",
+          "value": {
+            "pid": 23420,
+            "residual": false
+          }
+        },
+        {
+          "status": "fulfilled",
+          "value": {
+            "pid": 25292,
+            "residual": false
+          }
+        }
+      ]
+    }
+  ]
+}
