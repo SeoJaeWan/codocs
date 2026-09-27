@@ -13,6 +13,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { releaseMetadata } from './release-metadata.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const require = createRequire(path.join(root, 'packages/mcp/package.json'));
@@ -282,17 +283,7 @@ export async function verifyRelease(tgz, vsix) {
                 : file,
           ),
         ),
-        file.endsWith('.md')
-          ? Buffer.from(
-              (await readFile(path.join(root, file), 'utf8')).replace(
-                /\]\((?!https?:)([^)]+)\)/gu,
-                (_, link) =>
-                  '](https://github.com/SeoJaeWan/codocs/blob/main/' +
-                  link +
-                  ')',
-              ),
-            )
-          : await readFile(path.join(root, file)),
+        await releaseMetadata(root, file, true),
       );
     for (const file of [
       'dist/index.cjs',
@@ -305,14 +296,7 @@ export async function verifyRelease(tgz, vsix) {
     for (const file of ['README.md', 'README.ko.md', 'LICENSE', 'logo.png'])
       assert.deepEqual(
         await readFile(path.join(evidence.mcp.directory, file)),
-        file.endsWith('.md')
-          ? Buffer.from(
-              (await readFile(path.join(root, file), 'utf8')).replace(
-                /\]\((docs\/guide\/|examples\/)/gu,
-                '](dist/$1',
-              ),
-            )
-          : await readFile(path.join(root, file)),
+        await releaseMetadata(root, file),
       );
     evidence.passed = true;
   } catch (error) {

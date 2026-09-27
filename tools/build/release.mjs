@@ -7,28 +7,17 @@ import { build } from 'esbuild';
 import { createVSIX } from '@vscode/vsce';
 import { resolvePnpm, assertNodeVersion } from '../toolchain.mjs';
 import { bundledNotices } from './notices.mjs';
+import { releaseMetadata } from './release-metadata.mjs';
 
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 
 /** 공개 설명과 라이선스 및 원본 로고를 staging에 공급한다. */
 export async function copyReleaseMetadata(root, staging, webLinks = false) {
   for (const file of ['README.md', 'README.ko.md', 'LICENSE', 'logo.png']) {
-    if (file.endsWith('.md')) {
-      const text = (await readFile(path.join(root, file), 'utf8')).replace(
-        /\]\((docs\/guide\/|examples\/)/gu,
-        '](dist/$1',
-      );
-      const deployed = webLinks
-        ? text.replace(
-            /\]\((?!https?:)([^)]+)\)/gu,
-            (_, link) =>
-              '](https://github.com/SeoJaeWan/codocs/blob/main/' +
-              link.replace(/^dist\//u, '') +
-              ')',
-          )
-        : text;
-      await writeFile(path.join(staging, file), deployed);
-    } else await cp(path.join(root, file), path.join(staging, file));
+    await writeFile(
+      path.join(staging, file),
+      await releaseMetadata(root, file, webLinks),
+    );
   }
 }
 
@@ -65,7 +54,12 @@ export async function packageVSIX(root, archive) {
     path.join(staging, 'dist'),
   );
   await copyReleaseMetadata(root, staging, true);
-  await createVSIX({ cwd: staging, packagePath: archive, dependencies: false });
+  await createVSIX({
+    cwd: staging,
+    packagePath: archive,
+    dependencies: false,
+    rewriteRelativeLinks: false,
+  });
   return staging;
 }
 

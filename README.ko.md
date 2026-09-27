@@ -78,7 +78,7 @@ VS Code 서버 시작 문제를 해결한 뒤 **Codocs: Restart Language Servers
 
 ## 지원 범위와 제한
 
-로컬 디스크의 Windows·macOS를 배포 대상으로 한다. 검증 결과는 실제 OS·CPU·Node·VS Code 조합에 한정된다. 이 후보는 **최종 두 OS 및 최신 stable 검증 완료를 주장하지 않는다.** Linux·WSL·컨테이너·SSH/원격 workspace·네트워크 공유는 현재 지원 범위 밖이다.
+로컬 디스크의 Windows·macOS를 배포 대상으로 한다. 검증 결과는 실제 OS·CPU·Node·VS Code 조합에 한정된다. 후보 commit의 [PR #25 검사](https://github.com/SeoJaeWan/codocs/pull/25/checks)와 `release.json`·시험 artifact에서 정확한 소스·산출물 SHA-256·환경·최소/고정 최신 결과를 확인한다. 통과 결과는 해당 산출물 쌍에 한정되며 실패·스킵·미실행은 지원 검증 통과가 아니다. Linux·WSL·컨테이너·SSH/원격 workspace·네트워크 공유는 현재 지원 범위 밖이다.
 
 0.0.1은 초기 실험 버전이다. 자동완성·코드 자동 이름 변경·의미 검색·원격 MCP·프로세스 간 트랜잭션 저장을 보장하지 않는다. revision을 확인하지만 프로세스 간 잠금·트랜잭션은 없으므로 동시 편집을 조정하고 충돌 결과를 확인한다.
 

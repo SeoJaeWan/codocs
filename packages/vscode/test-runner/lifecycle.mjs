@@ -8,6 +8,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { runSupervised } from '../../../tools/test/runtime/process.mjs';
 import { prepareVSCodeApplication } from '../../../tools/test/runtime/vscode.mjs';
 import { vscodeVersion } from '../../../tools/test/runtime/vscode.mjs';
+import {
+  createLifecycleProfile,
+  assertMissingSuiteFailure,
+} from '../../../tools/test/runtime/lifecycle-evidence.mjs';
 
 /** 실제 VS Code 시작 실패·기능 실패·취소·시간 제한에서도 자식 정리를 확인한다. */
 async function main(args = process.argv.slice(2)) {
@@ -59,6 +63,8 @@ async function main(args = process.argv.slice(2)) {
       path.join(os.tmpdir(), 'codocs-lifecycle-'),
     );
     const controller = new AbortController();
+    const profile = await createLifecycleProfile();
+    const missingSuite = path.join(evidence, 'absent-suite.cjs');
     let interval;
     try {
       await mkdir(evidence, { recursive: true });
@@ -69,7 +75,6 @@ async function main(args = process.argv.slice(2)) {
       );
       await writeFile(path.join(temporary, 'probe.java'), 'ready();\n');
       const extensions = path.join(evidence, 'extensions');
-      const profile = path.join(evidence, 'profile');
       await mkdir(extensions);
       const environment = { ...process.env };
       delete environment.VSCODE_IPC_HOOK_CLI;
@@ -116,6 +121,8 @@ async function main(args = process.argv.slice(2)) {
           extension: harness,
           archive,
           archiveSha256,
+          profile,
+          missingSuite,
         }),
       );
       if (mode === 'cancelled')
@@ -142,7 +149,12 @@ async function main(args = process.argv.slice(2)) {
         ['timeout', 'cancelled'].includes(mode) ? mode : 'exit',
       );
       assert.notEqual(report.exitCode, 0);
-      if (mode !== 'startup-failure')
+      if (mode === 'startup-failure')
+        assertMissingSuiteFailure(
+          await readFile(path.join(evidence, 'process.log'), 'utf8'),
+          missingSuite,
+        );
+      else
         assert.equal(
           JSON.parse(await readFile(path.join(evidence, 'ready.json'), 'utf8'))
             .ready,
@@ -154,6 +166,8 @@ async function main(args = process.argv.slice(2)) {
         passed: true,
         reason: report.reason,
         residualProcesses: report.residualProcesses,
+        profile,
+        intendedCause: mode === 'startup-failure' ? 'missing-suite' : mode,
       });
     } catch (error) {
       results.push({ mode, passed: false, error: error.stack });
@@ -165,7 +179,7 @@ async function main(args = process.argv.slice(2)) {
         maxRetries: 5,
         retryDelay: 200,
       });
-      await rm(path.join(evidence, 'profile'), {
+      await rm(profile, {
         recursive: true,
         force: true,
         maxRetries: 5,

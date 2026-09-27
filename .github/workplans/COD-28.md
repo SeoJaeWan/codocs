@@ -24,6 +24,14 @@ DELIVERY-001은 두 부모 이력을 보존하여 후보를 병합하고 정상 
 
 성능의 알려진 한계도 유지한다. 현재 제한 표본 Hover API 중앙값 17.9초·p95 85.9초이며 정식 반복 전체와 macOS 성능 캠페인은 미측정이다. 성능 목표를 달성했다고 표시하거나 이 전달 작업을 최적화로 확대하지 않는다.
 
+## 실제 macOS CI 원인 수정
+
+REPAIR-001은 전달 후보 `8353fa7de2cc2e954a280ca15cb2568f4f98f251`에서 이어진다. binding은 `91cb5853ab488180d3afa5e3dd54ccfa2b8b0c08c12b5ee3ff411856a3c28c46`이며 원래 intent/2를 유지한다.
+
+[최초 실제 CI](https://github.com/SeoJaeWan/codocs/actions/runs/36322539867)는 Windows 검사를 통과했지만 macOS에서 읽기 거부 파일의 직접 watch EACCES, Windows CRLF README와 Mac LF 비교 불일치, 긴 lifecycle 프로필의 IPC 실패를 발견했다. Mac 기능은 양 버전 각각 58/58 통과했다. 최소 버전 lifecycle의 raw 4/4 중 startup은 ENOTSOCK 오인으로 유효 3/4, 최신의 raw 1/4도 startup EINVAL 오인으로 유효 0/4였다. 최초 결과를 통과로 다시 해석하지 않는다.
+
+수리는 부모 디렉터리 감시의 실제 read 거부·복원·변경 관측, 자체 설명/라이선스의 LF 패키징과 정확 바이트 검사, 짧은 고유 프로필 및 지정 suite 누락 원인 확인으로 한정한다. 제품 코드는 변경하지 않는다. LF/CRLF 실제 tgz·VSIX 회귀와 잘못된 시작 실패 거부 검사를 추가했다. 수정 후 실제 양 OS CI 결과는 PR #25의 해당 후보 Checks 및 SHA-256이 결합된 artifact로 추적한다. 이 커밋 이전의 로컬 결과나 최초 실패 로그를 새 후보 CI 통과로 간주하지 않는다.
+
 ## 최초 계획 기록
 
 아래 내용은 2026-09-13 최초 계획의 원문 기록이다. 현재 버전·지원 범위·검증 상태와 전달 권한은 위 intent/2 및 연결된 실행 결과가 우선한다.

@@ -2,14 +2,16 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { once } from 'node:events';
 import { watch } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import denial from './read-denial.cjs';
 
 test('현재 OS에서 읽기만 거부하고 파일 감시와 해제 뒤 원문을 보존한다', /** Windows 데이터 잠금 또는 Mac 권한 제한이 감시 등록을 방해하지 않는지 확인한다. */ async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'codocs-denial-'));
-  const target = path.join(root, 'document.yaml');
+  const documents = path.join(root, 'documents');
+  await mkdir(documents);
+  const target = path.join(documents, 'document.yaml');
   await writeFile(target, 'original');
   let release;
   let watcher;
@@ -20,14 +22,17 @@ test('현재 OS에서 읽기만 거부하고 파일 감시와 해제 뒤 원문�
       /** 실제 OS의 읽기 거부를 확인한다. */ (error) =>
         ['EACCES', 'EPERM', 'EBUSY'].includes(error.code),
     );
-    watcher = watch(target);
+    // 제품처럼 부모 디렉터리를 감시한다. macOS는 읽기 거부 파일 직접 감시도 거부한다.
+    watcher = watch(documents);
+    await release();
+    assert.equal(await readFile(target, 'utf8'), 'original');
     const changed = once(watcher, 'change', {
       signal: AbortSignal.timeout(5000),
     });
-    await release();
-    assert.equal(await readFile(target, 'utf8'), 'original');
     await writeFile(target, 'updated');
-    await changed;
+    const [, filename] = await changed;
+    assert.equal(filename, path.basename(target));
+    assert.equal(await readFile(target, 'utf8'), 'updated');
   } finally {
     watcher?.close();
     await release?.();

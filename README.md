@@ -78,7 +78,7 @@ After fixing a VS Code server startup problem, run **Codocs: Restart Language Se
 
 ## Support and limits
 
-Release targets are local disks on Windows and macOS. Results apply only to tested OS, CPU, Node, and VS Code versions. This candidate does **not** claim final two-OS or latest-stable verification. Linux, WSL, containers, SSH/remote workspaces, and network shares are outside the current support scope.
+Release targets are local disks on Windows and macOS. Results apply only to tested OS, CPU, Node, and VS Code versions. Check the candidate commit in [PR #25 Checks](https://github.com/SeoJaeWan/codocs/pull/25/checks) and its `release.json` / test artifacts for the exact source, artifact SHA-256, environment, and minimum/fixed-latest results. A passing run applies to that artifact pair; failed, skipped, or unrun checks are not verified support. Linux, WSL, containers, SSH/remote workspaces, and network shares are outside the current support scope.
 
 0.0.1 is experimental. Code completion, automatic source renaming, semantic search, remote MCP, and cross-process transactional writes are not promised. Writers check revisions but provide no cross-process lock or transaction; coordinate concurrent edits and inspect conflicts.
 
