@@ -1,5 +1,6 @@
 const { spawn } = require('node:child_process');
 const { createInterface } = require('node:readline');
+const path = require('node:path');
 
 /** 직접 소유한 stdio 자식의 요청·응답·EOF·실제 종료를 기록한다. */
 exports.startMcp =
@@ -10,11 +11,20 @@ exports.startMcp =
     args = [],
     record = /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ () => {},
   }) {
-    const child = spawn(node, [entry, ...args], {
-      cwd: project,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true,
-    });
+    const child = spawn(
+      node,
+      [
+        '--require',
+        path.join(__dirname, 'storage-io-observer.cjs'),
+        entry,
+        ...args,
+      ],
+      {
+        cwd: project,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      },
+    );
     const pending = new Map();
     let sequence = 0;
     let ended;

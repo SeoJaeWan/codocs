@@ -129,6 +129,44 @@ export class WorkspaceWatcher {
           onChange(event, changed);
       },
     );
+    if (options.usePolling)
+      watcher.on(
+        'raw',
+        /** 역순 mtime의 원자 교체도 poll 원시 관측으로 보완하며 읽기 atime은 무시한다. */ (
+          _event: string,
+          changed: string,
+          detail: unknown,
+        ) => {
+          if (
+            !prepared ||
+            !this.#active(epoch) ||
+            typeof detail !== 'object' ||
+            detail === null ||
+            !('curr' in detail) ||
+            !('prev' in detail)
+          )
+            return;
+          const { curr, prev } = detail;
+          if (
+            typeof curr !== 'object' ||
+            curr === null ||
+            typeof prev !== 'object' ||
+            prev === null
+          )
+            return;
+          const current = curr as Record<string, unknown>;
+          const previous = prev as Record<string, unknown>;
+          if (
+            ['dev', 'ino', 'size', 'mtimeMs', 'ctimeMs'].some(
+              (field) =>
+                typeof current[field] === 'number' &&
+                typeof previous[field] === 'number' &&
+                current[field] !== previous[field],
+            )
+          )
+            onChange('change', changed);
+        },
+      );
     const ready = new Promise<void>(
       /** ready·error·취소 중 먼저 도착한 결과로 준비 대기를 끝낸다. */ (
         resolve,
