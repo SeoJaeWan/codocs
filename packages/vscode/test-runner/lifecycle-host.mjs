@@ -24,7 +24,6 @@ try {
       path.join(config.output, 'profile'),
       '--extensions-dir',
       path.join(config.output, 'extensions'),
-      '--disable-extensions',
       '--new-window',
     ],
   });

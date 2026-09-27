@@ -156,3 +156,10 @@ definition: |
 
   구체적인 SDK 스키마·응답 한계·watcher 설정과 파일 연산은 구현·시험으로 정한다.
   확정한 기능 범위를 다시 미결정으로 돌리는 것은 아니다.
+
+  ## 공개 후보 조립과 동일 산출물 검증
+
+  pnpm release:pack은 현재 소스를 빌드한 뒤 실행별 고유 staging에서 co-documentation 0.0.1 tarball과 seojaewan.codocs 0.0.1 VSIX를 조립한다. 내부 workspace 패키지는 비공개로 유지한다. 공개 MCP는 의존성을 포함한 ESM codocs bin이며 Node 24.x에서 실행하고 별도 공개 JS API를 약속하지 않는다.
+  배포 목록은 실행 코드·가이드·예시·양언어 README·MIT LICENSE·원본 logo.png·번들 의존성 라이선스 원문으로 제한한다. 원본 로고를 변형하지 않으며 프롬프트·소스·테스트·개발용 map/선언 파일을 포함하지 않는다. npm README의 가이드·예시 상대 링크는 staging의 실제 dist 경로로 조정하고 Marketplace README는 저장소의 공개 원문 링크를 사용한다.
+  release.json은 소스 commit·diff·미추적 파일을 포함한 Git blob 목록과 실제 OS·CPU·Node 및 tgz/VSIX SHA-256을 기록한다. pnpm release:verify <tgz> <vsix>는 재빌드 없이 명시된 파일을 검사하고 저장소 밖 새 소비자에 tarball 하나를 offline 설치하여 codocs bin의 initialize·목록·상세·검증·생성/수정·가이드·refresh·종료를 검증한다. 내부 패키지 overrides나 저장소 의존성으로 실행 누락을 보충하지 않는다.
+  기능·성능 실행기의 --vsix와 --mcp-tgz는 함께 지정하며 두 파일을 재빌드하지 않고 설치하여 사용한다. lifecycle 실행기의 --vsix도 같은 파일을 실제 설치해 실패·취소·시간 제한 후 정리를 확인한다. 인자를 생략한 기존 개발 실행은 현재 소스를 빌드·패키징한다. 검증한 파일과 나중에 다시 만든 파일의 해시를 혼동하지 않는다.

@@ -105,7 +105,7 @@ export function createCodocsServer(
     ],
   ]);
   const server = new Server(
-    { name: 'codocs', version: '0.0.0' },
+    { name: 'co-documentation', version: '0.0.1' },
     { capabilities: { tools: {} } },
   );
   server.setRequestHandler(

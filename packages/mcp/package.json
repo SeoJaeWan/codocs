@@ -1,10 +1,10 @@
 {
   "name": "@codocs/mcp",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "bin": {
-    "codocs-mcp": "./dist/cli.js"
+    "codocs": "./dist/cli.js"
   },
   "exports": {
     ".": {
@@ -27,5 +27,13 @@
   ],
   "devDependencies": {
     "@types/node": "22.19.3"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SeoJaeWan/codocs.git"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

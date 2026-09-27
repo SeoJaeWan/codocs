@@ -26,8 +26,11 @@ exports.run =
       mcpSha256: config.mcpSha256,
       sourceHash: config.sourceHash,
     };
-    const extension = vscode.extensions.getExtension('codocs.codocs');
+    const extension = vscode.extensions.getExtension('seojaewan.codocs');
     c.assert.ok(extension, '설치한 VSIX 확장 등록');
+    c.assert.equal(extension.packageJSON.version, '0.0.1');
+    environment.extensionId = extension.id;
+    environment.extensionVersion = extension.packageJSON.version;
     c.assert.equal(
       await fs.realpath(extension.extensionPath),
       await fs.realpath(config.extension),
