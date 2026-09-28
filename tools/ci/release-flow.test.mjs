@@ -562,7 +562,8 @@ describe('준비 소스와 필수 검사 최신성', /** 입력 조건과 관찰
         run_attempt: 1,
         event: 'pull_request',
         head_sha: pr.head.sha,
-        name: 'Tests',
+        name: 'CI PR #35',
+        path: '.github/workflows/test.yml',
         pull_requests: [{ number: 35 }],
         status: 'completed',
         conclusion: 'success',
@@ -572,6 +573,36 @@ describe('준비 소스와 필수 검사 최신성', /** 입력 조건과 관찰
         /latest release CI unsuccessful/u,
       );
     });
+  test('릴리스 최신 CI는 실제 표시 이름 대신 canonical·qualified 경로로 판정한다', /** 다른 workflow와 누락 경로는 후보에서 제외한다. */ () => {
+    const pr = { number: 35, head: { sha: 'a'.repeat(40) } };
+    const run = {
+      id: 10,
+      run_attempt: 1,
+      name: 'CI PR #35',
+      path: '.github/workflows/test.yml',
+      event: 'pull_request',
+      head_sha: pr.head.sha,
+      pull_requests: [{ number: 35 }],
+      status: 'completed',
+      conclusion: 'success',
+    };
+    for (const path of [
+      '.github/workflows/test.yml',
+      '.github/workflows/test.yml@refs/heads/main',
+    ])
+      assert.equal(latestReleaseRun([{ ...run, path }], pr).id, 10);
+    for (const path of [
+      undefined,
+      '.github/workflows/other.yml',
+      '.github/workflows/test.yml.fake',
+      '.github/workflows/test.yml@',
+    ])
+      assert.throws(
+        /** 누락 경로를 성공 표시 이름으로 대체하지 않는다. */ () =>
+          latestReleaseRun([{ ...run, path }], pr),
+        /final release CI run required/u,
+      );
+  });
   test('새 required-ci 실패가 있으면 이전 성공 check를 게시 근거로 사용하지 않는다', /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ () => {
     const sha = 'a'.repeat(40);
     assert.throws(

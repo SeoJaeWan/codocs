@@ -12,6 +12,16 @@ export const releaseBranch = 'changeset-release/main';
 /** 보호 브랜치에 직접 쓰지 않는 동기화 PR의 단일 브랜치다. */
 export const syncBranch = 'codex/release-sync-main-to-develop';
 
+/** 표시 이름과 분리하여 공식 bare·@ref workflow 경로만 canonical 계약 이름으로 변환한다. */
+export function workflowIdentity(run) {
+  if (typeof run?.path !== 'string') return null;
+  const canonical = run.path.replace(/@[^@\s]+$/u, '');
+  if (canonical === '.github/workflows/test.yml') return workflowNames.ci;
+  if (canonical === '.github/workflows/release-publish.yml')
+    return workflowNames.publish;
+  return null;
+}
+
 /** 인자를 shell에 전달하지 않고 Git의 정확한 결과를 읽는다. */
 export function git(cwd, args, options = {}) {
   return execFileSync('git', args, {
@@ -197,7 +207,7 @@ export function latestReleaseRun(runs, pr) {
     ) =>
       run.event === 'pull_request' &&
       run.head_sha === pr.head.sha &&
-      run.name === workflowNames.ci &&
+      workflowIdentity(run) === workflowNames.ci &&
       run.pull_requests.some((item) => item.number === pr.number),
   );
   relevant.sort(
