@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { sourceDigest } from '../../build/release-contract.mjs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,14 +9,16 @@ import { artifactName, verifyInput } from './release-ci.mjs';
 
 test('전달 OS와 무관하게 후보 파일명을 검사한다', /** 전달 경로 형식을 독립적으로 확인한다. */ () => {
   assert.equal(
-    artifactName('D:\\candidate\\codocs-0.0.1.vsix'),
-    'codocs-0.0.1.vsix',
+    artifactName('D:\\candidate\\codocs-2.3.4.vsix'),
+    'codocs-2.3.4.vsix',
   );
   assert.equal(
-    artifactName('/tmp/co-documentation-0.0.1.tgz'),
-    'co-documentation-0.0.1.tgz',
+    artifactName('/tmp/co-documentation-1.2.3.tgz'),
+    'co-documentation-1.2.3.tgz',
   );
-  assert.throws(() => artifactName('/tmp/other.tgz'));
+  assert.throws(() => artifactName('/tmp/other.tgz'), {
+    message: /unknown artifact filename/u,
+  });
 });
 
 test('같은 소스와 버전이어도 전송 뒤 바뀐 바이트를 거부한다', /** 변경된 전달물을 거부하는지 확인한다. */ async () => {
@@ -23,16 +26,33 @@ test('같은 소스와 버전이어도 전송 뒤 바뀐 바이트를 거부한�
     path.join(os.tmpdir(), 'codocs-release-identity-'),
   );
   try {
-    const names = ['co-documentation-0.0.1.tgz', 'codocs-0.0.1.vsix'];
+    const names = ['co-documentation-1.2.3.tgz', 'codocs-2.3.4.vsix'];
     const artifacts = [];
-    for (const name of names) {
+    for (const [index, name] of names.entries()) {
       await writeFile(path.join(directory, name), name);
       artifacts.push({
         file: 'D:\\candidate\\' + name,
+        product: index === 0 ? 'npm' : 'vscode',
+        version: index === 0 ? '1.2.3' : '2.3.4',
+        basename: name,
         sha256: createHash('sha256').update(name).digest('hex'),
       });
     }
-    const receipt = { sourceCommit: 'a'.repeat(40), sourceDiff: '', artifacts };
+    const sourceFiles = [
+      { file: 'package.json', mode: '100644', gitBlob: 'b'.repeat(40) },
+    ];
+    const receipt = {
+      schemaVersion: 1,
+      sourceCommit: 'a'.repeat(40),
+      sourceTree: 'c'.repeat(40),
+      sourceFiles,
+      sourceDigest: sourceDigest(sourceFiles),
+      binding: null,
+      artifactName: null,
+      artifactId: null,
+      sourceDiff: '',
+      artifacts,
+    };
     await writeFile(
       path.join(directory, 'release.json'),
       JSON.stringify(receipt),
@@ -42,13 +62,17 @@ test('같은 소스와 버전이어도 전송 뒤 바뀐 바이트를 거부한�
       JSON.stringify({ sourceCommit: receipt.sourceCommit, stable: '1.139.1' }),
     );
     await verifyInput(directory, receipt.sourceCommit, '1.139.1');
-    await assert.rejects(verifyInput(directory, 'b'.repeat(40), '1.139.1'));
+    await assert.rejects(verifyInput(directory, 'b'.repeat(40), '1.139.1'), {
+      message: /selection source mismatch/u,
+    });
     await assert.rejects(
       verifyInput(directory, receipt.sourceCommit, '1.100.0'),
+      { message: /selection stable mismatch/u },
     );
     await writeFile(path.join(directory, names[0]), 'modified');
     await assert.rejects(
       verifyInput(directory, receipt.sourceCommit, '1.139.1'),
+      { message: /artifact hash mismatch/u },
     );
   } finally {
     await rm(directory, { recursive: true, force: true });

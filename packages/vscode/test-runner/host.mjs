@@ -1,3 +1,4 @@
+import { readProductVersions } from '../../../tools/build/release-contract.mjs';
 import { execFile, spawnSync } from 'node:child_process';
 import {
   cp,
@@ -444,9 +445,11 @@ try {
   if (
     installedManifest.publisher + '.' + installedManifest.name !==
       'seojaewan.codocs' ||
-    installedManifest.version !== '0.0.1'
+    installedManifest.version !==
+      (await readProductVersions(config.root)).vscode
   )
     throw new Error('설치된 확장 ID/버전 불일치');
+  config.extensionVersion = installedManifest.version;
   config.mcpEntry = config.mcpTgz
     ? (
         await installMcp(
