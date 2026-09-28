@@ -39,7 +39,7 @@
 | TypeScript 정의 기능              | native-definition                                                     | 내장 definition provider의 같은 TS 파일·정의 위치             |
 | 추가: 서버 재시작                 | restart-unsaved                                                       | 실제 restart 명령 후 dirty 코드 재동기화·링크 이동            |
 
-화면 렌더링, 물리적 hover/수정 키 클릭/F12, 알림 토스트·Quick Pick·Problems 패널의 픽셀/DOM은 검사하지 않는다. 예를 들어 링크 부재는 직접 이동 대상이 제공되지 않음을 입증하며 임의 클릭 후 팝업이 없다는 화면 증거를 만들지는 않는다. Markdown은 원문과 표시용 텍스트를 구분하고 URI 토큰은 원형 그대로 사용한다. 변경 직후 사례는 실제 변경과 명령의 순서를 검사하지만 제품 내부 경합 구간 도달을 강제했다고 주장하지 않는다.
+위 기존 ID·YAML 사례는 화면 렌더링, 물리적 hover/수정 키 클릭/F12, 알림 토스트·Quick Pick·Problems 패널의 픽셀/DOM을 검사하지 않는다. 예를 들어 링크 부재는 직접 이동 대상이 제공되지 않음을 입증하며 임의 클릭 후 팝업이 없다는 화면 증거를 만들지는 않는다. 아래 `whole-code-inlay` 사례는 전용 renderer에서 실제 Inlay 화면·설정·이동 제스처를 별도로 관찰한다. Markdown은 원문과 표시용 텍스트를 구분하고 URI 토큰은 원형 그대로 사용한다. 변경 직후 사례는 실제 변경과 명령의 순서를 검사하지만 제품 내부 경합 구간 도달을 강제했다고 주장하지 않는다.
 
 각 사례는 실제 편집기에서 이전 dirty 문서를 되돌리고 fixture를 복원한 뒤 서버를 재시작한다. 준비 sentinel의 실제 Hover를 확인한 다음 사례를 시작한다. 부분 관측은 Windows의 독점 공유 잠금 또는 macOS의 파일 권한 제한으로 실제 읽기 실패를 확인한 뒤 시작하고 종료 시 접근 상태를 복원한다. 관리자·symlink 권한이 필요하지 않다. 같은 사례를 Windows·macOS에서 실행하며 실제 창 표시를 허용한다.
 
@@ -58,3 +58,16 @@
 상태 표시줄의 실제 Host 객체에 설정된 텍스트와 상세 명령의 안내를 검사하며 픽셀 렌더링 검사로 보고하지 않는다. EACCES·EPERM, 전체 읽기 실패, 늦은 편집·색인·세션 응답은 인접 기능 테스트에서 결정적으로 재현한다.
 
 이름 중복 회귀: duplicate-name-open, duplicate-name-edit-name, duplicate-name-edit-domain, duplicate-name-save는 파일 열기·미저장 이름/도메인 편집·저장 후 상대 문서 진단 갱신을 확인한다.
+
+## 명시 코드 참조의 제품 연결
+
+| 계약                                                                                                  | 실제 설치 시나리오                                    |
+| ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| 전체 명시 span, 유효 링크·오류 이유, UTF-16/CRLF, dirty 숫자 행과 두 끝 검사                          | explicit-code-reference                               |
+| 정확한 출현·열, 겹친 행 합집합, YAML 이름 링크 우선                                                   | reverse-code-reference                                |
+| whole-only 2→1→0, Inlay 설정 off/on, 화면 표시·Meta/Ctrl 이동, 원문/dirty 불변                        | whole-code-inlay                                      |
+| 편집·재시작·경로 재사용 이후 오래된 command 거부                                                      | stale-code-reference                                  |
+| 추적 ignored·미추적 ignored·하위 ignore/reinclude·binary/UTF-16·링크/정션·프로젝트 범위, IDE/MCP 비교 | code-reference-eligibility + standalone installed-mcp |
+| 저장 전 출현, 내부/앞/뒤/삭제/whole/name/domain/repeated, 계산·수집·색인·저장 실패 보존               | standalone installed-mcp                              |
+
+`whole-code-inlay`는 실제 읽기 실패에 따른 incomplete의 확인 1개/0개에서 단일 이동·완료 부재를 제공하지 않고 실패 이유·개별 링크를 유지하며 복구되는지 검사한다. collecting과 저장 문서 partial, 실제 source 토큰·최신성 및 consumer 경합은 인접 LS/VS Code 테스트로 추가 확인한다. standalone installed-mcp는 같은 살아 있는 MCP의 Git 추적 제거·ignore 제거 뒤 저장 영향 수집도 검사한다. 실제 설치 자료가 없는 OS·버전을 이 표만으로 통과 처리하지 않는다.

@@ -126,3 +126,55 @@ describe('trustGeneratedOpenSourceHoverContents', () => {
     expect(markdown).not.toHaveProperty('isTrusted');
   });
 });
+
+describe('명시 목적지와 실제 buffer 선택', () => {
+  it('앞부분이 변경된 dirty buffer도 실제 번호의 두 행을 선택한다', async () => {
+    const { sourceSelection } = await import('./index.js');
+    const text = '삽입\n원래 첫 행\n원래 두 번째\n끝';
+    expect(
+      sourceSelection(text, { kind: 'rows', startLine: 2, endLine: 3 }),
+    ).toEqual({
+      start: { line: 1, character: 0 },
+      end: { line: 2, character: 7 },
+    });
+  });
+  it.each([
+    { kind: 'rows', startLine: 2, endLine: 8 },
+    { kind: 'rows', startLine: 0, endLine: 1 },
+    { kind: 'rows', startLine: 3, endLine: 2 },
+  ])(
+    '실제 두 끝이 없는 범위 $startLine~$endLine은 보정하지 않는다',
+    async (destination) => {
+      const { sourceSelection } = await import('./index.js');
+      expect(sourceSelection('첫 행\n끝', destination)).toBeUndefined();
+    },
+  );
+  it('역참조의 정확한 UTF-16 span을 그대로 선택한다', async () => {
+    const { sourceSelection } = await import('./index.js');
+    const range = {
+      start: { line: 0, character: 3 },
+      end: { line: 0, character: 17 },
+    };
+    expect(
+      sourceSelection('😀 @codocs [[대상]]', {
+        kind: 'occurrence',
+        range,
+        markerText: '@codocs [[대상]]',
+      }),
+    ).toEqual(range);
+  });
+});
+
+it('확인 뒤 실제 buffer에서 표기가 달라지면 같은 열 범위도 선택하지 않는다', async () => {
+  const { sourceSelection } = await import('./index.js');
+  expect(
+    sourceSelection('다른 표기의 원문', {
+      kind: 'occurrence',
+      range: {
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: 5 },
+      },
+      markerText: '@codocs [[대상]]',
+    }),
+  ).toBeUndefined();
+});

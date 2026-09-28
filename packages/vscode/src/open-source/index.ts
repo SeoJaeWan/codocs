@@ -100,14 +100,15 @@ export async function openSource<Document extends OpenSourceDocument>(
     const uri = result.uri;
     const document =
       host.findOpenDocument(uri) ?? (await host.openDocument(uri));
+    const destination =
+      'destination' in result ? result.destination : { kind: 'top' };
+    const selection = sourceSelection(document.text, destination);
+    if (!selection) return false;
     const viewColumn = host.findExistingViewColumn(uri);
     await host.showDocument(document, {
       preview: false,
       ...(viewColumn === undefined ? {} : { viewColumn }),
-      selection: {
-        start: { line: 0, character: 0 },
-        end: { line: 0, character: 0 },
-      },
+      selection,
     });
     return true;
   } catch (error: unknown) {
@@ -131,4 +132,84 @@ export async function openSource<Document extends OpenSourceDocument>(
       host.reportError(error);
     return false;
   }
+}
+
+/** 실제 현재 buffer의 두 끝이 존재할 때만 선택하며 범위를 보정하지 않는다. */
+export function sourceSelection(
+  text: string,
+  destination: unknown,
+): OpenSourceRange | undefined {
+  if (
+    typeof destination !== 'object' ||
+    destination === null ||
+    !('kind' in destination)
+  )
+    return undefined;
+  if (destination.kind === 'top')
+    return { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+  const rows = text.split(/\r\n|\r|\n/u);
+  if (
+    destination.kind === 'rows' &&
+    'startLine' in destination &&
+    'endLine' in destination
+  ) {
+    const start = destination.startLine,
+      end = destination.endLine;
+    if (
+      typeof start !== 'number' ||
+      typeof end !== 'number' ||
+      !Number.isSafeInteger(start) ||
+      !Number.isSafeInteger(end) ||
+      start < 1 ||
+      end < start ||
+      end > rows.length
+    )
+      return undefined;
+    return {
+      start: { line: start - 1, character: 0 },
+      end: { line: end - 1, character: rows[end - 1]!.length },
+    };
+  }
+  if (destination.kind === 'occurrence' && 'range' in destination) {
+    const range = destination.range as Partial<OpenSourceRange> | null;
+    /** 현재 buffer에 존재하는 실제 UTF-16 끝인지 확인한다. */
+    const valid = (
+      position: OpenSourcePosition | undefined,
+    ): position is OpenSourcePosition =>
+      !!position &&
+      Number.isSafeInteger(position.line) &&
+      Number.isSafeInteger(position.character) &&
+      position.line >= 0 &&
+      position.line < rows.length &&
+      position.character >= 0 &&
+      position.character <= rows[position.line]!.length;
+    if (
+      !range ||
+      !valid(range.start) ||
+      !valid(range.end) ||
+      range.end.line < range.start.line ||
+      (range.end.line === range.start.line &&
+        range.end.character < range.start.character)
+    )
+      return undefined;
+    if (
+      !('markerText' in destination) ||
+      typeof destination.markerText !== 'string'
+    )
+      return undefined;
+    const selected =
+      range.start.line === range.end.line
+        ? rows[range.start.line]!.slice(
+            range.start.character,
+            range.end.character,
+          )
+        : [
+            rows[range.start.line]!.slice(range.start.character),
+            ...rows.slice(range.start.line + 1, range.end.line),
+            rows[range.end.line]!.slice(0, range.end.character),
+          ].join('\n');
+    if (selected !== destination.markerText) return undefined;
+    return { start: { ...range.start }, end: { ...range.end } };
+  }
+  return undefined;
 }

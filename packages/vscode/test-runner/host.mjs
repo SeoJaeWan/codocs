@@ -1,4 +1,4 @@
-import { execFile, spawnSync } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
 import {
   cp,
   mkdir,
@@ -812,27 +812,50 @@ try {
   } else {
     phase = 'extension-host';
     await progress({ executable: runtime.executable });
-    await runTests({
-      vscodeExecutablePath: runtime.executable,
-      extensionDevelopmentPath: harness,
-      extensionTestsPath: path.join(
-        config.root,
-        'packages/vscode/src/integration/index.cjs',
-      ),
-      extensionTestsEnv: { CODOCS_VSCODE_CONFIG: process.argv[2] },
-      stdout: log,
-      stderr: log,
-      launchArgs: [
-        workspaceFile,
-        '--user-data-dir',
+    const uiObserver = spawn(
+      process.execPath,
+      [
+        path.join(
+          config.root,
+          'packages/vscode/test-runner/code-ui-observer.mjs',
+        ),
+        process.argv[2],
         profile,
-        '--extensions-dir',
-        extensions,
-        '--disable-telemetry',
-        '--disable-experiments',
-        '--new-window',
       ],
-    });
+      { stdio: ['ignore', log, log], windowsHide: true },
+    );
+    const uiExited = new Promise(
+      /** 실제 관측을 요청에 연결하고 실패를 호출자에게 전달한다. */ (
+        resolve,
+      ) => uiObserver.once('exit', resolve),
+    );
+    try {
+      await runTests({
+        vscodeExecutablePath: runtime.executable,
+        extensionDevelopmentPath: harness,
+        extensionTestsPath: path.join(
+          config.root,
+          'packages/vscode/src/integration/index.cjs',
+        ),
+        extensionTestsEnv: { CODOCS_VSCODE_CONFIG: process.argv[2] },
+        stdout: log,
+        stderr: log,
+        launchArgs: [
+          workspaceFile,
+          '--user-data-dir',
+          profile,
+          '--extensions-dir',
+          extensions,
+          '--disable-telemetry',
+          '--disable-experiments',
+          '--new-window',
+          '--remote-debugging-port=0',
+        ],
+      });
+    } finally {
+      uiObserver.kill('SIGTERM');
+      await uiExited;
+    }
   }
   phase = 'complete';
   await progress({ passed: true });
