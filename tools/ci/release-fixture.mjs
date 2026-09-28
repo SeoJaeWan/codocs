@@ -21,13 +21,47 @@ export const appTokenRevision = 'bcd2ba49218906704ab6c1aa796996da409d3eb1';
 /** 해당 commit의 action.yml 원문을 독립 다운로드로 확인한 SHA-256이다. */
 export const appTokenManifestSha256 =
   '2c4c77d1cafa8d792ab4a9d449799221baf95176a47692ad9a0b350b0a2618ed';
+/** 전체 release Action의 독립 primary manifest 원문과 고정 commit 계약이다. */
+export const releaseActionManifests = {
+  'actions/checkout': {
+    revision: '3d3c42e5aac5ba805825da76410c181273ba90b1',
+    sha256: 'd59219cb79590abdb877deaa14e3b65a00c05318bf5a6f3b989b9162b5d08c35',
+  },
+  'pnpm/action-setup': {
+    revision: 'ea17c68df8912ef543352723c149a84f56e3d413',
+    sha256: '9e252c0620f3de7d239b01455c8b50b3424e347d7547d991abf71694686bf82c',
+  },
+  'actions/setup-node': {
+    revision: '820762786026740c76f36085b0efc47a31fe5020',
+    sha256: '5d765941ab5d8bef27f08e81b0b041cdb2df2050ea0261dc925d157a2bafbd2b',
+  },
+  'actions/upload-artifact': {
+    revision: '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+    sha256: 'c5979822866a72362e609844b6ebe77d4b7e759af68cc1c2c425dcf51481fab4',
+  },
+  'actions/create-github-app-token': {
+    revision: appTokenRevision,
+    sha256: appTokenManifestSha256,
+  },
+  'changesets/action/version': {
+    revision: actionRevision,
+    sha256: '2f2c5ee86f3a35ab3b61f5911f11a9a5d481a8cf41470a8ae4a0e296c9fa6815',
+  },
+};
+/** family의 고정 primary manifest 원문을 읽고 실패를 검증 결과로 남긴다. */
+export async function officialReleaseActionManifest(family) {
+  const contract = releaseActionManifests[family];
+  assert.ok(contract, `unknown release Action: ${family}`);
+  const [owner, repository, ...directory] = family.split('/');
+  const response = await fetch(
+    `https://raw.githubusercontent.com/${owner}/${repository}/${contract.revision}/${[...directory, 'action.yml'].join('/')}`,
+  );
+  assert.ok(response.ok, `official ${family} manifest: ${response.status}`);
+  return Buffer.from(await response.arrayBuffer());
+}
 /** 고정 commit의 공식 manifest 원문을 읽고 네트워크 실패를 검증 실패로 남긴다. */
 export async function officialAppTokenManifest() {
-  const response = await fetch(
-    `https://raw.githubusercontent.com/actions/create-github-app-token/${appTokenRevision}/action.yml`,
-  );
-  assert.ok(response.ok, `official App Action manifest: ${response.status}`);
-  return Buffer.from(await response.arrayBuffer());
+  return officialReleaseActionManifest('actions/create-github-app-token');
 }
 /** Git fixture에 고정 identity를 사용하고 사용자 credential 설정을 읽지 않는다. */
 export const fixtureEnv = {

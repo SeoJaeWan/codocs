@@ -26,12 +26,114 @@ import {
   appTokenRevision,
   appTokenManifestSha256,
   officialAppTokenManifest,
+  releaseActionManifests,
+  officialReleaseActionManifest,
 } from './release-fixture.mjs';
 
 const coreRequire = createRequire(
   path.join(root, 'packages/core/package.json'),
 );
 const YAML = coreRequire('yaml');
+
+describe('전체 release Action revision과 입력 연결', /** 빠짐없는 inventory를 실제 primary manifest와 대조한다. */ () => {
+  test('세 workflow의 모든 Action을 검사하면 고정 Node24 commit과 호환 입력을 사용하고 자동 캐시를 끈다', /** 전체 family와 모든 소비 step의 계약을 확인한다. */ async () => {
+    const inventory = [];
+    for (const [name, families] of Object.entries({
+      prepare: [
+        'actions/create-github-app-token',
+        'actions/checkout',
+        'pnpm/action-setup',
+        'actions/setup-node',
+        'changesets/action/version',
+      ],
+      sync: [
+        'actions/create-github-app-token',
+        'actions/checkout',
+        'pnpm/action-setup',
+        'actions/setup-node',
+      ],
+      publish: [
+        'actions/create-github-app-token',
+        'actions/checkout',
+        'pnpm/action-setup',
+        'actions/setup-node',
+        'actions/upload-artifact',
+      ],
+    })) {
+      const workflow = YAML.parse(
+        await readFile(
+          path.join(root, `.github/workflows/release-${name}.yml`),
+          'utf8',
+        ),
+      );
+      const steps = Object.values(workflow.jobs).flatMap((job) =>
+        job.steps.filter((step) => step.uses),
+      );
+      inventory.push({ name, families, steps });
+    }
+    // 첫 실패가 다른 workflow의 uses를 가리지 않도록 전체 목록부터 수집한다.
+    const manifests = {};
+    const rawManifests = {};
+    for (const family of Object.keys(releaseActionManifests)) {
+      const raw = await officialReleaseActionManifest(family);
+      rawManifests[family] = raw;
+      manifests[family] = YAML.parse(raw.toString('utf8'));
+    }
+    for (const [family, contract] of Object.entries(releaseActionManifests)) {
+      assert.equal(
+        createHash('sha256').update(rawManifests[family]).digest('hex'),
+        contract.sha256,
+        family,
+      );
+      assert.equal(manifests[family].runs.using, 'node24', family);
+    }
+    const usedFamilies = new Set();
+    for (const { name, families, steps } of inventory) {
+      assert.deepEqual(
+        steps.map((step) => step.uses.split('@')[0]),
+        families,
+        name,
+      );
+      for (const step of steps) {
+        assert.match(step.uses, /^[\w-]+\/[\w/-]+@[a-f0-9]{40}$/u);
+        const [family, revision] = step.uses.split('@');
+        usedFamilies.add(family);
+        assert.equal(revision, releaseActionManifests[family].revision);
+        const manifest = manifests[family];
+        for (const input of Object.keys(step.with ?? {}))
+          assert.ok(
+            Object.hasOwn(manifest.inputs, input),
+            `${family}: ${input}`,
+          );
+        for (const [input, contract] of Object.entries(manifest.inputs))
+          if (contract.required && !Object.hasOwn(contract, 'default'))
+            assert.ok(
+              Object.hasOwn(step.with ?? {}, input),
+              `${family}: ${input}`,
+            );
+        if (family === 'actions/setup-node') {
+          assert.equal(step.with['node-version'], '24.21.0');
+          assert.equal(step.with['package-manager-cache'], false);
+          assert.equal(Object.hasOwn(step.with, 'cache'), false);
+        }
+        if (family === 'pnpm/action-setup') {
+          assert.deepEqual(step.with, { version: '10.34.5' });
+          assert.equal(String(manifest.inputs.cache.default), 'false');
+        }
+        if (family === 'actions/upload-artifact') {
+          assert.deepEqual(step.with, {
+            name: 'codocs-publish-${{ github.run_id }}-${{ github.run_attempt }}',
+            path: '.workbench/publish/publish.json',
+            'if-no-files-found': 'warn',
+            'retention-days': 90,
+          });
+          assert.equal(String(manifest.inputs.archive.default), 'true');
+        }
+      }
+    }
+    assert.deepEqual([...usedFamilies].sort(), Object.keys(manifests).sort());
+  });
+});
 
 describe('공식 GitHub App 토큰 Action 연결', /** 고정 primary manifest와 실제 workflow 입력을 대조한다. */ () => {
   for (const [name, permissions] of Object.entries({
@@ -204,7 +306,7 @@ describe('공식 릴리스 Action 연결', /** 입력 조건과 관찰 결과를
         ]).includes('변경 c'),
       );
       await writeFile(
-        path.join(root, '.workbench/task003-r1-official-api-evidence.json'),
+        path.join(root, '.workbench/task003-r2-official-api-evidence.json'),
         JSON.stringify(
           {
             requests: api.state.requests,
