@@ -11,11 +11,48 @@ definition: |
   Vitest는 TypeScript 설정과 선택 실행의 편의성으로 선정했으며 Jest 대비 보편적인 속도 우위를 약속하지 않는다.
   실제 VS Code 기능 검사는 공식 @vscode/test-electron 기반으로 실행한다. 로컬과 CI의 실행 범위는 [[테스트 컨벤션]]에서 정한다.
   pnpm test는 로직·도구 검사를 한 번 실행하며 pnpm test --watch는 로직 변경 감지 모드다. pnpm check는 타입·린트·서식·빌드·일반 테스트·개발 규칙·패키지 소비 검사를 수행한다. pnpm format은 서식을 수정한다.
+  pnpm test:release-management는 공식 버전·CHANGELOG·PR 상태·게시 재시도·동기화 관리 검사만 선택한다. pnpm test:os는 로직과 OS별 도구 검사를 선택하며 pnpm check:runtime:os는 빌드·OS 선택·패키지 소비 검사까지 수행한다. 두 선택은 전체 도구 수집의 서로 겹치지 않는 합집합이며 새 관리 도구는 관리 namespace로, 나머지 새 도구는 OS 검사로 포함한다. 기본 pnpm test와 pnpm check는 양쪽 전체를 유지한다.
   pnpm check의 서식 검사는 prettier . --check로 파일을 수정하지 않고 확인한다. 별도 format:check 스크립트를 두지 않으며, pnpm format의 자동 수정과 pnpm check의 검증 역할을 유지한다.
   pnpm test:vscode는 packages/vscode/test-runner/run.mjs를 통해 현재 소스의 VSIX 패키징·설치와 고정 VS Code를 준비하고 설치된 확장에서 전체 기능 사례를 한 번 실행한다. 기능 사례의 배치는 [[폴더 컨벤션]]을 따른다.
   IDE 성능은 같은 실행기의 --mode performance와 --scenario 옵션으로 명시적으로 선택한다. --vscode-version에는 검증할 정확한 x.y.z를 주고 --resolve-version stable로 받은 버전을 고정할 수 있다. 성능 실행의 결과와 기준은 [[배포]]가 소유하며 기본 pnpm test:vscode와 일반 CI에는 성능 측정을 포함하지 않는다.
   실제 창 사용과 격리·종료 기준은 [[테스트 컨벤션]]을 적용한다.
-  CI는 Windows·macOS에서 로컬과 같은 pnpm check와 pnpm test:vscode 및 실행기 정리 검사를 실행한다. 실행기 정리 검사의 진입점은 packages/vscode/test-runner/lifecycle.mjs다.
+  CI의 검사 배치는 아래 PR 검사와 병합 기준을 따른다. 실행기 정리 검사의 진입점은 packages/vscode/test-runner/lifecycle.mjs다.
+
+  ## PR 검사와 병합 기준
+
+  기능·수정 PR은 develop을 대상으로 하고, develop은 다음 출시의 변경을 모으는 통합 브랜치다. main은 출시를 확정하는 브랜치로 유지한다.
+  릴리스는 develop을 바탕으로 만든 임시 브랜치에서 main으로 PR을 보내며 버전·변경 내역 준비와 최종 검증을 한 PR에서 처리한다. 구체적인 기록 취합과 게시는 [[배포]]에서 정한다.
+  main의 릴리스 결과는 PR로 develop에 동기화한다. 기능 PR·릴리스 PR·동기화 PR 모두 아래 검사와 병합 기준을 적용한다.
+
+  Draft PR은 모든 자동 검사를 생략한다. 타입·린트·서식이나 변경 분류·결과 집계만을 위한 검사 러너도 시작하지 않는다.
+  develop 병합을 받아 Draft 릴리스 PR을 갱신하는 봇의 관리 작업은 제품 검사와 구분한다. 이 작업을 이유로 Draft PR의 검사 러너를 시작하지 않는다.
+  리뷰 준비 PR은 문서 변경을 포함해 변경 경로와 관계없이 동일한 전체 CI를 실행한다. 경로별 검사 선택이나 생략 규칙을 두지 않는다.
+  타입·린트·서식은 공통으로 한 번 검사한다. 빌드·로직·OS 도구·개발 규칙·패키지 계약, 독립 설치 MCP·VSIX, VS Code 기능과 종료·정리는 Windows·macOS에서 검사한다. VS Code 기능과 종료·정리는 최소 버전과 실행마다 고정한 최신 stable 버전 모두에서 수행한다.
+  커밋 훅의 통과 여부로 PR CI를 생략하지 않는다. 로컬에서 수행할 pnpm check의 범위는 유지하고 CI에서만 공통 정적 검사와 OS별 나머지 검사를 분리한다.
+
+  리뷰 준비 전환은 추가 push 없이 CI를 시작하고, 같은 PR의 추가 push는 이전 자동 실행을 취소한 뒤 최신 변경을 검사한다.
+  Draft 복귀나 PR 닫기·병합은 진행·대기 중인 해당 PR의 자동 검사를 취소한다. 다시 열 때는 Draft면 생략하고 리뷰 준비 상태면 검사한다.
+  취소 범위는 workflow와 PR을 기준으로 분리하여 다른 PR·main 배포·수동 실행에 영향을 주지 않는다. 제목·본문·라벨만 바뀌면 제품 검사를 재실행하지 않는다.
+
+  develop·main 변경은 PR로만 반영하며 각 PR의 최신 대상 브랜치 반영과 필수 CI 통과를 병합 조건으로 요구한다. 직접 push와 PR·필수 검사 우회는 관리자와 릴리스 봇에게도 허용하지 않는다. 사람의 리뷰 승인 횟수는 필수 조건으로 두지 않는다.
+  PR CI 통과 뒤 대상 브랜치가 바뀌면 PR을 업데이트하고 같은 CI를 다시 통과해야 한다. 검사 대상이 바뀌지 않았다면 병합 직전 별도 검사를 추가하지 않는다.
+  필수 결과 집계는 필요한 job의 실패·취소·예상 밖 생략을 통과로 처리하지 않는다. Draft에서 생략된 결과나 임의의 수동 실행은 리뷰 준비 상태의 필수 검사를 대신하지 않는다.
+  보호 규칙의 실제 적용을 확인한 뒤 develop·main 병합 후 자동 테스트 재실행을 생략한다. develop의 릴리스 PR 준비와 main의 버전 변경에 따른 게시는 [[배포]]에서 정하며 테스트 재실행과 구분한다.
+
+  ## CI 결과와 실행 도구
+
+  PR당 결과 댓글 하나를 갱신하여 성공 여부·OS별 소요 시간·Actions 실행 링크를 표시한다. 실패하면 같은 댓글에 실패 단계를 남긴다.
+  취소되거나 늦게 끝난 이전 실행이 최신 실행의 결과를 덮어쓰지 않게 한다.
+  성공한 실행의 상세 진단 파일은 별도 업로드하지 않으며 일반 콘솔 로그는 Actions 실행에서 확인한다. 실패한 실행은 원인 분석에 필요한 최소 진단 자료만 보관한다.
+  검증 후보와 소스·파일 해시·검증 실행 연결 정보의 보관은 [[배포]]의 동일 산출물 재사용을 위한 것이며 성공 로그 생략에 포함하지 않는다.
+
+  ready PR의 릴리스 관리 검사는 변경 경로와 무관하게 Ubuntu 24.04의 Release management tests job에서 한 번 실행한다. 버전 계산에 필요한 전체 Git history는 이 job에서만 checkout한다. Windows·macOS job은 관리 회귀를 다시 실행하거나 제품 버전을 계산하지 않으며 기존 빌드·로직·바이트/경로·패키지 소비·설치·최소/고정 stable 기능·네 종료 모드를 유지한다.
+
+  Tests의 static·prepare·release-management·macos·windows 결과는 required-ci로 집계한다. 소스 head/base·run/attempt·업로드 artifact ID·전체 Git tree/blob·제품 SHA-256과 두 OS의 고정 stable 증거를 대조한다. reporter는 신뢰한 기본 브랜치 코드만 실행하고 현재 PR/head/base와 최신 실행을 다시 확인한 뒤 PR별로 댓글 하나를 갱신한다. 게시 결과도 원래 검증 실행의 바인딩을 유지하여 같은 댓글에 전달한다.
+
+  JavaScript Action은 지원되는 Node 24 실행 기반을 사용한다. 프로젝트 Node 버전 선택과 Action 자체의 runs.using 런타임은 별도로 확인한다.
+  Action은 검증한 commit revision으로 고정하고 해당 revision의 manifest를 대조한다. 자동 준비·동기화·게시의 운영 활성화 순서와 실제 권한 확인은 [[배포]]가 소유한다. 보호 확인 전 main push와 수동 전체 Tests를 유지하며, 로컬 fixture 통과를 실제 보호 적용 근거로 사용하지 않는다.
+  CI 정리 효과는 자동 실행 횟수, 대기·job별 시간과 전체 러너 사용량으로 확인한다. 같은 종류의 여러 실행을 비교하고 단일 실행이나 캐시 적중만으로 개선율을 확정하지 않는다.
 
   ## 커밋 검사
 
@@ -50,3 +87,4 @@ definition: |
 
   공개 배포는 내부 tsc 구조를 유지하면서 별도 staging을 조립한다. MCP CLI와 내부 의존성을 Node 24용 ESM 번들로 묶고 dist/runtime/cli.js에 배치하여 가이드의 import.meta.url 상대 경로를 보존한다. VSIX는 기존 CommonJS 확장·언어 서버 번들을 사용하며 별도 시스템 Node 설치가 필요하지 않다.
   pnpm release:pack과 pnpm release:verify <tgz> <vsix>의 산출물·검증 경계는 [[배포]]에서 정의한다. VS Code 기능·성능 실행기는 --vsix <file> --mcp-tgz <file>로 기존 산출물을 선택하고 lifecycle.mjs는 --vsix <file>을 받는다.
+  CI·릴리스 결합 검사는 node --test tools/ci/ci-release.integration.test.mjs로 실행한다. 실제 GUI를 포함한 별도 native 검사는 CODOCS_VERIFY_GUI=1 node --test tools/test/release-native.integration.test.mjs이며 PowerShell에서는 $env:CODOCS_VERIFY_GUI='1' 설정 뒤 같은 node 명령을 실행한다. GUI 실행은 최종 버전 후보를 한 번 만들고 그 VSIX로 최소·한 번 고정한 stable의 전체 기능과 네 종류 종료 정리를 직렬 수행한다.

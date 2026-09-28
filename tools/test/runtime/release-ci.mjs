@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
   appendFile,
   copyFile,
@@ -12,81 +11,155 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { packageRelease } from '../../build/release.mjs';
+import {
+  artifactName as productArtifactName,
+  bindUploadedCandidate,
+  candidateArtifactName,
+  products,
+  readProductVersions,
+  releaseFiles,
+  verifyCandidate,
+} from '../../build/release-contract.mjs';
 import { resolveStableVersion } from '../../../packages/vscode/test-runner/cli.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const input = path.join(root, '.workbench/release-input');
 
-/** 다른 OS가 만든 receipt에서도 파일명만 추출하고 지정한 후보 두 개만 허용한다. */
+/** 다른 OS의 로컬 receipt 경로에서 안전한 동적 제품 파일명만 추출한다. */
 export function artifactName(filename) {
+  assert.equal(typeof filename, 'string', 'artifact path required');
   const name = filename.split(/[/\\]/u).at(-1);
-  assert.ok(['co-documentation-0.0.1.tgz', 'codocs-0.0.1.vsix'].includes(name));
-  return name;
+  for (const [product, definition] of Object.entries(products)) {
+    const prefix = definition.name + '-';
+    const suffix = '.' + definition.suffix;
+    if (name.startsWith(prefix) && name.endsWith(suffix)) {
+      const version = name.slice(prefix.length, -suffix.length);
+      assert.equal(name, productArtifactName(product, version));
+      return name;
+    }
+  }
+  throw new Error('unknown artifact filename');
 }
 
-/** 전달된 소스·버전·파일 바이트를 검사하고 호스트별 실제 환경을 기록한다. */
-export async function verifyInput(directory, expectedCommit, expectedStable) {
-  const receipt = JSON.parse(
-    await readFile(path.join(directory, 'release.json'), 'utf8'),
+/** 전달 소스·제품·파일 바이트와 선택 버전을 검사한다. 기대 실행 바인딩도 받을 수 있다. */
+export async function verifyInput(
+  directory,
+  expectedCommit,
+  expectedStable,
+  expected = {},
+) {
+  let receipt = JSON.parse(
+    await readFile(path.join(directory, releaseFiles.candidate), 'utf8'),
   );
   const selection = JSON.parse(
-    await readFile(path.join(directory, 'selection.json'), 'utf8'),
+    await readFile(path.join(directory, releaseFiles.selection), 'utf8'),
   );
-  assert.equal(receipt.sourceCommit, expectedCommit);
-  assert.equal(receipt.sourceDiff, '');
-  assert.equal(selection.sourceCommit, expectedCommit);
-  assert.match(selection.stable, /^\d+\.\d+\.\d+$/u);
-  assert.equal(selection.stable, expectedStable);
-  assert.equal(receipt.artifacts.length, 2);
-  const names = new Set();
-  for (const artifact of receipt.artifacts) {
-    const name = artifactName(artifact.file);
-    assert.ok(!names.has(name));
-    names.add(name);
-    const digest = createHash('sha256')
-      .update(await readFile(path.join(directory, name)))
-      .digest('hex');
-    assert.equal(digest, artifact.sha256, name);
-  }
+  assert.equal(
+    selection.sourceCommit,
+    expectedCommit,
+    'selection source mismatch',
+  );
+  assert.match(
+    selection.stable,
+    /^\d+\.\d+\.\d+$/u,
+    'exact stable version required',
+  );
+  assert.equal(selection.stable, expectedStable, 'selection stable mismatch');
+  if (Object.hasOwn(expected, 'binding'))
+    assert.deepEqual(
+      selection.binding,
+      expected.binding,
+      'selection run mismatch',
+    );
+  if (expected.artifactId && receipt.artifactId === null)
+    receipt = bindUploadedCandidate(
+      receipt,
+      expected.binding ?? receipt.binding,
+      expected.artifactId,
+    );
+  await verifyCandidate(directory, receipt, {
+    ...expected,
+    sourceCommit: expectedCommit,
+  });
   return { receipt, selection };
 }
 
-/** 한 번 패키징한 동일 바이트를 양 OS에서 소비하고 실패를 그대로 전달한다. */
+/** GitHub 환경에서 PR head/base와 실행 시도를 명시적으로 읽는다. */
+async function githubBinding(head) {
+  if (
+    !process.env.GITHUB_EVENT_PATH ||
+    process.env.GITHUB_EVENT_NAME !== 'pull_request'
+  )
+    return null;
+  const event = JSON.parse(
+    await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'),
+  );
+  assert.equal(head, event.pull_request.head.sha, 'checkout must use PR head');
+  return {
+    repository: process.env.GITHUB_REPOSITORY,
+    prNumber: event.pull_request.number,
+    headSha: event.pull_request.head.sha,
+    baseSha: event.pull_request.base.sha,
+    workflow: process.env.GITHUB_WORKFLOW,
+    runId: process.env.GITHUB_RUN_ID,
+    runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+    eventName: process.env.GITHUB_EVENT_NAME,
+    draft: event.pull_request.draft,
+  };
+}
+
+/** 한 번 패키징한 바이트를 양 OS에 전달하며 기존 prepare|verify 명령을 유지한다. */
 async function main(mode) {
   const head = execFileSync(
     'git',
     ['-c', 'core.longpaths=true', 'rev-parse', 'HEAD'],
     { cwd: root, encoding: 'utf8' },
   ).trim();
-  assert.equal(head, process.env.GITHUB_SHA);
+  assert.equal(head, process.env.CODOCS_SOURCE_SHA ?? process.env.GITHUB_SHA);
   if (mode === 'prepare') {
     const stable = await resolveStableVersion();
     const resolvedAt = new Date().toISOString();
     const receipt = await packageRelease(root);
     assert.equal(receipt.sourceCommit, head);
     assert.equal(receipt.sourceDiff, '');
+    receipt.binding = await githubBinding(head);
+    receipt.artifactName = receipt.binding
+      ? candidateArtifactName(receipt.binding)
+      : null;
     await mkdir(input, { recursive: true });
     for (const artifact of receipt.artifacts)
-      await copyFile(
-        artifact.file,
-        path.join(input, artifactName(artifact.file)),
-      );
+      await copyFile(artifact.file, path.join(input, artifact.basename));
+    await verifyCandidate(input, receipt, {
+      sourceCommit: head,
+      versions: await readProductVersions(root),
+    });
     await writeFile(
-      path.join(input, 'release.json'),
+      path.join(input, releaseFiles.candidate),
       JSON.stringify(receipt, null, 2) + '\n',
     );
     await writeFile(
-      path.join(input, 'selection.json'),
-      JSON.stringify({ sourceCommit: head, stable, resolvedAt }, null, 2) +
-        '\n',
+      path.join(input, releaseFiles.selection),
+      JSON.stringify(
+        { sourceCommit: head, binding: receipt.binding, stable, resolvedAt },
+        null,
+        2,
+      ) + '\n',
     );
-    await appendFile(process.env.GITHUB_OUTPUT, `stable=${stable}\n`);
+    if (process.env.GITHUB_OUTPUT) {
+      const filenames = Object.fromEntries(
+        receipt.artifacts.map(
+          /** 입력 조건과 관찰 결과를 계약에 대조한다. */ (artifact) => [
+            artifact.product,
+            artifact.basename,
+          ],
+        ),
+      );
+      await appendFile(
+        process.env.GITHUB_OUTPUT,
+        `stable=${stable}\nnpm_file=${filenames.npm}\nvsix_file=${filenames.vscode}\ncandidate_directory=${input}\ncandidate_artifact=${receipt.artifactName ?? ''}\n`,
+      );
+    }
   } else if (mode === 'verify') {
-    const { receipt } = await verifyInput(
-      input,
-      head,
-      process.env.CODOCS_EXPECTED_STABLE,
-    );
     const entries = execFileSync(
       'git',
       ['-c', 'core.longpaths=true', 'ls-tree', '-r', '-z', head],
@@ -95,12 +168,39 @@ async function main(mode) {
       .split('\0')
       .filter(Boolean);
     const sourceFiles = entries
-      .map((entry) => {
-        const [metadata, file] = entry.split('\t');
-        return { file, gitBlob: metadata.split(' ')[2] };
-      })
-      .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
-    assert.deepEqual(receipt.sourceFiles, sourceFiles);
+      .map(
+        /** 입력 조건과 관찰 결과를 계약에 대조한다. */ (entry) => {
+          const [metadata, file] = entry.split('\t');
+          return {
+            file,
+            mode: metadata.split(' ')[0],
+            gitBlob: metadata.split(' ')[2],
+          };
+        },
+      )
+      .sort(
+        /** 입력 조건과 관찰 결과를 계약에 대조한다. */ (a, b) =>
+          a.file < b.file ? -1 : a.file > b.file ? 1 : 0,
+      );
+    const sourceTree = execFileSync('git', ['rev-parse', `${head}^{tree}`], {
+      cwd: root,
+      encoding: 'utf8',
+    }).trim();
+    const binding = await githubBinding(head);
+    const expected = {
+      sourceFiles,
+      sourceTree,
+      versions: await readProductVersions(root),
+    };
+    if (binding) expected.binding = binding;
+    if (process.env.CODOCS_ARTIFACT_ID)
+      expected.artifactId = process.env.CODOCS_ARTIFACT_ID;
+    const { receipt } = await verifyInput(
+      input,
+      head,
+      process.env.CODOCS_EXPECTED_STABLE,
+      expected,
+    );
     await writeFile(
       path.join(input, 'test-environment.json'),
       JSON.stringify(
@@ -119,7 +219,6 @@ async function main(mode) {
     );
   } else throw new Error('Usage: release-ci.mjs prepare|verify');
 }
-
 if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)

@@ -1,7 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { globSync } from 'node:fs';
 import path from 'node:path';
 import { assertNodeVersion, root } from '../toolchain.mjs';
+import {
+  discoverToolTests,
+  selectToolTests,
+  testSuites,
+} from './selection.mjs';
 
 /** 하위 도구의 종료 상태를 그대로 전달한다. */
 function run(args) {
@@ -14,25 +18,33 @@ function run(args) {
 }
 
 /** node:test 도구 회귀는 Vitest와 구분하며 패키지의 실행 도우미 검사도 수집한다. */
-function runToolTests() {
-  const tests = globSync(
-    ['tools/**/*.test.mjs', 'packages/**/src/**/test-support/*.test.mjs'],
-    { cwd: root },
-  ).sort();
+function runToolTests(suite) {
+  const tests = selectToolTests(discoverToolTests(), suite);
   if (tests.length) run(['--test', ...tests]);
 }
 
 try {
   assertNodeVersion();
   const vitest = path.join(root, 'node_modules/vitest/vitest.mjs');
-  const args = process.argv.slice(2);
+  const input = process.argv.slice(2);
+  const selector = input.find((arg) => arg.startsWith('--suite='));
+  const suite = selector?.slice('--suite='.length) ?? testSuites.all;
+  const tests = selectToolTests(discoverToolTests(), suite);
+  const args = input.filter((arg) => arg !== selector);
+  if (args.includes('--list-tools')) {
+    console.log(JSON.stringify(tests, null, 2));
+    process.exit(0);
+  }
   const watch = args.includes('--watch');
-  run([
-    vitest,
-    watch ? '--watch' : 'run',
-    ...args.filter((arg) => arg !== '--watch'),
-  ]);
-  if (!watch) runToolTests();
+  if (suite !== testSuites.management)
+    run([
+      vitest,
+      watch ? '--watch' : 'run',
+      ...args.filter((arg) => arg !== '--watch'),
+    ]);
+  if (suite === testSuites.management && watch)
+    throw new Error('management watch unsupported');
+  if (!watch) runToolTests(suite);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;

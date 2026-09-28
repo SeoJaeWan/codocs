@@ -7,6 +7,8 @@ import {
 } from './guide-assets/index.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  cpSync,
+  symlinkSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -1088,6 +1090,59 @@ void start; void stop; void command;
       const deployed = path.join(extracted, 'extension/dist');
       assertGuideAssets(root, deployed);
       checkExamples(deployed);
+    });
+  });
+
+  describe('제품별 독립 배포 버전', () => {
+    it('서로 다른 버전의 실제 tgz와 VSIX를 만들면 설치 metadata와 MCP initialize가 제품 manifest에 일치한다', async () => {
+      const directory = mkdtempSync(path.join(fixture, 'dynamic-products-'));
+      const versions = { npm: '1.2.3', vscode: '2.3.4' };
+      for (const file of [
+        'README.md',
+        'README.ko.md',
+        'LICENSE',
+        'logo.png',
+        'docs/guide',
+        'examples/.codocs',
+      ])
+        cpSync(path.join(root, file), path.join(directory, file), {
+          recursive: true,
+        });
+      for (const [folder, version] of [
+        ['mcp', versions.npm],
+        ['vscode', versions.vscode],
+      ] as const) {
+        const destination = path.join(directory, 'packages', folder);
+        mkdirSync(destination, { recursive: true });
+        const manifest = JSON.parse(
+          readFileSync(
+            path.join(root, 'packages', folder, 'package.json'),
+            'utf8',
+          ),
+        ) as { version: string };
+        manifest.version = version;
+        writeFileSync(
+          path.join(destination, 'package.json'),
+          JSON.stringify(manifest),
+        );
+        cpSync(
+          path.join(root, 'packages', folder, 'dist'),
+          path.join(destination, 'dist'),
+          { recursive: true },
+        );
+        // fixture는 같은 작업 worktree의 의존성만 읽고 별도 설치 소비자를 만든다.
+        symlinkSync(
+          path.join(root, 'packages', folder, 'node_modules'),
+          path.join(destination, 'node_modules'),
+          process.platform === 'win32' ? 'junction' : 'dir',
+        );
+      }
+      const archive = path.join(directory, 'codocs-2.3.4.vsix');
+      await packageVSIX(directory, archive);
+      const tgz = await packageMcp(directory, directory);
+      expect(path.basename(tgz)).toBe('co-documentation-1.2.3.tgz');
+      const evidence = await verifyRelease(tgz, archive, versions);
+      expect(evidence.passed).toBe(true);
     });
   });
 

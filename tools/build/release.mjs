@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { cp, mkdir, readFile, writeFile, mkdtemp } from 'node:fs/promises';
+import {
+  cp,
+  mkdir,
+  readFile,
+  writeFile,
+  mkdtemp,
+  lstat,
+  readlink,
+} from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +16,11 @@ import { createVSIX } from '@vscode/vsce';
 import { resolvePnpm, assertNodeVersion } from '../toolchain.mjs';
 import { bundledNotices } from './notices.mjs';
 import { releaseMetadata } from './release-metadata.mjs';
+import {
+  artifactName,
+  readProductVersions,
+  sourceDigest,
+} from './release-contract.mjs';
 
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -130,11 +143,18 @@ export async function packageRelease(root = repository, destination) {
     { cwd: root, stdio: 'inherit', windowsHide: true },
   );
   const tgz = await packageMcp(root, output);
-  const vsix = path.join(output, 'codocs-0.0.1.vsix');
+  const versions = await readProductVersions(root);
+  const vsix = path.join(output, artifactName('vscode', versions.vscode));
   await packageVSIX(root, vsix);
   const artifacts = [];
-  for (const file of [tgz, vsix])
+  for (const [product, file] of [
+    ['npm', tgz],
+    ['vscode', vsix],
+  ])
     artifacts.push({
+      product,
+      version: versions[product],
+      basename: path.basename(file),
       file,
       sha256: createHash('sha256')
         .update(await readFile(file))
@@ -150,10 +170,21 @@ export async function packageRelease(root = repository, destination) {
     ['-c', 'core.longpaths=true', 'diff', 'HEAD', '--'],
     { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
   );
+  const sourceFiles = await sourceIdentity(root);
+  const sourceTree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
   const receipt = {
+    schemaVersion: 1,
+    binding: null,
+    artifactName: null,
+    artifactId: null,
+    sourceTree,
+    sourceDigest: sourceDigest(sourceFiles),
     sourceCommit,
     sourceDiff,
-    sourceFiles: await sourceIdentity(root),
+    sourceFiles,
     platform: process.platform,
     arch: process.arch,
     node: process.versions.node,
@@ -168,7 +199,7 @@ export async function packageRelease(root = repository, destination) {
 }
 
 /** 미추적 구현 파일까지 포함한 Git 정규화 blob 목록을 후보에 결합한다. */
-async function sourceIdentity(root) {
+export async function sourceIdentity(root) {
   const files = execFileSync(
     'git',
     [
@@ -185,21 +216,66 @@ async function sourceIdentity(root) {
     .split('\0')
     .filter(Boolean)
     .sort();
-  const blobs = execFileSync(
-    'git',
-    ['-c', 'core.longpaths=true', 'hash-object', '--stdin-paths'],
-    {
+  const statuses = new Map();
+  for (const file of files)
+    statuses.set(file, await lstat(path.join(root, file)));
+  const regularFiles = files.filter(
+    (file) => !statuses.get(file).isSymbolicLink(),
+  );
+  const blobs = regularFiles.length
+    ? execFileSync(
+        'git',
+        ['-c', 'core.longpaths=true', 'hash-object', '--stdin-paths'],
+        {
+          cwd: root,
+          input: regularFiles.join('\n') + '\n',
+          encoding: 'utf8',
+          maxBuffer: 16 * 1024 * 1024,
+          stdio: ['pipe', 'pipe', 'ignore'],
+        },
+      )
+        .trim()
+        .split(/\r?\n/u)
+    : [];
+  assertEqualLength(regularFiles, blobs);
+  const regularBlobs = new Map(
+    regularFiles.map((file, index) => [file, blobs[index]]),
+  );
+  // Git은 Windows에서도 실행 비트와 링크 mode를 보존한다.
+  const indexedModes = new Map(
+    execFileSync('git', ['ls-files', '--stage', '-z'], {
       cwd: root,
-      input: files.join('\n') + '\n',
       encoding: 'utf8',
-      maxBuffer: 16 * 1024 * 1024,
-      stdio: ['pipe', 'pipe', 'ignore'],
-    },
-  )
-    .trim()
-    .split(/\r?\n/u);
-  assertEqualLength(files, blobs);
-  return files.map((file, index) => ({ file, gitBlob: blobs[index] }));
+    })
+      .split('\0')
+      .filter(Boolean)
+      .map((entry) => {
+        const [metadata, file] = entry.split('\t');
+        return [file, metadata.split(' ')[0]];
+      }),
+  );
+  const result = [];
+  for (const file of files) {
+    const status = statuses.get(file);
+    result.push({
+      file,
+      mode:
+        indexedModes.get(file) ??
+        (status.isSymbolicLink()
+          ? '120000'
+          : status.mode & 0o111
+            ? '100755'
+            : '100644'),
+      gitBlob: status.isSymbolicLink()
+        ? execFileSync('git', ['hash-object', '--stdin'], {
+            cwd: root,
+            encoding: 'utf8',
+            input: await readlink(path.join(root, file)),
+          }).trim()
+        : regularBlobs.get(file),
+    });
+  }
+  return result;
 }
 
 /** 일부 파일 누락으로 소스 식별자가 불완전해지는 것을 막는다. */

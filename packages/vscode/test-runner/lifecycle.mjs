@@ -1,3 +1,4 @@
+import { readProductVersions } from '../../../tools/build/release-contract.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
@@ -31,6 +32,7 @@ async function main(args = process.argv.slice(2)) {
   if (!/^\d+\.\d+\.\d+$/u.test(version))
     throw new Error('정확한 VS Code 버전이 필요합니다');
   const root = path.resolve(import.meta.dirname, '../../..');
+  const productVersions = await readProductVersions(root);
   const output = path.join(
     root,
     '.workbench/vscode-lifecycle',
@@ -121,6 +123,7 @@ async function main(args = process.argv.slice(2)) {
           extension: harness,
           archive,
           archiveSha256,
+          extensionVersion: productVersions.vscode,
           profile,
           missingSuite,
         }),

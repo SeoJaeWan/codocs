@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { releaseMetadata } from './release-metadata.mjs';
+import { readProductVersions } from './release-contract.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const require = createRequire(path.join(root, 'packages/mcp/package.json'));
@@ -23,7 +24,7 @@ const {
 } = require('@modelcontextprotocol/sdk/client/stdio.js');
 
 /** npm의 실제 JS 진입점을 찾아 shell 해석 없이 설치한다. */
-export async function installMcp(archive, consumer) {
+export async function installMcp(archive, consumer, expectedVersion) {
   const candidates = [
     path.join(
       path.dirname(process.execPath),
@@ -76,7 +77,10 @@ export async function installMcp(archive, consumer) {
     await readFile(path.join(directory, 'package.json'), 'utf8'),
   );
   assert.equal(manifest.name, 'co-documentation');
-  assert.equal(manifest.version, '0.0.1');
+  assert.equal(
+    manifest.version,
+    expectedVersion ?? (await readProductVersions(root)).npm,
+  );
   assert.equal(manifest.license, 'MIT');
   assert.equal(manifest.engines.node, '24.x');
   assert.equal(manifest.private, undefined);
@@ -93,9 +97,10 @@ export async function installMcp(archive, consumer) {
 }
 
 /** 설치된 bin으로 MCP 전체 흐름과 번들 자산 및 EOF 종료를 확인한다. */
-export async function verifyMcp(archive, temporary) {
+export async function verifyMcp(archive, temporary, expectedVersion) {
   const consumer = path.join(temporary, 'consumer');
-  const installed = await installMcp(archive, consumer);
+  const installed = await installMcp(archive, consumer, expectedVersion);
+  const version = expectedVersion ?? (await readProductVersions(root)).npm;
   const project = path.join(temporary, '한글 project');
   await mkdir(project);
   await cp(
@@ -143,7 +148,7 @@ export async function verifyMcp(archive, temporary) {
     );
     assert.deepEqual(client.getServerVersion(), {
       name: 'co-documentation',
-      version: '0.0.1',
+      version,
     });
     assert.deepEqual(
       (await client.listTools()).tools.map((tool) => tool.name),
@@ -213,8 +218,9 @@ export async function verifyMcp(archive, temporary) {
 }
 
 /** 명시한 기존 산출물을 재빌드 없이 검사하고 외부 소비자 증거를 남긴다. */
-export async function verifyRelease(tgz, vsix) {
+export async function verifyRelease(tgz, vsix, versions) {
   assert.equal(process.versions.node.split('.')[0], '24');
+  versions ??= await readProductVersions(root);
   const temporary = await mkdtemp(path.join(os.tmpdir(), 'codocs-release-'));
   const output = path.join(
     root,
@@ -264,7 +270,7 @@ export async function verifyRelease(tgz, vsix) {
       await readFile(path.join(extension, 'package.json'), 'utf8'),
     );
     assert.equal(manifest.publisher + '.' + manifest.name, 'seojaewan.codocs');
-    assert.equal(manifest.version, '0.0.1');
+    assert.equal(manifest.version, versions.vscode);
     assert.equal(manifest.license, 'MIT');
     assert.equal(manifest.icon, 'logo.png');
     assert.equal(
@@ -292,7 +298,7 @@ export async function verifyRelease(tgz, vsix) {
       'dist/server/THIRD-PARTY-NOTICES.txt',
     ])
       await access(path.join(extension, file));
-    evidence.mcp = await verifyMcp(tgz, temporary);
+    evidence.mcp = await verifyMcp(tgz, temporary, versions.npm);
     for (const file of ['README.md', 'README.ko.md', 'LICENSE', 'logo.png'])
       assert.deepEqual(
         await readFile(path.join(evidence.mcp.directory, file)),

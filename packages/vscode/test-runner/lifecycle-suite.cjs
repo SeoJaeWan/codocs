@@ -8,7 +8,7 @@ exports.run =
       await fs.readFile(process.env.CODOCS_VSCODE_CONFIG, 'utf8'),
     );
     const extension = vscode.extensions.getExtension('seojaewan.codocs');
-    if (extension?.packageJSON.version !== '0.0.1')
+    if (extension?.packageJSON.version !== config.extensionVersion)
       throw new Error('설치된 확장 ID/버전 불일치');
     if (
       !extension.extensionPath.startsWith(
