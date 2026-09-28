@@ -30,6 +30,7 @@ import {
   latestReleaseRun,
   assertRequiredCheck,
   releaseBranch,
+  workflowIdentity,
 } from './release-flow.mjs';
 
 const require = createRequire(import.meta.url);
@@ -108,7 +109,7 @@ export async function validatePublication({
     'stale candidate attempt',
   );
   assert.equal(run.head_sha, pr.head.sha, 'CI head mismatch');
-  assert.equal(run.name, workflowNames.ci, 'CI workflow mismatch');
+  assert.equal(workflowIdentity(run), workflowNames.ci, 'CI workflow mismatch');
   assert.equal(run.event, 'pull_request', 'release PR CI required');
   assert.equal(run.status, 'completed', 'release CI incomplete');
   assert.equal(run.conclusion, 'success', 'release CI unsuccessful');

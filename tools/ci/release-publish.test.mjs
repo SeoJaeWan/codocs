@@ -130,7 +130,8 @@ async function publicationFixture(mode = 'squash') {
     id: 10,
     run_attempt: 1,
     head_sha: headSha,
-    name: 'Tests',
+    name: 'CI PR #35',
+    path: '.github/workflows/test.yml',
     event: 'pull_request',
     status: 'completed',
     conclusion: 'success',
@@ -222,6 +223,37 @@ describe('버전 증가 제품만 선택', /** 입력 조건과 관찰 결과를
 });
 
 describe('최종 CI 후보와 병합 소스 연결', /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ () => {
+  test('게시 검증은 실제 run 표시 이름과 bare·qualified 경로를 사용한다', /** unrelated·missing 경로는 원본 후보로도 거부한다. */ async () => {
+    const fixture = await publicationFixture();
+    try {
+      for (const path of [
+        '.github/workflows/test.yml',
+        '.github/workflows/test.yml@main',
+      ])
+        assert.deepEqual(
+          await validatePublication({
+            ...validationInput(fixture),
+            run: { ...fixture.run, path },
+          }),
+          ['npm'],
+        );
+      for (const path of [
+        undefined,
+        '.github/workflows/test.yml.fake',
+        '.github/workflows/other.yml',
+        '.github/workflows/test.yml@',
+      ])
+        await assert.rejects(
+          validatePublication({
+            ...validationInput(fixture),
+            run: { ...fixture.run, path },
+          }),
+          /CI workflow mismatch/u,
+        );
+    } finally {
+      await fixture.dispose();
+    }
+  });
   for (const mode of ['merge', 'squash', 'rebase'])
     test(`${mode}의 main commit 번호가 바뀌어도 전체 소스와 최종 검증 바이트가 같으면 게시를 허용한다`, /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ async () => {
       const fixture = await publicationFixture(mode);

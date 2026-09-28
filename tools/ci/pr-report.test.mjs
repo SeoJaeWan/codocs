@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import {
   commentMetadata,
@@ -10,6 +15,7 @@ import {
   summarizeJobs,
 } from './pr-report.mjs';
 import { createReport, sourceDigest } from '../build/release-contract.mjs';
+import { releaseBranch } from './release-flow.mjs';
 const binding = {
   repository: 'SeoJaeWan/codocs',
   prNumber: 35,
@@ -52,7 +58,8 @@ const candidate = {
 const run = {
   id: 123,
   run_attempt: 2,
-  name: 'Tests',
+  name: 'CI PR #35',
+  path: '.github/workflows/test.yml',
   event: 'pull_request',
   head_sha: binding.headSha,
   conclusion: 'success',
@@ -257,6 +264,70 @@ describe('최신 실행과 댓글 순서 확인', /** 입력 조건과 관찰 �
 });
 
 describe('신뢰한 API 결과와 단일 댓글 게시', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ () => {
+  for (const path of [
+    '.github/workflows/test.yml',
+    '.github/workflows/test.yml@main',
+  ])
+    for (const conclusion of ['success', 'failure'])
+      it(`실제 표시 이름과 ${path}의 ${conclusion} 결과를 하나의 댓글로 생성·갱신한다`, /** canonical binding과 실제 API 식별자를 함께 확인한다. */ async () => {
+        const f = fixture();
+        f.trigger.path = path;
+        f.trigger.conclusion = conclusion;
+        assert.equal(
+          await resolveReportPr(
+            f.api,
+            f.readArchive,
+            binding.repository,
+            f.trigger,
+          ),
+          35,
+        );
+        assert.equal(
+          newestRun([{ ...f.trigger, id: 120 }, f.trigger], binding).id,
+          123,
+        );
+        assert.equal(
+          await reportRun(f.api, f.readArchive, binding.repository, f.trigger),
+          'updated',
+        );
+        assert.equal(f.writes.length, 1);
+        assert.match(
+          f.writes[0].body.body,
+          new RegExp(`required-ci: \\*\\*${conclusion}\\*\\*`, 'u'),
+        );
+        f.comments.push({
+          id: 999,
+          user: { type: 'Bot', login: 'github-actions[bot]' },
+          body: f.writes[0].body.body,
+        });
+        assert.equal(
+          await reportRun(f.api, f.readArchive, binding.repository, f.trigger),
+          'updated',
+        );
+        assert.equal(f.writes.length, 2);
+        assert.equal(f.writes[1].method, 'PATCH');
+        assert.match(f.writes[1].route, /comments\/999$/u);
+      });
+  for (const path of [
+    undefined,
+    '.github/workflows/other.yml',
+    '.github/workflows/test.yml.fake',
+    '.github/workflows/test.yml@',
+  ])
+    it(`잘못된 workflow path ${path}를 실제 표시 이름만으로 허용하지 않는다`, /** 표시 이름은 workflow 신뢰 증거가 아니다. */ async () => {
+      const f = fixture();
+      const invalid = { ...f.trigger, path };
+      await assert.rejects(
+        resolveReportPr(f.api, f.readArchive, binding.repository, invalid),
+        /unknown workflow/u,
+      );
+      await assert.rejects(
+        reportRun(f.api, f.readArchive, binding.repository, invalid),
+        /unknown workflow/u,
+      );
+      assert.equal(newestRun([invalid], binding), undefined);
+      assert.equal(f.writes.length, 0);
+    });
   it('성공한 최신 PR의 OS 시간과 실행 링크를 댓글 하나에 쓴다', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ async () => {
     const f = fixture();
     assert.equal(
@@ -425,6 +496,7 @@ describe('신뢰한 API 결과와 단일 댓글 게시', /** 입력 조건과 �
       id: 987,
       run_attempt: 1,
       name: 'Release publish',
+      path: '.github/workflows/release-publish.yml',
       event: 'push',
       conclusion: 'failure',
     };
@@ -479,6 +551,7 @@ describe('신뢰한 API 결과와 단일 댓글 게시', /** 입력 조건과 �
           id: 987,
           run_attempt: 1,
           name: 'Release publish',
+          path: '.github/workflows/release-publish.yml',
         }),
         new RegExp(message, 'u'),
       );
@@ -492,6 +565,244 @@ describe('신뢰한 API 결과와 단일 댓글 게시', /** 입력 조건과 �
         ),
       /invalid comment run ID/u,
     );
+  });
+});
+
+/** 게시 없는 실행의 신뢰 조회·artifact·archive·댓글 경계를 관찰한다. */
+function noPublicationFixture(conclusion, event = 'push') {
+  const f = fixture();
+  const current = {
+    id: 987,
+    run_attempt: 1,
+    name: 'Release publish',
+    path: '.github/workflows/release-publish.yml',
+    head_branch: 'main',
+    head_sha: '9'.repeat(40),
+    event,
+    conclusion,
+  };
+  const artifacts = [];
+  const pulls = [];
+  const archiveReads = [];
+  /** 실제 게시 실행과 정확한 commit 연결만 대체한다. */
+  async function api(method, route, body) {
+    if (route === '/repos/SeoJaeWan/codocs/actions/runs/987') {
+      f.calls.push([method, route]);
+      return current;
+    }
+    if (route.includes('/runs/987/artifacts?')) {
+      f.calls.push([method, route]);
+      return { artifacts };
+    }
+    if (
+      route.startsWith(
+        `/repos/SeoJaeWan/codocs/commits/${current.head_sha}/pulls?`,
+      )
+    ) {
+      f.calls.push([method, route]);
+      return pulls;
+    }
+    return f.api(method, route, body);
+  }
+  return {
+    ...f,
+    current,
+    artifacts,
+    pulls,
+    archiveReads,
+    api,
+    /** archive 소비가 생략되었는지도 별도로 기록한다. */
+    readArchive: async (id, filename) => {
+      archiveReads.push([id, filename]);
+      return f.readArchive(id, filename);
+    },
+  };
+}
+
+describe('게시 없는 실행의 reporter 생략', /** 실제 누락과 정상 생략을 구별한다. */ () => {
+  for (const [name, operation, ignored] of [
+    ['resolver', resolveReportPr, null],
+    ['writer', reportRun, 'ignored'],
+  ]) {
+    it(`${name}: 신뢰한 skipped 실행은 artifact 조회조차 하지 않는다`, /** 러너 없는 게시의 댓글 소비를 생략한다. */ async () => {
+      const f = noPublicationFixture('skipped');
+      assert.equal(
+        await operation(f.api, f.readArchive, binding.repository, f.current),
+        ignored,
+      );
+      assert.equal(f.calls.length, 1);
+      assert.equal(f.archiveReads.length, 0);
+      assert.equal(f.writes.length, 0);
+    });
+    it(`${name}: 성공한 비릴리스 main push는 증거 없이 생략한다`, /** 정확한 commit의 일반 PR 연결만 허용한다. */ async () => {
+      const f = noPublicationFixture('success');
+      f.pulls.push({
+        merged_at: '2026-09-28',
+        merge_commit_sha: f.current.head_sha,
+        base: { ref: 'main' },
+        head: { ref: 'feature' },
+      });
+      assert.equal(
+        await operation(f.api, f.readArchive, binding.repository, f.current),
+        ignored,
+      );
+      assert.ok(
+        f.calls.some(([, route]) =>
+          route.includes(`/commits/${f.current.head_sha}/pulls?`),
+        ),
+      );
+      assert.equal(f.archiveReads.length, 0);
+      assert.equal(f.writes.length, 0);
+    });
+    it(`${name}: 실제 릴리스 commit의 게시 증거 누락은 실패한다`, /** 생략 예외가 릴리스 오류를 가리지 않는다. */ async () => {
+      const f = noPublicationFixture('success');
+      f.pulls.push({
+        merged_at: '2026-09-28',
+        merge_commit_sha: f.current.head_sha,
+        base: { ref: 'main' },
+        head: { ref: releaseBranch },
+      });
+      await assert.rejects(
+        operation(f.api, f.readArchive, binding.repository, f.current),
+        /one exact live artifact required/u,
+      );
+      assert.equal(f.writes.length, 0);
+    });
+    for (const [conclusion, event] of [
+      ['failure', 'push'],
+      ['cancelled', 'push'],
+      ['success', 'workflow_dispatch'],
+    ])
+      it(`${name}: ${event}/${conclusion}의 누락은 생략하지 않는다`, /** 실패·취소·재시도에는 게시 증거를 요구한다. */ async () => {
+        const f = noPublicationFixture(conclusion, event);
+        await assert.rejects(
+          operation(f.api, f.readArchive, binding.repository, f.current),
+          /one exact live artifact required/u,
+        );
+        assert.equal(f.writes.length, 0);
+      });
+    for (const expired of [true, false])
+      it(`${name}: ${expired ? '만료된' : '중복된'} 게시 증거는 비릴리스 예외로 무시하지 않는다`, /** 잘못된 artifact를 정상 부재와 구별한다. */ async () => {
+        const f = noPublicationFixture('success');
+        f.artifacts.push({ id: 988, name: 'codocs-publish-987-1', expired });
+        if (!expired)
+          f.artifacts.push({
+            id: 989,
+            name: 'codocs-publish-987-1',
+            expired: false,
+          });
+        await assert.rejects(
+          operation(f.api, f.readArchive, binding.repository, f.current),
+          /one exact live artifact required/u,
+        );
+        assert.equal(f.archiveReads.length, 0);
+        assert.equal(f.writes.length, 0);
+      });
+    it(`${name}: webhook의 skipped 주장만으로 현재 실패 실행을 생략하지 않는다`, /** 실제 조회한 결론만 신뢰한다. */ async () => {
+      const f = noPublicationFixture('failure');
+      await assert.rejects(
+        operation(f.api, f.readArchive, binding.repository, {
+          ...f.current,
+          conclusion: 'skipped',
+        }),
+        /one exact live artifact required/u,
+      );
+    });
+    it(`${name}: 손상된 게시 archive는 비릴리스 예외로 무시하지 않는다`, /** archive 소비 실패가 정상 부재로 바뀌지 않는다. */ async () => {
+      const f = noPublicationFixture('success');
+      f.artifacts.push({
+        id: 988,
+        name: 'codocs-publish-987-1',
+        expired: false,
+      });
+      await assert.rejects(
+        operation(
+          f.api,
+          /** 실제 archive 파싱 실패를 전달한다. */ async () => {
+            throw new Error('corrupt publish archive');
+          },
+          binding.repository,
+          f.current,
+        ),
+        /corrupt publish archive/u,
+      );
+      assert.equal(f.writes.length, 0);
+    });
+    it(`${name}: skipped라도 다른 workflow는 거부한다`, /** 생략 전에 고정 workflow를 확인한다. */ async () => {
+      const f = noPublicationFixture('skipped');
+      const trigger = { ...f.current };
+      f.current.path = '.github/workflows/fake.yml';
+      await assert.rejects(
+        operation(f.api, f.readArchive, binding.repository, trigger),
+        /trusted publish workflow required/u,
+      );
+    });
+  }
+  it('실제 resolver CLI는 생략한 실행에 pr_number 출력을 쓰지 않는다', /** 실행 출력 부재로 후속 writer를 막는다. */ async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'codocs-report-skip-'));
+    const f = noPublicationFixture('skipped');
+    const requests = [];
+    const server = createServer(
+      /** 독립 로컬 API는 현재 게시 실행 한 건만 제공한다. */ (
+        request,
+        response,
+      ) => {
+        requests.push(request.url);
+        response.setHeader('content-type', 'application/json');
+        if (request.url === '/repos/SeoJaeWan/codocs/actions/runs/987')
+          response.end(JSON.stringify(f.current));
+        else {
+          response.statusCode = 404;
+          response.end('{}');
+        }
+      },
+    );
+    try {
+      await new Promise(
+        /** 서버 준비 후 실제 CLI를 시작한다. */ (resolve) =>
+          server.listen(0, '127.0.0.1', resolve),
+      );
+      const event = path.join(directory, 'event.json');
+      const output = path.join(directory, 'output');
+      await writeFile(event, JSON.stringify({ workflow_run: f.current }));
+      await writeFile(output, '');
+      const child = spawn(
+        process.execPath,
+        [new URL('./pr-report.mjs', import.meta.url).pathname, 'resolve'],
+        {
+          env: {
+            ...process.env,
+            GITHUB_EVENT_PATH: event,
+            GITHUB_OUTPUT: output,
+            GITHUB_REPOSITORY: binding.repository,
+            GITHUB_TOKEN: 'fixture-only',
+            GITHUB_API_URL: `http://127.0.0.1:${server.address().port}`,
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+      );
+      let stderr = '';
+      child.stderr.on(
+        'data',
+        /** 실패 로그를 테스트 진단에만 남긴다. */ (value) => {
+          stderr += value;
+        },
+      );
+      const code = await new Promise(
+        /** CLI 종료 상태를 기다린다. */ (resolve, reject) => {
+          child.once('error', reject);
+          child.once('close', resolve);
+        },
+      );
+      assert.equal(code, 0, stderr);
+      assert.equal(await readFile(output, 'utf8'), '');
+      assert.deepEqual(requests, ['/repos/SeoJaeWan/codocs/actions/runs/987']);
+    } finally {
+      await new Promise(
+        /** fixture 서버를 종료한다. */ (resolve) => server.close(resolve),
+      );
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
 
