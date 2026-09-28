@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { test, describe } from 'node:test';
 import {
@@ -21,7 +23,78 @@ import {
   runOfficial,
   fixtureEnv,
   root,
+  appTokenRevision,
+  appTokenManifestSha256,
+  officialAppTokenManifest,
 } from './release-fixture.mjs';
+
+const coreRequire = createRequire(
+  path.join(root, 'packages/core/package.json'),
+);
+const YAML = coreRequire('yaml');
+
+describe('공식 GitHub App 토큰 Action 연결', /** 고정 primary manifest와 실제 workflow 입력을 대조한다. */ () => {
+  for (const [name, permissions] of Object.entries({
+    prepare: {
+      'permission-contents': 'write',
+      'permission-pull-requests': 'write',
+      'permission-actions': 'read',
+      'permission-checks': 'read',
+      'permission-administration': 'read',
+    },
+    publish: {
+      'permission-contents': 'read',
+      'permission-pull-requests': 'read',
+      'permission-actions': 'read',
+      'permission-checks': 'read',
+      'permission-administration': 'read',
+    },
+    sync: {
+      'permission-contents': 'write',
+      'permission-pull-requests': 'write',
+      'permission-administration': 'read',
+    },
+  }))
+    test(`${name} workflow는 실제 Node24 manifest의 고정 commit과 호환 입력·기존 권한을 사용한다`, /** 실제 primary 원문과 소비 workflow를 파싱하여 계약을 확인한다. */ async () => {
+      const raw = await officialAppTokenManifest();
+      assert.equal(
+        createHash('sha256').update(raw).digest('hex'),
+        appTokenManifestSha256,
+      );
+      const manifest = YAML.parse(raw.toString('utf8'));
+      assert.equal(manifest.runs.using, 'node24');
+      assert.ok(manifest.outputs.token);
+      const workflow = YAML.parse(
+        await readFile(
+          path.join(root, `.github/workflows/release-${name}.yml`),
+          'utf8',
+        ),
+      );
+      const tokenSteps = Object.values(workflow.jobs).flatMap((job) =>
+        job.steps.filter((step) =>
+          step.uses?.startsWith('actions/create-github-app-token@'),
+        ),
+      );
+      assert.equal(tokenSteps.length, 1);
+      const step = tokenSteps[0];
+      assert.match(appTokenRevision, /^[a-f0-9]{40}$/u);
+      assert.equal(
+        step.uses,
+        `actions/create-github-app-token@${appTokenRevision}`,
+      );
+      assert.equal(step.id, 'app');
+      assert.deepEqual(step.with, {
+        'app-id': '${{ vars.CODOCS_RELEASE_APP_ID }}',
+        'private-key': '${{ secrets.CODOCS_RELEASE_APP_PRIVATE_KEY }}',
+        ...permissions,
+      });
+      for (const input of Object.keys(step.with))
+        assert.ok(Object.hasOwn(manifest.inputs, input), input);
+      for (const [input, contract] of Object.entries(manifest.inputs))
+        if (contract.required && !Object.hasOwn(contract, 'default'))
+          assert.ok(Object.hasOwn(step.with, input), input);
+    });
+});
 
 describe('공식 릴리스 Action 연결', /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ () => {
   test('고정한 실제 version Action을 실행하면 같은 PR을 갱신하고 develop 원본에서 더 높은 버전을 다시 계산한다', /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ async () => {
@@ -131,7 +204,7 @@ describe('공식 릴리스 Action 연결', /** 입력 조건과 관찰 결과를
         ]).includes('변경 c'),
       );
       await writeFile(
-        path.join(root, '.workbench/official-api-evidence.json'),
+        path.join(root, '.workbench/task003-r1-official-api-evidence.json'),
         JSON.stringify(
           {
             requests: api.state.requests,

@@ -16,6 +16,19 @@ import { actionRevision, releaseBranch, git } from './release-flow.mjs';
 
 /** 인접 테스트의 독립 Git/API workspace 기준 디렉터리다. */
 export const root = fileURLToPath(new URL('../../', import.meta.url));
+/** Node24와 기존 App 입력을 제공하는 공식 v3.2.0 commit이다. */
+export const appTokenRevision = 'bcd2ba49218906704ab6c1aa796996da409d3eb1';
+/** 해당 commit의 action.yml 원문을 독립 다운로드로 확인한 SHA-256이다. */
+export const appTokenManifestSha256 =
+  '2c4c77d1cafa8d792ab4a9d449799221baf95176a47692ad9a0b350b0a2618ed';
+/** 고정 commit의 공식 manifest 원문을 읽고 네트워크 실패를 검증 실패로 남긴다. */
+export async function officialAppTokenManifest() {
+  const response = await fetch(
+    `https://raw.githubusercontent.com/actions/create-github-app-token/${appTokenRevision}/action.yml`,
+  );
+  assert.ok(response.ok, `official App Action manifest: ${response.status}`);
+  return Buffer.from(await response.arrayBuffer());
+}
 /** Git fixture에 고정 identity를 사용하고 사용자 credential 설정을 읽지 않는다. */
 export const fixtureEnv = {
   ...process.env,
