@@ -29,12 +29,15 @@ definition: |
   배포에 반영할 기능·수정 PR은 해당 코드와 함께 개별 Changesets 파일을 develop에 반영한다. 각 기록은 npm·확장 중 영향받는 대상, patch·minor·major 변경 수준과 설명을 담으며 확정된 다음 버전 번호를 적는 용도가 아니다.
   작업별 기록을 독립 파일로 누적하고 기능 PR 병합마다 실제 버전을 올리지 않는다. 배포가 필요하지 않은 변경에 제품 버전 증가를 요구하지 않는다.
 
+  버전 계산·changelog·기록 소비에는 고정한 공식 Changesets CLI를 사용한다. 릴리스 브랜치와 단일 PR의 생성·갱신에는 공식 Changesets version Action의 script·pr-base-branch·pr-draft 기능을 우선 사용한다. 자체 버전 계산기나 PR 관리자를 추가하지 않으며, 프로젝트 연결 도구는 소스 최신성·보호·동기화·검증 후보의 소비 경계를 확인한다.
+
   봇은 develop에 쌓인 미출시 Changesets를 취합하여 임시 릴리스 브랜치에서 버전·changelog를 갱신하고 소비한 기록을 정리한다. main을 대상으로 Draft 릴리스 PR 하나를 생성하고 추가 작업이 반영되면 같은 PR을 갱신한다.
   매 갱신은 기준 소스의 미출시 기록 전체로 계산한다. 이전에 봇이 생성한 다음 버전을 다시 증가시키지 않으며, 같은 제품의 여러 patch 기록은 한 번의 patch 릴리스로 모은다. 더 높은 변경 수준이 포함되면 그 수준을 반영한다.
   준비 중인 버전과 changelog 변경은 릴리스 브랜치에만 존재한다. 봇의 준비 작업은 develop·main에 직접 쓰지 않으며 별도 버전 준비 PR을 develop에 먼저 병합하는 단계를 요구하지 않는다.
 
   봇이 릴리스 PR을 만들거나 갱신한 사실은 출시 승인이 아니다. 출시할 작업이 준비되면 릴리스 PR을 리뷰 준비로 전환하여 포함 작업·제품별 버전·changelog를 확인하고 [[개발 환경]]의 전체 CI와 병합 조건을 적용한다.
   최종 버전이 들어간 소스에서 배포 파일을 만들고 검사한다. 리뷰 준비 이후 코드·버전이 바뀌면 최신 결과로 다시 검사하며 이전 실행의 파일을 게시 근거로 사용하지 않는다.
+  공식 Action은 리뷰 준비 후에도 같은 PR을 갱신한다. 갱신을 막거나 자동으로 Draft로 되돌리지 않는다. 최종 CI는 릴리스 head의 원래 부모가 현재 develop인지, main 결과가 develop에 동기화됐는지 확인하여 오래된 준비 결과를 거부한다.
 
   릴리스 PR을 main에 병합한 뒤 main의 버전·changelog·소비된 Changesets 결과를 PR로 develop에 동기화한다. 그 사이 develop에 추가된 다음 릴리스용 코드와 기록은 보존한다.
   봇은 동기화 전 develop에 남은 이미 소비된 기록으로 같은 릴리스를 다시 준비하지 않는다. 릴리스 반영·동기화와 다음 릴리스 준비의 순서를 조정하여 동일 기록의 재소비와 버전 중복 증가를 막는다.
@@ -49,6 +52,7 @@ definition: |
   검증 후보와 소스·해시·검증 실행 연결 정보는 배포를 위해 보관한다. 후보가 없거나 만료됐으면 임의 재빌드한 파일을 기존 검증 결과로 게시하지 않는다.
 
   대상별 게시 결과를 구분하고 일부만 실패하면 실패한 대상만 재시도한다. 이미 성공한 대상의 같은 버전을 중복 게시하지 않는다.
+  재시도는 현재 main의 동일 릴리스와 보관된 최종 CI 후보를 사용한다. 공개된 정확한 버전의 파일 해시를 대조하여 기록 저장 중 중단에도 중복 게시를 막는다. 현재 main·최종 CI 실행이 이동하거나 후보가 만료·누락됐으면 재시도를 차단하고 원인을 확인한다.
   PR 결과 댓글에는 대상별 버전·성공·실패를 표시하며 버전이 바뀌지 않아 게시하지 않은 대상을 배포 성공으로 표시하지 않는다. 댓글 유지와 일반 검사 결과의 표시는 [[개발 환경]]을 따른다.
 
   ## 배포 계약
@@ -68,6 +72,22 @@ definition: |
 
   VS Code manifest와 로컬 Extension Host 검사 기준은 1.100.0이다. 번들 의존성 chokidar 5의 Node >=20.19 요구와 VS Code 1.100.0 내장 Node 20.19.0의 실제 실행을 근거로 한다. Windows의 공식 Extension Host 기능 검증과 VSIX 설치·macOS 지원 검증을 구분한다. 동일 후보의 Windows·macOS 기능·정리 결과를 각각 확인한 뒤 지원 검증 완료를 선언한다.
   npm·Marketplace 게시에는 이름 사용 가능 여부와 게시 설정을 확인한다.
+
+  ## 운영 활성화와 검증 경계
+
+  자동 준비·동기화·게시의 활성화는 소스 구현과 별도로 수행한다. 운영자는 아래 순서를 완료한 뒤 저장소의 CODOCS_RELEASE_ENABLED를 true로 설정한다. main의 병합 후 Tests 실행 제거는 [[개발 환경]]의 보호 적용 확인 이후 별도로 반영한다.
+
+  1. develop을 생성하고 main·develop에 [[개발 환경]]의 strict required-ci·PR 의무·관리자 적용·우회 차단을 실제로 설정한다. 현재 연결 도구는 classic branch protection 응답을 확인하며 ruleset만 있는 설정은 통과로 인정하지 않는다.
+  2. 저장소에 설치한 GitHub App의 contents·pull requests 권한과 PR을 통한 변경 경로를 확인하고 CODOCS_RELEASE_APP_ID·CODOCS_RELEASE_APP_PRIVATE_KEY를 준비한다. App 커밋에서도 ready·추가 push의 Tests가 실제 시작돼야 한다. 게시용 release environment에는 CODOCS_NPM_TOKEN·CODOCS_MARKETPLACE_TOKEN을 연결하고 각 제품의 실제 권한·이름을 확인한다.
+  3. 실제 GitHub에서 Draft·ready·추가 수정·Draft 복귀·닫기·재개와 실행 취소 격리, 실패·취소·생략된 required-ci의 병합 차단을 확인한다. 동일 tgz·VSIX의 Windows·macOS 최소·고정 stable 설치·전체 기능·네 종류 종료 정리를 완료한다.
+  4. 검증한 최종 릴리스 PR 파일이 실제 게시에서 재사용되는지, 한 제품 실패 시 성공한 제품을 보존하는지 확인한다. main→develop 동기화 중 새 코드·Changesets를 보존하고 다음 공식 계산에서 소비한 기록을 다시 사용하지 않는지도 확인한다.
+
+  로컬 Git·REST·GraphQL fixture와 로컬 게시 adapter는 연결 계약을 확인하는 시험이다. 실제 GitHub 이벤트·보호·App 권한·공개 게시 또는 Windows 실행의 성공을 대신하지 않는다. macOS의 실제 설치·기능·종료 결과도 실행한 OS와 정확한 버전에 한해 기록한다.
+
+  ## 연결 도구와 통합 검사의 진입점
+
+  공식 CLI의 진입점은 pnpm changeset·pnpm release:version이다. tools/ci/release-flow.mjs와 인접 테스트는 공식 준비의 소스·활성화 guard를, release-sync.mjs와 인접 테스트는 신규 기록을 보존하는 동기화를, release-publish.mjs와 인접 테스트는 최종 CI archive 소비와 제품별 재시도를 확인한다.
+  tools/ci/ci-release.integration.test.mjs는 공식 CLI로 최종 버전을 만든 독립 fixture의 실제 tgz·VSIX를 CI 입력 검증·집계·게시 adapter에 연결한다. 실제 official Action fixture의 ready 갱신·preflight·동기화·다음 릴리스도 결합한다. 기본 pnpm test에 포함되며 GUI는 CODOCS_VERIFY_GUI=1로 명시한 실행에서만 같은 후보의 최소·고정 stable 기능과 종료·정리를 수행한다.
 
   ## 성능 목표
 

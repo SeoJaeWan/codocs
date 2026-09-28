@@ -4,7 +4,7 @@
 
 PR과 병합 후 반복하는 전체 검증을 정리하고 develop의 Changesets를 봇이 릴리스 PR으로 모아 main 병합 시 자동 배포하며, JavaScript Action의 Node 20 런타임 경고를 해소한다. 사용자 검토에 따라 이번 작업은 CI·자동 배포 정리로 한정한다. Hover를 포함한 제품 성능 측정·분석·최적화와 측정 도구 개선은 범위에서 제외한다. 기존 테스트 자체의 최적화도 후속으로 미룬다.
 
-이 PR은 검토 결과·합의한 프로젝트 지식과 후속 작업계획을 기록한다. 제품 코드, 워크플로, 저장소 보호 규칙, 배포 버전은 변경하지 않는다. CI 시간 단축을 완료했다고 판정하지 않는다. 별도 Jira 번호는 부여하지 않는다.
+이 문서는 최초 검토와 확정 정책을 보존하고 아래 로컬 구현 결과·운영 전환 경계를 연결한다. CI 시간 단축을 완료했다고 판정하지 않는다. 별도 Jira 번호는 부여하지 않는다.
 
 ## 검토 기준과 확인 결과
 
@@ -88,7 +88,7 @@ PR과 병합 후 반복하는 전체 검증을 정리하고 develop의 Changeset
 
 Draft 릴리스 PR의 제품 검사는 모두 생략하되 develop 병합을 처리하는 봇의 PR 관리 작업 자체는 실행한다. 봇은 보호된 develop·main에 직접 쓰거나 필수 검사를 우회하지 않는다. 기능·릴리스·동기화 PR 모두 같은 전체 검사를 요구하므로 기존 단일 브랜치 흐름보다 PR 검사 횟수가 늘 수 있다. 병합 후 테스트 재실행을 없애는 것과 PR 수에 따른 검증 비용을 구분한다.
 
-구현에서는 Changesets의 기본 버전 PR 자동화를 그대로 복사하지 않고 develop 입력·main 대상의 릴리스 PR 갱신을 연결한다. 현재 비공개 workspace 이름과 실제 공개 npm·Marketplace 대상의 연결, 내부 의존성에 따른 버전 변경 전파를 확인하여 두 제품의 독립 버전 정책을 보존한다. 봇이 만든 커밋에서도 ready 전환·추가 push의 필수 CI가 실제 실행되는지 확인한다.
+구현에서는 공식 Changesets CLI와 version Action의 script·pr-base-branch·pr-draft 기능을 우선 사용하여 develop 입력·main 대상의 릴리스 PR 갱신을 연결한다. 버전 계산·changelog·PR 관리를 자체 구현하지 않으며 프로젝트 연결 도구는 최신성·보호·동기화·게시 후보 검증을 담당한다. 현재 비공개 workspace 이름과 실제 공개 npm·Marketplace 대상의 연결, 내부 의존성에 따른 버전 변경 전파를 확인하여 두 제품의 독립 버전 정책을 보존한다. 봇이 만든 커밋에서도 ready 전환·추가 push의 필수 CI가 실제 실행되는지 확인한다.
 
 릴리스 병합 직후 develop에 남은 이미 소비한 기록이 다시 버전 증가에 사용되지 않게 게시·동기화·다음 PR 준비 순서를 조정한다. 실행 재시도·연속 병합·중단에서 PR 중복 생성, 버전 중복 증가, 새 Changesets 삭제가 없어야 한다. 게시 부분 실패는 해당 릴리스의 검증 파일로 복구하며 새 후보 생성으로 대체하지 않는다.
 
@@ -138,4 +138,19 @@ Draft 릴리스 PR의 제품 검사는 모두 생략하되 develop 병합을 처
 
 ## 이번 계획 PR의 검증 범위
 
-CI·자동 배포 구현과 저장소 보호 설정 변경은 아직 수행하지 않았다. 계획 문서의 형식과 diff를 검사하며, 실제 커밋 훅·원격 CI 실행 결과는 PR 본문과 Checks에서 구분해 기록한다.
+최초 계획 검증은 문서의 형식·diff와 실제 커밋 훅에 한정됐다. 다음 실행 결과는 그 기록과 구분한다. 저장소 보호·원격 이벤트·게시 활성화는 로컬 구현 완료와 별개다.
+
+## 로컬 구현과 통합 검증의 전달 경계
+
+실행은 원래 checkout을 수정하지 않는 관리형 worktree에서 수행한다. TASK-001은 공식 Changesets CLI와 동적 제품 버전·후보 계약을, TASK-002는 ready PR CI·집계·단일 댓글을, TASK-003은 공식 version Action 연결·동기화·검증 파일 게시를 담당한다. INT-001은 지정된 결과를 순서대로 가져와 실제 생산·소비 계약을 연결하고 담당 정책 문서와 개발 목차를 갱신한다.
+
+통합 정적 검사에서 App token Action의 이동 태그를 발견해 기존 결과를 보존한 별도 TASK-003-R1으로 수리했다. 세 릴리스 workflow는 공식 Node 24 기반 v3.2.0의 정확한 commit bcd2ba49218906704ab6c1aa796996da409d3eb1로 고정하고 기존 App 입력·권한을 유지한다. intent/3은 이 기계적 dependency 보강과 INT-001의 알려진 변경 재개를 기록하며 원래 계획·소스·정책은 바꾸지 않는다.
+첫 정적 확인이 App Action에서 멈춰 남은 v4 태그를 놓쳤고, 다음 전체 통합 시험이 이를 거부했다. 별도 TASK-003-R2는 나머지 열 개 사용을 TASK-002와 같은 공식 Node 24 revision으로 고정하고 세 setup-node 단계의 캐시 비활성화를 명시했다. 전체 열네 사용 지점·여섯 Action 종류의 정확한 manifest·입력 호환성을 대조한 뒤 intent/4로 통합을 재개했다. 기존 결과·첫 실패는 이력으로 보존한다.
+
+소스 패키지 버전 0.0.1과 미출시 Changeset은 유지한다. 통합 시험에서 공식 pnpm release:version으로 만든 독립 fixture의 최종 버전 0.0.2 tgz·VSIX는 실행 증거이며 공개 릴리스 후보가 아니다. 실제 CI prepare/verify·증거 기록·aggregate·archive 소비·로컬 게시 adapter가 동일 파일 해시를 사용하고 변조를 거부하는지 확인한다. 공식 Action의 실제 배포 코드는 로컬 Git·REST·GraphQL fixture에 연결하여 ready 이후 같은 PR 갱신, 오래된 준비 거부, 동시 신규 기록 보존과 다음 공식 계산을 확인한다. Windows·실제 GitHub·공개 게시 성공으로 확대하지 않는다.
+
+기본 pnpm test는 새 tools/ci/ci-release.integration.test.mjs를 자동 포함한다. 별도 CODOCS_VERIFY_GUI=1 실행은 실제 macOS에서 후보를 한 번 조립하고 그 VSIX와 tgz로 최소 1.100.0 및 한 번 고정한 stable의 전체 기능, 같은 VSIX로 각 버전의 시작 실패·기능 실패·시간 제한·취소 정리를 직렬 확인한다. 실행 명령·소요 시간·fixture source commit/tree·제품 버전·SHA-256·GUI 결과 경로는 ignored .workbench 실행 보고서에 남긴다. pnpm check와 결과 commit의 실제 hook을 통과해야 검증된 통합 HEAD로 반환한다.
+
+운영자는 .codocs/development/release.yaml의 활성화 순서에 따라 develop 생성, main/develop의 strict required-ci·PR 의무·관리자 보호·우회 차단, GitHub App와 제품별 게시 인증, 실제 Draft/ready/취소/양 OS·게시 재시도 검증을 완료한다. classic 보호 응답을 확인하는 현재 gate는 ruleset만으로 설정된 보호를 지원하지 않는다. 그 전에는 CODOCS_RELEASE_ENABLED를 활성화하지 않고 main push·수동 전체 Tests를 유지한다. 보호의 실제 적용을 확인한 뒤 별도 변경으로 postmerge 테스트 생략을 활성화한다.
+
+이번 전달은 로컬 소스 통합과 검증까지다. 원격 설정·push·PR 생성·main 병합·공개 게시·배포·작업 경로 정리는 실행하지 않는다. Prepare·Shape 원본은 복구 증거로 정확한 LF UTF-8와 raw SHA-256을 보존한다. Gateway 저장은 실제 Work Item key가 없어 보류하며 임의 Jira 번호나 Memory write로 대신하지 않는다. 상세한 네 작업 결과·원본/바인딩 해시·intent/2 소유권 보강·이전 실패와 최종 결과·실제 미검증 경계는 .workbench/execution-result.md에 기록한다.
