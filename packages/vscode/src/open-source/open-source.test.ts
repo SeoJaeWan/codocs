@@ -4,6 +4,9 @@ import {
   openSourceCommand,
   trustGeneratedOpenSourceHoverContents,
   type OpenSourceHost,
+  OpenSourceFailure,
+  OpenSourceFailureReporter,
+  openSourceFailureReasons,
 } from './index.js';
 
 const argument = {
@@ -64,6 +67,12 @@ describe('openSource', () => {
       expect(await openSource(argument, host)).toBe(false);
       expect(host.openDocument).not.toHaveBeenCalled();
       expect(host.showDocument).not.toHaveBeenCalled();
+      expect(host.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: openSourceFailureReasons.confirmationRejected,
+          sourceUri: argument.sourceUri,
+        }),
+      );
     },
   );
 
@@ -85,11 +94,16 @@ describe('openSource', () => {
       };
       expect(await openSource(input, host)).toBe(false);
       expect(host.confirmSource).not.toHaveBeenCalled();
+      expect(host.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: openSourceFailureReasons.invalidSelection,
+        }),
+      );
     },
   );
 
   it.each(['ENOENT', 'EACCES', 'internal'])(
-    '검증 뒤 %s 오류가 나면 팝업 없이 실패하고 내부 오류만 기록한다',
+    '검증 뒤 %s 오류가 나면 표시하지 않고 파일 접근 실패와 상세를 기록한다',
     async (code) => {
       const error = Object.assign(new Error(code), { code });
       const host: OpenSourceHost = {
@@ -102,11 +116,81 @@ describe('openSource', () => {
       };
       expect(await openSource(argument, host)).toBe(false);
       expect(host.showDocument).not.toHaveBeenCalled();
-      expect(host.reportError).toHaveBeenCalledTimes(
-        code === 'internal' ? 1 : 0,
+      expect(host.reportError).toHaveBeenCalledTimes(1);
+      expect(host.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: openSourceFailureReasons.fileAccessFailed,
+          sourceUri: argument.sourceUri,
+          cause: error,
+        }),
       );
     },
   );
+  it.each([
+    { phase: 'confirm', reason: openSourceFailureReasons.confirmationFailed },
+    { phase: 'show', reason: openSourceFailureReasons.displayFailed },
+  ])(
+    '$phase 오류가 나면 실패한 경계와 상세를 기록한다',
+    async ({ phase, reason }) => {
+      const error = new Error('test failure');
+      const document = { uri, text: '미저장 내용' };
+      const host: OpenSourceHost = {
+        confirmSource: vi.fn(() =>
+          phase === 'confirm'
+            ? Promise.reject(error)
+            : Promise.resolve({ uri }),
+        ),
+        findOpenDocument: () => document,
+        findExistingViewColumn: () => 2,
+        openDocument: vi.fn(),
+        showDocument: vi.fn(() => Promise.reject(error)),
+        reportError: vi.fn(),
+      };
+      expect(await openSource(argument, host)).toBe(false);
+      expect(host.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ reason, cause: error }),
+      );
+      expect(document.text).toBe('미저장 내용');
+      expect(host.openDocument).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe('OpenSourceFailureReporter', () => {
+  it('사유·출처·상세가 같은 반복 실패만 억제하고 토큰은 출력하지 않는다', () => {
+    const appendLine = vi.fn();
+    const reporter = new OpenSourceFailureReporter(appendLine);
+    const failure = new OpenSourceFailure(
+      openSourceFailureReasons.fileAccessFailed,
+      argument,
+      new Error('EACCES'),
+    );
+    reporter.report(failure);
+    reporter.report(
+      new OpenSourceFailure(
+        openSourceFailureReasons.confirmationRejected,
+        argument,
+      ),
+    );
+    reporter.report(
+      new OpenSourceFailure(
+        openSourceFailureReasons.fileAccessFailed,
+        { ...argument, token: 'b'.repeat(32) },
+        new Error('EACCES'),
+      ),
+    );
+    reporter.report(
+      new OpenSourceFailure(
+        openSourceFailureReasons.fileAccessFailed,
+        { ...argument, sourceUri: 'file:///other/source.ts' },
+        new Error('EACCES'),
+      ),
+    );
+    expect(appendLine).toHaveBeenCalledTimes(3);
+    expect(appendLine.mock.calls[0]![0]).toContain('EACCES');
+    expect(appendLine.mock.calls[0]![0]).toContain(argument.sourceUri);
+    expect(appendLine.mock.calls[0]![0]).not.toContain(argument.token);
+  });
 });
 
 describe('trustGeneratedOpenSourceHoverContents', () => {
