@@ -1,18 +1,17 @@
-# Windows·Mac 공통 검증
+# CI의 Windows·macOS 실제 UI 검사
 
-저장소의 고정 Node·pnpm 버전을 사용한다. 로컬에서는 현재 OS에서 실행하고 CI는 Windows·Mac 각각에서 같은 명령을 실행한다.
+CI가 한 번 확정한 동일 exact stable 버전과 동일 최종 후보 VSIX를 두 OS에 전달한다. 소스 빌드와 패키징은 UI 실행 전에 끝나 있어야 한다.
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm check
-pnpm test:vscode
-node packages/vscode/test-runner/lifecycle.mjs
+node packages/vscode/test-runner/ui/run.mjs --version <exact-stable> --vsix <absolute-candidate.vsix> --output <absolute-new-evidence-directory>
 ```
 
-`test:vscode`는 현재 소스를 빌드하고 고정된 `@vscode/vsce`로 VSIX를 패키징·설치한 뒤 실제 VS Code 창을 연다. 제품은 설치된 확장 경로에서 로드하며 별도의 빈 개발 확장은 테스트 진입점만 제공한다. 전체 기능 사례를 한 번 실행하므로 개발용·설치용 검사를 중복하지 않는다. 개인 프로필과 별개의 임시 프로필·확장·작업 공간을 사용한다. 커밋 훅에서는 실행하지 않는다.
+`CI=true`와 Windows/macOS가 필수다. `stable`, `insiders`, 상대 VSIX 경로, 이전 output 디렉터리는 거부한다. 선택적 `--timeout-ms`는 30000–1800000이고 기본 600000이다. 로컬 GUI 실행과 의도한 실패/timeout/cancel lifecycle suite는 지원하지 않는다.
 
-기능 시나리오는 [extension.test.cjs](extension.test.cjs), 준비·반복 실행은 [index.cjs](index.cjs), 실행기는 [test-runner](../../test-runner)에 있다. 공통 실행 도구는 [test-runtime](../../../../tools/test/runtime)에 있다.
+공식 `@vscode/test-electron` helper가 job 전용 download 경로에 준비하고 CLI로 VSIX를 설치한 뒤, 공식 `runTests`로 빈 harness와 실제 설치 확장을 실행한다. 사용자 profile·extensions·workspace는 짧은 실행별 임시 디렉터리에 격리한다. 개발 확장은 테스트 entry만 제공하고 Codocs는 설치된 VSIX 경로에서만 로드되는지 검사한다. 설치 확인은 활성화 및 서버가 게시한 진단 응답까지이며 첫 Hover를 중복하지 않는다.
 
-`.workbench/vscode-tests/<실행 ID>/result.json`은 실행 OS·HEAD·작업 트리 diff·단계·정리 결과를 기록한다. `codocs.vsix`와 `installation.json`은 검사한 패키지·해시·설치 결과이고, `functional.json`은 설치된 확장 경로와 개별 시나리오의 결과이며 `logs/`와 `process.log`에 VS Code·서버 로그를 보관한다. 실패한 검사를 통과로 보고하거나 실행하지 않은 OS를 통과로 추정하지 않는다.
+`installation.json`은 설치 확장 경로/버전·API 활성화·서버 응답을, `functional.json`은 renderer 입력을 사용하는 개별 사례 결과를 기록한다. `result.json`은 exact 버전·최종 VSIX SHA-256·OS·단계·통과/실패/취소/시간 초과·정리 상태를 기록한다. 성공은 exit 0과 passed/cleaned true로만 판정한다. 실패 때 screenshot, `process.log`, `vscode-logs/`를 보존하며 수집 오류가 원래 오류를 덮지 않는다. `worker.json`은 준비 단계 추적용이다.
 
-`.workbench/vscode-lifecycle`은 의도한 시작 실패·기능 실패·시간 제한·취소의 결과를 보관한다. 한 OS의 기능·정리 통과는 다른 OS의 실행 결과를 대신하지 않는다. 화면 픽셀·마우스 제스처는 자동 검증 범위에 포함하지 않는다.
+실제 실패·timeout·SIGINT/SIGTERM에서 소유 worker 트리를 공식 helper로 제한 시간 안에 정리한다. 정리 실패도 비정상 종료이며 임시 경로를 result에 남긴다. 각 UI 사례는 dirty fixture를 되돌리고 기준 파일을 복원하며 복원 실패도 검사 실패다. UI DOM·OS 입력·Output 로그 위치의 최종 수락은 정확한 후보의 양 OS GitHub 결과로만 확정한다.
+
+대표 시나리오와 제거한 API assertions의 책임은 [coverage.md](coverage.md)에 있다. 인접 driver/CLI 테스트는 `pnpm test`에서 GUI 없이 실행한다. renderer/provider 알고리즘을 광범위하게 mock으로 재검사하지 않는다.

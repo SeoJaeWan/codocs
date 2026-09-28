@@ -1,110 +1,116 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const vscode = require('vscode');
-const { context } = require('./test-support/context.cjs');
+const { uiContext } = require('./test-support/ui-context.cjs');
 const { scenarios } = require('./extension.test.cjs');
 
-/** 공식 Extension Host의 실행 진입점에서 독립 기능 사례와 관측을 기록한다. */
-exports.run =
-  /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ async function run() {
-    const config = JSON.parse(
-      await fs.readFile(process.env.CODOCS_VSCODE_CONFIG, 'utf8'),
-    );
-    const c = context(config);
-    const { restoreWorkspaceFixture } =
-      await import('./test-support/workspace-fixture.mjs');
-    const results = [];
-    const environment = {
-      vscode: vscode.version,
-      node: process.versions.node,
-      electron: process.versions.electron,
-      platform: process.platform,
-      apiObservation: true,
-      renderedUi: false,
-      mcpNodeExecutable: config.nodeExecutable,
-      mcpEntry: config.mcpEntry,
-      mcpSha256: config.mcpSha256,
-      sourceHash: config.sourceHash,
-    };
+/** 설치 준비는 API 응답으로 확인하고 기능은 실제 renderer 입력으로 검사한다. */
+exports.run = /** 현재 UI 입력·응답 관측을 연결한다. */ async function run() {
+  const config = JSON.parse(
+    await fs.readFile(process.env.CODOCS_VSCODE_CONFIG, 'utf8'),
+  );
+  const { connectRenderer, until } =
+    await import('../../test-runner/ui/driver.mjs');
+  const environment = {
+    vscode: vscode.version,
+    platform: process.platform,
+    packageKind: 'installed-vsix',
+    renderedUi: true,
+    vsixSha256: config.vsixSha256,
+  };
+  const results = [];
+  let driver;
+  try {
+    const assert = require('node:assert/strict');
+    assert.equal(vscode.version, config.version);
     const extension = vscode.extensions.getExtension('seojaewan.codocs');
-    c.assert.ok(extension, '설치한 VSIX 확장 등록');
-    c.assert.equal(extension.packageJSON.version, config.extensionVersion);
-    environment.extensionId = extension.id;
-    environment.extensionVersion = extension.packageJSON.version;
-    c.assert.equal(
+    assert.ok(extension, 'installed VSIX registration');
+    assert.equal(
       await fs.realpath(extension.extensionPath),
       await fs.realpath(config.extension),
-      '제품은 개발 소스가 아닌 이번에 설치한 VSIX에서 로드되어야 한다',
     );
-    environment.packageKind = 'installed-vsix';
-    environment.extensionPath = extension.extensionPath;
     await extension.activate();
-    c.assert.ok(extension.isActive);
-    /** 사례가 연 편집기를 닫고 공유 작업 공간을 기준 파일로 되돌린다. */
-    async function resetWorkspace() {
-      for (const document of vscode.workspace.textDocuments)
-        if (document.isDirty && document.uri.scheme === 'file') {
-          await vscode.window.showTextDocument(document);
-          await vscode.commands.executeCommand(
-            'workbench.action.revertAndCloseActiveEditor',
-          );
-        }
-      await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-      await restoreWorkspaceFixture(c.root);
-    }
-    for (const scenario of scenarios) {
-      const started = Date.now();
-      c.observations.length = 0;
-      try {
-        await vscode.commands.executeCommand('codocs.restartLanguageServers');
-        const ready = await c.open('source.java');
-        await c.hover(ready, 'readySignal', 'UI ready sentinel');
-        await scenario.run(c);
-        results.push({
-          id: scenario.id,
-          title: scenario.title,
+    assert.ok(extension.isActive);
+    environment.extensionPath = extension.extensionPath;
+    environment.extensionVersion = extension.packageJSON.version;
+    const uri = vscode.Uri.file(
+      path.join(config.workspace, '.codocs/old-source.yaml'),
+    );
+    await until(
+      /** 현재 UI 입력·응답 관측을 연결한다. */ () =>
+        vscode.languages
+          .getDiagnostics(uri)
+          .some(
+            (item) =>
+              (typeof item.code === 'object' ? item.code.value : item.code) ===
+              'deprecated_reference',
+          ),
+      'installed server diagnostic response',
+    );
+    await fs.writeFile(
+      path.join(config.output, 'installation.json'),
+      JSON.stringify(
+        {
+          ...environment,
+          active: true,
+          serverResponse: 'published-diagnostics',
           passed: true,
-          milliseconds: Date.now() - started,
-        });
-      } catch (error) {
-        results.push({
-          id: scenario.id,
-          title: scenario.title,
-          passed: false,
-          milliseconds: Date.now() - started,
-          error: error.stack ?? String(error),
-        });
-      }
+        },
+        null,
+        2,
+      ),
+    );
+    driver = await connectRenderer(config.profile);
+    const c = uiContext(config, driver, until);
+    for (const scenario of scenarios) {
+      const result = {
+        id: scenario.id,
+        passed: false,
+        input: 'renderer-mouse',
+      };
       try {
-        await c.closeMcp();
-        results.at(-1).observations = [...c.observations];
-        await resetWorkspace();
-        results.at(-1).milliseconds = Date.now() - started;
+        await scenario.run(c);
+        result.passed = true;
       } catch (error) {
-        const result = results.at(-1);
-        result.observations = [...c.observations];
+        result.error = error.stack ?? String(error);
+        try {
+          await driver.screenshot(
+            path.join(config.output, `failure-${scenario.id}.png`),
+          );
+        } catch (error) {
+          result.evidenceError = String(error);
+        }
+      }
+      results.push(result);
+      try {
+        await c.reset();
+      } catch (error) {
         result.passed = false;
-        result.milliseconds = Date.now() - started;
-        result.error = [
-          result.error,
-          `fixture 복원 실패: ${error.stack ?? String(error)}`,
-        ]
-          .filter(Boolean)
-          .join('\n');
-        await fs.writeFile(
-          path.join(config.output, 'functional.json'),
-          JSON.stringify({ environment, results }, null, 2),
-        );
-        throw error;
+        result.cleanupError = String(error);
       }
       await fs.writeFile(
         path.join(config.output, 'functional.json'),
         JSON.stringify({ environment, results }, null, 2),
       );
+      if (result.cleanupError)
+        throw new Error(`Fixture restoration failed: ${result.cleanupError}`);
     }
     const failures = results.filter((result) => !result.passed);
     if (failures.length)
       throw new Error(
-        `${failures.length}/${results.length} VS Code 기능 실패: ${failures.map((item) => item.id).join(', ')}`,
+        `Rendered UI failures: ${failures.map((item) => item.id).join(', ')}`,
       );
-  };
+  } catch (error) {
+    await fs.writeFile(
+      path.join(config.output, 'functional.json'),
+      JSON.stringify(
+        { environment, results, error: error.stack ?? String(error) },
+        null,
+        2,
+      ),
+    );
+    throw error;
+  } finally {
+    driver?.close();
+  }
+};

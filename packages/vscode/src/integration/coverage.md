@@ -1,60 +1,39 @@
-# 실제 VS Code 기능 검사 대응표
+# 실제 VS Code UI 검사와 이전 assertion 소유권
 
-`extension.test.cjs`의 각 `id`는 `functional.json`에 독립 결과로 기록된다. 모든 사례는 현재 소스로 패키징·설치한 VSIX의 실제 확장·언어 서버와 등록된 `vscode.executeHoverProvider` / `vscode.executeLinkProvider`를 사용한다. URI 인수와 토큰을 만들어 제품 명령을 직접 흉내내지 않고 provider가 반환한 명령을 실행한다.
+`extension.test.cjs`의 9개 대표 사례는 설치된 VSIX의 실제 renderer에서 포인터 Hover, 표시된 앵커 press/release, Windows Ctrl-click 또는 macOS Cmd-click을 사용한다. API는 활성화, 게시된 진단, fixture 편집 준비, 실제 editor/선택/탭 관측에만 사용한다. provider 응답이나 제품 command를 직접 호출하지 않는다. 설치 smoke는 활성화와 서버가 게시한 진단 응답만 확인한다.
 
-이전 Playwright 시나리오와 전용 실행기·도우미는 제거했다. 원래 구현은 Git 이력에서 확인하며 아래 대응표는 이전 기능 목표의 추적 근거로 유지한다. 자동 기능 검사 진입점은 `pnpm test:vscode`다.
+| UI 사례                      | 고유한 화면/Host 관측                                                      |
+| ---------------------------- | -------------------------------------------------------------------------- |
+| hover-content-and-relations  | 본문·현재 ID·도메인·세 관계 및 네 종류 앵커 클릭                           |
+| yaml-single-special-path     | 공백·한글·%20·# 출처와 대상의 실제 OS 링크 제스처                          |
+| yaml-multiple-candidates     | 도메인/경로가 다른 두 후보의 렌더링과 개별 선택                            |
+| dirty-target-tab             | 기존 탭 객체·미저장 내용·디스크 보존, (0,0) 빈 선택                        |
+| changed-reference-and-save   | 미저장 참조 변경, 폐기 경고 제거, 새 링크 클릭, 저장 후 새 Hover           |
+| saved-and-external-refresh   | 저장·외부 변경 뒤 새 Hover의 최신 본문·참조와 클릭 대상                    |
+| stale-target-latest-content  | 화면에 남은 동일 href 앵커의 실제 클릭과 최신 대상 원문                    |
+| stale-target-rejected-output | 다른 문서로 대체된 대상 거부, Codocs Output 이유, editor/탭·패널·알림 보존 |
+| nested-workspace-owner       | 같은 ID의 가장 가까운 workspace 설명과 대상                                |
 
-| 원래 Playwright 기능 목표         | 새 검사 ID                                                            | 실제 관측                                                     |
-| --------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------- |
-| 미저장 코드 식별자 변경           | unsaved-code                                                          | WorkspaceEdit, 새 Hover, dirty 및 디스크                      |
-| 미저장 참조 변경과 경고 제거      | unsaved-reference                                                     | diagnostics 제거, 새 DocumentLink 실행                        |
-| 변경 직후 남은 링크 실행          | in-flight-link                                                        | 명령 실행 중 활성 문서 이벤트의 URI·최신 내용                 |
-| 본문·현재 ID·도메인·세 관계       | hover-content                                                         | Markdown 내용과 관계별 반환 명령                              |
-| 원문·함께 매칭·정방향·역방향 링크 | relation-zone, relation-auxiliary, relation-direct, relation-referrer | 실제 활성 문서·(0,0) 빈 선택                                  |
-| 중복 ID 후보와 보조 링크          | duplicate-id                                                          | 두 후보 경로 및 Auxiliary 링크                                |
-| 이전 ID 안내                      | previous-id                                                           | 현재 ID·본문·안내                                             |
-| 다른 출현의 이전 ID 안내          | other-occurrence                                                      | 다른 위치 안내                                                |
-| 필수 필드 누락 문서               | broken-document                                                       | 오류 내용·원문 링크                                           |
-| 잘못된 현재 ID의 이전 ID 호버     | invalid-id                                                            | 본문·ID 오류·원문 이동                                        |
-| 매칭 부재                         | no-match                                                              | 준비 완료 후 Codocs Hover 부재                                |
-| 본문·예시 세 출현의 단일 링크     | yaml-occurrence-0, yaml-occurrence-1, yaml-occurrence-2               | 각각의 실제 범위·명령·대상 상단                               |
-| 메타데이터 동일 표기              | metadata                                                              | 해당 범위에 DocumentLink 부재                                 |
-| 복수 후보 본문 직접 이동 없음     | ambiguous-body                                                        | 직접 DocumentLink 부재·대상 탭 부재                           |
-| 복수 후보 각각 선택               | ambiguous-a, ambiguous-b                                              | 선택한 후보만 열림·다른 탭 부재                               |
-| 잘못된 현재 ID의 이름 참조        | invalid-name-link                                                     | 이름으로 확정한 실제 링크 이동                                |
-| 미저장 본문 참조 위치 변경        | unsaved-yaml                                                          | 새 UTF-16 행·대상·dirty·디스크 보존                           |
-| 대상 변경 후 새 호버              | fresh-hover                                                           | 새 설명·반환 명령 이동                                        |
-| 완료 관측 뒤 남은 링크            | stale-link                                                            | 새 조회로 완료 관측 후 기존 토큰 실행·최신 편집기 내용        |
-| 대상 이동 후 새 링크              | moved-target                                                          | 새 경로·상단                                                  |
-| 삭제 후 같은 경로의 다른 문서     | replaced-target                                                       | 기존 토큰 실행 후 활성 문서·탭 유지                           |
-| 삭제 뒤 새 호버                   | deleted-fresh-hover                                                   | 설명·연결 제거                                                |
-| 기존 dirty 탭 재사용              | dirty-target-tab                                                      | 탭 수·빈 선택·미저장 내용·디스크 보존                         |
-| 부분 탐색                         | partial-scan                                                          | 현재 OS의 실제 읽기 제한으로 실패, 부분 안내·확인된 대상 이동 |
-| 부분 탐색의 미확정 참조           | unconfirmed-reference                                                 | 미확정 진단·폐기 경고와 이동 링크 부재                        |
-| 폐기 참조와 이동 공존             | deprecated-link                                                       | 실제 Warning 진단·링크 이동                                   |
-| 폐기 해제                         | clear-deprecated                                                      | 게시된 경고 제거                                              |
-| 현재 ID와 같은 이전 ID            | same-previous-id                                                      | YAML 진단·코드 이전 ID 안내 부재                              |
-| 없는 이름 참조                    | missing-reference                                                     | 실제 진단·링크 부재                                           |
-| 중첩 작업 공간                    | nested-workspace                                                      | 가장 가까운 workspace의 내용·원문                             |
-| TypeScript 정의 기능              | native-definition                                                     | 내장 definition provider의 같은 TS 파일·정의 위치             |
-| 추가: 서버 재시작                 | restart-unsaved                                                       | 실제 restart 명령 후 dirty 코드 재동기화·링크 이동            |
+아래 표는 제거한 API 기능 묶음의 assertion을 현재 책임에 연결한다. 파일명은 repository 기준이며 인접 검사는 기본 `pnpm test`에 포함된다. 화면 조합 전체를 인접 검사로 대체했다고 주장하지 않는다. 상세 조건은 기존 책임 검사에 남고 UI 대표 경계는 위 사례로 확인한다. 실제 Windows/macOS UI 실행 전에는 화면 수락 결과가 미검증이다.
 
-화면 렌더링, 물리적 hover/수정 키 클릭/F12, 알림 토스트·Quick Pick·Problems 패널의 픽셀/DOM은 검사하지 않는다. 예를 들어 링크 부재는 직접 이동 대상이 제공되지 않음을 입증하며 임의 클릭 후 팝업이 없다는 화면 증거를 만들지는 않는다. Markdown은 원문과 표시용 텍스트를 구분하고 URI 토큰은 원형 그대로 사용한다. 변경 직후 사례는 실제 변경과 명령의 순서를 검사하지만 제품 내부 경합 구간 도달을 강제했다고 주장하지 않는다.
+| 제거한 사례/조건                                                                                                                 | 유지한 assertion 소유자                                                                                                                                                                                               |
+| -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| unsaved-code, unsaved-reference, unsaved-yaml; UTF-16/CRLF 최신 원문                                                             | language-server/src/server-session/server-session.test.ts, document-sync/document-sync.test.ts; UI changed-reference-and-save                                                                                         |
+| hover-content, relation-zone/auxiliary/direct/referrer                                                                           | language-server/src/hover/hover.test.ts; UI hover-content-and-relations                                                                                                                                               |
+| duplicate-id, previous-id, other-occurrence, broken-document, invalid-id, no-match, same-previous-id                             | core/src/matcher/matcher.test.ts, core/src/catalog/catalog.test.ts, language-server/src/hover/hover.test.ts, navigation/navigation.test.ts                                                                            |
+| yaml-occurrence-0/1/2, metadata, invalid-name-link                                                                               | core/src/references/references.test.ts, language-server/src/navigation/navigation.test.ts; UI yaml-single-special-path                                                                                                |
+| ambiguous-body/a/b                                                                                                               | language-server/src/server-session/live-navigation.test.ts (복수 후보의 직접 링크 부재와 개별 Hover 링크); UI yaml-multiple-candidates                                                                                |
+| in-flight-link, fresh-hover, stale-link, moved-target, replaced-target, deleted-fresh-hover                                      | workspace/src/query/candidate.test.ts, language-server/src/navigation/navigation.test.ts, server-session/live-navigation.test.ts; UI saved-and-external-refresh, stale-target-latest-content/rejected-output          |
+| dirty-target-tab, 기본 위치·명시 행/범위                                                                                         | vscode/src/open-source/open-source.test.ts; UI dirty-target-tab                                                                                                                                                       |
+| 부분 탐색·미확정 대상·읽기 실패·복구                                                                                             | workspace/src/query/discovery-path.test.ts, query-reconciliation.test.ts, language-server/src/server-session/diagnostics.test.ts                                                                                      |
+| deprecated-link, clear-deprecated, missing-reference                                                                             | language-server/src/navigation/navigation.test.ts, server-session/live-navigation.test.ts; UI changed-reference-and-save                                                                                              |
+| nested-workspace, multiprocess-project-isolation                                                                                 | vscode/src/workspace-routing/workspace-routing.test.ts, language-server/src/server-session/live-navigation.test.ts, server/server-process.test.ts; UI nested-workspace-owner                                          |
+| restart-unsaved, rapid-edit-restart-diagnostics, unexpected-server-exit, restart-budget-recovery                                 | vscode/src/client-manager/client-manager.test.ts, vscode-client/vscode-client.test.ts (버전별 didChange·늦은 세션·종료 실패 복구), language-server/src/server/server-process.test.ts (실제 프로세스 재시작·최신 원문) |
+| duplicate-name-open/edit-name/edit-domain/save, diagnostics-closed-catalog/live-create/live-resolve/save/delete/recheck-recovery | core/src/catalog/live-diagnostics.test.ts, language-server/src/server-session/diagnostics.test.ts; UI 게시 진단과 changed-reference-and-save                                                                          |
+| multiprocess-mcp-write/external-edit/move/recreate 및 두 독립 색인·revision·참조                                                 | workspace/src/indexing/indexing.test.ts, query/shared-results.test.ts, watcher/watcher.test.ts, write/write.test.ts; UI saved-and-external-refresh                                                                    |
+| multiprocess-exit-eof/kill, stdout·EOF·실제 종료                                                                                 | mcp/src/server/server.test.ts와 language-server/src/server/server-process.test.ts; UI 설치 smoke는 MCP를 중복 실행하지 않음                                                                                           |
+| 동시 같은 revision 쓰기·서로 다른 경로의 같은 ID 충돌                                                                            | mcp/src/server/write-race.test.ts의 실제 독립 프로세스 쓰기 경합 및 workspace/src/storage/storage.test.ts·storage-retry.test.ts의 저장 직전 확인 (순차 UI 저장으로 대체하지 않음)                                     |
+| 실패 이유·중복 억제·출처 버전/닫기/세션·snapshot 세대                                                                            | vscode/src/open-source/open-source.test.ts, vscode-client/vscode-client.test.ts; UI stale-target-rejected-output의 실제 실패 클릭                                                                                     |
+| native-definition                                                                                                                | 외부 TypeScript provider 알고리즘 재검사 제거. Codocs의 등록/라우팅 계약은 vscode-client와 workspace-routing 인접 검사에 유지                                                                                         |
 
-각 사례는 실제 편집기에서 이전 dirty 문서를 되돌리고 fixture를 복원한 뒤 서버를 재시작한다. 준비 sentinel의 실제 Hover를 확인한 다음 사례를 시작한다. 부분 관측은 Windows의 독점 공유 잠금 또는 macOS의 파일 권한 제한으로 실제 읽기 실패를 확인한 뒤 시작하고 종료 시 접근 상태를 복원한다. 관리자·symlink 권한이 필요하지 않다. 같은 사례를 Windows·macOS에서 실행하며 실제 창 표시를 허용한다.
-
-## 진단과 재검사 상태
-
-`extension.test.cjs`는 실제 `languages.getDiagnostics`와 등록된 `codocs.showDiagnosticStatus` 명령을 사용한다.
-
-- `diagnostics-closed-catalog`: 한 번도 열지 않은 파일의 저장 진단과 UTF-16 위치.
-- `diagnostics-live-create`, `diagnostics-live-resolve`: 미저장 중복 생성·해소와 다른 문서의 저장 색인 보존.
-- `diagnostics-save`, `diagnostics-delete`: 저장 후 다른 문서의 진단 갱신과 확인된 삭제의 진단 제거. 닫힌 탭이 문서 모델의 종료를 보장하지 않으므로 삭제 사례는 한 번도 열지 않은 파일임을 확인한다.
-- `diagnostics-recheck-recovery`: 전용 파일을 실제 잠근 뒤 실패·파일·이유·과거 결과·현재 확인 불가 안내, 편집 후 이전 밑줄 제거, 잠금 해제 후 복구, 다른 workspace 실패의 독립 유지.
-- `rapid-edit-restart-diagnostics`: 연속 편집 직후 수동 재시작의 최신 원문·위치.
-- `restart-budget-recovery`: 각 workspace의 실제 응답을 확인하며 서버를 반복 종료한다. 자동 재시작 3회 이후 4번째 종료에서 중단 상태를 확인하고 수동 명령으로 복구한 뒤 모든 workspace의 Hover·미저장 문서 진단·버전·원문·디스크 보존을 검사한다.
-- `unexpected-server-exit`: 시험 Extension Host의 직접 자식이며 전용 확장 경로를 실행하는 서버만 종료한 뒤 새 PID·자동 복구·미저장 진단·실제 Hover를 확인한다.
-
-상태 표시줄의 실제 Host 객체에 설정된 텍스트와 상세 명령의 안내를 검사하며 픽셀 렌더링 검사로 보고하지 않는다. EACCES·EPERM, 전체 읽기 실패, 늦은 편집·색인·세션 응답은 인접 기능 테스트에서 결정적으로 재현한다.
-
-이름 중복 회귀: duplicate-name-open, duplicate-name-edit-name, duplicate-name-edit-domain, duplicate-name-save는 파일 열기·미저장 이름/도메인 편집·저장 후 상대 문서 진단 갱신을 확인한다.
+성능 실행기가 사용하는 이전 context·fixtures 및 observer는 다음 제거 task가 소비할 기존 인터페이스다. 새로운 기능 진입점은 `test-runner/ui/run.mjs`이며 그 경로는 이 문서의 실제 UI 검사만 실행한다. 기존 성능 측정은 새로운 driver에 포함되지 않는다.
