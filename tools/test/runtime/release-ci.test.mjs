@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { artifactName, verifyInput } from './release-ci.mjs';
+import { artifactName, executionBinding, verifyInput } from './release-ci.mjs';
 
 test('전달 OS와 무관하게 후보 파일명을 검사한다', /** 전달 경로 형식을 독립적으로 확인한다. */ () => {
   assert.equal(
@@ -57,11 +57,36 @@ test('같은 소스와 버전이어도 전송 뒤 바뀐 바이트를 거부한�
       path.join(directory, 'release.json'),
       JSON.stringify(receipt),
     );
+    const execution = executionBinding(receipt.sourceCommit, {
+      GITHUB_REPOSITORY: 'SeoJaeWan/codocs',
+      GITHUB_EVENT_NAME: 'workflow_dispatch',
+      GITHUB_RUN_ID: '123',
+      GITHUB_RUN_ATTEMPT: '2',
+    });
     await writeFile(
       path.join(directory, 'selection.json'),
-      JSON.stringify({ sourceCommit: receipt.sourceCommit, stable: '1.139.1' }),
+      JSON.stringify({
+        sourceCommit: receipt.sourceCommit,
+        stable: '1.139.1',
+        execution,
+      }),
     );
     await verifyInput(directory, receipt.sourceCommit, '1.139.1');
+    const manual = await verifyInput(
+      directory,
+      receipt.sourceCommit,
+      '1.139.1',
+      { execution, artifactId: '456' },
+    );
+    assert.equal(manual.receipt.binding, null);
+    assert.equal(manual.receipt.artifactId, '456');
+    await assert.rejects(
+      verifyInput(directory, receipt.sourceCommit, '1.139.1', {
+        execution: { ...execution, runAttempt: '3' },
+        artifactId: '456',
+      }),
+      { message: /execution run mismatch/u },
+    );
     await assert.rejects(verifyInput(directory, 'b'.repeat(40), '1.139.1'), {
       message: /selection source mismatch/u,
     });

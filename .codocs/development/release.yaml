@@ -123,4 +123,5 @@ definition: |
 
   release.json은 소스 commit·diff·미추적 파일을 포함한 Git blob 목록과 실제 OS·CPU·Node 및 tgz/VSIX SHA-256을 기록한다. pnpm release:verify <tgz> <vsix>는 재빌드 없이 명시된 파일을 검사하고 저장소 밖 새 소비자에 tarball 하나를 offline 설치하여 codocs bin의 시작·SDK 연결·SDK listTools 응답의 도구 등록을 확인한 뒤 시험 프로세스를 정리한다. 내부 패키지 overrides나 저장소 의존성으로 실행 누락을 보충하지 않는다.
   CI의 VS Code 기능 검사는 같은 후보 VSIX를 실제 설치하며 시험 도중 다시 빌드하지 않는다. 검증한 파일과 나중에 다시 만든 파일의 해시를 혼동하지 않는다.
+  실행별 selection.json은 정확한 stable과 소스·실행·시도를 고정한다. OS별 성공 증거는 전달 artifact ID·소스 tree/blob 식별자·두 제품 해시에 설치 API와 실제 UI 결과를 연결한다. 실제 UI의 모든 대표 사례와 exit 0·passed/cleaned true가 확인되어야 성공으로 집계한다. 수동 실행의 증거는 PR 필수 집계와 구분한다.
   비공개 내부 workspace 패키지의 개별 포장·설치·외부 JS 및 타입 선언 소비 검사는 두지 않는다. 성능 측정 기능과 전용 검사의 제거 범위는 [[테스트 컨벤션]]을 따른다.

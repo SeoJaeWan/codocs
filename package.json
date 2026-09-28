@@ -23,7 +23,7 @@
     "check:static": "pnpm typecheck && pnpm lint && pnpm exec prettier . --check",
     "check:runtime": "pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs",
     "test:release-management": "node --test tools/ci/**/*.test.{mjs,cjs} tools/build/**/*.test.{mjs,cjs}",
-    "test:os": "pnpm test",
+    "test:os": "pnpm test:unit && node --test tools/test/**/*.test.{mjs,cjs} tools/toolchain.test.mjs packages/**/test-runner/**/*.test.{mjs,cjs} packages/**/src/**/test-support/**/*.test.{mjs,cjs}",
     "check:runtime:os": "pnpm build && pnpm test:os && pnpm exec vitest run --config vitest.checks.config.mjs"
   },
   "lint-staged": {
