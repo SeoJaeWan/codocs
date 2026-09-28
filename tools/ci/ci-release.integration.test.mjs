@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -10,7 +11,7 @@ import {
   git,
   releaseBranch,
 } from './release-flow.mjs';
-import { buildSync } from './release-sync.mjs';
+import { createGitFixtureEnvironment } from '../test/git-config.mjs';
 import {
   root,
   fixtureEnv,
@@ -79,6 +80,13 @@ test('실제 공식 Action의 ready 갱신·preflight·동기화·다음 공식 
     git(fixture.directory, ['clone', fixture.remote, fresh], {
       env: fixtureEnv,
     });
+    // clone은 원본의 local identity를 복사하지 않으므로 이 fixture에 직접 설정한다.
+    git(fresh, ['config', '--local', 'user.name', 'Fixture'], {
+      env: fixtureEnv,
+    });
+    git(fresh, ['config', '--local', 'user.email', 'fixture@example.invalid'], {
+      env: fixtureEnv,
+    });
     git(fresh, ['checkout', 'develop'], { env: fixtureEnv });
     await changeset(fresh, 'b', { '@codocs/mcp': 'minor' });
     const developSha = commit(fresh, 'ready source edit');
@@ -117,12 +125,49 @@ test('실제 공식 Action의 ready 갱신·preflight·동기화·다음 공식 
       'concurrent next release\n',
     );
     const concurrent = commit(fresh, 'next release input');
-    const sync = buildSync({
-      cwd: fresh,
-      mainSha,
-      developSha: concurrent,
-      releaseSha: headSha,
-    });
+    // 실제 sync의 하위 Git 호출이 개발자 설정·환경 identity에 기대지 않게 한다.
+    const syncEnv = createGitFixtureEnvironment();
+    for (const key of Object.keys(syncEnv))
+      if (
+        /^GIT_(AUTHOR|COMMITTER)_/u.test(key) ||
+        /^GIT_CONFIG_(COUNT|KEY_\d+|VALUE_\d+|PARAMETERS)$/u.test(key) ||
+        key === 'EMAIL'
+      )
+        delete syncEnv[key];
+    syncEnv.GIT_CONFIG_COUNT = '1';
+    syncEnv.GIT_CONFIG_KEY_0 = 'user.useConfigOnly';
+    syncEnv.GIT_CONFIG_VALUE_0 = 'true';
+    const sync = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '--eval',
+          `import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { buildSync } from ${JSON.stringify(new URL('./release-sync.mjs', import.meta.url).href)};
+          assert.equal(readFileSync(process.env.GIT_CONFIG_GLOBAL, 'utf8'), '');
+          assert.equal(readFileSync(process.env.GIT_CONFIG_SYSTEM, 'utf8'), '');
+          assert.equal(Object.keys(process.env).some(key => /^GIT_(AUTHOR|COMMITTER)_/.test(key)), false);
+          process.stdout.write(JSON.stringify(buildSync(JSON.parse(readFileSync(0, 'utf8')))));`,
+        ],
+        {
+          cwd: fresh,
+          env: syncEnv,
+          input: JSON.stringify({
+            cwd: fresh,
+            mainSha,
+            developSha: concurrent,
+            releaseSha: headSha,
+          }),
+          encoding: 'utf8',
+        },
+      ),
+    );
+    assert.equal(
+      git(fresh, ['show', '-s', '--format=%an <%ae>|%cn <%ce>', sync.head]),
+      'Fixture <fixture@example.invalid>|Fixture <fixture@example.invalid>',
+    );
     assert.equal(
       git(fresh, ['show', `${sync.head}:.changeset/next.md`]).includes(
         '변경 next',
