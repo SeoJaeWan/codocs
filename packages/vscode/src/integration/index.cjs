@@ -74,6 +74,15 @@ exports.run = /** 현재 UI 입력·응답 관측을 연결한다. */ async func
       } catch (error) {
         result.error = error.stack ?? String(error);
         try {
+          result.failureState = {
+            editor: c.editorState(),
+            output: await c.output(),
+            workbench: await driver.workbenchState(),
+          };
+        } catch (error) {
+          result.stateEvidenceError = String(error);
+        }
+        try {
           await driver.screenshot(
             path.join(config.output, `failure-${scenario.id}.png`),
           );

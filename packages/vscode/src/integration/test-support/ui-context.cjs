@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
+const { realpathSync } = require('node:fs');
 const path = require('node:path');
 const vscode = require('vscode');
 
@@ -10,9 +11,10 @@ exports.uiContext =
     driver,
     until,
   ) {
+    // 8.3 TEMP 별칭과 VS Code의 정규 경로를 같은 파일 URI로 준비한다.
+    const workspace = realpathSync(config.workspace);
     /** 실제 파일 URI를 만든다. */
-    const uri = (relative) =>
-      vscode.Uri.file(path.join(config.workspace, relative));
+    const uri = (relative) => vscode.Uri.file(path.join(workspace, relative));
     /** 화면에 파일과 목표 행을 준비한다. */
     async function open(relative) {
       const document = await vscode.workspace.openTextDocument(uri(relative));
@@ -111,8 +113,15 @@ exports.uiContext =
       await driver.dismiss();
       for (const document of vscode.workspace.textDocuments) {
         if (!document.isDirty || document.uri.scheme !== 'file') continue;
+        const relative = path.relative(
+          workspace,
+          await fs.realpath(document.uri.fsPath),
+        );
         assert.ok(
-          document.uri.fsPath.startsWith(config.workspace + path.sep),
+          relative &&
+            relative !== '..' &&
+            !relative.startsWith('..' + path.sep) &&
+            !path.isAbsolute(relative),
           'only owned fixture may be reverted',
         );
         await vscode.window.showTextDocument(document);

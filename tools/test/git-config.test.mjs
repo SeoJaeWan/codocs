@@ -94,7 +94,7 @@ test('훅의 저장소·index·설정을 상속해도 fixture init·config·add�
   const child = `
     import assert from 'node:assert/strict';
     import { execFileSync } from 'node:child_process';
-    import { mkdirSync, writeFileSync } from 'node:fs';
+    import { mkdirSync, writeFileSync, realpathSync } from 'node:fs';
     import path from 'node:path';
     import { createGitFixtureEnvironment } from ${JSON.stringify(helperUrl)};
     const cwd = ${JSON.stringify(target)};
@@ -108,7 +108,7 @@ test('훅의 저장소·index·설정을 상속해도 fixture init·config·add�
     writeFileSync(path.join(cwd, 'owned.txt'), 'fixture\\n');
     git(['add', '.']);
     git(['commit', '-m', 'fixture']);
-    assert.equal(path.resolve(git(['rev-parse', '--show-toplevel'])), path.resolve(cwd));
+    assert.equal(realpathSync(git(['rev-parse', '--show-toplevel'])), realpathSync(cwd));
     git(['init', '--bare', path.join(cwd, 'remote.git')]);
     assert.equal(git(['config', '--local', 'core.bare']), 'false');
   `;

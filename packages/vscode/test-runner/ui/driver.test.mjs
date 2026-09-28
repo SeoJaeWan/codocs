@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { runInNewContext } from 'node:vm';
 import { linkModifier, RendererDriver } from './driver.mjs';
 
 test('panel anchor click sends real mouse move, press and release without decoding href', /** 입력 계약의 성공·실패 관측을 검증한다. */ async () => {
@@ -66,11 +67,18 @@ for (const platform of ['win32', 'darwin']) {
     await driver.yamlLink('[[Zone]]');
     assert.deepEqual(
       calls.map((call) => call.params.type),
-      ['keyDown', 'mouseMoved', 'mousePressed', 'mouseReleased', 'keyUp'],
+      [
+        'keyDown',
+        'mouseMoved',
+        'mouseMoved',
+        'mousePressed',
+        'mouseReleased',
+        'keyUp',
+      ],
     );
     assert.ok(
       calls
-        .slice(0, 4)
+        .slice(0, 5)
         .every(
           (call) => call.params.modifiers === linkModifier(platform).modifiers,
         ),
@@ -105,4 +113,149 @@ for (const platform of ['win32', 'darwin']) {
 
 test('unsupported gestures fail instead of selecting a platform default', () => {
   assert.throws(() => linkModifier('linux'), /Unsupported/u);
+});
+
+test('clipped anchor receives real wheel input before a single click of the retained href', /** 실제 화면 관측과 입력 순서를 확인한다. */ async () => {
+  const calls = [];
+  let observations = 0;
+  const href = 'command:opaque-retained';
+  const driver = new RendererDriver(
+    /** 실제 화면 관측과 입력 순서를 확인한다. */ async (method, params) => {
+      calls.push({ method, params });
+      if (method === 'Runtime.evaluate')
+        return {
+          result: {
+            value: {
+              anchors: [
+                {
+                  label: 'Referrer',
+                  href,
+                  visible: ++observations > 1,
+                  x: 20,
+                  y: 30,
+                  scroll: { x: 20, y: 10, deltaY: 100 },
+                },
+              ],
+            },
+          },
+        };
+    },
+    'darwin',
+  );
+  assert.equal((await driver.clickAnchor('Referrer', href)).href, href);
+  assert.deepEqual(
+    calls
+      .filter((call) => call.method === 'Input.dispatchMouseEvent')
+      .map((call) => call.params.type),
+    ['mouseWheel', 'mouseMoved', 'mousePressed', 'mouseReleased'],
+  );
+});
+
+test('Hover waits for provider readiness without nested timeout failure or repeating clicks', /** 실제 화면 관측과 입력 순서를 확인한다. */ async () => {
+  const calls = [];
+  let states = 0;
+  const driver = new RendererDriver(
+    /** 실제 화면 관측과 입력 순서를 확인한다. */ async (method, params) =>
+      calls.push({ method, params }),
+    'win32',
+  );
+  driver.dismiss = /** 실제 화면 관측과 입력 순서를 확인한다. */ async () => {};
+  driver.evaluate = /** 실제 화면 관측과 입력 순서를 확인한다. */ async (fn) =>
+    fn.name === 'textPoint'
+      ? { x: 30, y: 40 }
+      : ++states > 2
+        ? { body: 'Ready body', loading: false, anchors: [] }
+        : null;
+  assert.equal((await driver.hover('zone', 'Ready body')).body, 'Ready body');
+  assert.deepEqual(
+    calls.map((call) => call.params.type),
+    ['mouseMoved', 'mouseMoved'],
+  );
+});
+
+test('renderer observes opaque data-href and clips anchor hit point to the Hover viewport', /** 실제 DOM 속성과 가려진 앵커 좌표를 검증한다. */ async () => {
+  const href = 'command:codocs.openSource?opaque%2520';
+  const rect = {
+    left: 20,
+    right: 60,
+    top: 30,
+    bottom: 45,
+    width: 40,
+    height: 15,
+  };
+  const popup = {
+    parentElement: null,
+    /** 실제 Hover viewport를 준비한다. */
+    getBoundingClientRect: () => ({
+      left: 0,
+      right: 100,
+      top: 0,
+      bottom: 40,
+      width: 100,
+      height: 40,
+    }),
+    /** 렌더러의 본문과 앵커를 공급한다. */
+    querySelectorAll: (selector) =>
+      selector === '.hover-row'
+        ? [
+            {
+              innerText: 'Ready',
+              /** 완료한 본문을 공급한다. */
+              querySelector: () => ({
+                textContent: 'Ready',
+              }),
+            },
+          ]
+        : [node],
+  };
+  const node = {
+    parentElement: popup,
+    textContent: '원문 열기',
+    /** 일부가 가려진 앵커를 준비한다. */
+    getBoundingClientRect: () => rect,
+    /** 렌더러가 보존한 링크 속성만 공급한다. */
+    getAttribute: (key) =>
+      ({
+        href: '',
+        'data-href': href,
+        title: 'Execute command codocs.openSource',
+      })[key],
+    /** 실제 포인터가 앵커에 닿는지 공급한다. */
+    closest: () => node,
+  };
+  const driver = new RendererDriver(
+    /** 실제 renderer 관측 함수를 격리 DOM에서 실행한다. */ async (
+      method,
+      params,
+    ) => ({
+      result: {
+        value: runInNewContext(params.expression, {
+          innerWidth: 100,
+          innerHeight: 100,
+          /** Hover의 실제 clipping 속성을 공급한다. */
+          getComputedStyle: () => ({
+            visibility: 'visible',
+            overflow: 'hidden',
+            overflowX: '',
+            overflowY: '',
+          }),
+          document: {
+            /** 표시 중인 Hover만 공급한다. */
+            querySelectorAll: () => [popup],
+            /** 현재 앵커의 hit target을 공급한다. */
+            elementFromPoint: () => node,
+          },
+        }),
+      },
+    }),
+    'win32',
+  );
+  let hover;
+  driver.click = /** 클릭 전에 실제 관측 결과만 수집한다. */ async (anchor) => {
+    hover = anchor;
+  };
+  await driver.clickAnchor('원문 열기', href);
+  assert.equal(hover.href, href);
+  assert.equal(hover.visible, true);
+  assert.equal(hover.y, 35);
 });

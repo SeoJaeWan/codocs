@@ -193,12 +193,49 @@ function hoverState() {
   const anchors = [...popup.querySelectorAll('a')].map(
     /** 현재 UI 입력·응답 관측을 연결한다. */ (node) => {
       const rect = node.getBoundingClientRect();
+      // 앵커 자체의 크기뿐 아니라 Hover와 모든 스크롤 viewport의 교집합을 읽는다.
+      let left = 0,
+        top = 0,
+        right = innerWidth,
+        bottom = innerHeight;
+      for (
+        let parent = node.parentElement;
+        parent;
+        parent = parent.parentElement
+      ) {
+        const style = getComputedStyle(parent);
+        if (
+          parent !== popup &&
+          !/(auto|scroll|hidden|clip)/u.test(
+            style.overflow + style.overflowX + style.overflowY,
+          )
+        )
+          continue;
+        const clip = parent.getBoundingClientRect();
+        left = Math.max(left, clip.left);
+        top = Math.max(top, clip.top);
+        right = Math.min(right, clip.right);
+        bottom = Math.min(bottom, clip.bottom);
+      }
+      const x = (Math.max(left, rect.left) + Math.min(right, rect.right)) / 2;
+      const y = (Math.max(top, rect.top) + Math.min(bottom, rect.bottom)) / 2;
+      const inside =
+        Math.min(right, rect.right) > Math.max(left, rect.left) &&
+        Math.min(bottom, rect.bottom) > Math.max(top, rect.top);
       return {
         label: node.textContent,
-        href: node.getAttribute('href'),
-        x: rect.x + rect.width / 2,
-        y: rect.y + rect.height / 2,
-        visible: rect.width > 0 && rect.height > 0,
+        href: node.getAttribute('data-href') ?? node.getAttribute('href'),
+        title: node.getAttribute('title'),
+        x,
+        y,
+        visible:
+          inside && document.elementFromPoint(x, y)?.closest('a') === node,
+        scroll: {
+          x: (left + right) / 2,
+          y: (top + bottom) / 2,
+          deltaY:
+            rect.top < top ? rect.top - top - 20 : rect.bottom - bottom + 20,
+        },
       };
     },
   );
@@ -274,29 +311,39 @@ export class RendererDriver {
     });
     await this.key('Escape', 'Escape', 27);
     await until(
-      async () => !(await this.evaluate(hoverState)),
+      /** 실제 화면 관측과 입력 순서를 확인한다. */ async () =>
+        !(await this.evaluate(hoverState)),
       'previous Hover dismissed',
     );
   }
 
   /** 화면의 실제 문자 범위에 포인터를 올려 표시된 본문을 기다린다. */
   async hover(text, expectedBody, occurrence = 0) {
+    await this.dismiss();
+    let nextArm = 0;
     return until(
-      /** 현재 UI 입력·응답 관측을 연결한다. */ async () => {
-        await this.dismiss();
-        const point = await until(
-          () => this.evaluate(textPoint, { text, occurrence }),
-          `visible token ${text}`,
-        );
-        await this.command('Input.dispatchMouseEvent', {
-          type: 'mouseMoved',
-          ...point,
-        });
-        const state = await until(async () => {
-          const current = await this.evaluate(hoverState);
-          return current && !current.loading && current.body && current;
-        }, `visible Hover ${text}`);
-        return state.body.includes(expectedBody) && state;
+      /** 실제 화면 관측과 입력 순서를 확인한다. */ async () => {
+        const state = await this.evaluate(hoverState);
+        if (state && !state.loading && state.body.includes(expectedBody))
+          return state;
+        // 초기 provider 준비나 완료 관측 교체 뒤 실제 포인터를 다시 올린다.
+        // 동일 시나리오의 클릭/결과를 반복하지 않고 Hover 표시 준비만 제한한다.
+        if (Date.now() >= nextArm && !state?.loading) {
+          const point = await this.evaluate(textPoint, { text, occurrence });
+          if (point) {
+            await this.command('Input.dispatchMouseEvent', {
+              type: 'mouseMoved',
+              x: 1,
+              y: 1,
+            });
+            await this.command('Input.dispatchMouseEvent', {
+              type: 'mouseMoved',
+              ...point,
+            });
+            nextArm = Date.now() + 2_000;
+          }
+        }
+        return false;
       },
       `rendered Hover ${expectedBody}`,
       30_000,
@@ -333,20 +380,34 @@ export class RendererDriver {
 
   /** 현재 화면에 보이는 유일한 앵커를 클릭하며 오래된 링크의 href도 그대로 확인한다. */
   async clickAnchor(label, href) {
-    const state = await this.evaluate(hoverState);
-    const matches =
-      state?.anchors.filter(
-        (anchor) =>
-          anchor.visible &&
-          anchor.label.includes(label) &&
-          (href === undefined || anchor.href === href),
-      ) ?? [];
-    if (matches.length !== 1)
-      throw new Error(
-        `Expected one rendered anchor ${label}, got ${matches.length}`,
-      );
-    await this.click(matches[0]);
-    return matches[0];
+    let scrolls = 0;
+    const anchor = await until(
+      /** 실제 화면 관측과 입력 순서를 확인한다. */ async () => {
+        const state = await this.evaluate(hoverState);
+        const matches =
+          state?.anchors.filter(
+            (item) =>
+              item.label.includes(label) &&
+              (href === undefined || item.href === href),
+          ) ?? [];
+        if (matches.length !== 1)
+          throw new Error(
+            `Expected one rendered anchor ${label}, got ${matches.length}`,
+          );
+        if (matches[0].visible) return matches[0];
+        if (!matches[0].scroll || ++scrolls > 8)
+          throw new Error(`Rendered anchor outside Hover viewport: ${label}`);
+        await this.command('Input.dispatchMouseEvent', {
+          type: 'mouseWheel',
+          ...matches[0].scroll,
+          deltaX: 0,
+        });
+        return false;
+      },
+      `visible anchor ${label}`,
+    );
+    await this.click(anchor);
+    return anchor;
   }
 
   /** YAML 본문 링크를 OS 기본 수정 키 클릭으로 연다. */
@@ -363,6 +424,27 @@ export class RendererDriver {
       modifiers,
     });
     try {
+      await this.command('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        ...point,
+        modifiers,
+      });
+      await until(
+        /** 실제 화면 관측과 입력 순서를 확인한다. */ async () => {
+          const active = await this.evaluate(({ x, y }) => {
+            const element = document.elementFromPoint(x, y);
+            return !!element?.closest('.detected-link-active');
+          }, point);
+          if (!active)
+            await this.command('Input.dispatchMouseEvent', {
+              type: 'mouseMoved',
+              ...point,
+              modifiers,
+            });
+          return active;
+        },
+        `active YAML link ${text}`,
+      );
       await this.click(point, modifiers);
     } finally {
       await this.command('Input.dispatchKeyEvent', {

@@ -35,9 +35,12 @@ module.exports.scenarios = [
     async run(c) {
       await c.open(source);
       const hover = await c.driver.hover('[[Zone]]', 'Zone');
+      c.assert.ok(hover.anchors.some((anchor) => anchor.label === 'Zone'));
       c.assert.ok(
-        hover.anchors.some((anchor) =>
-          anchor.href?.startsWith('command:codocs.openSource'),
+        hover.anchors.some(
+          (anchor) =>
+            anchor.href?.startsWith('command:codocs.openSource') &&
+            anchor.title?.includes('codocs.openSource'),
         ),
       );
       await c.driver.yamlLink('[[Zone]]');
@@ -158,7 +161,13 @@ module.exports.scenarios = [
       ).href;
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: zone\nname: Zone\ndefinition: Changed after display\ndomains: [test]\n',
+        'id: zone\nname: Zone\ndefinition: Changed after display [[Old]]\ndomains: [test]\n',
+      );
+      // 새 저장 원문의 실제 진단 게시로 완료 snapshot을 관측한다.
+      // 기존 Hover와 href는 유지하며 제품 조회·명시 refresh는 호출하지 않는다.
+      await c.until(
+        () => c.diagnostics(zone, 'deprecated_reference').length === 1,
+        'changed target completed snapshot',
       );
       await c.driver.clickAnchor('원문 열기', href);
       const editor = await c.atTop(zone);
@@ -176,6 +185,7 @@ module.exports.scenarios = [
       ).href;
       const beforeEditor = c.editorState();
       const beforeUi = await c.driver.workbenchState();
+      const beforeOutput = await c.output();
       await c.fs.writeFile(
         c.uri(zone).fsPath,
         'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\n',
@@ -185,7 +195,10 @@ module.exports.scenarios = [
         /** 입력 계약의 성공·실패 관측을 검증한다. */ async () => {
           const output = await c.output();
           return (
-            output.includes('Codocs 원문 이동 실패: [confirmation_rejected]') &&
+            output.startsWith(beforeOutput) &&
+            output
+              .slice(beforeOutput.length)
+              .includes('Codocs 원문 이동 실패: [confirmation_rejected]') &&
             output
           );
         },
