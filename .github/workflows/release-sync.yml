@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   synchronize:
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'changeset-release/main' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'changeset-release/main' && github.event.pull_request.head.repo.full_name == github.repository && vars.CODOCS_RELEASE_ENABLED == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Require manual activation

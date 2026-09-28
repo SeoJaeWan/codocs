@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.CODOCS_RELEASE_ENABLED == 'true'
     runs-on: ubuntu-24.04
     environment: release
     steps:

@@ -35,6 +35,114 @@ const coreRequire = createRequire(
 );
 const YAML = coreRequire('yaml');
 
+/** 이 회귀 fixture의 AND·동등 비교만 판정하며 GitHub 전체 표현식 엔진을 대신하지 않는다. */
+function releaseJobEligible(condition, context) {
+  assert.equal(typeof condition, 'string');
+  return condition.split(/\s*&&\s*/u).every(
+    /** fixture에서 지원하는 비교절을 독립 판정한다. */ (clause) => {
+      const comparison = clause.match(/^([\w.]+) == ('[^']*'|true|[\w.]+)$/u);
+      assert.ok(comparison, `unsupported fixture expression: ${clause}`);
+      /** fixture의 확인된 context 경로만 읽고 미설정 변수는 공식 계약의 빈 문자열로 둔다. */
+      function value(operand) {
+        if (operand === 'true') return true;
+        if (operand.startsWith("'")) return operand.slice(1, -1);
+        return (
+          operand
+            .split('.')
+            .reduce((current, key) => current?.[key], context) ?? ''
+        );
+      }
+      const left = value(comparison[1]);
+      const right = value(comparison[2]);
+      return typeof left === 'string' && typeof right === 'string'
+        ? left.toLowerCase() === right.toLowerCase()
+        : left === right;
+    },
+  );
+}
+
+describe('release job 활성화와 기존 이벤트 조건', /** 실제 YAML 조건이 비활성 러너를 생략하고 기존 허용 범위를 유지하는지 확인한다. */ () => {
+  const eligible = {
+    vars: { CODOCS_RELEASE_ENABLED: 'true' },
+    github: {
+      ref: 'refs/heads/main',
+      repository: 'Fixture/release',
+      event: {
+        pull_request: {
+          merged: true,
+          head: {
+            ref: 'changeset-release/main',
+            repo: { full_name: 'Fixture/release' },
+          },
+        },
+      },
+    },
+  };
+  for (const [workflowName, jobName] of [
+    ['prepare', 'version'],
+    ['publish', 'publish'],
+    ['sync', 'synchronize'],
+  ]) {
+    test(`${workflowName}은 미설정·false에서 러너를 생략하고 true에서 기존 조건을 유지한다`, /** 파싱한 실제 job 조건에 허용·거부 이벤트를 넣으며 내부 step guard도 보존한다. */ async () => {
+      const workflow = YAML.parse(
+        await readFile(
+          path.join(root, `.github/workflows/release-${workflowName}.yml`),
+          'utf8',
+        ),
+      );
+      const job = workflow.jobs[jobName];
+      assert.equal(releaseJobEligible(job.if, eligible), true);
+      for (const vars of [{}, { CODOCS_RELEASE_ENABLED: 'false' }])
+        assert.equal(releaseJobEligible(job.if, { ...eligible, vars }), false);
+      assert.equal(job.steps[0].name, 'Require manual activation');
+      assert.equal(job.steps[0].run, 'test "$CODOCS_RELEASE_ENABLED" = true');
+      assert.equal(
+        job.steps[0].env.CODOCS_RELEASE_ENABLED,
+        '${{ vars.CODOCS_RELEASE_ENABLED }}',
+      );
+      if (workflowName === 'publish')
+        assert.equal(
+          releaseJobEligible(job.if, {
+            ...eligible,
+            github: { ...eligible.github, ref: 'refs/heads/develop' },
+          }),
+          false,
+        );
+      if (workflowName === 'sync')
+        for (const changed of [
+          { merged: false },
+          {
+            head: {
+              ref: 'feature/other',
+              repo: { full_name: 'Fixture/release' },
+            },
+          },
+          {
+            head: {
+              ref: 'changeset-release/main',
+              repo: { full_name: 'Fork/release' },
+            },
+          },
+        ])
+          assert.equal(
+            releaseJobEligible(job.if, {
+              ...eligible,
+              github: {
+                ...eligible.github,
+                event: {
+                  pull_request: {
+                    ...eligible.github.event.pull_request,
+                    ...changed,
+                  },
+                },
+              },
+            }),
+            false,
+          );
+    });
+  }
+});
+
 describe('전체 release Action revision과 입력 연결', /** 빠짐없는 inventory를 실제 primary manifest와 대조한다. */ () => {
   test('세 workflow의 모든 Action을 검사하면 고정 Node24 commit과 호환 입력을 사용하고 자동 캐시를 끈다', /** 전체 family와 모든 소비 step의 계약을 확인한다. */ async () => {
     const inventory = [];

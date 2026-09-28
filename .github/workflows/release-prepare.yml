@@ -9,6 +9,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   version:
+    if: vars.CODOCS_RELEASE_ENABLED == 'true'
     name: Prepare official release PR
     runs-on: ubuntu-24.04
     steps:
