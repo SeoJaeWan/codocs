@@ -1,3 +1,9 @@
+import {
+  captureWorkspaceWriteImpact,
+  createWorkspaceWriteImpactNotice,
+  type WorkspaceWriteImpactNotice,
+} from '../write-impact/index.js';
+import { takeSavedChangeContext } from '../storage/save-context.js';
 import { discoveryPath } from './discovery-path.js';
 import {
   WorkspaceCodeReferenceIndex,
@@ -10,6 +16,7 @@ import {
   type WorkspaceCodeBufferInput,
 } from '../code-reference/index.js';
 import {
+  changeImpactDiagnosticMessages,
   catalogConfirmations,
   catalogDiagnosticCodes,
   catalogDiagnosticMessages,
@@ -196,6 +203,7 @@ export type WorkspaceListResult = RequestResult<
 export type WorkspaceWriteResult =
   | (Extract<WorkspaceStorageResult, { success: true }> & {
       indexUpdated?: boolean;
+      writeImpact?: WorkspaceWriteImpactNotice;
     })
   | (Extract<WorkspaceStorageResult, { success: false }> & {
       error: Diagnostic<string>;
@@ -205,6 +213,8 @@ export type WorkspaceWriteResult =
 export interface WorkspaceQuerySessionOptions {
   storage?: WorkspaceStorageOptions;
   beforeIndexUpdate?: (attempt: 1 | 2) => Promise<void>;
+  /** 실제 영향 계산 직전의 예외만 검사하는 경계다. 저장 성공은 유지한다. */
+  beforeWriteImpactCalculation?: () => void;
 }
 
 /** 상세 조회 결과다. */
@@ -1105,9 +1115,33 @@ export class WorkspaceQuerySession {
           scan.diagnostics[0] ??
           workspaceIndexNotReady().error,
       ]);
+    const documentGeneration = this.#catalogVersion;
+    let impactCapture = await captureWorkspaceWriteImpact(this);
+    // 저장은 확보한 scan과 기존 디스크 버전 검사로 판단한다. 수집 중 갱신은 안내의 근거만 분리한다.
+    if (this.#closed || this.#explicitRefreshPromise)
+      return this.#writeFailure([workspaceIndexNotReady().error]);
+    const currentWatchFailure = this.#watchFailure();
+    if (currentWatchFailure)
+      return this.#writeFailure([
+        this.#watchFailureResult(currentWatchFailure).error,
+      ]);
+    if (impactCapture.snapshot.documentGeneration !== documentGeneration)
+      impactCapture = {
+        ...impactCapture,
+        failures: [
+          ...impactCapture.failures,
+          changeImpactDiagnosticMessages.revisionMismatch,
+        ],
+      };
     const saved = await saveWorkspaceChange(input, scan, this.#options.storage);
     if (!saved.success) return this.#writeFailure(saved.diagnostics);
     if (!saved.saved) return saved;
+    const writeImpact = createWorkspaceWriteImpactNotice(
+      impactCapture,
+      takeSavedChangeContext(saved),
+      { path: saved.source.path, revision: saved.revision },
+      this.#options.beforeWriteImpactCalculation,
+    );
     let updated = false;
     let indexError: unknown;
     for (const attempt of [1, 2] as const) {
@@ -1128,7 +1162,7 @@ export class WorkspaceQuerySession {
       }
       if (this.#closed) break;
     }
-    if (updated) return { ...saved, indexUpdated: true };
+    if (updated) return { ...saved, indexUpdated: true, writeImpact };
     const cause =
       indexError instanceof Error
         ? indexError.message
@@ -1143,6 +1177,7 @@ export class WorkspaceQuerySession {
     return {
       ...saved,
       indexUpdated: false,
+      writeImpact,
       diagnostics: [
         ...saved.diagnostics,
         {

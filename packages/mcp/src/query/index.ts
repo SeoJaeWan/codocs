@@ -55,7 +55,7 @@ export type CodocsGetResponse = WorkspaceGetResponse;
 /** codocs_validate의 공통 결과이며 문서 오류 진단도 요청 성공이다. */
 export type CodocsValidationResponse = WorkspaceValidationResult;
 
-/** codocs_write의 저장 여부와 색인 게시 여부를 구분하는 공통 결과다. */
+/** codocs_write의 저장·색인 상태와 별도 코드 연결 영향 안내를 그대로 전달한다. */
 export type CodocsWriteResponse = WorkspaceWriteResult;
 
 /** SDK 등록과 독립적으로 직접 호출할 수 있는 조회 handler 모음이다. */

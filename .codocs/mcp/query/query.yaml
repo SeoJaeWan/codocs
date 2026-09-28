@@ -40,3 +40,8 @@ definition: |
 
   대표 함수 createCodocsQueryHandlers와 조회 입력·응답은 [조회 어댑터 구현](../../../packages/mcp/src/query/index.ts)에서 확인한다.
   입력 검증과 작업 공간 응답 연결 사례는 [인접 테스트](../../../packages/mcp/src/query/query.test.ts)에서 확인한다.
+
+  ## 저장 결과의 전달
+
+  같은 프로젝트 세션의 codocs_write는 [[저장]]의 실제 반영 결과와 [[저장 후 색인 갱신 실패를 복구하는 절차]]의 게시 결과를 그대로 전달한다.
+  실제 변경 저장의 추가 writeImpact는 [[문서 변경의 코드 연결 영향 안내]]를 적용한다. 조회 어댑터는 저장 코드 출현을 IDE buffer로 대체하거나 계산 실패를 저장 실패로 바꾸지 않는다.

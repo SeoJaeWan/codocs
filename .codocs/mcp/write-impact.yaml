@@ -36,3 +36,23 @@ definition: |
   코드 수집 또는 영향 계산이 불완전하면 확인한 항목과 수집·계산 상태 및 확인하지 못한 이유를 함께 안내한다.
   빈 목록만으로 영향 없음이나 전체 확인 완료를 단정하지 않는다. 안내를 계산하지 못해도 실제 saved·changed·revision·indexUpdated를 보존한다.
   [[도구 결과]]의 요청 처리 여부와 저장 여부, 색인 갱신 여부를 영향 계산 성공 하나로 바꾸지 않는다.
+
+  ## 외부 응답과 책임 경계
+
+  실제 변경 저장의 writeImpact는 basis:saved_files와 target의 path·beforeRevision·revision, collection, calculation, impacts를 제공한다.
+  collection에는 저장 전 코드의 status·confirmedCount·codeGeneration·documentGeneration·failures를 유지한다. calculation은 complete 또는 incomplete와 별도 failures를 전달한다.
+  두 상태를 함께 확인해야 하며, collection이 불완전한 빈 impacts는 전체 영향 없음의 증거가 아니다.
+
+  impacts는 출현별 occurrenceId·sourcePath·sourceUri·sourceRevision·range·marker와 변경 전 destination, certainty, reasons를 제공한다.
+  range는 코드 표기의 JS/LSP UTF-16 좌표이고 destination의 명시 행은 1부터 시작하며 끝 행을 포함한다. 새 행 번호를 안내하거나 자동 재배치하지 않는다.
+  certainty는 confirmed 또는 possible이다. reasons의 region_changed·preceding_line_shift·document_changed·name_changed·domain_changed·ambiguous_correspondence는 같은 출현 안에서 함께 보존한다.
+  도메인 사유는 기존 도메인 한정 표기의 해석이 달라지는 경우에 적용한다. 도메인 한정이 없는 참조의 해석을 도메인 변경만으로 바뀌었다고 판단하지 않는다.
+
+  반복 행은 가능한 최장 공통 부분열 대응을 모두 확인하고 임의의 대응을 선택하지 않는다. 행 대응의 계산 크기 한도를 넘으면 calculation:incomplete와 원인을 제공하며 독립적으로 판단한 문서 전체·이름·도메인 사유를 보존한다.
+  저장 전 출현의 문서 세대와 비교 자료의 revision이 일치하지 않으면 다른 원문의 영향으로 섞지 않고 계산 불완전으로 안내한다.
+  저장·색인 상태와 안내의 실패는 독립적이다. 검증된 무변경과 저장 실패는 writeImpact를 생략한다.
+
+  ## 코드와 검증 위치
+
+  순수 판단은 [Core 영향 계산](../../packages/core/src/change-impact/index.ts)과 [인접 테스트](../../packages/core/src/change-impact/change-impact.test.ts), 디스크 출현·revision 연결과 실패 보존은 [작업 공간 영향 안내](../../packages/workspace/src/write-impact/index.ts)와 [실제 저장 테스트](../../packages/workspace/src/write-impact/write-impact.test.ts)에서 확인한다.
+  [실제 stdio 검증](../../packages/mcp/src/server/write-impact.test.ts)은 IDE 없이 저장 코드의 구간·전체·이름·도메인·반복 대응과 응답 보존을 확인한다.

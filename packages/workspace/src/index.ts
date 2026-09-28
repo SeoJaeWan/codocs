@@ -10,3 +10,5 @@ export * from './query/index.js';
 export * from './revision/index.js';
 export * from './storage/index.js';
 export * from './watcher/index.js';
+export { writeImpactBases } from './write-impact/index.js';
+export type { WorkspaceWriteImpactNotice } from './write-impact/index.js';
