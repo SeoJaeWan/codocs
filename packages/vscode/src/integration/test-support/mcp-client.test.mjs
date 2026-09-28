@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { startMcp } from './mcp-client.cjs';
+import { createSourceCli } from '../../../../mcp/test-support/source-cli.ts';
 
 for (const mode of ['eof', 'kill'])
   test(
@@ -16,6 +17,7 @@ for (const mode of ['eof', 'kill'])
       );
       const observations = [];
       let client;
+      const sourceCli = await createSourceCli();
       try {
         await mkdir(path.join(project, '.codocs'));
         await writeFile(
@@ -24,7 +26,7 @@ for (const mode of ['eof', 'kill'])
         );
         client = await startMcp({
           node: process.execPath,
-          entry: path.resolve('packages/mcp/dist/cli.js'),
+          entry: sourceCli.entry,
           project,
           /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ record: (
             value,
@@ -50,6 +52,7 @@ for (const mode of ['eof', 'kill'])
         assert.deepEqual(await client.close(), exit);
       } finally {
         await client?.close('kill');
+        await sourceCli.close();
         await rm(project, { recursive: true, force: true });
       }
     },

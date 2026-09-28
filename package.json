@@ -11,7 +11,9 @@
     "typecheck": "node tools/build/build.mjs typecheck",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier . --write",
-    "test": "node tools/test/run.mjs",
+    "test": "pnpm test:unit && pnpm test:node",
+    "test:unit": "vitest run",
+    "test:node": "node --test tools/**/*.test.{mjs,cjs} packages/**/test-runner/**/*.test.{mjs,cjs} packages/**/src/**/test-support/**/*.test.{mjs,cjs}",
     "test:vscode": "node packages/vscode/test-runner/run.mjs",
     "check": "pnpm check:static && pnpm check:runtime",
     "bench": "node tools/performance/runner.mjs",
@@ -21,8 +23,8 @@
     "release:version": "changeset version",
     "check:static": "pnpm typecheck && pnpm lint && pnpm exec prettier . --check",
     "check:runtime": "pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs",
-    "test:release-management": "node tools/test/run.mjs --suite=release-management",
-    "test:os": "node tools/test/run.mjs --suite=os",
+    "test:release-management": "node --test tools/ci/**/*.test.{mjs,cjs} tools/build/release-version.test.mjs",
+    "test:os": "pnpm test",
     "check:runtime:os": "pnpm build && pnpm test:os && pnpm exec vitest run --config vitest.checks.config.mjs"
   },
   "lint-staged": {

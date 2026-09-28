@@ -16,7 +16,10 @@ import { afterAll, describe, expect, it } from 'vitest';
 import codocs from './eslint-rules.mjs';
 
 import { resolvePnpm } from '../toolchain.mjs';
-import { createFixtureEslint } from '../test/support/eslint.js';
+import {
+  createFixtureEslint,
+  fixtureEslintConfig,
+} from '../test/support/eslint.js';
 
 const root = process.cwd();
 mkdirSync(path.join(root, '.workbench/fixtures'), { recursive: true });
@@ -288,6 +291,8 @@ await Promise.resolve(1);
           process.execPath,
           [
             path.join(root, 'node_modules/eslint/bin/eslint.js'),
+            '--config',
+            fixtureEslintConfig(),
             fixture,
             '--format',
             'json',
