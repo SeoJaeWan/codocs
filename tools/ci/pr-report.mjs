@@ -27,6 +27,7 @@ import {
   validateReport,
   workflowNames,
 } from '../build/release-contract.mjs';
+import { releaseBranch } from './release-flow.mjs';
 
 /** API run ID와 재실행 attempt를 함께 비교한다. */
 export function sameRun(a, b) {
@@ -229,7 +230,12 @@ async function record(
   const matches = artifacts.filter(
     (item) => item.name === name && !item.expired,
   );
-  if (!matches.length && optional) return null;
+  if (!matches.length && optional) {
+    if (typeof optional !== 'function') return null;
+    // 만료된 동일 이름은 정상 부재가 아니므로 예외 판단 전에 실패시킨다.
+    if (!artifacts.some((item) => item.name === name) && (await optional()))
+      return null;
+  }
   assert.equal(matches.length, 1, 'one exact live artifact required');
   const artifact = matches[0];
   assert.ok(
@@ -256,6 +262,40 @@ function assertPublishRun(run) {
   );
 }
 
+/** 정상 생략과 비릴리스 main push만 제외하고 실제 게시에는 증거를 요구한다. */
+async function publicationRecord(api, readArchive, repository, run) {
+  if (run.conclusion === 'skipped') return null;
+  const identity = {
+    runId: String(run.id),
+    runAttempt: String(run.run_attempt),
+  };
+  return record(
+    api,
+    readArchive,
+    repository,
+    identity.runId,
+    publishArtifactName(identity),
+    releaseFiles.publish,
+    /** 성공 push의 정확한 commit에 병합된 릴리스 PR이 없을 때만 부재를 허용한다. */
+    async () => {
+      if (run.event !== 'push' || run.conclusion !== 'success') return false;
+      assert.match(run.head_sha, /^[0-9a-f]{40}$/u, 'invalid publish commit');
+      const pulls = await list(
+        api,
+        `/repos/${repository}/commits/${run.head_sha}/pulls`,
+      );
+      return !pulls.some(
+        /** 생산자가 게시하는 병합 릴리스 PR 조건을 그대로 대조한다. */
+        (pr) =>
+          pr.merged_at &&
+          pr.merge_commit_sha === run.head_sha &&
+          pr.base?.ref === 'main' &&
+          pr.head?.ref === releaseBranch,
+      );
+    },
+  );
+}
+
 /** 댓글 권한 없이 실행의 PR 번호만 확인해 PR별 작성 그룹을 분리한다. */
 export async function resolveReportPr(api, readArchive, repository, run) {
   if (run.name === workflowNames.ci) {
@@ -277,14 +317,13 @@ export async function resolveReportPr(api, readArchive, repository, run) {
     runId: String(run.id),
     runAttempt: String(run.run_attempt),
   };
-  const uploaded = await record(
+  const uploaded = await publicationRecord(
     api,
     readArchive,
     repository,
-    identity.runId,
-    publishArtifactName(identity),
-    releaseFiles.publish,
+    current,
   );
+  if (!uploaded) return null;
   const binding = validateBinding(uploaded.value.binding);
   assert.equal(binding.repository, repository, 'repository mismatch');
   assert.deepEqual(uploaded.value.publishRun, identity, 'publish run mismatch');
@@ -315,14 +354,13 @@ export async function reportRun(
   let binding;
   if (run.name === workflowNames.publish) {
     publishRun = { runId: String(run.id), runAttempt: String(run.run_attempt) };
-    const published = await record(
+    const published = await publicationRecord(
       api,
       readArchive,
       repository,
-      publishRun.runId,
-      publishArtifactName(publishRun),
-      releaseFiles.publish,
+      currentRun,
     );
+    if (!published) return 'ignored';
     publish = published.value;
     assert.deepEqual(publish.publishRun, publishRun, 'publish run mismatch');
     binding = validateBinding(publish.binding);
@@ -579,7 +617,8 @@ async function main() {
       repository,
       event.workflow_run,
     );
-    await appendFile(process.env.GITHUB_OUTPUT, `pr_number=${number}\n`);
+    if (number !== null)
+      await appendFile(process.env.GITHUB_OUTPUT, `pr_number=${number}\n`);
     return;
   }
   console.log(
