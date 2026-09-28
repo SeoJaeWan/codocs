@@ -1,0 +1,63 @@
+name: Release publish
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release-pr:
+        description: Merged release PR to retry with its original verified candidate
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: codocs-release-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: release
+    steps:
+      - name: Require manual activation
+        run: test "$CODOCS_RELEASE_ENABLED" = true
+        env:
+          CODOCS_RELEASE_ENABLED: ${{ vars.CODOCS_RELEASE_ENABLED }}
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.CODOCS_RELEASE_APP_ID }}
+          private-key: ${{ secrets.CODOCS_RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+          permission-actions: read
+          permission-checks: read
+          permission-administration: read
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile --store-dir .workbench/pnpm-store
+      - name: Publish only verified candidate bytes
+        run: node tools/ci/release-publish.mjs
+        env:
+          CODOCS_RELEASE_ENABLED: ${{ vars.CODOCS_RELEASE_ENABLED }}
+          CODOCS_APP_TOKEN: ${{ steps.app.outputs.token }}
+          CODOCS_RELEASE_PR: ${{ inputs.release-pr }}
+          NODE_AUTH_TOKEN: ${{ secrets.CODOCS_NPM_TOKEN }}
+          VSCE_PAT: ${{ secrets.CODOCS_MARKETPLACE_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codocs-publish-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .workbench/publish/publish.json
+          if-no-files-found: warn
+          retention-days: 90

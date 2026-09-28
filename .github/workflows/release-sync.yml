@@ -1,0 +1,47 @@
+name: Release sync
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: codocs-release-state
+  cancel-in-progress: false
+jobs:
+  synchronize:
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'changeset-release/main' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require manual activation
+        run: test "$CODOCS_RELEASE_ENABLED" = true
+        env:
+          CODOCS_RELEASE_ENABLED: ${{ vars.CODOCS_RELEASE_ENABLED }}
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.CODOCS_RELEASE_APP_ID }}
+          private-key: ${{ secrets.CODOCS_RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-administration: read
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - run: pnpm install --frozen-lockfile --store-dir .workbench/pnpm-store
+      - name: Prepare a PR without writing protected branches
+        run: |
+          git config user.name 'codocs-release[bot]'
+          git config user.email 'codocs-release@users.noreply.github.com'
+          node tools/ci/release-sync.mjs
+        env:
+          CODOCS_RELEASE_ENABLED: ${{ vars.CODOCS_RELEASE_ENABLED }}
+          CODOCS_APP_TOKEN: ${{ steps.app.outputs.token }}

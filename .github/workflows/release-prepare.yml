@@ -1,0 +1,61 @@
+name: Release prepare
+on:
+  push:
+    branches: [develop]
+permissions:
+  contents: read
+concurrency:
+  group: codocs-release-state
+  cancel-in-progress: false
+jobs:
+  version:
+    name: Prepare official release PR
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require manual activation
+        run: test "$CODOCS_RELEASE_ENABLED" = true
+        env:
+          CODOCS_RELEASE_ENABLED: ${{ vars.CODOCS_RELEASE_ENABLED }}
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.CODOCS_RELEASE_APP_ID }}
+          private-key: ${{ secrets.CODOCS_RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-actions: read
+          permission-checks: read
+          permission-administration: read
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - run: pnpm install --frozen-lockfile --store-dir .workbench/pnpm-store
+      - name: Check protection, latest source and synchronization
+        id: preflight
+        run: node tools/ci/release-flow.mjs prepare
+        env:
+          CODOCS_RELEASE_ENABLED: ${{ vars.CODOCS_RELEASE_ENABLED }}
+          CODOCS_APP_TOKEN: ${{ steps.app.outputs.token }}
+      - uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51
+        if: steps.preflight.outputs.prepare == 'true'
+        with:
+          github-token: ${{ steps.app.outputs.token }}
+          script: node tools/ci/release-flow.mjs version
+          pr-base-branch: main
+          pr-draft: create
+          push-with-git-cli: false
+        env:
+          CODOCS_APP_TOKEN: ${{ steps.app.outputs.token }}
+      - name: Reject a baseline that moved during the official Action
+        if: steps.preflight.outputs.prepare == 'true'
+        run: node tools/ci/release-flow.mjs audit-preparation
+        env:
+          CODOCS_APP_TOKEN: ${{ steps.app.outputs.token }}
