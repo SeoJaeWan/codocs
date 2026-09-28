@@ -9,6 +9,7 @@ exports.startMcp =
     entry,
     project,
     args = [],
+    preload = [],
     record = /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ () => {},
   }) {
     const child = spawn(
@@ -16,7 +17,10 @@ exports.startMcp =
       [
         '--require',
         path.join(__dirname, 'storage-io-observer.cjs'),
+        ...preload.flatMap((file) => ['--require', file]),
         entry,
+        '--project',
+        project,
         ...args,
       ],
       {

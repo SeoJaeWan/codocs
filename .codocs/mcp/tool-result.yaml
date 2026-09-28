@@ -45,6 +45,10 @@ definition: |
   오류 코드나 success 하나로 저장 여부를 추정하지 않는다. 구체 도구의 입력과 결과를 찾는 출발점은 [[MCP 도구 호출]]이다.
   실제 변경 저장의 코드 참조 확인 항목은 [[문서 변경의 코드 연결 영향 안내]]에서 정의한다. 수집·영향 계산 실패는 실제 파일 반영 결과와 별도로 전달한다.
 
+  writeImpact는 실제 변경 저장에서만 추가되는 코드 연결 안내이며 요청 처리 success나 saved·changed·revision·indexUpdated를 다시 판정하지 않는다.
+  basis·collection·calculation·impacts의 의미와 계산 불완전 처리 기준은 [[문서 변경의 코드 연결 영향 안내]]를 적용한다.
+  MCP 래퍼의 structuredContent와 JSON text는 계산 실패 상태까지 같은 객체로 전달한다. 안내를 만들지 못했다는 이유로 이미 가능한 저장을 거부하거나 isError를 바꾸지 않는다.
+
   ## 코드와 검증 위치
 
   목록·상세 요청의 결과 연결은 [조회 어댑터](../../packages/mcp/src/query/index.ts)와 [조회 테스트](../../packages/mcp/src/query/query.test.ts)에서 확인한다. 공통 실패 분기는 [공통 진단](../../packages/core/src/diagnostics/index.ts), 준비·부분 목록 결과는 [작업 공간 조회](../../packages/workspace/src/query/index.ts), MCP 포장은 [stdio 서버](../../packages/mcp/src/server/index.ts)에서 확인한다.

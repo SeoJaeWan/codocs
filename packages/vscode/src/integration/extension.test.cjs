@@ -1241,6 +1241,428 @@ const multiprocess = [
   ),
 ];
 
+const codeReferences = [
+  {
+    id: 'explicit-code-reference',
+    title: '명시 링크·오류 전체 span과 dirty buffer의 실제 행 번호를 검증한다',
+    /** 설치한 제품의 실제 링크·진단·현재 buffer 선택을 관찰한다. */
+    async run(c) {
+      const source =
+        '😀 @codocs [[Code Target]]\r\n"@codocs [[Code Target]]#L11"\r\n@codocs [[test:Code Target]]#L11-L12\r\n@codocs [[Code Target]]#L0\r\n@codocs [[Code Target]]#L12-L11\r\n@codocs [[Code Target]]#L999\r\n@codocs [[Absent]]\r\n@codocs [[Twin]]\r\n';
+      const d = await c.open('code-reference');
+      const eol = new c.vscode.WorkspaceEdit();
+      eol.set(d.uri, [c.vscode.TextEdit.setEndOfLine(c.vscode.EndOfLine.CRLF)]);
+      c.assert.equal(await c.vscode.workspace.applyEdit(eol), true);
+      await c.replace(d, source);
+      const links = await c.links(d, 3);
+      c.assert.equal(links[0].range.start.character, 3);
+      await c.eventually(
+        /** 실제 관측을 요청에 연결하고 실패를 호출자에게 전달한다. */ () =>
+          c.assert.equal(
+            c.vscode.languages
+              .getDiagnostics(d.uri)
+              .filter((item) =>
+                String(item.code).startsWith('codocs.codeReference.'),
+              ).length,
+            5,
+          ),
+      );
+      const h = await c.hover(d, '@codocs [[Code Target]]#L0');
+      c.assert.ok(h.text.includes('행 번호'));
+      c.assert.ok(!h.text.includes('First body'));
+      const target = await c.open('.codocs/code-target.yaml');
+      const disk = target.getText();
+      await c.replace(target, '# inserted\n' + disk);
+      const dirty = target.getText();
+      const version = target.version;
+      const latest = await c.links(d, 3);
+      await c.execute(latest[2].target);
+      c.assert.equal(c.vscode.window.activeTextEditor.document, target);
+      c.assert.equal(c.vscode.window.activeTextEditor.selection.start.line, 10);
+      c.assert.equal(c.vscode.window.activeTextEditor.selection.end.line, 11);
+      c.assert.equal(target.getText(), dirty);
+      c.assert.equal(target.version, version);
+      c.assert.ok(target.isDirty);
+      await c.replace(target, 'id: code-target');
+      await c.vscode.window.showTextDocument(target);
+      const selection = c.vscode.window.activeTextEditor.selection;
+      const bounds = await c.links(d, 3);
+      c.assert.equal(await c.execute(bounds[2].target), false);
+      c.assert.deepEqual(c.vscode.window.activeTextEditor.selection, selection);
+      c.assert.equal(target.getText(), 'id: code-target');
+    },
+  },
+  {
+    id: 'reverse-code-reference',
+    title: '행 구간의 출현 합집합·같은 행의 열과 YAML 이름 이동을 보존한다',
+    /** 실제 저장 source와 미저장 overlay의 정확한 marker 선택을 검사한다. */
+    async run(c) {
+      const text =
+        '@codocs [[Code Target]]#L11-L12 @codocs [[Code Target]]#L12-L13';
+      const d = await c.open('code-reference');
+      await c.replace(d, text);
+      const test = await c.open('code-reference.test.txt');
+      await c.replace(test, '@codocs [[Code Target]]#L12');
+      const target = await c.open('.codocs/code-target.yaml');
+      const h = await c.hover(target, 'Row twelve', '연결된 코드 · 3곳');
+      c.assert.equal(c.commands(h).length, 3);
+      c.assert.ok(
+        c.commands(h).some((item) => item.label === 'code-reference:1:33'),
+      );
+      const selected = c
+        .commands(h)
+        .find((item) => item.label === 'code-reference:1:33');
+      await c.execute(selected.uri);
+      c.assert.equal(c.vscode.window.activeTextEditor.document, d);
+      c.assert.equal(
+        c.vscode.window.activeTextEditor.document.getText(
+          c.vscode.window.activeTextEditor.selection,
+        ),
+        '@codocs [[Code Target]]#L12-L13',
+      );
+      const links = await c.links(target);
+      c.assert.ok(!links.some((link) => link.range.start.line === 11));
+      await c.replace(d, '@codocs [[Code Target]]#L6');
+      await c.replace(test, 'no marker');
+      const yaml = await c.eventually(
+        /** 실제 관측을 요청에 연결하고 실패를 호출자에게 전달한다. */ async () => {
+          const values = await c.links(target);
+          const found = values.find(
+            (link) =>
+              link.range.start.line === 5 && link.range.start.character === 2,
+          );
+          c.assert.ok(found);
+          return found;
+        },
+      );
+      await c.execute(yaml.target);
+      await c.atTop('.codocs/direct.yaml');
+      const overlap = await c.hover(target, '[[Direct]]', 'code-reference:1:1');
+      c.assert.ok(c.commands(overlap).length >= 2);
+    },
+  },
+  {
+    id: 'whole-code-inlay',
+    title:
+      '실제 Inlay Hint의 2→1→0·설정·단일 이동 제스처와 원문 불변을 확인한다',
+    /** 실제 설치 provider와 renderer 표시를 같은 원문 상태에서 확인한다. */
+    async run(c) {
+      const code = await c.open('code-reference');
+      await c.replace(
+        code,
+        '@codocs [[Code Target]] @codocs [[Code Target]] @codocs [[Code Target]]#L11',
+      );
+      const target = await c.open('.codocs/code-target.yaml');
+      const before = {
+        text: target.getText(),
+        dirty: target.isDirty,
+        lines: target.lineCount,
+        version: target.version,
+      };
+      const multiple = await c.eventually(
+        /** 실제 관측을 요청에 연결하고 실패를 호출자에게 전달한다. */ async () => {
+          const hints = await c.hints(target);
+          c.assert.equal(hints.length, 1);
+          c.assert.equal(
+            hints[0].label[0].value,
+            '문서 전체에 연결된 코드 · 2곳',
+          );
+          return hints[0];
+        },
+      );
+      c.assert.equal(multiple.label[0].command, undefined);
+      c.assert.equal(multiple.textEdits, undefined);
+      await c.ui('visible', '문서 전체에 연결된 코드 · 2곳');
+      await c.ui('plain-click', '문서 전체에 연결된 코드 · 2곳');
+      c.assert.equal(c.vscode.window.activeTextEditor.document, target);
+      const settings = c.vscode.workspace.getConfiguration('editor');
+      const original = settings.get('inlayHints.enabled');
+      try {
+        await settings.update(
+          'inlayHints.enabled',
+          'off',
+          c.vscode.ConfigurationTarget.Workspace,
+        );
+        await c.ui('hidden', '문서 전체에 연결된 코드');
+        await settings.update(
+          'inlayHints.enabled',
+          'on',
+          c.vscode.ConfigurationTarget.Workspace,
+        );
+        await c.ui('visible', '문서 전체에 연결된 코드 · 2곳');
+      } finally {
+        await settings.update(
+          'inlayHints.enabled',
+          original,
+          c.vscode.ConfigurationTarget.Workspace,
+        );
+      }
+      await c.replace(
+        code,
+        '@codocs [[Code Target]] @codocs [[Code Target]]#L11',
+      );
+      await c.vscode.window.showTextDocument(target);
+      await c.write('.gitignore', '');
+      await c.eventually(
+        /** 불완전한 확인 1곳을 단일 이동으로 확정하지 않는다. */ async () => {
+          const hints = await c.hints(target);
+          c.assert.equal(
+            hints[0].label[0].value,
+            '확인된 코드 1곳 · 수집 불완전',
+          );
+          c.assert.equal(hints[0].label[0].command, undefined);
+          c.assert.equal(
+            c.commands({ markdown: hints[0].tooltip.value }).length,
+            1,
+          );
+          c.assert.ok(hints[0].tooltip.value.includes('EACCES'));
+        },
+      );
+      await c.write('.gitignore', 'partial/\n');
+      await c.eventually(async () => {
+        const hints = await c.hints(target);
+        c.assert.ok(hints[0].label[0].command);
+      });
+      await c.ui('gesture', '문서 전체에 연결된 코드 · 1곳');
+      await c.eventually(() =>
+        c.assert.equal(c.vscode.window.activeTextEditor.document, code),
+      );
+      c.assert.equal(
+        c.vscode.window.activeTextEditor.document.getText(
+          c.vscode.window.activeTextEditor.selection,
+        ),
+        '@codocs [[Code Target]]',
+      );
+      await c.replace(code, '@codocs [[Code Target]]#L11');
+      await c.vscode.window.showTextDocument(target);
+      await c.write('.gitignore', '');
+      await c.eventually(
+        /** 불완전한 확인 0곳을 완료된 부재로 확정하지 않는다. */ async () => {
+          const hints = await c.hints(target);
+          c.assert.equal(
+            hints[0].label[0].value,
+            '확인된 코드 0곳 · 수집 불완전',
+          );
+          c.assert.equal(hints[0].label[0].command, undefined);
+        },
+      );
+      await c.write('.gitignore', 'partial/\n');
+      await c.eventually(async () =>
+        c.assert.equal((await c.hints(target)).length, 0),
+      );
+      await c.ui('hidden', '문서 전체에 연결된 코드');
+      c.assert.deepEqual(
+        {
+          text: target.getText(),
+          dirty: target.isDirty,
+          lines: target.lineCount,
+          version: target.version,
+        },
+        before,
+      );
+    },
+  },
+  {
+    id: 'code-reference-eligibility',
+    title:
+      '설치 IDE와 MCP가 Git 추적·ignore·재포함·경계·binary 범위를 공유한다',
+    /** 격리 workspace의 Git metadata와 실제 파일 정책을 양쪽 제품에서 확인한다. */
+    async run(c) {
+      const { execFileSync } = require('node:child_process');
+      const names = [
+        'ignored-tracked',
+        'ignored-untracked',
+        'sub/keep',
+        'sub/excluded',
+        'dist/custom',
+        'node_modules/custom',
+        'binary',
+        'linked',
+      ];
+      const marker = '@codocs [[Code Target]]\n';
+      try {
+        for (const name of ['sub', 'scope', 'dist', 'node_modules'])
+          await c.fs.mkdir(c.path.join(c.root, name), { recursive: true });
+        await c.write('.gitignore', 'partial/\nignored*\nsub/*\n!sub/keep\n');
+        await c.write('scope/.gitignore', '*.txt\n!keep.txt\n');
+        await c.write('scope/keep.txt', marker);
+        await c.write('scope/ignored.txt', marker);
+        await c.fs.writeFile(
+          c.path.join(c.root, 'utf16'),
+          Buffer.from(marker, 'utf16le'),
+        );
+        for (const name of names.slice(0, 6)) await c.write(name, marker);
+        await c.fs.writeFile(
+          c.path.join(c.root, 'binary'),
+          Buffer.from('\0' + marker),
+        );
+        execFileSync('git', ['init', '-q'], { cwd: c.root });
+        execFileSync('git', ['add', '-f', 'ignored-tracked'], { cwd: c.root });
+        await c.fs.mkdir(c.path.join(c.root, '.git', 'excluded-fixture'), {
+          recursive: true,
+        });
+        await c.write('.git/excluded-fixture/text', marker);
+        const outside = c.path.join(c.config.temporary, 'outside-code');
+        await c.fs.mkdir(outside);
+        await c.fs.writeFile(c.path.join(outside, 'source'), marker);
+        await c.fs.symlink(
+          outside,
+          c.path.join(c.root, 'linked'),
+          process.platform === 'win32' ? 'junction' : 'dir',
+        );
+        const target = await c.open('.codocs/code-target.yaml');
+        await c.open('ignored-untracked');
+        await c.replace(
+          c.vscode.window.activeTextEditor.document,
+          marker + marker,
+        );
+        await c.vscode.window.showTextDocument(target);
+        const initial = await c.eventually(
+          /** 실제 관측을 요청에 연결하고 실패를 호출자에게 전달한다. */ async () => {
+            const values = await c.hints(target);
+            c.assert.equal(
+              values[0].label[0].value,
+              '문서 전체에 연결된 코드 · 5곳',
+            );
+            return values[0];
+          },
+        );
+        const text = c
+          .commands({ markdown: initial.tooltip.value })
+          .map((item) => item.label)
+          .join('\n');
+        c.assert.ok(text.includes('ignored-tracked'));
+        c.assert.ok(text.includes('sub/keep'));
+        c.assert.ok(text.includes('dist/custom'));
+        c.assert.ok(text.includes('node_modules/custom'));
+        c.assert.ok(!text.includes('ignored-untracked'));
+        c.assert.ok(!text.includes('linked'));
+        const mcp = await c.mcp();
+        const current = (await mcp.call('codocs_get', { ids: ['code-target'] }))
+          .results[0];
+        const write = await mcp.call('codocs_write', {
+          mode: 'update',
+          id: 'code-target',
+          revision: current.revision,
+          set: { definition: 'Changed eligible whole target' },
+        });
+        c.assert.deepEqual(
+          [
+            ...new Set(
+              write.writeImpact.impacts.map((item) => item.sourcePath),
+            ),
+          ].sort(),
+          [
+            'dist/custom',
+            'ignored-tracked',
+            'node_modules/custom',
+            'scope/keep.txt',
+            'sub/keep',
+          ],
+        );
+        await c.closeMcp();
+        execFileSync('git', ['rm', '--cached', '--', 'ignored-tracked'], {
+          cwd: c.root,
+        });
+        await c.eventually(
+          /** 실제 관측을 요청에 연결하고 실패를 호출자에게 전달한다. */ async () => {
+            const values = await c.hints(target);
+            c.assert.equal(
+              values[0].label[0].value,
+              '문서 전체에 연결된 코드 · 4곳',
+            );
+          },
+        );
+        await c.write('.gitignore', 'partial/\nsub/*\n!sub/keep\n');
+        await c.eventually(
+          /** 실제 관측을 요청에 연결하고 실패를 호출자에게 전달한다. */ async () => {
+            const values = await c.hints(target);
+            c.assert.equal(
+              values[0].label[0].value,
+              '문서 전체에 연결된 코드 · 7곳',
+            );
+          },
+        ); // 두 출현의 dirty 버퍼가 저장 단일 출현을 대체한다.
+      } finally {
+        await c.closeMcp();
+        await c.fs.rm(c.path.join(c.root, 'linked'), {
+          recursive: true,
+          force: true,
+        });
+        for (const name of [
+          '.git',
+          '.gitignore',
+          'ignored-tracked',
+          'ignored-untracked',
+          'sub',
+          'scope',
+          'utf16',
+          'dist',
+          'node_modules',
+          'binary',
+        ])
+          await c.fs.rm(c.path.join(c.root, name), {
+            recursive: true,
+            force: true,
+          });
+        await c.fs.rm(c.path.join(c.config.temporary, 'outside-code'), {
+          recursive: true,
+          force: true,
+        });
+      }
+    },
+  },
+  {
+    id: 'stale-code-reference',
+    title: '표기 삭제·서버 재시작·경로 재사용 후 오래된 명시 링크를 거부한다',
+    /** 서버와 출처 소유권에 고정한 이전 command의 실행 거부를 확인한다. */
+    async run(c) {
+      const d = await c.open('code-reference');
+      await c.replace(d, '@codocs [[Code Target]]');
+      const old = (await c.links(d, 1))[0].target;
+      await c.replace(d, 'removed');
+      c.assert.equal(await c.execute(old), false);
+      await c.replace(d, '@codocs [[Code Target]]');
+      const restart = (await c.links(d, 1))[0].target;
+      await c.vscode.commands.executeCommand('codocs.restartLanguageServers');
+      c.assert.equal(await c.execute(restart), false);
+      const replaced = (await c.links(d, 1))[0].target;
+      const targetPath = c.path.join(c.root, '.codocs/code-target.yaml');
+      await c.fs.rename(targetPath, targetPath + '.previous');
+      try {
+        await c.fs.writeFile(
+          targetPath,
+          'id: replacement\nname: Code Target\ndefinition: Replacement\n',
+        );
+        c.assert.equal(await c.execute(replaced), false);
+      } finally {
+        await c.fs.rm(targetPath, { force: true });
+        await c.fs.rename(targetPath + '.previous', targetPath);
+      }
+    },
+  },
+];
+
 module.exports = {
-  scenarios: [...navigation, ...diagnostics, ...multiprocess],
+  scenarios: [
+    ...navigation,
+    ...diagnostics,
+    ...multiprocess,
+    ...codeReferences.map(
+      /** 같은 private 수집 정책에서 명시 참조 사례를 격리한다. */ (
+        scenario,
+      ) => ({
+        ...scenario,
+        /** 다른 사례의 의도적인 읽기 실패 fixture를 코드 수집에서 격리한다. */
+        async run(c) {
+          await c.write('.gitignore', 'partial/\n');
+          try {
+            await scenario.run(c);
+          } finally {
+            await c.fs.rm(c.path.join(c.root, '.gitignore'), { force: true });
+          }
+        },
+      }),
+    ),
+  ],
 };

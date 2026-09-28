@@ -1,6 +1,10 @@
 /** 실행별 기본 문서와 편집할 코드의 고정 데이터를 제공한다. */
 export function fixtureFiles() {
   return {
+    '.codocs/code-target.yaml':
+      'id: code-target\nname: Code Target\ndomains: [test]\ndefinition: |\n  First body row\n  [[Direct]]\n  Row seven\n  Row eight\n  Row nine\n  Row ten\n  Row eleven\n  Row twelve\n  Row thirteen\n  Row fourteen\n',
+    'code-reference': 'reference fixture\n',
+    'code-reference.test.txt': 'test fixture\n',
     'nested/.codocs/nested-zone.yaml':
       'id: zone\nname: Nested Zone\ndefinition: Nested workspace body\ndomains: [nested]\n',
     'nested/nested.java': 'zone();\n',

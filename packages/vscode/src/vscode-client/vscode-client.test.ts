@@ -33,6 +33,13 @@ const boundary = vi.hoisted(() => {
     dispose: vi.fn().mockResolvedValue(undefined),
     options: undefined as LanguageClientOptions | undefined,
     state: undefined as ((event: { newState: number }) => void) | undefined,
+    hints: undefined as
+      | ((
+          document: unknown,
+          range: unknown,
+          token: unknown,
+        ) => Promise<unknown>)
+      | undefined,
     links: undefined as
       ((document: unknown, token: unknown) => Promise<unknown>) | undefined,
     hover: undefined as
@@ -75,6 +82,13 @@ vi.mock('vscode', () => ({
       boundary.links = provider.provideDocumentLinks;
       return boundary.disposable;
     },
+    registerInlayHintsProvider: (
+      _selector: unknown,
+      provider: { provideInlayHints: typeof boundary.hints },
+    ) => {
+      boundary.hints = provider.provideInlayHints;
+      return boundary.disposable;
+    },
     registerHoverProvider: (
       _selector: unknown,
       provider: { provideHover: typeof boundary.hover },
@@ -93,6 +107,7 @@ vi.mock('vscode-languageclient/node.js', () => ({
   ['TransportKind']: { ipc: 1 },
   ['HoverRequest']: { type: 'hover' },
   ['DocumentLinkRequest']: { type: 'links' },
+  ['InlayHintRequest']: { type: 'hints' },
   ['LanguageClient']: class {
     state = 2;
     /** SDK에 전달한 동기화 경계를 테스트에 노출한다. */
@@ -107,6 +122,7 @@ vi.mock('vscode-languageclient/node.js', () => ({
     protocol2CodeConverter = {
       asDocumentLinks: (value: unknown) => Promise.resolve(value),
       asHover: (value: unknown) => value,
+      asInlayHints: (value: unknown) => value,
     };
     /** 테스트 요청의 응답 경계를 노출한다. */
     sendRequest(...args: unknown[]) {
@@ -423,4 +439,40 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
       await client.stop();
     },
   );
+});
+
+describe('source-owning Inlay Hint provider', () => {
+  it('소유한 source의 힌트만 요청하고 서버가 생성한 tooltip command만 신뢰한다', async () => {
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    const hints = [
+      {
+        label: [{ value: '문서 전체에 연결된 코드 · 2곳' }],
+        tooltip: { value: '[source:1:1](command:codocs.openSource?[])' },
+      },
+    ];
+    boundary.send.mockResolvedValue(hints);
+    const token = { isCancellationRequested: false };
+    expect(await boundary.hints!(boundary.document, {}, token)).toBe(hints);
+    expect(boundary.send).toHaveBeenCalledWith(
+      'hints',
+      expect.objectContaining({
+        textDocument: { uri: boundary.document.uri.toString() },
+      }),
+      token,
+    );
+    expect(hints[0]!.tooltip).toMatchObject({
+      isTrusted: { enabledCommands: ['codocs.openSource'] },
+    });
+    boundary.owner = {
+      ...boundary.folder,
+      uri: { ...boundary.folder.uri, toString: () => 'file:///other' },
+    };
+    expect(await boundary.hints!(boundary.document, {}, token)).toEqual([]);
+    await client.stop();
+  });
 });

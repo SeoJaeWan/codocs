@@ -1,4 +1,5 @@
 export * from './diagnostics/index.js';
+export * from './code-reference/index.js';
 export * from './change-plan/index.js';
 export * from './indexing/index.js';
 export * from './lifecycle/index.js';
@@ -9,3 +10,5 @@ export * from './query/index.js';
 export * from './revision/index.js';
 export * from './storage/index.js';
 export * from './watcher/index.js';
+export { writeImpactBases } from './write-impact/index.js';
+export type { WorkspaceWriteImpactNotice } from './write-impact/index.js';

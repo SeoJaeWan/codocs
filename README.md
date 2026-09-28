@@ -5,7 +5,7 @@
 Codocs connects code to project knowledge stored in local `.codocs` YAML files. Record domain terms, business rules, and development conventions once, then use the same knowledge in VS Code and your AI assistant.
 
 - **MCP:** Let your AI assistant find, read, create, and update project knowledge.
-- **VS Code:** Hover over code identifiers to read definitions and open the source documents.
+- **VS Code:** Hover over code identifiers, follow explicit document links, and navigate back to the exact code references.
 
 Use either integration on its own, or both. Codocs supports projects on local disks on Windows and macOS. Document names and content can be written in any language.
 
@@ -47,6 +47,8 @@ On Windows, use `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd` as the J
 | `codocs_refresh`  | Rebuild the project's knowledge index                         |
 | `codocs_guide`    | Read guidance for writing, updating, and recovering documents |
 
+Changed saves also return `writeImpact`: saved code occurrences that may be affected, their reasons, and collection/calculation completeness. Review these notices before editing code; explicit row numbers are never moved automatically. A notice failure does not undo a successful save.
+
 For example, ask your assistant to “find the definition of an order,” “check the project documents for errors,” or “document this business rule.” When updating a document, the assistant first reads it with `codocs_get`, then passes its revision to `codocs_write`.
 
 ## VS Code
@@ -70,7 +72,11 @@ Open the project folder containing `.codocs` to start using the extension.
 - **Related knowledge:** Follow links to referenced documents, documents that refer to the current one, and other terms matched in the identifier.
 - **Document diagnostics:** Check YAML syntax, required fields, duplicate IDs, and reference errors in `.codocs` documents.
 - **Document links:** Navigate to resolved `[[Document name]]` references in YAML content.
+- **Explicit code links:** Write `@codocs [[Document name]]`, `@codocs [[Document name]]#L11`, or `@codocs [[Domain:Document name]]#L11-L12` anywhere in eligible text. Links use saved YAML names and one-based, inclusive physical rows. Invalid markers show the reason.
+- **Code references:** Navigate from a YAML row to its exact code marker. Multiple occurrences have separate path/row/column hover links. Whole-document references appear as an Inlay Hint before the first row; use the IDE navigation gesture for a single occurrence. The hint follows `editor.inlayHints.enabled`.
 - **Workspace support:** Use separate project knowledge for each folder in a multi-folder workspace. Document changes are reflected automatically.
+
+Unsaved source edits replace their saved observations. Navigation preserves dirty target buffers and selects the explicit numeric rows only if both exist. Tracked Git text is included even when ignored; untracked text follows project and nested `.gitignore` rules. Non-Git projects follow the untracked rules. Binary files, links/junctions, `.git`, and files outside the project are excluded. Disk text uses UTF-8. Collection in progress or incomplete collection shows confirmed counts and reasons without claiming a unique link or absence.
 
 If you need to reconnect after resolving a server problem, run **Codocs: Restart Language Servers** from the Command Palette.
 

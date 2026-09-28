@@ -64,3 +64,11 @@ create 경로가 이미 있으면 덮어쓰지 않는다. 실패를 update로 �
 적용이 끝난 내용은 `set: {"status":"deprecated"}`로 참고용 상태를 표시할 수 있다.
 폐기 이유와 대체 원문을 본문에 설명하고 참조하는 문서가 계속 연결할 필요가 있는지 검토한다.
 폐기 문서의 연결은 유지되며 참조 위치에 경고를 제공한다. 상태 변경만으로 코드·참조·파일을 자동 삭제하지 않는다.
+
+## 저장 후 코드 영향 안내
+
+실제 변경 저장의 `writeImpact`는 `basis: saved_files`를 사용한다. VS Code 없이 저장 코드만 확인하고 변경 전 코드 출현의 경로·revision·정확한 표기 범위·이전 목적지를 유지한다.
+
+`target`은 실제 저장 revision과 이전 revision을, `collection`은 확인한 출현 수·수집 상태·실패 이유를, `calculation`은 별도의 계산 완료 상태를 제공한다. `impacts`의 출현별 `certainty`는 confirmed 또는 possible이며 `reasons`에는 구간 변경, 앞 행 증감, 문서 전체 변경, 이름·도메인 영향 또는 반복 원문의 대응 불확실성이 포함된다. 확인한 무영향은 제외하고 원문 전체나 자동으로 옮긴 행은 반환하지 않는다.
+
+수집과 계산이 모두 완료된 경우에만 빈 안내를 확인된 영향 없음으로 해석한다. 실패·무변경 저장에는 실제 변경 안내를 만들지 않는다. 수집·계산 실패는 성공한 저장의 saved·changed·revision·indexUpdated를 덮어쓰지 않는다. saved가 true이고 indexUpdated가 false이면 같은 파일을 다시 저장하지 않고 refresh 후 현재 revision을 다시 확인한다. 안내에 있는 코드·행 번호를 자동 변경하지 말고 각 출현을 검토한다.

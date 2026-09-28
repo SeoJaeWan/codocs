@@ -1,3 +1,4 @@
+import { retainSavedChangeContext } from './save-context.js';
 import {
   changePlanStatuses,
   diagnosticSeverities,
@@ -270,6 +271,9 @@ export async function saveWorkspaceChange(
     `.codocs-write-${randomUUID()}.tmp`,
   );
   const bytes = Buffer.from(planned.raw, 'utf8');
+  const previous = scan.documents.find(
+    (document) => document.source.path === sourcePath,
+  );
   let ownedTemp = false;
   let tempIdentity: { dev: number; ino: number } | undefined;
   let applied = false;
@@ -496,7 +500,7 @@ export async function saveWorkspaceChange(
     }
   }
   if (!applied) return failure(...failureDiagnostics);
-  return {
+  const result: WorkspaceStorageResult = {
     success: true,
     saved: true,
     changed: true,
@@ -506,4 +510,24 @@ export async function saveWorkspaceChange(
     warnings: planned.diagnostics,
     diagnostics: [...planned.diagnostics, ...failureDiagnostics],
   };
+  retainSavedChangeContext(result, {
+    path: sourcePath,
+    ...(baseRevision === undefined ? {} : { baseRevision }),
+    ...(previous && 'data' in previous
+      ? {
+          before: {
+            raw: previous.raw,
+            revision: previous.revision,
+            name: previous.data.name,
+            domains: previous.data.domains,
+          },
+        }
+      : {}),
+    after: {
+      raw: Buffer.from(bytes).toString('utf8'),
+      name: planned.data.name,
+      domains: planned.data.domains,
+    },
+  });
+  return result;
 }

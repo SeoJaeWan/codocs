@@ -97,6 +97,12 @@ exports.run =
         );
         throw error;
       }
+      environment.renderedUi = results.some(
+        (result) => result.id === 'whole-code-inlay' && result.passed,
+      );
+      environment.renderedUiScopes = environment.renderedUi
+        ? ['whole-code-inlay']
+        : [];
       await fs.writeFile(
         path.join(config.output, 'functional.json'),
         JSON.stringify({ environment, results }, null, 2),

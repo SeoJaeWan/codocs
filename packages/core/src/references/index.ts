@@ -53,7 +53,7 @@ function escaped(value: string, index: number): boolean {
   return count % 2 === 1;
 }
 /** 첫 비이스케이프 콜론으로 도메인을 나누고 이름 내부 콜론은 명시적 escape만 허용한다. */
-function components(
+export function parseReferenceComponents(
   value: string,
 ): { name: string; domain?: string } | undefined {
   let separator = -1;
@@ -113,7 +113,7 @@ export function extractReferences(
       if (!begin || !finish) return;
       const range = { start: begin, end: finish };
       const parts = closed
-        ? components(value.slice(start + 2, end - 2))
+        ? parseReferenceComponents(value.slice(start + 2, end - 2))
         : undefined;
       const location = {
         fieldPath: [...fieldPath],

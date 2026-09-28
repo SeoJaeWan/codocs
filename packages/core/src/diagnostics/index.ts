@@ -258,3 +258,13 @@ export type RequestResult<
   Success extends { success: true },
   Failure extends RequestFailure = RequestFailure,
 > = Success | Failure;
+
+/** 저장 영향 안내만 실패했을 때 실제 저장 오류와 구분하는 고정 문구다. */
+export const changeImpactDiagnosticMessages = {
+  captureFailed: '저장 전 코드 출현을 확인하지 못했습니다.',
+  calculationFailed: '코드 연결의 변경 영향을 계산하지 못했습니다.',
+  revisionMismatch: '코드 출현과 변경 전 원문의 관측 버전이 다릅니다.',
+  contextMissing: '실제 반영 원문의 비교 자료를 확인하지 못했습니다.',
+  correspondenceLimit: '행 대응 계산의 크기 한도를 초과했습니다.',
+  invalidRegion: '변경 전 원문의 참조 구간을 확인할 수 없습니다.',
+} as const;

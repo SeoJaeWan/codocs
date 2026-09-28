@@ -44,6 +44,11 @@ exports.context =
         try {
           await client.close();
         } catch (error) {
+          observations.push({
+            kind: 'shutdown-error',
+            pid: client.pid,
+            error: error.stack ?? String(error),
+          });
           failures.push(error);
           await client.close('kill');
         }
@@ -151,6 +156,44 @@ exports.context =
         },
       );
     }
+    /** 실제 설치된 Inlay Hint provider의 최신 값을 조회한다. */
+    async function hints(document) {
+      return vscode.commands.executeCommand(
+        'vscode.executeInlayHintProvider',
+        document.uri,
+        new vscode.Range(
+          document.positionAt(0),
+          document.positionAt(document.getText().length),
+        ),
+      );
+    }
+    /** runner가 소유한 renderer에서 화면·이동 제스처 관측을 요청한다. */
+    async function ui(action, expected) {
+      const id = `${Date.now()}-${Math.random()}`;
+      await fs.writeFile(
+        path.join(config.output, 'code-ui-request.tmp'),
+        JSON.stringify({ id, action, expected }),
+      );
+      await fs.rename(
+        path.join(config.output, 'code-ui-request.tmp'),
+        path.join(config.output, 'code-ui-request.json'),
+      );
+      return eventually(
+        /** 실제 관측을 요청에 연결하고 실패를 호출자에게 전달한다. */ async () => {
+          const result = JSON.parse(
+            await fs.readFile(
+              path.join(config.output, 'code-ui-result.json'),
+              'utf8',
+            ),
+          );
+          assert.equal(result.id, id);
+          assert.equal(result.passed, true, result.error);
+          observations.push({ kind: 'rendered-code-reference', ...result });
+          return result;
+        },
+        30000,
+      );
+    }
     /** 원문 이동의 실제 URI와 상단 빈 선택을 검사한다. */
     async function atTop(relative) {
       await eventually(
@@ -218,6 +261,8 @@ exports.context =
       command,
       execute,
       links,
+      hints,
+      ui,
       atTop,
       replace,
       write,

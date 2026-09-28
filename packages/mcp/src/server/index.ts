@@ -91,7 +91,7 @@ export function createCodocsServer(
       'codocs_write',
       {
         description:
-          '문서 하나를 생성하거나 수정하고 저장 결과와 색인 게시 상태를 반환합니다.',
+          '문서 하나를 생성하거나 수정하고 저장·색인 결과와 저장 파일 기준 코드 연결 영향 안내를 반환합니다.',
         execute: handlers.codocsWrite.bind(handlers),
       },
     ],
