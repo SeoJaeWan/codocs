@@ -1,7 +1,15 @@
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import {
@@ -17,6 +25,7 @@ import {
 type Result = {
   success: boolean;
   saved?: boolean;
+  changed?: boolean;
   revision?: string;
   indexUpdated?: boolean;
   diagnostics?: { code: string }[];
@@ -179,11 +188,19 @@ async function release(actor: string): Promise<void> {
 }
 async function bytes(relative = '.codocs/a.yaml'): Promise<Buffer> {
   const value = await readFile(path.join(project, relative));
+  const identity = await stat(path.join(project, relative));
   evidence.push({
     kind: 'file',
     relative,
     bytes: value.toString(),
     sha256: hash(value),
+    identity: {
+      dev: identity.dev,
+      ino: identity.ino,
+      size: identity.size,
+      mtimeMs: identity.mtimeMs,
+      ctimeMs: identity.ctimeMs,
+    },
   });
   return value;
 }
@@ -209,15 +226,32 @@ describe('실제 독립 MCP 작성자의 저장 경계', () => {
       )
       .toBe('writer A');
     const before = await bytes();
-    const rejected = await call(b, 'codocs_write', {
+    const staleRequest = {
       mode: 'update',
       id: 'a',
       revision,
       set: { definition: 'stale B' },
-    });
+    };
+    const deadline = Date.now() + 15000;
+    let rejected = await call(b, 'codocs_write', staleRequest);
+    // get의 마지막 완료 snapshot은 다음 쓰기 시점의 준비 상태를 보장하지 않는다.
+    // 미저장·무변경 준비 응답만 같은 stale revision으로 제한 재요청한다.
+    while (
+      rejected.success === false &&
+      rejected.saved === false &&
+      rejected.changed === false &&
+      rejected.diagnostics?.length === 1 &&
+      rejected.diagnostics[0]?.code === 'index_not_ready' &&
+      Date.now() < deadline
+    ) {
+      expect(await bytes()).toEqual(before);
+      await delay(25);
+      rejected = await call(b, 'codocs_write', staleRequest);
+    }
     expect(rejected).toMatchObject({
       success: false,
       saved: false,
+      changed: false,
       diagnostics: [{ code: 'change_revision_mismatch' }],
     });
     expect(await bytes()).toEqual(before);

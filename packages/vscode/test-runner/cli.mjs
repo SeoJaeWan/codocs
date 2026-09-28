@@ -21,6 +21,8 @@ export function parseRunnerArgs(args) {
     const value = args[index + 1];
     if (
       ![
+        '--vsix',
+        '--mcp-tgz',
         '--mode',
         '--vscode-version',
         '--scenario',
@@ -35,12 +37,16 @@ export function parseRunnerArgs(args) {
       );
     if (seen.has(flag)) throw new Error(`중복 옵션: ${flag}`);
     seen.add(flag);
+    if (flag === '--vsix') options.vsix = value;
+    if (flag === '--mcp-tgz') options.mcpTgz = value;
     if (flag === '--mode') options.mode = value;
     if (flag === '--vscode-version') options.version = value;
     if (flag === '--scenario') options.scenario = value;
     if (flag === '--config') options.config = value;
     if (flag === '--resolve-version') options.resolveVersion = value;
   }
+  if (Boolean(options.vsix) !== Boolean(options.mcpTgz))
+    throw new Error('--vsix와 --mcp-tgz는 함께 지정해야 합니다');
   if (!['functional', 'performance'].includes(options.mode))
     throw new Error(`지원하지 않는 모드: ${options.mode}`);
   if (!exactVersion.test(options.version))

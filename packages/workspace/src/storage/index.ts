@@ -11,6 +11,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { link, lstat, open, readFile, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { planWorkspaceChange } from '../change-plan/index.js';
 import { getIoErrorCode } from '../diagnostics/index.js';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
@@ -76,6 +77,9 @@ const fileOperations: WorkspaceStorageOperations = {
   link,
   unlink,
 };
+
+// Windows의 일시적인 교체 공유 위반만 짧고 유한하게 기다린다.
+const windowsRenameRetryDelays = [20, 50, 100] as const;
 
 /** 반영 전의 확인 실패를 실제 IO 예외와 구분한다. */
 class StorageRejection extends Error {
@@ -271,6 +275,7 @@ export async function saveWorkspaceChange(
   let applied = false;
   const failureDiagnostics: Diagnostic<string>[] = [];
   let appliedRevision = calculateRevision(bytes);
+  let targetIdentity: { dev: number; ino: number } | undefined;
   try {
     let handle: WorkspaceStorageFileHandle | undefined;
     try {
@@ -320,79 +325,129 @@ export async function saveWorkspaceChange(
       ]);
     appliedRevision = calculateRevision(written);
     if (options.beforeApply) await options.beforeApply();
-    const beforeScan = await inspectTarget(
-      root,
-      sourcePath,
-      logicalPath,
-      baseRevision,
-      operations,
-    );
-    if (beforeScan.length) throw new StorageRejection(beforeScan);
-    const current = await loadWorkspace({
-      cwd: root.startCwd,
-      project: root.projectRoot,
-    });
-    if (current.status !== scanStatuses.complete)
-      throw new StorageRejection([
-        storageDiagnostic(
-          storageDiagnosticCodes.fileAccessFailed,
-          storageDiagnosticMessages.fileAccessFailed,
-          sourcePath,
-          '전체 문서를 다시 탐색한 뒤 저장하세요.',
-        ),
-      ]);
-    const currentTarget = await inspectTarget(
-      root,
-      sourcePath,
-      logicalPath,
-      baseRevision,
-      operations,
-    );
-    if (currentTarget.length) throw new StorageRejection(currentTarget);
-    const catalog = buildWorkspaceCatalog(current);
-    if (
-      [...(catalog.idPaths.get(planned.id) ?? [])].some(
-        (item) => path.normalize(item) !== path.normalize(sourcePath),
-      )
-    )
-      throw new StorageRejection([
-        {
-          code: catalogDiagnosticCodes.duplicateId,
-          severity: diagnosticSeverities.error,
-          message: catalogDiagnosticMessages.duplicateId,
-          path: sourcePath,
-          suggestion: '충돌한 문서 ID를 확인하고 다시 저장하세요.',
-        },
-      ]);
-    const latest = await inspectTarget(
-      root,
-      sourcePath,
-      logicalPath,
-      baseRevision,
-      operations,
-    );
-    if (latest.length) throw new StorageRejection(latest);
-    if (baseRevision === undefined) {
-      try {
-        await operations.link(tempPath, logicalPath);
-      } catch (error: unknown) {
-        if (getIoErrorCode(error) === 'EEXIST')
+    for (let attempt = 0; ; attempt++) {
+      if (attempt > 0) {
+        const checkedTemp = await resolveWorkspacePath(root, tempPath);
+        if (!checkedTemp.success)
+          throw new StorageRejection(checkedTemp.diagnostics);
+        const identity = await lstat(tempPath);
+        if (
+          checkedTemp.kind !== workspaceTargetKinds.file ||
+          identity.dev !== tempIdentity?.dev ||
+          identity.ino !== tempIdentity.ino ||
+          !Buffer.from(await operations.readFile(tempPath)).equals(bytes)
+        )
           throw new StorageRejection([
             storageDiagnostic(
-              storageDiagnosticCodes.fileExists,
-              storageDiagnosticMessages.fileExists,
+              storageDiagnosticCodes.fileWriteFailed,
+              storageDiagnosticMessages.fileWriteFailed,
               sourcePath,
-              '현재 파일을 확인하고 다른 경로를 선택하세요.',
-              error,
+              '임시 파일의 경로·식별자·기록 바이트가 변경되었습니다. 원본은 유지되었습니다.',
             ),
           ]);
-        throw error;
       }
-    } else {
-      await operations.rename(tempPath, logicalPath);
-      ownedTemp = false;
+      const beforeScan = await inspectTarget(
+        root,
+        sourcePath,
+        logicalPath,
+        baseRevision,
+        operations,
+      );
+      if (beforeScan.length) throw new StorageRejection(beforeScan);
+      const current = await loadWorkspace({
+        cwd: root.startCwd,
+        project: root.projectRoot,
+      });
+      if (current.status !== scanStatuses.complete)
+        throw new StorageRejection([
+          storageDiagnostic(
+            storageDiagnosticCodes.fileAccessFailed,
+            storageDiagnosticMessages.fileAccessFailed,
+            sourcePath,
+            '전체 문서를 다시 탐색한 뒤 저장하세요.',
+          ),
+        ]);
+      const currentTarget = await inspectTarget(
+        root,
+        sourcePath,
+        logicalPath,
+        baseRevision,
+        operations,
+      );
+      if (currentTarget.length) throw new StorageRejection(currentTarget);
+      const catalog = buildWorkspaceCatalog(current);
+      if (
+        [...(catalog.idPaths.get(planned.id) ?? [])].some(
+          (item) => path.normalize(item) !== path.normalize(sourcePath),
+        )
+      )
+        throw new StorageRejection([
+          {
+            code: catalogDiagnosticCodes.duplicateId,
+            severity: diagnosticSeverities.error,
+            message: catalogDiagnosticMessages.duplicateId,
+            path: sourcePath,
+            suggestion: '충돌한 문서 ID를 확인하고 다시 저장하세요.',
+          },
+        ]);
+      const latest = await inspectTarget(
+        root,
+        sourcePath,
+        logicalPath,
+        baseRevision,
+        operations,
+      );
+      if (latest.length) throw new StorageRejection(latest);
+      if (baseRevision === undefined) {
+        try {
+          await operations.link(tempPath, logicalPath);
+        } catch (error: unknown) {
+          if (getIoErrorCode(error) === 'EEXIST')
+            throw new StorageRejection([
+              storageDiagnostic(
+                storageDiagnosticCodes.fileExists,
+                storageDiagnosticMessages.fileExists,
+                sourcePath,
+                '현재 파일을 확인하고 다른 경로를 선택하세요.',
+                error,
+              ),
+            ]);
+          throw error;
+        }
+      } else {
+        const identity = await lstat(logicalPath);
+        if (
+          targetIdentity &&
+          (identity.dev !== targetIdentity.dev ||
+            identity.ino !== targetIdentity.ino)
+        )
+          throw new StorageRejection([
+            storageDiagnostic(
+              storageDiagnosticCodes.fileAccessFailed,
+              storageDiagnosticMessages.fileAccessFailed,
+              sourcePath,
+              '재시도 전에 대상 파일이 교체되었습니다. 최신 문서를 다시 확인하세요.',
+            ),
+          ]);
+        targetIdentity = { dev: identity.dev, ino: identity.ino };
+        try {
+          await operations.rename(tempPath, logicalPath);
+        } catch (error: unknown) {
+          const wait = windowsRenameRetryDelays[attempt];
+          if (
+            process.platform !== 'win32' ||
+            getIoErrorCode(error) !== 'EPERM' ||
+            wait === undefined
+          )
+            throw error;
+          await delay(wait);
+          continue;
+        }
+        ownedTemp = false;
+      }
+      applied = true;
+      break;
     }
-    applied = true;
   } catch (error: unknown) {
     if (error instanceof StorageRejection)
       failureDiagnostics.push(...error.diagnostics);

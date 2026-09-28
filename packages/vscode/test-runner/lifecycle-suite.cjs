@@ -7,7 +7,16 @@ exports.run =
     const config = JSON.parse(
       await fs.readFile(process.env.CODOCS_VSCODE_CONFIG, 'utf8'),
     );
-    await vscode.extensions.getExtension('codocs.codocs').activate();
+    const extension = vscode.extensions.getExtension('seojaewan.codocs');
+    if (extension?.packageJSON.version !== '0.0.1')
+      throw new Error('설치된 확장 ID/버전 불일치');
+    if (
+      !extension.extensionPath.startsWith(
+        path.join(config.output, 'extensions'),
+      )
+    )
+      throw new Error('설치 경로 불일치');
+    await extension.activate();
     const document = await vscode.workspace.openTextDocument(
       vscode.Uri.file(path.join(config.workspace, 'probe.java')),
     );
@@ -40,6 +49,9 @@ exports.run =
       path.join(config.output, 'ready.json'),
       JSON.stringify({
         ready,
+        extensionId: extension.id,
+        extensionVersion: extension.packageJSON.version,
+        extensionPath: extension.extensionPath,
         vscode: vscode.version,
         node: process.versions.node,
       }),

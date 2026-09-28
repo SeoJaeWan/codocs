@@ -1,0 +1,11 @@
+{
+  "archive": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\vscode-tests\\1790514204072-11884\\codocs.vsix",
+  "sha256": "c6fd9d4e142af14c4e5fcd22d5193487faf24d5ab371b02b834d4e21ca1f5f7f",
+  "extension": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-vscode-KUwqh7\\extensions\\seojaewan.codocs-0.0.1",
+  "id": "seojaewan.codocs",
+  "version": "0.0.1",
+  "mcpTgz": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release\\candidate-jvwJPD\\co-documentation-0.0.1.tgz",
+  "mcpTgzSha256": "a0874840e42742c578caf19f98ad5e7f63e0ed23cf9d21c794f8cbd5b25e87a8",
+  "stdout": "Installing extensions...\nExtension 'codocs.vsix' was successfully installed.\n",
+  "stderr": ""
+}

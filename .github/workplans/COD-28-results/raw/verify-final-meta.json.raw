@@ -1,0 +1,5 @@
+{
+  "seconds": 1.7531612,
+  "exit": 0,
+  "command": "pnpm release:verify D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release\\candidate-jvwJPD\\co-documentation-0.0.1.tgz D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release\\candidate-jvwJPD\\codocs-0.0.1.vsix"
+}

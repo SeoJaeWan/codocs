@@ -2,9 +2,9 @@
   "name": "codocs",
   "displayName": "Codocs",
   "description": "Connect code in a workspace to its local .codocs knowledge files.",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "publisher": "codocs",
+  "publisher": "seojaewan",
   "type": "module",
   "engines": {
     "vscode": "^1.100.0"
@@ -47,5 +47,11 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/index.cjs"
+  "main": "./dist/index.cjs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SeoJaeWan/codocs.git"
+  },
+  "icon": "logo.png"
 }

@@ -1,0 +1,21 @@
+
+> codocs@0.0.1 check D:\dev\codocs-worktrees\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\INT-001
+> pnpm typecheck && pnpm lint && pnpm exec prettier . --check && pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs
+
+
+> codocs@0.0.1 typecheck D:\dev\codocs-worktrees\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\INT-001
+> node tools/build/build.mjs typecheck
+
+
+> codocs@0.0.1 lint D:\dev\codocs-worktrees\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\INT-001
+> eslint . --max-warnings=0
+
+
+D:\dev\codocs-worktrees\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\INT-001\tools\test\runtime\release-ci.test.mjs
+   9:34  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+  21:40  error  선언 함수, 메서드, 변수 할당 함수에 한국어 JSDoc을 작성하세요  codocs/korean-jsdoc
+
+✖ 2 problems (2 errors, 0 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

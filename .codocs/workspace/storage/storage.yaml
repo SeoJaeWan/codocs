@@ -63,3 +63,4 @@ definition: |
   같은 세션의 [쓰기 연결](../../../packages/workspace/src/query/index.ts)은 이 결과를 받아 저장 경로를 재관측한다. 저장 성공과 색인 성공은 별도 결과이며 추가 색인 복구가 실패해도 파일을 재저장하지 않는다.
 
   [실제 파일 테스트](../../../packages/workspace/src/storage/storage.test.ts)는 Windows의 생성·수정 바이트, 하드링크 비덮어쓰기, 실패 후 원본 보존, 늦은 변경·ID 충돌, 링크 경로, 임시 정리 실패를 확인한다.
+  [Windows 교체 회귀](../../../packages/workspace/src/storage/storage-retry.test.ts)는 삭제 공유를 제외한 실제 파일 핸들에서 rename EPERM과 원본 보존을 관측한다. 핸들 해제 뒤 같은 revision 저장, 영구 거부의 제한 종료, 재시도 중 원문·ID·대상·임시 파일·정션 변경 차단을 각각 확인한다.

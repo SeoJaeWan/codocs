@@ -1,0 +1,5 @@
+{
+  "apiWarmup": 2,
+  "targets": { "api": 10 },
+  "changeReason": "COD-28 candidate observation of changed runtime/packaging; bounded sample only. Formal 100 warmup/1000 measurement campaign and other IDE scenarios remain unmeasured for this candidate."
+}

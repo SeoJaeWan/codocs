@@ -74,30 +74,39 @@ export async function resolveVSCodeApplicationPaths(
   platform = process.platform,
 ) {
   if (platform === 'win32') {
-    const root = path.dirname(executable);
-    const candidates = [root];
-    for (const entry of await readdir(root, { withFileTypes: true }))
-      if (entry.isDirectory()) candidates.push(path.join(root, entry.name));
-    const found = [];
-    for (const candidate of candidates) {
-      const paths = vscodeApplicationPaths(executable, platform, candidate);
-      try {
-        if (
-          (await stat(paths.cliPrefix[0])).isFile() &&
-          (await stat(paths.packageJson)).isFile()
-        )
-          found.push(paths);
-      } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
-      }
-    }
-    if (found.length !== 1)
-      throw new Error(
-        `VS Code Windows CLI 경로가 정확히 하나여야 합니다: ${found.length} (${root})`,
-      );
-    return found[0];
+    const applicationRoot = await resolveWindowsApplicationRoot(executable);
+    return vscodeApplicationPaths(executable, platform, applicationRoot);
   }
   return vscodeApplicationPaths(executable, platform);
+}
+
+/** Windows 압축본의 app 위치를 호스트의 실제 파일 경로로 탐색한다. */
+export async function resolveWindowsApplicationRoot(executable) {
+  const root = path.dirname(executable);
+  const candidates = [root];
+  for (const entry of await readdir(root, { withFileTypes: true }))
+    if (entry.isDirectory()) candidates.push(path.join(root, entry.name));
+  const found = [];
+  for (const candidate of candidates) {
+    try {
+      if (
+        (
+          await stat(path.join(candidate, 'resources/app/out/cli.js'))
+        ).isFile() &&
+        (
+          await stat(path.join(candidate, 'resources/app/package.json'))
+        ).isFile()
+      )
+        found.push(candidate);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+  if (found.length !== 1)
+    throw new Error(
+      `VS Code Windows CLI 경로가 정확히 하나여야 합니다: ${found.length} (${root})`,
+    );
+  return found[0];
 }
 
 /** 다운로드 완료 후 실행 파일·라이브러리 전체의 내용을 해시한다. 프로필은 캐시에 만들지 않는다. */

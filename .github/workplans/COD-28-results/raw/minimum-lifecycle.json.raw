@@ -1,0 +1,34 @@
+{
+  "platform": "win32",
+  "arch": "x64",
+  "node": "24.21.0",
+  "version": "1.100.0",
+  "archive": "D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release\\candidate-jvwJPD\\codocs-0.0.1.vsix",
+  "archiveSha256": "c6fd9d4e142af14c4e5fcd22d5193487faf24d5ab371b02b834d4e21ca1f5f7f",
+  "results": [
+    {
+      "mode": "startup-failure",
+      "passed": true,
+      "reason": "exit",
+      "residualProcesses": 0
+    },
+    {
+      "mode": "failure",
+      "passed": true,
+      "reason": "exit",
+      "residualProcesses": 0
+    },
+    {
+      "mode": "timeout",
+      "passed": true,
+      "reason": "timeout",
+      "residualProcesses": 0
+    },
+    {
+      "mode": "cancelled",
+      "passed": true,
+      "reason": "cancelled",
+      "residualProcesses": 0
+    }
+  ]
+}

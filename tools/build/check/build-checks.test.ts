@@ -1,4 +1,5 @@
-import { createVSIX } from '@vscode/vsce';
+import { packageMcp, packageVSIX } from '../release.mjs';
+import { verifyRelease } from '../verify-release.mjs';
 import {
   assertGuideAssets,
   exampleContractScript,
@@ -1078,13 +1079,9 @@ void start; void stop; void command;
     });
     it('실제 VSIX의 전체 가이드와 예시 바이트·링크·참조가 원본과 일치한다', async () => {
       const archive = path.join(fixture, 'guide.vsix');
-      await createVSIX({
-        cwd: path.join(root, 'packages/vscode'),
-        packagePath: archive,
-        dependencies: false,
-        allowMissingRepository: true,
-        skipLicense: true,
-      });
+      await packageVSIX(root, archive);
+      const publicMcp = await packageMcp(root, fixture);
+      await verifyRelease(publicMcp, archive);
       const extracted = path.join(fixture, 'vsix');
       mkdirSync(extracted, { recursive: true });
       execFileSync('tar', ['-xf', archive, '-C', extracted]);
