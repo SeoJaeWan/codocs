@@ -828,3 +828,20 @@ describe('제품별 기록 보존과 같은 후보의 부분 재시도', /** 입
     }
   });
 });
+
+for (const outcome of ['failure', 'cancelled', 'skipped', 'missing'])
+  test(`관리 job ${outcome}을 성공 report로 위조해도 게시 입력은 거부한다`, /** OS 통과만으로 게시 guard를 넘을 수 없다. */ async () => {
+    const fixture = await publicationFixture();
+    try {
+      const input = validationInput(fixture);
+      const report = structuredClone(input.report);
+      if (outcome === 'missing') delete report.jobs['release-management'];
+      else report.jobs['release-management'].result = outcome;
+      await assert.rejects(
+        validatePublication({ ...input, report }),
+        /required job set mismatch|report result mismatch/u,
+      );
+    } finally {
+      await fixture.dispose();
+    }
+  });

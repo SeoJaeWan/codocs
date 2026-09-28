@@ -18,10 +18,11 @@ export const products = Object.freeze({
     suffix: 'vsix',
   }),
 });
-/** 준비·정적 검사와 양 OS 검사를 모두 통과해야 하는 필수 job ID다. */
+/** 준비·정적·단일 관리 검사와 양 OS 검사를 모두 통과해야 하는 필수 job ID다. */
 export const requiredJobs = Object.freeze([
   'static',
   'prepare',
+  'release-management',
   'macos',
   'windows',
 ]);
@@ -34,6 +35,7 @@ export const workflowNames = Object.freeze({
 export const jobNames = Object.freeze({
   static: 'Static checks',
   prepare: 'Freeze release candidate',
+  'release-management': 'Release management tests',
   macos: 'Tests (macos-15)',
   windows: 'Tests (windows-2025)',
 });

@@ -105,9 +105,9 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
     ['opened', 'open', true, 0],
     ['synchronize', 'open', true, 0],
     ['reopened', 'open', true, 0],
-    ['ready_for_review', 'open', false, 5],
-    ['synchronize', 'open', false, 5],
-    ['reopened', 'open', false, 5],
+    ['ready_for_review', 'open', false, 6],
+    ['synchronize', 'open', false, 6],
+    ['reopened', 'open', false, 6],
     ['converted_to_draft', 'open', true, 0],
     ['closed', 'closed', false, 0],
     ['closed', 'closed', true, 0],
@@ -149,7 +149,7 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
       assert.equal(
         Object.values(workflow.jobs).filter((job) => evaluate(job.if, github))
           .length,
-        4,
+        5,
       );
       assert.equal(
         evaluate(workflow.concurrency.group, github),
@@ -224,6 +224,7 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
     assert.equal(workflow.on.pull_request['paths-ignore'], undefined);
     assert.deepEqual(Object.keys(workflow.jobs), [
       'static',
+      'release-management',
       'prepare',
       'windows',
       'macos',
@@ -232,6 +233,7 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
     assert.deepEqual(workflow.jobs['required-ci'].needs, [
       'static',
       'prepare',
+      'release-management',
       'macos',
       'windows',
     ]);
@@ -241,6 +243,24 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
       ).length,
       1,
     );
+    const administration = workflow.jobs['release-management'];
+    assert.equal(administration['runs-on'], 'ubuntu-24.04');
+    assert.equal(administration.name, 'Release management tests');
+    assert.equal(administration.steps[0].with['fetch-depth'], 0);
+    assert.ok(
+      administration.steps.some(
+        (step) => step.run === 'pnpm test:release-management',
+      ),
+    );
+    for (const [id, job] of Object.entries(workflow.jobs))
+      if (id !== 'release-management')
+        assert.equal(
+          job.steps.find(
+            /** checkout history 확장은 관리 job 하나로 제한한다. */ (step) =>
+              step.uses?.startsWith('actions/checkout@'),
+          )?.with?.['fetch-depth'],
+          undefined,
+        );
     for (const [id, os] of [
       ['windows', 'windows-2025'],
       ['macos', 'macos-15'],
@@ -249,7 +269,7 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
       assert.equal(job['runs-on'], os);
       assert.equal(job.name, `Tests (${os})`);
       assert.equal(job.needs, 'prepare');
-      assert.ok(job.steps.some((step) => step.run === 'pnpm check:runtime'));
+      assert.ok(job.steps.some((step) => step.run === 'pnpm check:runtime:os'));
       assert.equal(
         job.steps.filter((step) =>
           step.run?.includes('run.mjs --vscode-version'),
@@ -351,6 +371,38 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
 });
 
 describe('필수 CI 후보와 OS 증거 집계', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ () => {
+  for (const result of ['failure', 'cancelled', 'skipped', 'missing'])
+    it(`릴리스 관리가 ${result}이면 OS 성공에도 필수 CI가 통과하지 않는다`, /** 누락은 성공 job 집합으로 인정하지 않는다. */ () => {
+      const jobs = Object.fromEntries(
+        requiredJobs.map((job) => [job, { result: 'success' }]),
+      );
+      if (result === 'missing') {
+        delete jobs['release-management'];
+        assert.throws(
+          /** 관리 job의 부재는 필수 집합 오류로 명시적 거부한다. */ () =>
+            aggregate(
+              binding,
+              candidate,
+              jobs,
+              { macos: evidence('macos'), windows: evidence('windows') },
+              '1.110.0',
+            ),
+          /required job set mismatch/u,
+        );
+      } else {
+        jobs['release-management'].result = result;
+        assert.equal(
+          aggregate(
+            binding,
+            candidate,
+            jobs,
+            { macos: evidence('macos'), windows: evidence('windows') },
+            '1.110.0',
+          ).result,
+          'failure',
+        );
+      }
+    });
   it('전체 성공이면 동일 후보와 양 OS 증거로 통과한다', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ () => {
     const jobs = Object.fromEntries(
       requiredJobs.map((job) => [job, { result: 'success' }]),
@@ -375,6 +427,7 @@ describe('필수 CI 후보와 OS 증거 집계', /** 입력 조건과 관찰 결
     it(`static이 ${result}면 성공으로 집계하지 않는다`, /** 입력 조건과 관찰 결과를 계약에 대조한다. */ () => {
       const jobs = {
         static: { result },
+        'release-management': { result: 'success' },
         prepare: { result: 'success' },
         macos: { result: 'success' },
         windows: { result: 'success' },
@@ -433,6 +486,7 @@ describe('필수 CI 후보와 OS 증거 집계', /** 입력 조건과 관찰 결
           candidate,
           {
             static: { result: 'success' },
+            'release-management': { result: 'success' },
             prepare: { result: 'success' },
             macos: { result: 'success' },
             windows: { result: 'success' },

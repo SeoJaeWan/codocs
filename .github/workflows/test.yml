@@ -45,6 +45,26 @@ jobs:
           version: 10.34.5
       - run: pnpm install --frozen-lockfile --store-dir .workbench/pnpm-store
       - run: pnpm check:static
+  release-management:
+    name: Release management tests
+    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.state == 'open' && !github.event.pull_request.draft) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, node24
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0, node24
+        with:
+          node-version: 24.21.0
+          package-manager-cache: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0, node24
+        with:
+          version: 10.34.5
+      - run: pnpm install --frozen-lockfile --store-dir .workbench/pnpm-store
+      - run: pnpm test:release-management
   prepare:
     name: Freeze release candidate
     if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.state == 'open' && !github.event.pull_request.draft) }}
@@ -115,8 +135,8 @@ jobs:
         name: Verify transferred bytes and source
         run: node tools/test/runtime/release-ci.mjs verify
       - id: runtime
-        name: Check build, logic, tools and package contracts
-        run: pnpm check:runtime
+        name: Check build, logic, OS tools and package contracts
+        run: pnpm check:runtime:os
       - id: installed
         name: Standalone installed MCP and VSIX metadata
         if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
@@ -194,8 +214,8 @@ jobs:
         name: Verify transferred bytes and source
         run: node tools/test/runtime/release-ci.mjs verify
       - id: runtime
-        name: Check build, logic, tools and package contracts
-        run: pnpm check:runtime
+        name: Check build, logic, OS tools and package contracts
+        run: pnpm check:runtime:os
       - id: installed
         name: Standalone installed MCP and VSIX metadata
         if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
@@ -245,7 +265,7 @@ jobs:
   required-ci:
     name: ${{ github.event_name == 'pull_request' && github.event.pull_request.state == 'open' && !github.event.pull_request.draft && 'required-ci' || 'PR checks omitted' }}
     if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.state == 'open' && !github.event.pull_request.draft }}
-    needs: [static, prepare, macos, windows]
+    needs: [static, prepare, release-management, macos, windows]
     runs-on: windows-2025
     timeout-minutes: 10
     steps:

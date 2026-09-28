@@ -9,7 +9,7 @@ import {
   rm,
 } from 'node:fs/promises';
 import path from 'node:path';
-import { devNull } from 'node:os';
+import { createGitFixtureEnvironment } from '../test/git-config.mjs';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { actionRevision, releaseBranch, git } from './release-flow.mjs';
@@ -65,9 +65,7 @@ export async function officialAppTokenManifest() {
 }
 /** Git fixture에 고정 identity를 사용하고 사용자 credential 설정을 읽지 않는다. */
 export const fixtureEnv = {
-  ...process.env,
-  GIT_CONFIG_GLOBAL: devNull,
-  GIT_CONFIG_SYSTEM: devNull,
+  ...createGitFixtureEnvironment(),
   GIT_AUTHOR_NAME: 'Fixture',
   GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
   GIT_COMMITTER_NAME: 'Fixture',

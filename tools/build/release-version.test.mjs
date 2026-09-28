@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createGitFixtureEnvironment } from '../test/git-config.mjs';
+const env = createGitFixtureEnvironment();
 import { execFileSync } from 'node:child_process';
 import {
   mkdir,
@@ -53,9 +55,10 @@ async function fixture() {
   }
   execFileSync('git', ['init', '-b', 'develop'], {
     cwd: directory,
+    env,
     stdio: 'pipe',
   });
-  execFileSync('git', ['add', '.'], { cwd: directory });
+  execFileSync('git', ['add', '.'], { cwd: directory, env });
   execFileSync(
     'git',
     [
@@ -67,7 +70,7 @@ async function fixture() {
       '-m',
       'fixture',
     ],
-    { cwd: directory, stdio: 'pipe' },
+    { cwd: directory, env, stdio: 'pipe' },
   );
   return directory;
 }
@@ -75,6 +78,7 @@ async function fixture() {
 function version(directory) {
   return execFileSync(process.execPath, [cli, 'version'], {
     cwd: directory,
+    env,
     encoding: 'utf8',
     stdio: 'pipe',
   });
@@ -129,7 +133,7 @@ for (const scenario of [
             )
             .join('\n')}\n---\n\n독립 변경 ${index}\n`,
         );
-      execFileSync('git', ['add', '.'], { cwd: directory });
+      execFileSync('git', ['add', '.'], { cwd: directory, env });
       execFileSync(
         'git',
         [
@@ -141,11 +145,12 @@ for (const scenario of [
           '-m',
           'changesets',
         ],
-        { cwd: directory, stdio: 'pipe' },
+        { cwd: directory, env, stdio: 'pipe' },
       );
       version(directory);
       const first = execFileSync('git', ['diff', '--', '.'], {
         cwd: directory,
+        env,
         encoding: 'utf8',
       });
       const mcp = JSON.parse(
@@ -165,12 +170,17 @@ for (const scenario of [
       if (scenario.title.startsWith('private'))
         assert.equal(mcp.dependencies['@codocs/core'], 'workspace:^');
       // 이전 다음 버전을 증가시키지 않고 동일 미출시 소스에서 다시 계산한다.
-      execFileSync('git', ['restore', '.'], { cwd: directory });
-      execFileSync('git', ['clean', '-fd'], { cwd: directory, stdio: 'pipe' });
+      execFileSync('git', ['restore', '.'], { cwd: directory, env });
+      execFileSync('git', ['clean', '-fd'], {
+        cwd: directory,
+        env,
+        stdio: 'pipe',
+      });
       version(directory);
       assert.equal(
         execFileSync('git', ['diff', '--', '.'], {
           cwd: directory,
+          env,
           encoding: 'utf8',
         }),
         first,

@@ -154,3 +154,11 @@ Draft 릴리스 PR의 제품 검사는 모두 생략하되 develop 병합을 처
 운영자는 .codocs/development/release.yaml의 활성화 순서에 따라 develop 생성, main/develop의 strict required-ci·PR 의무·관리자 보호·우회 차단, GitHub App와 제품별 게시 인증, 실제 Draft/ready/취소/양 OS·게시 재시도 검증을 완료한다. classic 보호 응답을 확인하는 현재 gate는 ruleset만으로 설정된 보호를 지원하지 않는다. 그 전에는 CODOCS_RELEASE_ENABLED를 활성화하지 않고 main push·수동 전체 Tests를 유지한다. 보호의 실제 적용을 확인한 뒤 별도 변경으로 postmerge 테스트 생략을 활성화한다.
 
 이번 전달은 로컬 소스 통합과 검증까지다. 원격 설정·push·PR 생성·main 병합·공개 게시·배포·작업 경로 정리는 실행하지 않는다. Prepare·Shape 원본은 복구 증거로 정확한 LF UTF-8와 raw SHA-256을 보존한다. Gateway 저장은 실제 Work Item key가 없어 보류하며 임의 Jira 번호나 Memory write로 대신하지 않는다. 상세한 네 작업 결과·원본/바인딩 해시·intent/2 소유권 보강·이전 실패와 최종 결과·실제 미검증 경계는 .workbench/execution-result.md에 기록한다.
+
+## 사용자 리뷰 후 검사 책임 분리
+
+사용자 지시에 따라 intent/6은 릴리스 관리 회귀를 Ubuntu 24.04의 단일 job으로 분리하고 기존 MCP·VSIX·패키지 소비·VS Code 기능/종료 검사를 Windows·macOS에 유지한다. 관리 job은 모든 ready PR에서 경로 분기 없이 실행하며 required-ci·신뢰한 댓글·게시 guard도 그 결과를 요구한다. 기본 pnpm test/check는 전체 합집합을 보존하고 명시적 관리·OS 선택은 누락·중복 없이 분할한다.
+
+GitHub run36387568137의 Windows Git 설정 장치 경로 실패는 실행별 빈 일반 Git config 파일로 수정한다. macOS의 공식 CLI shallow history deepen 실패는 관리 checkout의 fetch-depth0과 독립 재현/전체 history 검증으로 다룬다. 사용자 global/system Git 설정은 수정하지 않는다. 실제 후보 관리 adapter 검사는 설치 smoke·GUI를 실행하지 않고 두 OS receipt를 모두 fixtureOnly로 표시한다. 별도 native opt-in 진입점은 최종 버전 후보 하나를 그대로 설치하고 최소·고정 stable 기능과 네 종료 모드를 보존한다.
+
+이 수정은 패키지 소스나 기존 native runner·기능 assertions를 변경하지 않는다. 실제 Ubuntu·Windows 수정 후 실행은 로컬 macOS 결과로 대신하지 않으며 원격 push·운영 활성화를 수행하지 않는다. 이전 소스·Prepare/Shape·구현/전달 보고서는 보존하고 새 바인딩·명령·결과는 .workbench/ci-split-r1*에 기록한다.

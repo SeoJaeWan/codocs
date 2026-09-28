@@ -306,7 +306,7 @@ describe('공식 릴리스 Action 연결', /** 입력 조건과 관찰 결과를
         ]).includes('변경 c'),
       );
       await writeFile(
-        path.join(root, '.workbench/task003-r2-official-api-evidence.json'),
+        path.join(root, '.workbench/ci-split-r1-official-api-evidence.json'),
         JSON.stringify(
           {
             requests: api.state.requests,

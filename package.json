@@ -20,7 +20,10 @@
     "changeset": "changeset",
     "release:version": "changeset version",
     "check:static": "pnpm typecheck && pnpm lint && pnpm exec prettier . --check",
-    "check:runtime": "pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs"
+    "check:runtime": "pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs",
+    "test:release-management": "node tools/test/run.mjs --suite=release-management",
+    "test:os": "node tools/test/run.mjs --suite=os",
+    "check:runtime:os": "pnpm build && pnpm test:os && pnpm exec vitest run --config vitest.checks.config.mjs"
   },
   "lint-staged": {
     "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}": [

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createGitFixtureEnvironment } from '../test/git-config.mjs';
+const env = createGitFixtureEnvironment();
 import { execFileSync } from 'node:child_process';
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -11,18 +13,20 @@ test('filesystem 실행 비트가 없어도 Git index의 실행 mode를 소스 �
     path.join(os.tmpdir(), 'codocs-source-mode-'),
   );
   try {
-    execFileSync('git', ['init'], { cwd: directory, stdio: 'pipe' });
+    execFileSync('git', ['init'], { cwd: directory, env, stdio: 'pipe' });
     await writeFile(
       path.join(directory, 'script.mjs'),
       'export const source = true;\n',
     );
     await chmod(path.join(directory, 'script.mjs'), 0o644);
-    execFileSync('git', ['add', '.'], { cwd: directory });
+    execFileSync('git', ['add', '.'], { cwd: directory, env });
     execFileSync('git', ['update-index', '--chmod=+x', 'script.mjs'], {
       cwd: directory,
+      env,
     });
     const expectedBlob = execFileSync('git', ['rev-parse', ':script.mjs'], {
       cwd: directory,
+      env,
       encoding: 'utf8',
     }).trim();
     assert.deepEqual(await sourceIdentity(directory), [

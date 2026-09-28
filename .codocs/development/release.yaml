@@ -87,7 +87,7 @@ definition: |
   ## 연결 도구와 통합 검사의 진입점
 
   공식 CLI의 진입점은 pnpm changeset·pnpm release:version이다. tools/ci/release-flow.mjs와 인접 테스트는 공식 준비의 소스·활성화 guard를, release-sync.mjs와 인접 테스트는 신규 기록을 보존하는 동기화를, release-publish.mjs와 인접 테스트는 최종 CI archive 소비와 제품별 재시도를 확인한다.
-  tools/ci/ci-release.integration.test.mjs는 공식 CLI로 최종 버전을 만든 독립 fixture의 실제 tgz·VSIX를 CI 입력 검증·집계·게시 adapter에 연결한다. 실제 official Action fixture의 ready 갱신·preflight·동기화·다음 릴리스도 결합한다. 기본 pnpm test에 포함되며 GUI는 CODOCS_VERIFY_GUI=1로 명시한 실행에서만 같은 후보의 최소·고정 stable 기능과 종료·정리를 수행한다.
+  tools/ci/ci-release.integration.test.mjs는 공식 CLI로 최종 버전을 만든 독립 fixture의 실제 tgz·VSIX를 CI 입력 검증·집계·게시 adapter에 연결한다. 실제 official Action fixture의 ready 갱신·preflight·동기화·다음 릴리스도 결합한다. 관리 job에서 한 번 실행하며 양 OS 집계 receipt는 실제 실행으로 표시하지 않는 fixtureOnly 입력이다. 제품 설치 smoke나 native GUI는 이 관리 경로에서 실행하지 않는다. 기본 pnpm test는 전체 관리·OS 합집합을 유지한다. 별도 tools/test/release-native.integration.test.mjs를 CODOCS_VERIFY_GUI=1로 명시한 실행에서만 같은 최종 버전 후보의 실제 설치·최소/고정 stable 기능·종료·정리를 수행한다. 기존 두 OS CI의 실제 후보 소비 검사는 [[개발 환경]]의 배치를 유지한다.
 
   ## 성능 목표
 

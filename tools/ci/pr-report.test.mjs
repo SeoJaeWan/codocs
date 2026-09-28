@@ -88,6 +88,7 @@ const jobRows = [
     started_at: '2026-09-28T01:00:00Z',
     completed_at: '2026-09-28T01:04:00Z',
   },
+  { name: 'Release management tests', conclusion: 'success' },
   { name: 'required-ci', conclusion: 'success' },
 ];
 
@@ -105,6 +106,7 @@ function fixture() {
   ];
   const uploaded = createReport(binding, candidate, {
     static: { result: 'success' },
+    'release-management': { result: 'success' },
     prepare: { result: 'success' },
     macos: { result: 'success' },
     windows: { result: 'success' },
@@ -326,8 +328,10 @@ describe('신뢰한 API 결과와 단일 댓글 게시', /** 입력 조건과 �
     });
   it('required-ci 집계 job 실패도 성공 댓글을 쓰지 않는다', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ async () => {
     const f = fixture();
-    f.jobs[4].conclusion = 'failure';
-    f.jobs[4].steps = [{ name: 'Aggregate candidate', conclusion: 'failure' }];
+    f.jobs.find((job) => job.name === 'required-ci').conclusion = 'failure';
+    f.jobs.find((job) => job.name === 'required-ci').steps = [
+      { name: 'Aggregate candidate', conclusion: 'failure' },
+    ];
     await reportRun(f.api, f.readArchive, binding.repository, f.trigger);
     assert.match(f.writes[0].body.body, /required-ci: \*\*failure\*\*/u);
   });
@@ -490,3 +494,15 @@ describe('신뢰한 API 결과와 단일 댓글 게시', /** 입력 조건과 �
     );
   });
 });
+
+for (const outcome of ['failure', 'cancelled', 'skipped', 'missing'])
+  it(`관리 job ${outcome}이면 reporter도 성공 댓글을 표시하지 않는다`, /** 신뢰한 jobs API의 관리 결과를 필수 집계에 연결한다. */ async () => {
+    const f = fixture();
+    const management = f.jobs.find(
+      (job) => job.name === 'Release management tests',
+    );
+    if (outcome === 'missing') f.jobs.splice(f.jobs.indexOf(management), 1);
+    else management.conclusion = outcome;
+    await reportRun(f.api, f.readArchive, binding.repository, f.trigger);
+    assert.match(f.writes[0].body.body, /required-ci: \*\*failure\*\*/u);
+  });
