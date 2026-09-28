@@ -1,0 +1,26 @@
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001
+
+ ❯ packages/workspace/src/watcher/watcher-registration.test.ts (2 tests | 1 failed | 1 skipped) 15209ms
+   ❯ 새 하위 폴더의 실제 감시 등록 경합 (2)
+     × 하위 폴더 경로 확인 중 종료하면 늦은 반환 뒤에도 자식이 자연 종료한다 15208ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/workspace/src/watcher/watcher-registration.test.ts > 새 하위 폴더의 실제 감시 등록 경합 > 하위 폴더 경로 확인 중 종료하면 늦은 반환 뒤에도 자식이 자연 종료한다
+Error: Command failed: C:\Program Files\nodejs\node.exe C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\packages\workspace\src\watcher\test-support\registration-child.mjs C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\.workbench\fixtures\watcher-close-MGTZXc\watcher.mjs C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\.workbench\fixtures\watcher-close-MGTZXc close-during-path-check
+import: 2ms
+start: 747ms
+ready: 760ms
+path-confirmed: 899ms
+closed-before-release: 901ms
+closing: 902ms
+closed: 902ms
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 skipped (2)
+   Start at  00:51:32
+   Duration  16.44s (tests 99%, import 1%)

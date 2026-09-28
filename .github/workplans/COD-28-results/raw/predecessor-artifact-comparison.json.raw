@@ -1,0 +1,29 @@
+{
+  "tgzEntries": 17,
+  "differences": [
+    {
+      "file": "package/LICENSE",
+      "oldBytes": 1067,
+      "newBytes": 1087,
+      "equalAfterLFNormalization": true
+    },
+    {
+      "file": "package/README.ko.md",
+      "oldBytes": 7937,
+      "newBytes": 8045,
+      "equalAfterLFNormalization": true
+    },
+    {
+      "file": "package/README.md",
+      "oldBytes": 7688,
+      "newBytes": 7796,
+      "equalAfterLFNormalization": true
+    }
+  ],
+  "vsixDifferingEntries": [
+    "extension/readme.md",
+    "extension/README.ko.md",
+    "extension/LICENSE.txt"
+  ],
+  "cause": "Git autocrlf checkout changed formerly added LF metadata to CRLF; runtime payload entries equal. VSIX container timestamps also vary."
+}

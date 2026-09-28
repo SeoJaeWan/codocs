@@ -1,10 +1,7 @@
-import {
-  documentKinds,
-  documentStatuses,
-  validateDocument,
-} from '@codocs/core';
+import { documentKinds, documentStatuses } from '@codocs/core';
 import type { WorkspaceListInput } from '@codocs/workspace';
 import { z } from 'zod';
+import { guideTopics } from '../guide/domain-values.js';
 
 const userFields = z.record(z.string(), z.unknown());
 
@@ -63,6 +60,7 @@ const listSchema = z.strictObject({
 });
 const getSchema = z.strictObject({ ids: z.array(z.string().min(1)) });
 const validateSchema = z.strictObject({ path: z.string().optional() });
+const guideSchema = z.strictObject({ topic: z.enum(guideTopics).optional() });
 const writeSchema = z.discriminatedUnion('mode', [
   z.strictObject({
     mode: z.literal('create'),
@@ -78,27 +76,22 @@ const writeSchema = z.discriminatedUnion('mode', [
   }),
 ]);
 
+/** 형식만 확인해 문서 자체의 상세 검증 진단은 변경 계획에 맡긴다. */
+export function parseWriteInput(
+  input: unknown,
+): z.infer<typeof writeSchema> | undefined {
+  if (!dataOnly(input)) return undefined;
+  const result = writeSchema.safeParse(input);
+  return result.success ? result.data : undefined;
+}
+
 /** 여섯 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다. */
 export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_list', listSchema],
   ['codocs_get', getSchema],
   ['codocs_refresh', z.strictObject({})],
   ['codocs_validate', validateSchema],
-  [
-    'codocs_guide',
-    z.strictObject({
-      topic: z
-        .enum([
-          'overview',
-          'schema',
-          'writing',
-          'examples',
-          'updating',
-          'validation',
-        ])
-        .optional(),
-    }),
-  ],
+  ['codocs_guide', guideSchema],
   ['codocs_write', writeSchema],
 ]);
 
@@ -106,7 +99,10 @@ export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
 export function codocsJsonInputSchema(
   name: CodocsToolName,
 ): Record<string, unknown> {
-  return z.toJSONSchema(codocsInputSchemas.get(name)!);
+  return {
+    ...(name === 'codocs_write' ? { type: 'object' } : {}),
+    ...z.toJSONSchema(codocsInputSchemas.get(name)!),
+  };
 }
 
 /** 목록 입력을 알 수 없는 속성 없이 보존한다. */
@@ -142,7 +138,16 @@ export function parseValidateInput(
   return result.data.path === undefined ? {} : { path: result.data.path };
 }
 
-/** 입력 필드와 기존 문서 구조를 확인하되 사용자 필드를 보존한다. */
+/** 생략한 주제를 보존하고 주제 원본에 없는 값과 알 수 없는 속성을 거부한다. */
+export function parseGuideInput(
+  input: unknown,
+): z.infer<typeof guideSchema> | undefined {
+  if (!dataOnly(input)) return undefined;
+  const result = guideSchema.safeParse(input);
+  return result.success ? result.data : undefined;
+}
+
+/** 입력 형태만 확인하고 문서 내용 진단은 변경 계획에 맡긴다. */
 export function acceptsToolInput(
   name: CodocsToolName,
   input: unknown,
@@ -154,10 +159,5 @@ export function acceptsToolInput(
     return parseValidateInput(input) !== undefined;
   const result = codocsInputSchemas.get(name)!.safeParse(input);
   if (!result.success) return false;
-  if (name !== 'codocs_write') return true;
-  const request = writeSchema.parse(input);
-  return (
-    request.mode === 'update' ||
-    validateDocument({ data: request.document }).success
-  );
+  return true;
 }

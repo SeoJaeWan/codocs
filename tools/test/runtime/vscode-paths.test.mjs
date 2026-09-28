@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   resolveVSCodeApplicationPaths,
+  resolveWindowsApplicationRoot,
   vscodeApplicationPaths,
 } from './vscode.mjs';
 
@@ -22,6 +23,23 @@ function verifyWindowsPaths() {
 
 test('Windows 공식 실행 파일을 CLI로도 사용한다', verifyWindowsPaths);
 
+test('Windows 중첩 레이아웃의 문자열 경로를 호스트 OS와 무관하게 조합한다', /** 실제 파일 탐색과 Windows 문자열 계산을 분리한다. */ () => {
+  const paths = vscodeApplicationPaths(
+    'C:\\cache\\Code.exe',
+    'win32',
+    'C:\\cache\\release',
+  );
+  assert.equal(
+    paths.cliPrefix[0],
+    'C:\\cache\\release\\resources\\app\\out\\cli.js',
+  );
+  assert.equal(
+    paths.packageJson,
+    'C:\\cache\\release\\resources\\app\\package.json',
+  );
+  assert.equal(paths.runtimeRoot, 'C:\\cache');
+});
+
 test('Windows 구형과 중첩된 공식 CLI 레이아웃을 실제 파일로 구별한다', /** 두 공식 설치 형태의 실제 파일을 검사한다. */ async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'codocs-vscode-path-'));
   try {
@@ -31,19 +49,21 @@ test('Windows 구형과 중첩된 공식 CLI 레이아웃을 실제 파일로 �
     await mkdir(path.join(old, 'out'), { recursive: true });
     await writeFile(path.join(old, 'out/cli.js'), '');
     await writeFile(path.join(old, 'package.json'), '{}');
-    assert.equal(
-      (await resolveVSCodeApplicationPaths(executable, 'win32')).cliPrefix[0],
-      path.join(old, 'out/cli.js'),
-    );
+    assert.equal(await resolveWindowsApplicationRoot(executable), root);
     await rm(path.join(root, 'resources'), { recursive: true });
     const nested = path.join(root, 'example-release-hash', 'resources/app');
     await mkdir(path.join(nested, 'out'), { recursive: true });
     await writeFile(path.join(nested, 'out/cli.js'), '');
     await writeFile(path.join(nested, 'package.json'), '{}');
     assert.equal(
-      (await resolveVSCodeApplicationPaths(executable, 'win32')).cliPrefix[0],
-      path.join(nested, 'out/cli.js'),
+      await resolveWindowsApplicationRoot(executable),
+      path.join(root, 'example-release-hash'),
     );
+    if (process.platform === 'win32')
+      assert.equal(
+        (await resolveVSCodeApplicationPaths(executable)).cliPrefix[0],
+        path.join(nested, 'out/cli.js'),
+      );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

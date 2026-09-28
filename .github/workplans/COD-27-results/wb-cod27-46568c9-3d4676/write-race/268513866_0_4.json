@@ -1,0 +1,319 @@
+{
+  "title": "다른 경로의 동일 ID create가 최종 검사를 통과하면 두 파일과 충돌 조회를 남긴다",
+  "evidence": [
+    {
+      "kind": "environment",
+      "platform": "win32",
+      "node": "v24.21.0",
+      "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-4npFWL",
+      "bundleSha256": "7901e428cd3659b19e2aacda6b9566a43219d2f67ec366882841c7d8aa1c3977"
+    },
+    {
+      "kind": "process",
+      "actor": "A",
+      "pid": 1972,
+      "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-4npFWL",
+      "stage": "link"
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["a"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "a",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\a.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "a",
+              "name": "A",
+              "definition": "original",
+              "domains": ["test"]
+            },
+            "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "process",
+      "actor": "B",
+      "pid": 3040,
+      "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-4npFWL",
+      "stage": "link"
+    },
+    {
+      "kind": "request",
+      "client": 1,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["a"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "a",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\a.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "a",
+              "name": "A",
+              "definition": "original",
+              "domains": ["test"]
+            },
+            "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_write",
+      "args": {
+        "mode": "create",
+        "path": ".codocs/one.yaml",
+        "document": {
+          "id": "shared",
+          "name": "One",
+          "definition": "first",
+          "domains": ["test"]
+        }
+      }
+    },
+    {
+      "kind": "request",
+      "client": 1,
+      "name": "codocs_write",
+      "args": {
+        "mode": "create",
+        "path": ".codocs/two.yaml",
+        "document": {
+          "id": "shared",
+          "name": "Two",
+          "definition": "second",
+          "domains": ["test"]
+        }
+      }
+    },
+    {
+      "kind": "arrival",
+      "actor": "A",
+      "boundary": "link",
+      "value": {
+        "actor": "A",
+        "boundary": "link",
+        "pid": 1972,
+        "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-4npFWL"
+      }
+    },
+    {
+      "kind": "arrival",
+      "actor": "B",
+      "boundary": "link",
+      "value": {
+        "actor": "B",
+        "boundary": "link",
+        "pid": 3040,
+        "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-4npFWL"
+      }
+    },
+    {
+      "kind": "release",
+      "actor": "A"
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "saved": true,
+        "changed": true,
+        "id": "shared",
+        "source": {
+          "path": ".codocs/one.yaml"
+        },
+        "revision": "027e269bbdded6127336531c2e259553605343e2a31a72ba7f3c8e3793b8cdef",
+        "warnings": [],
+        "diagnostics": [],
+        "indexUpdated": true
+      }
+    },
+    {
+      "kind": "release",
+      "actor": "B"
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "saved": true,
+        "changed": true,
+        "id": "shared",
+        "source": {
+          "path": ".codocs/two.yaml"
+        },
+        "revision": "5dcca48d045629943494218d4d2b6ca1ed4091bd281e281b717fa02eea1ac8e2",
+        "warnings": [],
+        "diagnostics": [],
+        "indexUpdated": true
+      }
+    },
+    {
+      "kind": "file",
+      "relative": ".codocs/one.yaml",
+      "bytes": "id: shared\nname: One\ndefinition: first\ndomains:\n  - test\n",
+      "sha256": "027e269bbdded6127336531c2e259553605343e2a31a72ba7f3c8e3793b8cdef"
+    },
+    {
+      "kind": "file",
+      "relative": ".codocs/two.yaml",
+      "bytes": "id: shared\nname: Two\ndefinition: second\ndomains:\n  - test\n",
+      "sha256": "5dcca48d045629943494218d4d2b6ca1ed4091bd281e281b717fa02eea1ac8e2"
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["shared"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "shared",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\one.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "shared",
+              "name": "One",
+              "definition": "first",
+              "domains": ["test"]
+            },
+            "revision": "027e269bbdded6127336531c2e259553605343e2a31a72ba7f3c8e3793b8cdef",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["shared"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "shared",
+            "found": true,
+            "conflict": true,
+            "paths": [".codocs\\one.yaml", ".codocs\\two.yaml"],
+            "diagnostics": [
+              {
+                "code": "duplicate_id",
+                "severity": "error",
+                "message": "같은 ID를 가진 발견 경로가 여러 개입니다.",
+                "relatedPaths": [".codocs\\one.yaml", ".codocs\\two.yaml"]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "request",
+      "client": 1,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["shared"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "shared",
+            "found": true,
+            "conflict": true,
+            "paths": [".codocs\\one.yaml", ".codocs\\two.yaml"],
+            "diagnostics": [
+              {
+                "code": "duplicate_id",
+                "severity": "error",
+                "message": "같은 ID를 가진 발견 경로가 여러 개입니다.",
+                "relatedPaths": [".codocs\\one.yaml", ".codocs\\two.yaml"]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "kind": "cleanup",
+      "cleanup": [
+        {
+          "status": "fulfilled",
+          "value": {
+            "pid": 1972,
+            "residual": false
+          }
+        },
+        {
+          "status": "fulfilled",
+          "value": {
+            "pid": 3040,
+            "residual": false
+          }
+        }
+      ]
+    }
+  ]
+}

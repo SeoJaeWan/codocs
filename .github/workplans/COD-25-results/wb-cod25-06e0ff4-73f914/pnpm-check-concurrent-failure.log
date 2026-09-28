@@ -1,0 +1,205 @@
+
+> codocs@0.0.0 check C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> pnpm typecheck && pnpm lint && pnpm exec prettier . --check && pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs
+
+
+> codocs@0.0.0 typecheck C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> node tools/build/build.mjs typecheck
+
+
+> codocs@0.0.0 lint C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> eslint . --max-warnings=0
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> codocs@0.0.0 build C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> node tools/build/build.mjs build
+
+
+> codocs@0.0.0 test C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> node tools/test/run.mjs
+
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod25-06e0ff4-73f914/task-001
+
+
+ Test Files  48 passed (48)
+      Tests  926 passed (926)
+   Start at  20:51:14
+   Duration  18.23s (tests 70%, import 21%, transform 8%)
+
+✔ Windows 조회에서 부모와 서버 경로가 일치하는 PID만 선택한다 (2.5899ms)
+✔ macOS 조회에서 부모와 서버 경로가 일치하는 PID만 선택한다 (0.3615ms)
+✔ 기능 사례 뒤 변경된 파일만 복원하고 읽기 거부 파일은 보존한다 (110.5941ms)
+✔ 부분 스테이징을 검사하면 커밋 대상만 읽고 사용자 변경을 보존한다 (3178.823ms)
+warning: in the working copy of 'sample.txt', LF will be replaced by CRLF the next time Git touches it
+✔ lint-staged 자동 수정 후 검사하면 수정된 인덱스를 읽고 비스테이징 줄을 보존한다 (4445.6674ms)
+✔ lint-staged가 수정 후 실패하면 원래 인덱스와 사용자 변경을 복원한다 (3226.7547ms)
+✔ 기능 실패가 발생하면 커밋을 거부하고 사용자 변경을 보존한다 (1788.3137ms)
+✔ 취소가 발생하면 커밋을 거부하고 사용자 변경을 보존한다 (1961.3145ms)
+✔ 검사 도중 사용자가 인덱스를 변경하면 새 변경을 보존하고 커밋을 거부한다 (1729.8436ms)
+✔ 검사가 복사본 소스를 변경하면 커밋을 거부하고 원본을 보존한다 (1667.5763ms)
+✔ 실제 Git 훅의 success 결과가 커밋 허용과 사용자 변경 보존에 반영된다 (3032.451ms)
+✔ 실제 Git 훅의 failure 결과가 커밋 허용과 사용자 변경 보존에 반영된다 (2945.6615ms)
+✔ 실제 Git 훅의 cancel 결과가 커밋 허용과 사용자 변경 보존에 반영된다 (2831.0079ms)
+warning: in the working copy of 'sample.txt', LF will be replaced by CRLF the next time Git touches it
+✔ 자동 수정한 CRLF는 Git clean 규칙으로 정규화하고 미스테이징 줄을 커밋에 넣지 않는다 (2561.1678ms)
+✔ 자동 수정의 줄바꿈 변환이 부분 스테이징과 충돌하면 사용자 변경을 보존하고 실패한다 (2853.9977ms)
+✔ 동일 번호의 오래된 완료 기록과 잘린 줄이 있어도 최신 대기 요청을 분리한다 (43.3099ms)
+✔ 외부 변경 준비 중 중단되면 쓰기가 완료되지 않은 대기를 표시한다 (29.1821ms)
+✔ 중간 진행 기록이 손상되면 부분 결과에 복구 오류를 표시한다 (31.5828ms)
+✔ 느리지만 정확하게 완료된 요청을 p95 표본에 보존한다 (3.8029ms)
+✔ 부분 보고서에 첫 워밍업 시간과 대기 요청 및 실패 이유를 한국어로 표시한다 (2.4497ms)
+✔ 앞 다운로드가 잠금을 놓은 뒤에만 다음 다운로드를 시작한다 (161.3767ms)
+✔ 죽은 프로세스의 잠금은 회수하고 실패한 다운로드도 잠금을 해제한다 (39.8824ms)
+✔ 인자가 없으면 기존 기능 모드와 고정 버전을 선택한다 (1.5736ms)
+✔ 성능 시나리오와 정확한 버전을 선택하고 잘못된 조합은 준비 전에 거부한다 (1.0422ms)
+✔ 공식 stable 응답이 정확한 버전 목록이면 한 버전만 반환한다 (1.1671ms)
+✔ 생성한 천 문서는 배타적이고 파일과 기대 결과 및 요청 순서가 재현된다 (1468.3675ms)
+✔ 취소와 실패는 완료 시간을 꾸미지 않고 JSON과 한국어 부분 보고서에 보존한다 (37.9814ms)
+✔ 대기 중 자식 종료와 취소는 마지막 진행과 미완료 표본을 보존한다 (2.5841ms)
+✔ 조회 간격 변경에 근거가 없으면 설정 파일을 거부한다 (24.7151ms)
+✔ 부모 종료 뒤에도 남은 자손을 찾고 무관한 프로세스는 제외한다 (2.4932ms)
+✔ success 이후 시험 자식 프로세스를 종료한다 (3033.2855ms)
+✔ failure 이후 시험 자식 프로세스를 종료한다 (2076.9646ms)
+✔ timeout 이후 시험 자식 프로세스를 종료한다 (4146.4065ms)
+✔ cancelled 이후 시험 자식 프로세스를 종료한다 (1912.4575ms)
+✔ 제품 대기 제한을 끄면 느린 정상 응답을 보존하고 자식도 정리한다 (3494.2495ms)
+✔ 현재 OS에서 실제 읽기를 거부하고 해제 뒤 원문을 읽는다 (1642.9063ms)
+✔ macOS 권한 준비는 읽기 거부를 확인하고 원래 권한으로 복원한다 (1.0002ms)
+✔ macOS에서 실제 read가 성공하면 준비 실패로 처리하고 권한을 복원한다 (0.701ms)
+✔ macOS 준비 표시 쓰기가 실패해도 파일 권한을 즉시 복원한다 (0.4183ms)
+✔ Windows 대상 파일이 없으면 잠금 준비 실패를 반환한다 (312.6606ms)
+✔ Windows 공식 실행 파일을 CLI로도 사용한다 (1.736ms)
+✔ Windows 구형과 중첩된 공식 CLI 레이아웃을 실제 파일로 구별한다 (34.6103ms)
+✔ macOS 공식 앱 실행 파일에서 번들 CLI를 찾는다 (0.7605ms)
+✔ pnpm native wrapper를 Node로 실행할 수 없으면 인접 공식 진입점을 찾고 버전을 검증한다 (398.3562ms)
+✔ 다른 버전 pnpm이 프로젝트 버전을 출력하면 준비 실패로 처리한다 (72.9394ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32493.334
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod25-06e0ff4-73f914/task-001
+
+ ❯ tools/build/check/build-checks.test.ts (32 tests | 6 failed) 68753ms
+   ❯ 빌드된 패키지의 외부 소비자 계약 (32)
+     ❯ 산출물 구성과 배포 asset (10)
+       ❯ 빌드 산출물의 파일 구성 (8)
+         × language-server를 빌드하면 실행 파일과 선언 파일을 만들고 테스트 파일을 제외한다 9ms
+         × vscode를 빌드하면 실행 파일과 선언 파일을 만들고 테스트 파일을 제외한다 2ms
+         × mcp를 빌드하면 가이드와 예제 원문을 dist에 복사한다 2ms
+         × vscode를 빌드하면 가이드와 예제 원문을 dist에 복사한다 1ms
+         × VS Code 서버를 빌드하면 language-server 번들과 같은 내용을 배치한다 0ms
+       × pnpm pack 결과에 guide/example/server asset을 포함한다 780ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tools/build/check/build-checks.test.ts > 빌드된 패키지의 외부 소비자 계약 > 산출물 구성과 배포 asset > 빌드 산출물의 파일 구성 > language-server를 빌드하면 실행 파일과 선언 파일을 만들고 테스트 파일을 제외한다
+ FAIL  tools/build/check/build-checks.test.ts > 빌드된 패키지의 외부 소비자 계약 > 산출물 구성과 배포 asset > 빌드 산출물의 파일 구성 > vscode를 빌드하면 실행 파일과 선언 파일을 만들고 테스트 파일을 제외한다
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tools/build/check/build-checks.test.ts:985:74
+    983|             ? 'cjs'
+    984|             : 'js';
+    985|           expect(existsSync(path.join(directory, `index.${extension}`)…
+       |                                                                          ^
+    986|             true,
+    987|           );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  tools/build/check/build-checks.test.ts > 빌드된 패키지의 외부 소비자 계약 > 산출물 구성과 배포 asset > 빌드 산출물의 파일 구성 > mcp를 빌드하면 가이드와 예제 원문을 dist에 복사한다
+Error: ENOENT: no such file or directory, open 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001\packages\mcp\dist\docs\guide\README.md'
+ ❯ tools/build/check/build-checks.test.ts:1008:15
+    1006|           ]) {
+    1007|             expect(
+    1008|               readFileSync(
+       |               ^
+    1009|                 path.join(root, 'packages', folder, 'dist', relative),
+    1010|                 'utf8',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  tools/build/check/build-checks.test.ts > 빌드된 패키지의 외부 소비자 계약 > 산출물 구성과 배포 asset > 빌드 산출물의 파일 구성 > vscode를 빌드하면 가이드와 예제 원문을 dist에 복사한다
+Error: ENOENT: no such file or directory, open 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001\packages\vscode\dist\docs\guide\README.md'
+ ❯ tools/build/check/build-checks.test.ts:1008:15
+    1006|           ]) {
+    1007|             expect(
+    1008|               readFileSync(
+       |               ^
+    1009|                 path.join(root, 'packages', folder, 'dist', relative),
+    1010|                 'utf8',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  tools/build/check/build-checks.test.ts > 빌드된 패키지의 외부 소비자 계약 > 산출물 구성과 배포 asset > 빌드 산출물의 파일 구성 > VS Code 서버를 빌드하면 language-server 번들과 같은 내용을 배치한다
+Error: ENOENT: no such file or directory, open 'C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001\packages\vscode\dist\server\index.cjs'
+ ❯ tools/build/check/build-checks.test.ts:1021:24
+    1019|
+    1020|       it('VS Code 서버를 빌드하면 language-server 번들과 같은 내용을 배치한다', () => {
+    1021|         const server = readFileSync(
+       |                        ^
+    1022|           path.join(root, 'packages/vscode/dist/server/index.cjs'),
+    1023|           'utf8',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  tools/build/check/build-checks.test.ts > 빌드된 패키지의 외부 소비자 계약 > 산출물 구성과 배포 asset > pnpm pack 결과에 guide/example/server asset을 포함한다
+AssertionError: expected 'package/dist/cli.js\r\npackage/dist/i…' to contain 'package/dist/docs/guide/README.md'
+
+- Expected
++ Received
+
+- package/dist/docs/guide/README.md
++ package/dist/cli.js
++ package/dist/index.js
++ package/dist/query/index.js
++ package/dist/server/index.js
++ package/dist/tool-input/index.js
++ package/package.json
++ package/dist/cli.d.ts.map
++ package/dist/cli.js.map
++ package/dist/index.d.ts.map
++ package/dist/query/index.d.ts.map
++ package/dist/server/index.d.ts.map
++ package/dist/tool-input/index.d.ts.map
++ package/dist/index.js.map
++ package/dist/query/index.js.map
++ package/dist/server/index.js.map
++ package/dist/tool-input/index.js.map
++ package/dist/cli.d.ts
++ package/dist/index.d.ts
++ package/dist/query/index.d.ts
++ package/dist/server/index.d.ts
++ package/dist/tool-input/index.d.ts
++
+
+ ❯ tools/build/check/build-checks.test.ts:1103:25
+    1101|           'examples/.codocs/fulfillment.yaml',
+    1102|         ]) {
+    1103|           expect(files).toContain('package/dist/' + relative);
+       |                         ^
+    1104|         }
+    1105|         expect(files).not.toContain('package/src/');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  6 failed | 109 passed (115)
+   Start at  20:52:07
+   Duration  181.81s (tests 99%, import 1%)
+
+ ELIFECYCLE  Command failed with exit code 1.

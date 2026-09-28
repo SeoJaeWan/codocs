@@ -1,0 +1,7 @@
+{
+  "stdout": "{\"pathCheckReached\":true,\"closeCompleted\":true}\n{\"lateConnectionAfterClose\":true}\n",
+  "stderr": "",
+  "code": null,
+  "killed": true,
+  "signal": "SIGTERM"
+}

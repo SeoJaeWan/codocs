@@ -1,0 +1,8 @@
+{
+  "base": "486f634d7df88ad0e2e79e681e1fbc21f3609229",
+  "tree": "0d6040bd2f1fec74ca3a744fa8499e556853aec2",
+  "snapshot": "C:\\Users\\sjw73\\AppData\\Local\\Temp\\codocs-staged-4kKMMu",
+  "passed": false,
+  "phase": "verification",
+  "error": "Error: 검사 실패 (1): tools/test/run.mjs\n    at ChildProcess.completed (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/tools/git/staged.mjs:45:11)\n    at ChildProcess.wrapper (node:events:639:12)\n    at ChildProcess.emit (node:events:514:28)\n    at maybeClose (node:internal/child_process:1141:16)\n    at ChildProcess._handle.onexit (node:internal/child_process:306:5)"
+}

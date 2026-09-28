@@ -1,3 +1,10 @@
+import { packageMcp, packageVSIX } from '../release.mjs';
+import { verifyRelease } from '../verify-release.mjs';
+import {
+  assertGuideAssets,
+  exampleContractScript,
+  installedGuideScript,
+} from './guide-assets/index.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -72,74 +79,9 @@ function run(args: string[], cwd = consumer): string {
 
 /** 원본 또는 배포된 예제를 소스 없는 소비자의 공개 파서와 검증기로 검사한다. */
 function checkExamples(directory: string): void {
-  const cases = [
-    {
-      relative: 'examples/.codocs/order.yaml',
-      expected: {
-        id: 'sample-order',
-        name: '가상 주문',
-        definition:
-          '가상 고객의 구매 요청이며 [[가상 주문 처리]] 절차를 따른다.',
-        domains: ['sample-sales'],
-        examples: ['가상 주문 SAMPLE-001을 생성한다.'],
-      },
-    },
-    {
-      relative: 'examples/.codocs/fulfillment.yaml',
-      expected: {
-        id: 'sample-fulfillment',
-        name: '가상 주문 처리',
-        definition:
-          '가상 프로젝트에서 [[가상 주문]]를 확인한 뒤 가상 배송 상태를 기록한다.',
-        domains: ['sample-sales'],
-      },
-    },
-  ].map((item) => ({
-    ...item,
-    source: readFileSync(path.join(root, item.relative), 'utf8'),
-  }));
-  const script = `import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { parseYaml, validateDocument, getKeyRange, getValueRange, getPropertyRange, buildCatalog } from '@codocs/core';
-const observations = [];
-for (const item of ${JSON.stringify(cases)}) {
-  const filePath = path.join(process.argv[2], item.relative);
-  const source = readFileSync(filePath, 'utf8');
-  assert.equal(source, item.source);
-  const parsed = parseYaml(source, filePath);
-  assert.equal(parsed.success, true, JSON.stringify(parsed.diagnostics));
-  assert.equal(parsed.source, source);
-  observations.push({path: item.relative, parsed});
-  assert.deepEqual(parsed.diagnostics, []);
-  assert.deepEqual(parsed.data, item.expected);
-  const before = structuredClone(parsed);
-  const validated = validateDocument({data: parsed.data, source: parsed.source, fields: parsed.fields, path: filePath, ...(parsed.rootRange ? {rootRange: parsed.rootRange} : {})});
-  assert.equal(validated.success, true, JSON.stringify(validated.errors));
-  assert.deepEqual(validated.data, item.expected);
-  assert.deepEqual(validated.errors, []);
-  assert.deepEqual(validated.warnings, []);
-  assert.deepEqual(parsed, before);
-  const key = getKeyRange(parsed, ['id']);
-  const value = getValueRange(parsed, ['id']);
-  const property = getPropertyRange(parsed, ['id']);
-  assert.ok(key && value && property);
-  assert.equal(source.slice(key.start, key.end), 'id');
-  assert.equal(source.slice(value.start, value.end), item.expected.id);
-  const newline = source.includes('\\r\\n') ? '\\r\\n' : '\\n';
-  assert.equal(source.slice(property.start, property.end), 'id: ' + item.expected.id + newline);
-}
-const catalog = buildCatalog({status: 'complete', observations});
-for (const document of catalog.documents.values()) {
-  assert.equal(document.occurrences.length, 1);
-  assert.equal(document.occurrences[0].resolution.status, 'resolved');
-  assert.equal(document.references.length, 1);
-  assert.equal(document.referencedBy.length, 1);
-}
-console.log('2 examples parsed and validated');`;
-  writeFileSync(path.join(consumer, 'examples.mjs'), script);
+  writeFileSync(path.join(consumer, 'examples.mjs'), exampleContractScript);
   expect(run(['examples.mjs', directory])).toContain(
-    '2 examples parsed and validated',
+    '4 examples parsed and validated',
   );
 }
 
@@ -1112,10 +1054,40 @@ void start; void stop; void command;
             'utf8',
           ),
         ).toBe(readFileSync(path.join(root, 'docs/guide/README.md'), 'utf8'));
+        assertGuideAssets(root, path.join(extracted, 'package/dist'));
         checkExamples(path.join(extracted, 'package/dist'));
         if (folder === 'vscode')
           expect(files).toContain('package/dist/server/index.cjs');
       }
+    });
+  });
+
+  describe('가이드 실제 설치와 VSIX 자산', () => {
+    it('저장소 밖 설치된 MCP CLI가 생략·모든 주제·오류 입력을 처리한다', () => {
+      writeFileSync(
+        path.join(consumer, 'installed-guide.mjs'),
+        installedGuideScript,
+      );
+      expect(run(['installed-guide.mjs'])).toContain(
+        'Installed CLI guide topics verified',
+      );
+      assertGuideAssets(
+        root,
+        path.join(consumer, 'node_modules/@codocs/mcp/dist'),
+      );
+      checkExamples(path.join(consumer, 'node_modules/@codocs/mcp/dist'));
+    });
+    it('실제 VSIX의 전체 가이드와 예시 바이트·링크·참조가 원본과 일치한다', async () => {
+      const archive = path.join(fixture, 'guide.vsix');
+      await packageVSIX(root, archive);
+      const publicMcp = await packageMcp(root, fixture);
+      await verifyRelease(publicMcp, archive);
+      const extracted = path.join(fixture, 'vsix');
+      mkdirSync(extracted, { recursive: true });
+      execFileSync('tar', ['-xf', archive, '-C', extracted]);
+      const deployed = path.join(extracted, 'extension/dist');
+      assertGuideAssets(root, deployed);
+      checkExamples(deployed);
     });
   });
 

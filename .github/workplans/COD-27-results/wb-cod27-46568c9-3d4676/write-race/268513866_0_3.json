@@ -1,0 +1,331 @@
+{
+  "title": "같은 revision의 두 update가 rename에 도달하면 순서대로 저장하고 마지막 본문을 양쪽에서 조회한다",
+  "evidence": [
+    {
+      "kind": "environment",
+      "platform": "win32",
+      "node": "v24.21.0",
+      "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-Ph588e",
+      "bundleSha256": "7901e428cd3659b19e2aacda6b9566a43219d2f67ec366882841c7d8aa1c3977"
+    },
+    {
+      "kind": "process",
+      "actor": "A",
+      "pid": 22292,
+      "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-Ph588e",
+      "stage": "rename"
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["a"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "a",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\a.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "a",
+              "name": "A",
+              "definition": "original",
+              "domains": ["test"]
+            },
+            "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "process",
+      "actor": "B",
+      "pid": 12220,
+      "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-Ph588e",
+      "stage": "rename"
+    },
+    {
+      "kind": "request",
+      "client": 1,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["a"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "a",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\a.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "a",
+              "name": "A",
+              "definition": "original",
+              "domains": ["test"]
+            },
+            "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "file",
+      "relative": ".codocs/a.yaml",
+      "bytes": "id: a\nname: A\ndefinition: original\ndomains: [test]\n",
+      "sha256": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4"
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_write",
+      "args": {
+        "mode": "update",
+        "id": "a",
+        "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+        "set": {
+          "definition": "writer A"
+        }
+      }
+    },
+    {
+      "kind": "request",
+      "client": 1,
+      "name": "codocs_write",
+      "args": {
+        "mode": "update",
+        "id": "a",
+        "revision": "e950d0bf74340063b1d12b5bea05c9b29996b7f572fd9d53156a6168c7b325f4",
+        "set": {
+          "definition": "writer B"
+        }
+      }
+    },
+    {
+      "kind": "arrival",
+      "actor": "A",
+      "boundary": "rename",
+      "value": {
+        "actor": "A",
+        "boundary": "rename",
+        "pid": 22292,
+        "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-Ph588e"
+      }
+    },
+    {
+      "kind": "arrival",
+      "actor": "B",
+      "boundary": "rename",
+      "value": {
+        "actor": "B",
+        "boundary": "rename",
+        "pid": 12220,
+        "project": "C:\\Users\\sjw73\\OneDrive\\Desktop\\dev\\codocs-worktrees\\wb-cod27-46568c9-3d4676-task-001\\.workbench\\write-race-5Tsmdd\\project-Ph588e"
+      }
+    },
+    {
+      "kind": "release",
+      "actor": "A"
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "saved": true,
+        "changed": true,
+        "id": "a",
+        "source": {
+          "path": ".codocs\\a.yaml"
+        },
+        "revision": "3d4bb454a89201f3f871728f78d30f8f83c4a9eb9450000c1de1bee2a45baa42",
+        "warnings": [],
+        "diagnostics": [],
+        "indexUpdated": true
+      }
+    },
+    {
+      "kind": "file",
+      "relative": ".codocs/a.yaml",
+      "bytes": "id: a\nname: A\ndefinition: writer A\ndomains: [test]\n",
+      "sha256": "3d4bb454a89201f3f871728f78d30f8f83c4a9eb9450000c1de1bee2a45baa42"
+    },
+    {
+      "kind": "release",
+      "actor": "B"
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "saved": true,
+        "changed": true,
+        "id": "a",
+        "source": {
+          "path": ".codocs\\a.yaml"
+        },
+        "revision": "48db84c8961bc2a106188822bddacb473911b4a1fea4d548c2fe127250e2a408",
+        "warnings": [],
+        "diagnostics": [],
+        "indexUpdated": true
+      }
+    },
+    {
+      "kind": "file",
+      "relative": ".codocs/a.yaml",
+      "bytes": "id: a\nname: A\ndefinition: writer B\ndomains: [test]\n",
+      "sha256": "48db84c8961bc2a106188822bddacb473911b4a1fea4d548c2fe127250e2a408"
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["a"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "a",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\a.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "a",
+              "name": "A",
+              "definition": "writer A",
+              "domains": ["test"]
+            },
+            "revision": "3d4bb454a89201f3f871728f78d30f8f83c4a9eb9450000c1de1bee2a45baa42",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "request",
+      "client": 0,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["a"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "a",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\a.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "a",
+              "name": "A",
+              "definition": "writer B",
+              "domains": ["test"]
+            },
+            "revision": "48db84c8961bc2a106188822bddacb473911b4a1fea4d548c2fe127250e2a408",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "request",
+      "client": 1,
+      "name": "codocs_get",
+      "args": {
+        "ids": ["a"]
+      }
+    },
+    {
+      "kind": "response",
+      "result": {
+        "success": true,
+        "scanStatus": "complete",
+        "results": [
+          {
+            "id": "a",
+            "found": true,
+            "conflict": false,
+            "source": {
+              "path": ".codocs\\a.yaml"
+            },
+            "confirmation": "confirmed",
+            "document": {
+              "id": "a",
+              "name": "A",
+              "definition": "writer B",
+              "domains": ["test"]
+            },
+            "revision": "48db84c8961bc2a106188822bddacb473911b4a1fea4d548c2fe127250e2a408",
+            "references": [],
+            "referencedBy": [],
+            "diagnostics": []
+          }
+        ]
+      }
+    },
+    {
+      "kind": "cleanup",
+      "cleanup": [
+        {
+          "status": "fulfilled",
+          "value": {
+            "pid": 22292,
+            "residual": false
+          }
+        },
+        {
+          "status": "fulfilled",
+          "value": {
+            "pid": 12220,
+            "residual": false
+          }
+        }
+      ]
+    }
+  ]
+}

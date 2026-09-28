@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { PassThrough } from 'node:stream';
+import { pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -12,11 +13,16 @@ import { createWorkspaceQuerySession } from '@codocs/workspace';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createCodocsQueryHandlers } from '../query/index.js';
 import { startCodocsStdio } from './index.js';
+import { createCodocsGuideHandler } from '../guide/index.js';
 
 const cli = path.resolve('packages/mcp/dist/cli.js');
+const sourceGuide = createCodocsGuideHandler(
+  pathToFileURL(path.resolve('docs/guide') + path.sep),
+);
 let fixture: string;
 let projectA: string;
 let projectB: string;
+let projectWrite: string;
 let projectPages: string;
 
 /** 실제 파일 두 벌로 서로 다른 프로젝트의 조회 결과를 구별한다. */
@@ -25,10 +31,12 @@ beforeAll(async () => {
   fixture = await mkdtemp(path.resolve('.workbench/mcp-server-'));
   projectA = path.join(fixture, 'a');
   projectB = path.join(fixture, 'b');
+  projectWrite = path.join(fixture, 'write');
   projectPages = path.join(fixture, 'pages');
   for (const [project, id] of [
     [projectA, 'alpha'],
     [projectB, 'bravo'],
+    [projectWrite, 'bravo'],
   ] as const) {
     await mkdir(path.join(project, '.codocs'), { recursive: true });
     await writeFile(
@@ -49,6 +57,171 @@ beforeAll(async () => {
     path.join(pages, 'other.yaml'),
     'id: other\nname: Other\ndomains: [other]\ndefinition: 본문\n',
   );
+});
+
+describe('codocs_write 실제 stdio와 파일', () => {
+  it('직접 handler와 SDK가 입력 형태 오류와 문서 상세 오류를 같게 반환한다', async () => {
+    const session = createWorkspaceQuerySession({ project: projectA });
+    const handlers = createCodocsQueryHandlers(session);
+    const { client } = await clientFor(projectA);
+    try {
+      const malformed = {
+        mode: 'create',
+        path: '.codocs/bad.yaml',
+        document: {},
+        extra: true,
+      };
+      expect(
+        payload(
+          await client.callTool({ name: 'codocs_write', arguments: malformed }),
+        ),
+      ).toEqual(await handlers.codocsWrite(malformed));
+      const invalidDocument = {
+        mode: 'create',
+        path: '.codocs/bad.yaml',
+        document: { id: 'bad', name: '잘못됨' },
+      };
+      const direct = await handlers.codocsWrite(invalidDocument);
+      const remote = payload(
+        await client.callTool({
+          name: 'codocs_write',
+          arguments: invalidDocument,
+        }),
+      );
+      expect(remote).toEqual(direct);
+      expect(remote).toMatchObject({ success: false, saved: false });
+      expect(
+        (remote.diagnostics as { code: string }[]).map((item) => item.code),
+      ).toContain('missing_required_field');
+    } finally {
+      await client.close();
+      await session.close();
+    }
+  });
+
+  it('생성·ID 변경·무변경 뒤 같은 서버의 조회와 저장 바이트 revision이 일치한다', async () => {
+    const { client } = await clientFor(projectWrite);
+    const file = path.join(projectWrite, '.codocs', 'created.yaml');
+    try {
+      const created = payload(
+        await client.callTool({
+          name: 'codocs_write',
+          arguments: {
+            mode: 'create',
+            path: '.codocs/created.yaml',
+            document: {
+              id: 'created',
+              name: '생성 문서',
+              domains: ['test'],
+              definition: '[[bravo]] 참조',
+              custom: { nested: [1, true] },
+            },
+          },
+        }),
+      );
+      expect(created).toMatchObject({
+        success: true,
+        saved: true,
+        changed: true,
+        indexUpdated: true,
+        id: 'created',
+      });
+      let bytes = await readFile(file);
+      expect(created.revision).toBe(
+        createHash('sha256').update(bytes).digest('hex'),
+      );
+      expect(bytes.toString()).toContain('custom:');
+      const afterCreate = payload(
+        await client.callTool({
+          name: 'codocs_get',
+          arguments: { ids: ['created', 'bravo'] },
+        }),
+      );
+      expect(afterCreate).toMatchObject({
+        success: true,
+        results: [
+          {
+            found: true,
+            revision: created.revision,
+            references: ['bravo'],
+          },
+          { found: true, referencedBy: ['created'] },
+        ],
+      });
+      expect(
+        payload(
+          await client.callTool({ name: 'codocs_validate', arguments: {} }),
+        ),
+      ).toMatchObject({
+        success: true,
+        scanStatus: 'complete',
+        diagnostics: [{ code: 'unknown_field', severity: 'warning' }],
+      });
+      expect(
+        payload(await client.callTool({ name: 'codocs_list', arguments: {} }))
+          .items,
+      ).toMatchObject([{ id: 'bravo' }, { id: 'created' }]);
+      const renamed = payload(
+        await client.callTool({
+          name: 'codocs_write',
+          arguments: {
+            mode: 'update',
+            id: 'created',
+            revision: created.revision as string,
+            set: { id: 'renamed' },
+          },
+        }),
+      );
+      expect(renamed).toMatchObject({
+        success: true,
+        saved: true,
+        indexUpdated: true,
+        id: 'renamed',
+      });
+      bytes = await readFile(file);
+      expect(renamed.revision).toBe(
+        createHash('sha256').update(bytes).digest('hex'),
+      );
+      expect(bytes.toString()).toContain('deprecatedAliases:');
+      expect(bytes.toString()).toContain('- id: created');
+      expect(
+        payload(
+          await client.callTool({
+            name: 'codocs_get',
+            arguments: { ids: ['created', 'renamed'] },
+          }),
+        ).results,
+      ).toMatchObject([
+        { found: false },
+        {
+          found: true,
+          revision: renamed.revision,
+          references: ['bravo'],
+        },
+      ]);
+      const unchanged = payload(
+        await client.callTool({
+          name: 'codocs_write',
+          arguments: {
+            mode: 'update',
+            id: 'renamed',
+            revision: renamed.revision as string,
+            set: { name: '생성 문서' },
+          },
+        }),
+      );
+      expect(unchanged).toMatchObject({
+        success: true,
+        saved: false,
+        changed: false,
+        revision: renamed.revision,
+      });
+      expect(unchanged).not.toHaveProperty('indexUpdated');
+      expect(await readFile(file)).toEqual(bytes);
+    } finally {
+      await client.close();
+    }
+  });
 });
 
 afterAll(async () => {
@@ -93,7 +266,33 @@ function payload(response: unknown): Record<string, unknown> {
 }
 
 describe('빌드 MCP stdio 서버', () => {
-  it('초기화 후 네 도구를 제공하고 실제 문서를 목록·상세·검증·갱신한다', async () => {
+  it.each([
+    {},
+    ...[
+      'overview',
+      'schema',
+      'writing',
+      'examples',
+      'updating',
+      'validation',
+    ].map((topic) => ({ topic })),
+    { topic: 'missing' },
+    { topic: 'schema', extra: true },
+  ])(
+    'guide %j 입력은 실제 stdio와 직접 handler에서 같은 결과를 반환한다',
+    async (input) => {
+      const { client } = await clientFor(projectA);
+      try {
+        const result = payload(
+          await client.callTool({ name: 'codocs_guide', arguments: input }),
+        );
+        expect(result).toEqual(await sourceGuide(input));
+      } finally {
+        await client.close();
+      }
+    },
+  );
+  it('초기화 후 쓰기를 포함한 도구를 제공하고 실제 문서를 목록·상세·검증·갱신한다', async () => {
     const { client, transport } = await clientFor(projectA);
     try {
       const names = (await client.listTools()).tools.map((tool) => tool.name);
@@ -102,6 +301,8 @@ describe('빌드 MCP stdio 서버', () => {
         'codocs_get',
         'codocs_refresh',
         'codocs_validate',
+        'codocs_write',
+        'codocs_guide',
       ]);
       const listed = payload(
         await client.callTool({ name: 'codocs_list', arguments: {} }),

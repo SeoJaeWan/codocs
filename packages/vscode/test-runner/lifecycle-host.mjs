@@ -13,7 +13,7 @@ try {
     extensionDevelopmentPath: config.extension,
     extensionTestsPath:
       config.mode === 'startup-failure'
-        ? path.join(config.output, 'absent-suite.cjs')
+        ? config.missingSuite
         : path.join(import.meta.dirname, 'lifecycle-suite.cjs'),
     extensionTestsEnv: { CODOCS_VSCODE_CONFIG: process.argv[2] },
     stdout: log,
@@ -21,10 +21,9 @@ try {
     launchArgs: [
       config.workspace,
       '--user-data-dir',
-      path.join(config.output, 'profile'),
+      config.profile,
       '--extensions-dir',
       path.join(config.output, 'extensions'),
-      '--disable-extensions',
       '--new-window',
     ],
   });

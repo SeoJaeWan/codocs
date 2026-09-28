@@ -1,0 +1,53 @@
+{
+  "base": "46568c9feda16739604096b738a915632f58c697",
+  "implementationTree": "0419cba0a8c51cca56a67a64fe3e99273362bdf9",
+  "files": [
+    {
+      "path": "packages/mcp/src/server/write-race.test.ts",
+      "gitBlob": "30bd2077e99f8e24f60fca04e8fe518fdefd075f"
+    },
+    {
+      "path": "packages/mcp/src/test-support/write-race-child.mjs",
+      "gitBlob": "2faa211b8600938037c2227b1c899a7f7a942745"
+    },
+    {
+      "path": "packages/vscode/src/integration/extension.test.cjs",
+      "gitBlob": "d66fc1c8f71e483583c2852fea97b35b543c0faf",
+      "testedGitBlob": "ca85599976cec0d1aed10fc00d6ace07a278b32d",
+      "commentOnlyChange": true,
+      "syntaxTreeSha256": "565120dc6ed6f62db7c7ae2079e187a0e23364fffd0d54375f5a915e94974bd9"
+    },
+    {
+      "path": "packages/vscode/src/integration/index.cjs",
+      "gitBlob": "f0a7bc3d5923a6151d2b72bd13c1cb7441b4e09b"
+    },
+    {
+      "path": "packages/vscode/src/integration/test-support/context.cjs",
+      "gitBlob": "a466335f006fdb555b45a48f3cfc10a3b59c83ea"
+    },
+    {
+      "path": "packages/vscode/src/integration/test-support/mcp-client.cjs",
+      "gitBlob": "7ff514b4ece7e2ca27cd9f26b43dd0d8405d5515"
+    },
+    {
+      "path": "packages/vscode/src/integration/test-support/mcp-client.test.mjs",
+      "gitBlob": "1f6d21c560cc133463c1b074865631a49eb3d163"
+    },
+    {
+      "path": "packages/vscode/src/integration/test-support/workspace-fixture.mjs",
+      "gitBlob": "42c5ee33c94817546eb9dec53b8c9d0015c3b79a"
+    },
+    {
+      "path": "packages/vscode/src/integration/test-support/workspace-fixture.test.mjs",
+      "gitBlob": "a1a4a7ac4a33d9f654aedbbd0ebfb92494da0348"
+    },
+    {
+      "path": "packages/vscode/test-runner/host.mjs",
+      "gitBlob": "f7257d7ff01ec319dcea5293c45aa1a52e3c5cb2"
+    },
+    {
+      "path": "packages/vscode/test-runner/run.mjs",
+      "gitBlob": "b2abf68d64f8ca1928565e4fb7d43bbacd0bcfae"
+    }
+  ]
+}

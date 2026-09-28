@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, rmSync } from 'node:fs';
+import { cpSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { bundledNotices } from './notices.mjs';
 import { assertNodeVersion } from '../toolchain.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
@@ -68,6 +69,10 @@ function copyAssets() {
     path.join(root, 'packages/vscode/dist/server/index.cjs'),
   );
   cpSync(
+    path.join(root, 'packages/language-server/dist/THIRD-PARTY-NOTICES.txt'),
+    path.join(root, 'packages/vscode/dist/server/THIRD-PARTY-NOTICES.txt'),
+  );
+  cpSync(
     path.join(root, 'packages/language-server/dist/index.cjs.map'),
     path.join(root, 'packages/vscode/dist/server/index.cjs.map'),
   );
@@ -110,10 +115,14 @@ async function main(mode) {
     compile(folder, mode === 'bundle' ? ['--noCheck'] : []);
   for (const folder of ['language-server', 'vscode']) {
     if (mode === 'build') compile(folder, ['--emitDeclarationOnly']);
-    await bundleIde(
+    const bundled = await bundleIde(
       [path.join(root, 'packages', folder, 'src/index.ts')],
       path.join(root, 'packages', folder, 'dist/index.cjs'),
       folder === 'vscode' ? ['vscode'] : [],
+    );
+    writeFileSync(
+      path.join(root, 'packages', folder, 'dist/THIRD-PARTY-NOTICES.txt'),
+      await bundledNotices(bundled.metafile, root),
     );
   }
   copyAssets();

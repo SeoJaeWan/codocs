@@ -1,15 +1,29 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { on } from 'node:events';
+import { watch } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import denial from './read-denial.cjs';
 
-test('현재 OS에서 실제 읽기를 거부하고 해제 뒤 원문을 읽는다', /** Windows 잠금 또는 Mac 권한 제한의 실제 읽기 실패와 복원을 확인한다. */ async () => {
+/** 부모·형제 이벤트를 건너뛰고 실제 대상 파일의 감시 이벤트를 기다린다. */
+async function observeFile(watcher, filename) {
+  for await (const [, changed] of on(watcher, 'change', {
+    signal: AbortSignal.timeout(5000),
+  })) {
+    if (changed?.toString() === filename) return;
+  }
+}
+
+test('현재 OS에서 읽기만 거부하고 파일 감시와 해제 뒤 원문을 보존한다', /** Windows 데이터 잠금 또는 Mac 권한 제한이 감시 등록을 방해하지 않는지 확인한다. */ async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'codocs-denial-'));
-  const target = path.join(root, 'document.yaml');
+  const documents = path.join(root, 'documents');
+  await mkdir(documents);
+  const target = path.join(documents, 'document.yaml');
   await writeFile(target, 'original');
   let release;
+  let watcher;
   try {
     release = await denial.denyRead(target, path.join(root, 'lock'));
     await assert.rejects(
@@ -17,9 +31,22 @@ test('현재 OS에서 실제 읽기를 거부하고 해제 뒤 원문을 읽는�
       /** 실제 OS의 읽기 거부를 확인한다. */ (error) =>
         ['EACCES', 'EPERM', 'EBUSY'].includes(error.code),
     );
+    // 제품처럼 부모 디렉터리를 감시한다. macOS는 읽기 거부 파일 직접 감시도 거부한다.
+    watcher = watch(documents);
+    // 새 디렉터리의 초기 이벤트와 감시 준비를 실제 파일 생성으로 확인한다.
+    await Promise.all([
+      observeFile(watcher, 'watch-ready'),
+      writeFile(path.join(documents, 'watch-ready'), 'ready'),
+    ]);
     await release();
     assert.equal(await readFile(target, 'utf8'), 'original');
+    await Promise.all([
+      observeFile(watcher, path.basename(target)),
+      writeFile(target, 'updated'),
+    ]);
+    assert.equal(await readFile(target, 'utf8'), 'updated');
   } finally {
+    watcher?.close();
     await release?.();
     await rm(root, { recursive: true, force: true });
   }

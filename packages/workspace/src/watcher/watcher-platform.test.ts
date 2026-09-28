@@ -36,6 +36,44 @@ afterEach(() => {
 import { createWorkspaceWatcher } from './index.js';
 
 describe('현재 OS 경로와 watcher 이벤트·종료 처리', () => {
+  it('같은 크기의 파일이 더 오래된 mtime으로 교체되면 poll 원시 신호를 전달한다', async () => {
+    const watcher = await createWorkspaceWatcher(contract.root);
+    const received: string[][] = [];
+    watcher.subscribe((batch) => received.push([...batch.paths]));
+    const target = path.join(contract.codocs, 'first.yaml');
+    try {
+      boundary.connections[0]!.emitter.emit('raw', 'change', target, {
+        prev: { dev: 1, ino: 10, size: 50, mtimeMs: 200, ctimeMs: 300 },
+        curr: { dev: 1, ino: 11, size: 50, mtimeMs: 100, ctimeMs: 400 },
+      });
+      watcher.drain();
+      expect(received).toEqual([[target]]);
+    } finally {
+      await watcher.close();
+    }
+  });
+
+  it('poll 원시 관측의 접근 시간만 바뀌면 재읽기 신호를 만들지 않는다', async () => {
+    const watcher = await createWorkspaceWatcher(contract.root);
+    const listener = vi.fn();
+    watcher.subscribe(listener);
+    const identity = { dev: 1, ino: 10, size: 50, mtimeMs: 200, ctimeMs: 300 };
+    try {
+      boundary.connections[0]!.emitter.emit(
+        'raw',
+        'change',
+        path.join(contract.codocs, 'first.yaml'),
+        {
+          prev: { ...identity, atimeMs: 200 },
+          curr: { ...identity, atimeMs: 400 },
+        },
+      );
+      watcher.drain();
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      await watcher.close();
+    }
+  });
   it('프로젝트와 .codocs만 감시하며 연결 추적을 열지 않는다', async () => {
     boundary.connections.length = 0;
     const watcher = await createWorkspaceWatcher(contract.root);

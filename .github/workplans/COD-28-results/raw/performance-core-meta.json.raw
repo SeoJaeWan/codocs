@@ -1,0 +1,6 @@
+{
+  "exit": 0,
+  "scope": "bounded comparison; formal repetitions and other document scales unmeasured",
+  "seconds": 8.8118285,
+  "command": "pnpm bench --documents 1000 --startup-runs 3 --warmup-runs 20 --query-runs 100 --propagation-runs 10 --output .workbench/performance-core --fixture-root .workbench/fixtures/int-001-core"
+}

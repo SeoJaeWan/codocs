@@ -531,7 +531,7 @@ async function run() {
   activeConfig = config;
   const scenario = config.performanceSession?.scenario ?? 'unknown';
   try {
-    const extension = vscode.extensions.getExtension('codocs.codocs');
+    const extension = vscode.extensions.getExtension('seojaewan.codocs');
     if (!extension) throw new Error('설치된 VSIX 확장이 없습니다');
     if (
       fs.realpathSync(extension.extensionPath) !==

@@ -14,7 +14,7 @@ function reportFailure(error: unknown): void {
 function projectArgument(args: readonly string[]): string | undefined {
   if (args.length === 0) return undefined;
   if (args.length === 2 && args[0] === '--project' && args[1]) return args[1];
-  throw new Error('Usage: codocs-mcp [--project <path>]');
+  throw new Error('Usage: codocs [--project <path>]');
 }
 
 /** EOF와 종료 신호를 중복 호출해도 같은 정리 작업을 기다린다. */

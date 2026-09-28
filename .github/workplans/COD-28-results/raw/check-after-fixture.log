@@ -1,0 +1,133 @@
+
+> codocs@0.0.1 check D:\dev\codocs-worktrees\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\INT-001
+> pnpm typecheck && pnpm lint && pnpm exec prettier . --check && pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs
+
+
+> codocs@0.0.1 typecheck D:\dev\codocs-worktrees\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\INT-001
+> node tools/build/build.mjs typecheck
+
+
+> codocs@0.0.1 lint D:\dev\codocs-worktrees\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\INT-001
+> eslint . --max-warnings=0
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> codocs@0.0.1 build D:\dev\codocs-worktrees\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\INT-001
+> node tools/build/build.mjs build
+
+
+> codocs@0.0.1 test D:\dev\codocs-worktrees\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\INT-001
+> node tools/test/run.mjs
+
+
+ RUN  v5.0.0 D:/dev/codocs-worktrees/wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e/INT-001
+
+
+ Test Files  53 passed (53)
+      Tests  979 passed (979)
+   Start at  22:00:49
+   Duration  11.50s (tests 77%, import 16%, transform 6%)
+
+    Isolate  53 workers spawned · ~179ms startup each (spawn + environment, per file)
+             at least ~684ms faster with isolate: false — reuses workers across files instead of one per file
+
+✔ 직접 소유 MCP의 stdin을 닫으면 신호 없이 코드 0으로 종료한다 (599.4406ms)
+✔ 직접 소유 MCP를 강제 종료하면 해당 PID의 종료 방식을 기록한다 (441.639ms)
+✔ Windows 조회에서 부모와 서버 경로가 일치하는 PID만 선택한다 (2.691ms)
+✔ macOS 조회에서 부모와 서버 경로가 일치하는 PID만 선택한다 (0.4382ms)
+✔ 기능 사례 뒤 변경된 파일만 복원하고 읽기 거부 파일은 보존한다 (368.8821ms)
+✔ 부분 스테이징을 검사하면 커밋 대상만 읽고 사용자 변경을 보존한다 (1269.5934ms)
+warning: in the working copy of 'sample.txt', LF will be replaced by CRLF the next time Git touches it
+✔ lint-staged 자동 수정 후 검사하면 수정된 인덱스를 읽고 비스테이징 줄을 보존한다 (1994.1305ms)
+✔ lint-staged가 수정 후 실패하면 원래 인덱스와 사용자 변경을 복원한다 (1586.6104ms)
+✔ 기능 실패가 발생하면 커밋을 거부하고 사용자 변경을 보존한다 (734.9ms)
+✔ 취소가 발생하면 커밋을 거부하고 사용자 변경을 보존한다 (715.7933ms)
+✔ 검사 도중 사용자가 인덱스를 변경하면 새 변경을 보존하고 커밋을 거부한다 (902.1647ms)
+✔ 검사가 복사본 소스를 변경하면 커밋을 거부하고 원본을 보존한다 (739.6179ms)
+✔ 실제 Git 훅의 success 결과가 커밋 허용과 사용자 변경 보존에 반영된다 (1839.9306ms)
+✔ 실제 Git 훅의 failure 결과가 커밋 허용과 사용자 변경 보존에 반영된다 (1588.2335ms)
+✔ 실제 Git 훅의 cancel 결과가 커밋 허용과 사용자 변경 보존에 반영된다 (1511.1064ms)
+warning: in the working copy of 'sample.txt', LF will be replaced by CRLF the next time Git touches it
+✔ 자동 수정한 CRLF는 Git clean 규칙으로 정규화하고 미스테이징 줄을 커밋에 넣지 않는다 (1333.2234ms)
+✔ 자동 수정의 줄바꿈 변환이 부분 스테이징과 충돌하면 사용자 변경을 보존하고 실패한다 (1620.4701ms)
+✔ 동일 번호의 오래된 완료 기록과 잘린 줄이 있어도 최신 대기 요청을 분리한다 (52.5657ms)
+✔ 외부 변경 준비 중 중단되면 쓰기가 완료되지 않은 대기를 표시한다 (2.8218ms)
+✔ 중간 진행 기록이 손상되면 부분 결과에 복구 오류를 표시한다 (3.1398ms)
+✔ 느리지만 정확하게 완료된 요청을 p95 표본에 보존한다 (11.1087ms)
+✔ 부분 보고서에 첫 워밍업 시간과 대기 요청 및 실패 이유를 한국어로 표시한다 (2.5257ms)
+✔ 앞 다운로드가 잠금을 놓은 뒤에만 다음 다운로드를 시작한다 (165.5597ms)
+✔ 죽은 프로세스의 잠금은 회수하고 실패한 다운로드도 잠금을 해제한다 (60.1207ms)
+✔ 인자가 없으면 기존 기능 모드와 고정 버전을 선택한다 (1.8163ms)
+✔ 성능 시나리오와 정확한 버전을 선택하고 잘못된 조합은 준비 전에 거부한다 (0.8028ms)
+✔ 공식 stable 응답이 정확한 버전 목록이면 한 버전만 반환한다 (0.8138ms)
+✔ 생성한 천 문서는 배타적이고 파일과 기대 결과 및 요청 순서가 재현된다 (1036.0114ms)
+✔ 취소와 실패는 완료 시간을 꾸미지 않고 JSON과 한국어 부분 보고서에 보존한다 (10.5309ms)
+✔ 대기 중 자식 종료와 취소는 마지막 진행과 미완료 표본을 보존한다 (1.4862ms)
+✔ 조회 간격 변경에 근거가 없으면 설정 파일을 거부한다 (2.6428ms)
+✔ 부모 종료 뒤에도 남은 자손을 찾고 무관한 프로세스는 제외한다 (1.6922ms)
+✔ success 이후 시험 자식 프로세스를 종료한다 (1270.5711ms)
+✔ failure 이후 시험 자식 프로세스를 종료한다 (866.6352ms)
+✔ timeout 이후 시험 자식 프로세스를 종료한다 (3261.7114ms)
+✔ cancelled 이후 시험 자식 프로세스를 종료한다 (819.4387ms)
+✔ 제품 대기 제한을 끄면 느린 정상 응답을 보존하고 자식도 정리한다 (2336.1016ms)
+✔ 현재 OS에서 읽기만 거부하고 파일 감시와 해제 뒤 원문을 보존한다 (352.5469ms)
+✔ macOS 권한 준비는 읽기 거부를 확인하고 원래 권한으로 복원한다 (0.4904ms)
+✔ macOS에서 실제 read가 성공하면 준비 실패로 처리하고 권한을 복원한다 (0.2536ms)
+✔ macOS 준비 표시 쓰기가 실패해도 파일 권한을 즉시 복원한다 (0.2378ms)
+✔ Windows 대상 파일이 없으면 잠금 준비 실패를 반환한다 (329.5102ms)
+✔ 전달 OS와 무관하게 후보 파일명을 검사한다 (6.091ms)
+✔ 같은 소스와 버전이어도 전송 뒤 바뀐 바이트를 거부한다 (22.6409ms)
+✔ Windows 공식 실행 파일을 CLI로도 사용한다 (1.4872ms)
+✔ Windows 중첩 레이아웃의 문자열 경로를 호스트 OS와 무관하게 조합한다 (0.1964ms)
+✔ Windows 구형과 중첩된 공식 CLI 레이아웃을 실제 파일로 구별한다 (24.0309ms)
+✔ macOS 공식 앱 실행 파일에서 번들 CLI를 찾는다 (0.3304ms)
+✔ pnpm native wrapper를 Node로 실행할 수 없으면 인접 공식 진입점을 찾고 버전을 검증한다 (301.0179ms)
+✔ 다른 버전 pnpm이 프로젝트 버전을 출력하면 준비 실패로 처리한다 (5.4378ms)
+ℹ tests 50
+ℹ suites 0
+ℹ pass 50
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16138.253
+
+ RUN  v5.0.0 D:/dev/codocs-worktrees/wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e/INT-001
+
+📦  co-documentation@0.0.1
+Tarball Contents
+dist/docs/guide/examples.md
+dist/docs/guide/README.md
+dist/docs/guide/schema.md
+dist/docs/guide/updating.md
+dist/docs/guide/validation.md
+dist/docs/guide/writing.md
+dist/examples/.codocs/fulfillment.yaml
+dist/examples/.codocs/order.yaml
+dist/examples/.codocs/receipt.yaml
+dist/examples/.codocs/shipping-policy.yaml
+dist/runtime/cli.js
+dist/THIRD-PARTY-NOTICES.txt
+LICENSE
+logo.png
+package.json
+README.ko.md
+README.md
+Tarball Details
+C:\Users\sjw73\AppData\Local\Temp\codocs build consumer-OmDyRX\co-documentation-0.0.1.tgz
+npm warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "shared-workspace-lockfile". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm notice
+npm notice New major version of npm available! 11.19.0 -> 12.1.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.1.0
+npm notice To update run: npm install -g npm@12.1.0
+npm notice
+
+ Test Files  3 passed (3)
+      Tests  117 passed (117)
+   Start at  22:01:18
+   Duration  108.08s (tests 98%, import 2%)
+

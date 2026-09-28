@@ -1,6 +1,13 @@
 import * as core from '@codocs/core';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspaceLifecycleStates } from '../lifecycle/index.js';
@@ -14,6 +21,9 @@ const boundary = vi.hoisted(() => ({
   afterReadDirectory: undefined as
     undefined | ((file: string) => Promise<void>),
   reads: new Map<string, number>(),
+  fullLoads: 0,
+  scopedLoads: [] as string[],
+  failScopedOnce: undefined as string | undefined,
   emit: (_paths: string[]) => {
     void _paths;
   },
@@ -21,7 +31,29 @@ const boundary = vi.hoisted(() => ({
   onDrain: undefined as undefined | (() => void),
   starts: 0,
   closes: 0,
+  watchFailed: false,
 }));
+vi.mock('../loader/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../loader/index.js')>();
+  return {
+    ...actual,
+    loadWorkspace: (...args: Parameters<typeof actual.loadWorkspace>) => {
+      boundary.fullLoads++;
+      return actual.loadWorkspace(...args);
+    },
+    loadWorkspacePath: (
+      ...args: Parameters<typeof actual.loadWorkspacePath>
+    ) => {
+      const scope = String(args[1]);
+      boundary.scopedLoads.push(scope);
+      if (boundary.failScopedOnce === scope) {
+        boundary.failScopedOnce = undefined;
+        throw new Error('injected scoped observation failure');
+      }
+      return actual.loadWorkspacePath(...args);
+    },
+  };
+});
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
@@ -46,7 +78,15 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 vi.mock('../watcher/index.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../watcher/index.js')>();
   class WorkspaceWatcher {
-    readiness = { state: workspaceLifecycleStates.ready, ready: true };
+    get readiness() {
+      return boundary.watchFailed
+        ? {
+            state: workspaceLifecycleStates.failed,
+            ready: false,
+            cause: 'injected watcher failure',
+          }
+        : { state: workspaceLifecycleStates.ready, ready: true };
+    }
     subscribe(listener: (batch: { paths: string[] }) => void): () => void {
       boundary.emit = (paths) => listener({ paths });
       return () => {};
@@ -78,14 +118,20 @@ beforeEach(async () => {
   project = await mkdtemp(path.join(parent, 'reconciliation-'));
   await mkdir(path.join(project, '.codocs'));
   boundary.reads.clear();
+  boundary.fullLoads = 0;
+  boundary.scopedLoads.length = 0;
+  boundary.failScopedOnce = undefined;
   boundary.pending.length = 0;
   boundary.starts = 0;
   boundary.closes = 0;
+  boundary.watchFailed = false;
 });
 afterEach(async () => {
   boundary.afterRead = undefined;
   boundary.afterReadDirectory = undefined;
   boundary.onDrain = undefined;
+  boundary.failScopedOnce = undefined;
+  boundary.watchFailed = false;
   await session?.close();
   session = undefined;
   vi.restoreAllMocks();
@@ -269,6 +315,113 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
 });
 
 describe('게시와 공유 작업 정리의 변경 수집', () => {
+  it('저장 임시 파일의 늦은 삭제 신호는 무시하고 일반 파일 생성·삭제는 재관측한다', async () => {
+    const folder = path.join(project, '.codocs');
+    const alpha = path.join(folder, 'alpha.yaml');
+    const beta = path.join(folder, 'beta.yaml');
+    await writeFile(
+      alpha,
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    session = createWorkspaceQuerySession({ cwd: project });
+    expect(await session.list()).toMatchObject({
+      success: true,
+      scanStatus: 'complete',
+      totalCount: 1,
+    });
+    const version = session.catalogVersion;
+    boundary.emit([path.join(folder, '.codocs-write-deadbeef.tmp')]);
+    await Promise.resolve();
+    expect(session.catalogVersion).toBe(version);
+    expect(session.scanStatus).toBe('complete');
+    await writeFile(
+      beta,
+      'id: beta\nname: beta\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    boundary.emit([beta]);
+    await vi.waitFor(async () =>
+      expect(await session!.list()).toMatchObject({
+        success: true,
+        scanStatus: 'complete',
+        totalCount: 2,
+      }),
+    );
+    await rm(beta);
+    boundary.emit([beta]);
+    await vi.waitFor(async () =>
+      expect(await session!.list()).toMatchObject({
+        success: true,
+        scanStatus: 'complete',
+        totalCount: 1,
+      }),
+    );
+  });
+
+  it('저장 경로 관측 실패 뒤 최신 다른 경로를 보존하고 전체 순회 없이 한 번 복구한다', async () => {
+    const starts: Record<string, unknown>[] = [];
+    const folder = path.join(project, '.codocs');
+    const alpha = path.join(folder, 'alpha.yaml');
+    const beta = path.join(folder, 'beta.yaml');
+    const before = 'id: alpha\nname: 알파\ndomains: [업무]\ndefinition: 본문\n';
+    await writeFile(alpha, before);
+    await writeFile(
+      beta,
+      'id: beta\nname: 베타\ndomains: [업무]\ndefinition: 본문\n',
+    );
+    session = createWorkspaceQuerySession(
+      { cwd: project },
+      (kind, detail) => {
+        if (kind === 'index-start') starts.push(detail);
+      },
+      {
+        beforeIndexUpdate: async (attempt) => {
+          if (attempt !== 1) return;
+          await writeFile(
+            beta,
+            'id: beta\nname: 베타 최신\ndomains: [업무]\ndefinition: 본문\n',
+          );
+          boundary.emit([beta]);
+          await vi.waitFor(async () =>
+            expect(await session!.get(['beta'])).toMatchObject({
+              results: [{ found: true, document: { name: '베타 최신' } }],
+            }),
+          );
+          boundary.failScopedOnce = alpha;
+        },
+      },
+    );
+    expect(await session.list()).toMatchObject({
+      success: true,
+      scanStatus: 'complete',
+      totalCount: 2,
+    });
+    expect(boundary.fullLoads).toBe(1);
+    const result = await session.write({
+      mode: 'update',
+      id: 'alpha',
+      revision: createHash('sha256').update(before).digest('hex'),
+      set: { name: '알파 저장' },
+    });
+    expect(result).toMatchObject({
+      success: true,
+      saved: true,
+      indexUpdated: true,
+    });
+    // 저장 계층의 저장 전 충돌 검사는 전체 탐색 한 번을 별도로 수행한다.
+    expect(boundary.fullLoads).toBe(2);
+    expect(starts.filter((event) => event.full)).toHaveLength(1);
+    expect(boundary.scopedLoads.filter((file) => file === alpha)).toHaveLength(
+      2,
+    );
+    expect(boundary.reads.get(beta)).toBe(3);
+    expect(await session.get(['alpha', 'beta'])).toMatchObject({
+      results: [
+        { found: true, document: { name: '알파 저장' } },
+        { found: true, document: { name: '베타 최신' } },
+      ],
+    });
+  });
+
   it('배치 전달 전 첫 읽기가 끝나면 drain으로 변경을 반영한 뒤 최초 요청을 완료한다', async () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
     const latest =
@@ -385,6 +538,97 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     expect(session.readiness.state).toBe(workspaceLifecycleStates.closed);
     expect(boundary.starts).toBe(1);
     expect(boundary.closes).toBe(1);
+  });
+});
+
+describe('준비 상태별 저장 차단', () => {
+  const before = 'id: alpha\nname: 알파\ndomains: [업무]\ndefinition: 본문\n';
+  const change = () => ({
+    mode: 'update',
+    id: 'alpha',
+    revision: createHash('sha256').update(before).digest('hex'),
+    set: { name: '변경' },
+  });
+
+  it('최초 탐색이 끝나기 전에는 저장하지 않고 완료 뒤에만 반영한다', async () => {
+    const target = path.join(project, '.codocs', 'alpha.yaml');
+    await writeFile(target, before);
+    const reached = barrier();
+    const released = barrier();
+    boundary.afterRead = async (file) => {
+      if (file !== target) return;
+      boundary.afterRead = undefined;
+      reached.release();
+      await released.promise;
+    };
+    session = createWorkspaceQuerySession({ cwd: project });
+    const operation = session.write(change());
+    await reached.promise;
+    expect(await readFile(target, 'utf8')).toBe(before);
+    released.release();
+    expect(await operation).toMatchObject({
+      success: true,
+      saved: true,
+      indexUpdated: true,
+    });
+  });
+
+  it('최초 전체 탐색 실패에는 저장을 시작하지 않는다', async () => {
+    const folder = path.join(project, '.codocs');
+    const target = path.join(folder, 'alpha.yaml');
+    await writeFile(target, before);
+    boundary.afterReadDirectory = (directory) =>
+      directory === folder
+        ? Promise.reject(new Error('root unavailable'))
+        : Promise.resolve();
+    session = createWorkspaceQuerySession({ cwd: project });
+    expect(await session.write(change())).toMatchObject({
+      success: false,
+      saved: false,
+    });
+    expect(await readFile(target, 'utf8')).toBe(before);
+  });
+
+  it('부분 탐색과 감시 실패에는 저장을 시작하지 않는다', async () => {
+    const target = path.join(project, '.codocs', 'alpha.yaml');
+    await writeFile(target, before);
+    session = createWorkspaceQuerySession({ cwd: project });
+    await session.list();
+    boundary.afterRead = (file) =>
+      file === target
+        ? Promise.reject(new Error('injected read failure'))
+        : Promise.resolve();
+    boundary.emit([target]);
+    await vi.waitFor(() => expect(session!.scanStatus).toBe('partial'));
+    expect(await session.write(change())).toMatchObject({
+      success: false,
+      saved: false,
+    });
+    boundary.afterRead = undefined;
+    await session.refresh();
+    boundary.watchFailed = true;
+    const watchResult = await session.write(change());
+    expect(watchResult).toMatchObject({
+      success: false,
+      saved: false,
+    });
+    if (!watchResult.success)
+      expect(watchResult.error.message).toContain('injected watcher failure');
+    expect(await readFile(target, 'utf8')).toBe(before);
+  });
+
+  it('명시적 전체 refresh가 진행되는 동안 저장을 시작하지 않는다', async () => {
+    const target = path.join(project, '.codocs', 'alpha.yaml');
+    await writeFile(target, before);
+    session = createWorkspaceQuerySession({ cwd: project });
+    await session.list();
+    const refreshing = session.refresh();
+    expect(await session.write(change())).toMatchObject({
+      success: false,
+      saved: false,
+    });
+    await refreshing;
+    expect(await readFile(target, 'utf8')).toBe(before);
   });
 });
 

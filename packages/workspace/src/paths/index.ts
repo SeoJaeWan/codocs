@@ -1,4 +1,4 @@
-import { lstat, realpath } from 'node:fs/promises';
+import { lstat, mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import {
   createWorkspaceDiagnostic,
@@ -258,4 +258,82 @@ export async function resolveWorkspacePath(
     access: { read: true, write: true },
     diagnostics: [],
   };
+}
+
+/**
+ * 저장 후보의 프로젝트 상대 경로를 검증하고 허용된 부모 폴더를 한 단계씩 만든다.
+ * create에서만 부재 폴더를 생성한다. 각 단계의 연결·종류를 다시 확인하며 최종 파일은 만들지 않는다.
+ */
+export async function ensureWorkspaceParent(
+  root: ProjectRoot,
+  input: string,
+  createMissing: boolean,
+): Promise<
+  | { success: true; logicalPath: string }
+  | { success: false; diagnostics: readonly WorkspaceDiagnostic[] }
+> {
+  const segments = pathSegments(input);
+  if (
+    path.isAbsolute(input) ||
+    segments.length < 2 ||
+    segments[0] !== codocsDirectoryName ||
+    segments.some((segment) => segment === '.' || segment === '..') ||
+    !/\.ya?ml$/u.test(segments.at(-1) ?? '')
+  )
+    return failure(
+      root,
+      workspacePathFailureStatuses.denied,
+      workspaceDiagnosticCodes.invalidWorkspacePath,
+      workspaceDiagnosticMessages.invalidPath,
+    );
+  const selected = await resolveProjectRoot({
+    cwd: root.startCwd,
+    project: root.projectRoot,
+  });
+  if (!selected.success)
+    return { success: false, diagnostics: selected.diagnostics };
+  let current = root.projectRoot;
+  for (const segment of segments.slice(0, -1)) {
+    current = path.join(current, segment);
+    let checked = await checkTarget(
+      root,
+      current,
+      segment === codocsDirectoryName,
+    );
+    if (
+      'success' in checked &&
+      !checked.success &&
+      checked.status === workspacePathFailureStatuses.missing &&
+      createMissing
+    ) {
+      try {
+        await mkdir(current);
+      } catch (error: unknown) {
+        if (getIoErrorCode(error) !== 'EEXIST')
+          return failure(
+            root,
+            workspacePathFailureStatuses.unavailable,
+            workspaceDiagnosticCodes.pathUnavailable,
+            workspaceDiagnosticMessages.pathUnavailable,
+            current,
+            error,
+          );
+      }
+      checked = await checkTarget(
+        root,
+        current,
+        segment === codocsDirectoryName,
+      );
+    }
+    if ('success' in checked) return checked;
+    if (checked.kind !== workspaceTargetKinds.directory)
+      return failure(
+        root,
+        workspacePathFailureStatuses.unavailable,
+        workspaceDiagnosticCodes.notDirectory,
+        workspaceDiagnosticMessages.notDirectory,
+        current,
+      );
+  }
+  return { success: true, logicalPath: path.join(current, segments.at(-1)!) };
 }

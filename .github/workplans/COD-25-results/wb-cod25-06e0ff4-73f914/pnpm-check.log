@@ -1,0 +1,64 @@
+
+> codocs@0.0.0 check C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> pnpm typecheck && pnpm lint && pnpm exec prettier . --check && pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs
+
+
+> codocs@0.0.0 typecheck C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> node tools/build/build.mjs typecheck
+
+
+> codocs@0.0.0 lint C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> eslint . --max-warnings=0
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> codocs@0.0.0 build C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> node tools/build/build.mjs build
+
+
+> codocs@0.0.0 test C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod25-06e0ff4-73f914\task-001
+> node tools/test/run.mjs
+
+
+ RUN  v5.0.0 C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod25-06e0ff4-73f914/task-001
+
+ ❯ packages/workspace/src/write/write.test.ts (12 tests | 1 failed) 4597ms
+   ❯ WorkspaceQuerySession.write 실제 IO (12)
+     × ID와 이전 ID를 한 파일에 반영하고 저장 직후 참조·진단·목록을 게시한다 388ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/workspace/src/write/write.test.ts > WorkspaceQuerySession.write 실제 IO > ID와 이전 ID를 한 파일에 반영하고 저장 직후 참조·진단·목록을 게시한다
+AssertionError: expected { success: true, saved: true, …(7) } to match object { success: true, saved: true, …(2) }
+(6 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "id": "renamed",
+-   "indexUpdated": true,
++   "indexUpdated": false,
+    "saved": true,
+    "success": true,
+  }
+
+ ❯ packages/workspace/src/write/write.test.ts:63:20
+     61|       set: { id: 'renamed', name: '새 이름' },
+     62|     });
+     63|     expect(result).toMatchObject({
+       |                    ^
+     64|       success: true,
+     65|       saved: true,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 47 passed (48)
+      Tests  1 failed | 919 passed (920)
+   Start at  20:14:20
+   Duration  19.39s (tests 72%, import 20%, transform 7%)
+
+ ELIFECYCLE  Test failed. See above for more details.
+ ELIFECYCLE  Command failed with exit code 1.

@@ -1,0 +1,153 @@
+⋯ Backing up original state…
+✔ Done backing up original state (65dac0e)!
+⋯ Running tasks for staged files…
+    *.{js,mjs,cjs,jsx,ts,mts,cts,tsx} — 12 files
+      ⋯ eslint --fix --max-warnings=0
+      ⋯ prettier --write
+    *.{json,jsonc,md,mdx,yaml,yml,css,scss,html,svg} — 24 files
+      ⋯ prettier --write
+
+✔ prettier --write
+✔ eslint --fix --max-warnings=0
+✔ prettier --write
+
+✔ Done running tasks for staged files!
+⋯ Staging changes from tasks…
+✔ Done staging changes from tasks!
+⋯ Cleaning up temporary files…
+✔ Done cleaning up temporary files!
+Scope: all 6 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +523
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 523, reused 177, downloaded 0, added 0
+Progress: resolved 523, reused 356, downloaded 0, added 0
+Progress: resolved 523, reused 521, downloaded 0, added 3
+Progress: resolved 523, reused 523, downloaded 0, added 8
+Progress: resolved 523, reused 523, downloaded 0, added 15
+Progress: resolved 523, reused 523, downloaded 0, added 45
+Progress: resolved 523, reused 523, downloaded 0, added 81
+Progress: resolved 523, reused 523, downloaded 0, added 98
+Progress: resolved 523, reused 523, downloaded 0, added 132
+Progress: resolved 523, reused 523, downloaded 0, added 146
+Progress: resolved 523, reused 523, downloaded 0, added 163
+Progress: resolved 523, reused 523, downloaded 0, added 185
+Progress: resolved 523, reused 523, downloaded 0, added 200
+Progress: resolved 523, reused 523, downloaded 0, added 239
+Progress: resolved 523, reused 523, downloaded 0, added 249
+Progress: resolved 523, reused 523, downloaded 0, added 266
+Progress: resolved 523, reused 523, downloaded 0, added 283
+Progress: resolved 523, reused 523, downloaded 0, added 298
+Progress: resolved 523, reused 523, downloaded 0, added 307
+Progress: resolved 523, reused 523, downloaded 0, added 327
+Progress: resolved 523, reused 523, downloaded 0, added 354
+Progress: resolved 523, reused 523, downloaded 0, added 360
+Progress: resolved 523, reused 523, downloaded 0, added 379
+Progress: resolved 523, reused 523, downloaded 0, added 399
+Progress: resolved 523, reused 523, downloaded 0, added 438
+Progress: resolved 523, reused 523, downloaded 0, added 459
+Progress: resolved 523, reused 523, downloaded 0, added 479
+Progress: resolved 523, reused 523, downloaded 0, added 488
+Progress: resolved 523, reused 523, downloaded 0, added 507
+Progress: resolved 523, reused 523, downloaded 0, added 516
+Progress: resolved 523, reused 523, downloaded 0, added 517
+Progress: resolved 523, reused 523, downloaded 0, added 518
+Progress: resolved 523, reused 523, downloaded 0, added 519
+Progress: resolved 523, reused 523, downloaded 0, added 520
+Progress: resolved 523, reused 523, downloaded 0, added 521
+Progress: resolved 523, reused 523, downloaded 0, added 522
+Progress: resolved 523, reused 523, downloaded 0, added 523, done
+
+devDependencies:
++ @types/node 22.19.3
++ @vscode/test-electron 3.1.0
++ @vscode/vsce 3.6.2
++ esbuild 0.28.2
++ eslint 10.10.0
++ eslint-plugin-check-file 3.3.2
++ eslint-plugin-jsdoc 64.3.10
++ husky 9.1.7
++ lint-staged 17.5.1
++ pnpm 10.34.5
++ prettier 3.9.6
++ typescript 5.9.3
++ typescript-eslint 8.70.0
++ vitest 5.0.0
+
+. prepare$ husky
+. prepare: HUSKY=0 skip install
+. prepare: Done
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: @vscode/vsce-sign@2.1.0, keytar@7.9.0.              │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 44s using pnpm v10.34.5
+
+ RUN  v5.0.0 C:/Users/sjw73/AppData/Local/Temp/codocs-staged-4kKMMu
+
+ ❯ packages/workspace/src/watcher/watcher-registration.test.ts (1 test | 1 failed) 15849ms
+   ❯ 새 하위 폴더의 실제 감시 등록 경합 (1)
+     × 새 폴더 열거가 끝나고 Chokidar 연결 전 파일이 생기면 해당 경로를 전달한다 15844ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/workspace/src/watcher/watcher-registration.test.ts > 새 하위 폴더의 실제 감시 등록 경합 > 새 폴더 열거가 끝나고 Chokidar 연결 전 파일이 생기면 해당 경로를 전달한다
+Error: 감시 자식 실패: Command failed: C:\Program Files\nodejs\node.exe C:\Users\sjw73\AppData\Local\Temp\codocs-staged-4kKMMu\packages\workspace\src\watcher\test-support\registration-child.mjs C:\Users\sjw73\AppData\Local\Temp\codocs-staged-4kKMMu\.workbench\fixtures\watcher-registration-LZOl8u\watcher.mjs C:\Users\sjw73\AppData\Local\Temp\codocs-staged-4kKMMu\.workbench\fixtures\watcher-registration-LZOl8u
+import: 12ms
+start: 773ms
+ready: 824ms
+delivered: 980ms
+closing: 981ms
+closed: 985ms
+
+import: 12ms
+start: 773ms
+ready: 824ms
+delivered: 980ms
+closing: 981ms
+closed: 985ms
+
+ ❯ packages/workspace/src/watcher/watcher-registration.test.ts:47:15
+     45|       } catch (error) {
+     46|         const failure = error as Error & { stderr?: string };
+     47|         throw new Error(
+       |               ^
+     48|           `감시 자식 실패: ${failure.message}\n${failure.stderr ?? ''}`,
+     49|           {
+
+Caused by: Error: Command failed: C:\Program Files\nodejs\node.exe C:\Users\sjw73\AppData\Local\Temp\codocs-staged-4kKMMu\packages\workspace\src\watcher\test-support\registration-child.mjs C:\Users\sjw73\AppData\Local\Temp\codocs-staged-4kKMMu\.workbench\fixtures\watcher-registration-LZOl8u\watcher.mjs C:\Users\sjw73\AppData\Local\Temp\codocs-staged-4kKMMu\.workbench\fixtures\watcher-registration-LZOl8u
+import: 12ms
+start: 773ms
+ready: 824ms
+delivered: 980ms
+closing: 981ms
+closed: 985ms
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: null, killed: true, signal: 'SIGTERM', cmd: 'C:\Program Files\nodejs\node.exe C:\Users\sjw73\AppData\Local\Temp\codocs-staged-4kKMMu\packages\workspace\src\watcher\test-support\registration-child.mjs C:\Users\sjw73\AppData\Local\Temp\codocs-staged-4kKMMu\.workbench\fixtures\watcher-registration-LZOl8u\watcher.mjs C:\Users\sjw73\AppData\Local\Temp\codocs-staged-4kKMMu\.workbench\fixtures\watcher-registration-LZOl8u', stdout: '{"reached":true,"delivered":true}', stderr: 'import: 12ms
+start: 773ms
+ready: 824ms
+delivered: 980ms
+closing: 981ms
+closed: 985ms
+' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 50 passed (51)
+      Tests  1 failed | 959 passed (960)
+   Start at  23:17:00
+   Duration  58.40s (tests 74%, import 17%, transform 9%)
+
+커밋 검사 FAIL: C:\Users\sjw73\OneDrive\Desktop\dev\codocs-worktrees\wb-cod26-486f634-8c4a21\task-001\.workbench\commit-check\run-Onq5xq
+Error: 검사 실패 (1): tools/test/run.mjs
+    at ChildProcess.completed (file:///C:/Users/sjw73/OneDrive/Desktop/dev/codocs-worktrees/wb-cod26-486f634-8c4a21/task-001/tools/git/staged.mjs:45:11)
+    at ChildProcess.wrapper (node:events:639:12)
+    at ChildProcess.emit (node:events:514:28)
+    at maybeClose (node:internal/child_process:1141:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:306:5)
+husky - pre-commit script failed (code 1)

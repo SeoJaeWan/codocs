@@ -978,4 +978,269 @@ const diagnostics = [
   },
 ];
 
-module.exports = { scenarios: [...navigation, ...diagnostics] };
+const multiprocess = [
+  ...[
+    ['mcp-write', 'MCP 저장을 다른 MCP와 IDE가 새 본문과 참조로 관찰한다'],
+    ['external-edit', '외부 편집을 두 MCP와 IDE가 새 본문과 참조로 관찰한다'],
+    ['move', '외부 이동을 두 MCP와 IDE가 새 경로와 참조로 관찰한다'],
+    [
+      'recreate',
+      '삭제를 확인한 뒤 재생성하면 두 MCP와 IDE가 새 본문을 관찰한다',
+    ],
+  ].map(
+    /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ ([
+      mode,
+      title,
+    ]) => ({
+      id: 'multiprocess-' + mode,
+      title,
+      /** 같은 프로젝트의 독립 색인을 준비한 뒤 한 가지 변경만 관찰한다. */
+      async run(c) {
+        const a = await c.mcp();
+        const b = await c.mcp();
+        const d = await c.open('source.java');
+        for (const client of [a, b]) {
+          const ready = await client.call('codocs_get', { ids: ['zone'] });
+          c.assert.equal(
+            ready.results[0].document.definition,
+            'Zone body [[Direct]]',
+          );
+        }
+        await c.hover(d, 'zoneAuxiliary', 'Zone body');
+        const before = await c.fileEvidence('.codocs/zone.yaml');
+        const definition =
+          mode === 'move'
+            ? 'Zone body [[Direct]]'
+            : mode + ' new body [[Auxiliary]]';
+        let relative = '.codocs/zone.yaml';
+        if (mode === 'mcp-write') {
+          const saved = await a.call('codocs_write', {
+            mode: 'update',
+            id: 'zone',
+            revision: before.revision,
+            set: { definition },
+          });
+          c.assert.equal(saved.saved, true);
+          c.assert.equal(saved.success, true);
+          c.assert.equal(
+            saved.revision,
+            (await c.fileEvidence(relative)).revision,
+          );
+        } else if (mode === 'move') {
+          relative = '.codocs/mcp-moved.yaml';
+          await c.fs.rename(
+            c.path.join(c.root, '.codocs/zone.yaml'),
+            c.path.join(c.root, relative),
+          );
+        } else {
+          if (mode === 'recreate') {
+            await c.fs.unlink(c.path.join(c.root, relative));
+            for (const client of [a, b])
+              await c.eventually(
+                /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ async () => {
+                  const missing = await client.call('codocs_get', {
+                    ids: ['zone'],
+                  });
+                  c.assert.equal(missing.results[0].found, false);
+                },
+              );
+            await c.eventually(
+              /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ async () => {
+                const h = await c.hover(d, 'zoneAuxiliary');
+                c.assert.ok(!h.text.includes('Zone body'));
+                const source = await c.open('.codocs/referrer.yaml');
+                c.assert.equal(
+                  c.diagnostics(source, 'reference_not_found').length,
+                  1,
+                );
+              },
+            );
+          }
+          await c.write(
+            relative,
+            'id: zone\nname: Zone\ndefinition: ' +
+              definition +
+              '\ndomains: [test]\n',
+          );
+        }
+        const current = await c.fileEvidence(relative);
+        for (const client of [a, b])
+          await c.eventually(
+            /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ async () => {
+              const result = (
+                await client.call('codocs_get', { ids: ['zone', 'referrer'] })
+              ).results;
+              c.assert.equal(result[0].document.definition, definition);
+              c.assert.equal(result[0].revision, current.revision);
+              c.assert.equal(
+                result[0].source.path.replaceAll('\\', '/'),
+                relative,
+              );
+              c.assert.deepEqual(result[0].references, [
+                mode === 'move' ? 'direct' : 'auxiliary',
+              ]);
+              c.assert.ok(result[0].referencedBy.includes('referrer'));
+              c.assert.deepEqual(result[1].references, ['zone']);
+            },
+          );
+        const h = await c.hover(d, 'zoneAuxiliary', definition.split(' [[')[0]);
+        c.assert.ok(
+          c
+            .commands(h)
+            .some(
+              (item) =>
+                item.label === (mode === 'move' ? 'Direct' : 'Auxiliary'),
+            ),
+        );
+        c.assert.ok(h.text.includes('이 문서가 참조'));
+        if (mode !== 'move')
+          c.assert.ok(
+            !c
+              .commands(h)
+              .some(
+                /** 변경 전 참조 링크가 남지 않았는지 확인한다. */ (item) =>
+                  item.label === 'Direct',
+              ),
+          );
+        await c.execute(c.command(h, '원문 열기'));
+        await c.atTop(relative);
+        const source = await c.open('.codocs/source.yaml');
+        await c.eventually(
+          /** 재생성 이후 참조 진단의 해소를 기다린다. */ () =>
+            c.assert.equal(
+              c.diagnostics(source, 'reference_not_found').length,
+              0,
+            ),
+        );
+        c.observations.push({
+          kind: 'ide',
+          workspace: c.root,
+          hover: h.text,
+          source: relative,
+          referencesRestored: true,
+        });
+      },
+    }),
+  ),
+  {
+    id: 'multiprocess-project-isolation',
+    title:
+      '같은 ID를 가진 root만 변경하면 nested MCP와 IDE의 본문·참조·진단·파일을 보존한다',
+    /** 실제 multi-root의 두 프로젝트에 별도 MCP를 연결하여 격리를 검사한다. */
+    async run(c) {
+      const a = await c.mcp();
+      const b = await c.mcp(c.path.join(c.root, 'nested'));
+      const rootDocument = await c.open('source.java');
+      const nestedDocument = await c.open('nested/nested.java');
+      await c.hover(rootDocument, 'zoneAuxiliary', 'Zone body');
+      await c.hover(nestedDocument, 'zone()', 'Nested workspace body');
+      const original = (await a.call('codocs_get', { ids: ['zone'] }))
+        .results[0];
+      c.assert.equal(original.document.definition, 'Zone body [[Direct]]');
+      const nested = (await b.call('codocs_get', { ids: ['zone'] })).results[0];
+      c.assert.equal(nested.document.definition, 'Nested workspace body');
+      const nestedBytes = await c.fileEvidence(
+        'nested/.codocs/nested-zone.yaml',
+      );
+      const nestedSource = await c.open('nested/.codocs/nested-zone.yaml');
+      const baselineDiagnostics = c.vscode.languages.getDiagnostics(
+        nestedSource.uri,
+      );
+      const saved = await a.call('codocs_write', {
+        mode: 'update',
+        id: 'zone',
+        revision: original.revision,
+        set: { definition: 'Root isolated change [[Auxiliary]]' },
+      });
+      c.assert.equal(saved.saved, true);
+      await c.hover(rootDocument, 'zoneAuxiliary', 'Root isolated change');
+      c.assert.equal(
+        (await a.call('codocs_get', { ids: ['zone'] })).results[0].revision,
+        (await c.fileEvidence('.codocs/zone.yaml')).revision,
+      );
+      c.assert.deepEqual(
+        (await b.call('codocs_get', { ids: ['zone'] })).results[0],
+        nested,
+      );
+      c.assert.deepEqual(
+        await c.fileEvidence('nested/.codocs/nested-zone.yaml'),
+        nestedBytes,
+      );
+      const h = await c.hover(
+        nestedDocument,
+        'zone()',
+        'Nested workspace body',
+      );
+      c.assert.ok(!h.text.includes('Root isolated change'));
+      c.assert.deepEqual(
+        c.vscode.languages.getDiagnostics(nestedSource.uri),
+        baselineDiagnostics,
+      );
+      c.observations.push({
+        kind: 'ide-isolation',
+        workspaces: c.vscode.workspace.workspaceFolders.map(
+          (folder) => folder.uri.fsPath,
+        ),
+        nested: h.text,
+        diagnostics: baselineDiagnostics,
+      });
+    },
+  },
+  ...['eof', 'kill'].map(
+    /** 실제 입력·관측을 연결하고 실패를 호출자에게 전달한다. */ (mode) => ({
+      id: 'multiprocess-exit-' + mode,
+      title:
+        mode === 'eof'
+          ? 'MCP A가 EOF로 정상 종료한 뒤 B 저장과 IDE 관찰을 유지한다'
+          : '소유 MCP A를 강제 종료한 뒤 B 저장과 IDE 관찰을 유지한다',
+      /** 종료 방식별 실제 exit를 확인한 뒤 생존한 관찰자에서 새 저장을 검사한다. */
+      async run(c) {
+        const a = await c.mcp();
+        const b = await c.mcp();
+        const d = await c.open('source.java');
+        for (const client of [a, b])
+          c.assert.equal(
+            (await client.call('codocs_get', { ids: ['zone'] })).results[0]
+              .document.definition,
+            'Zone body [[Direct]]',
+          );
+        await c.hover(d, 'zoneAuxiliary', 'Zone body');
+        const exit = await a.close(mode);
+        if (mode === 'eof') c.assert.deepEqual(exit, { code: 0, signal: null });
+        else c.assert.ok(exit.signal === 'SIGKILL' || exit.code !== 0);
+        const before = await c.fileEvidence('.codocs/zone.yaml');
+        const definition = 'Surviving B after ' + mode + ' [[Direct]]';
+        const saved = await b.call('codocs_write', {
+          mode: 'update',
+          id: 'zone',
+          revision: before.revision,
+          set: { definition },
+        });
+        const current = await c.fileEvidence('.codocs/zone.yaml');
+        c.assert.equal(saved.saved, true);
+        c.assert.equal(saved.revision, current.revision);
+        c.assert.equal(
+          (await b.call('codocs_get', { ids: ['zone'] })).results[0].document
+            .definition,
+          definition,
+        );
+        const h = await c.hover(
+          d,
+          'zoneAuxiliary',
+          'Surviving B after ' + mode,
+        );
+        c.observations.push({
+          kind: 'ide-after-exit',
+          workspace: c.root,
+          hover: h.text,
+          terminatedPid: a.pid,
+          survivingPid: b.pid,
+        });
+      },
+    }),
+  ),
+];
+
+module.exports = {
+  scenarios: [...navigation, ...diagnostics, ...multiprocess],
+};

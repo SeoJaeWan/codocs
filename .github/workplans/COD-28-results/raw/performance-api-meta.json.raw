@@ -1,0 +1,5 @@
+{
+  "exit": 0,
+  "seconds": 410.342592,
+  "command": "node packages/vscode/test-runner/run.mjs --mode performance --scenario api --config .workbench/performance-sample.json --vscode-version 1.139.1 --vsix .workbench/release/candidate-jvwJPD/codocs-0.0.1.vsix --mcp-tgz .workbench/release/candidate-jvwJPD/co-documentation-0.0.1.tgz"
+}

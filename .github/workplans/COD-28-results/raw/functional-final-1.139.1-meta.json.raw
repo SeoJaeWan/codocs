@@ -1,0 +1,5 @@
+{
+  "seconds": 53.9043714,
+  "exit": 0,
+  "command": "node packages/vscode/test-runner/run.mjs --vscode-version 1.139.1 --vsix D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release\\candidate-jvwJPD\\codocs-0.0.1.vsix --mcp-tgz D:\\dev\\codocs-worktrees\\wb-prepare-20260927T111517Z-8249a22b31f2-5eaf0e\\INT-001\\.workbench\\release\\candidate-jvwJPD\\co-documentation-0.0.1.tgz"
+}
