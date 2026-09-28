@@ -23,7 +23,7 @@
     "release:version": "changeset version",
     "check:static": "pnpm typecheck && pnpm lint && pnpm exec prettier . --check",
     "check:runtime": "pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs",
-    "test:release-management": "node --test tools/ci/**/*.test.{mjs,cjs} tools/build/release-version.test.mjs",
+    "test:release-management": "node --test tools/ci/**/*.test.{mjs,cjs} tools/build/**/*.test.{mjs,cjs}",
     "test:os": "pnpm test",
     "check:runtime:os": "pnpm build && pnpm test:os && pnpm exec vitest run --config vitest.checks.config.mjs"
   },
@@ -36,6 +36,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",
+    "@codocs/core": "workspace:*",
     "@types/node": "22.19.3",
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.6.2",

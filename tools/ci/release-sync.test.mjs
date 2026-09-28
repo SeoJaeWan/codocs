@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { createGitFixtureEnvironment } from '../test/git-config.mjs';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test, describe } from 'node:test';
@@ -14,18 +16,18 @@ import {
   git,
   changeset,
   commit,
-  officialCli,
+  versionedFixture,
   fixtureEnv,
 } from './release-fixture.mjs';
 
-/** 공식 CLI와 실제 Git 병합 방식별로 이미 게시할 main 및 동시 추가 develop을 만든다. */
+/** 계산된 버전과 실제 Git 병합 방식별로 이미 게시할 main 및 동시 추가 develop을 만든다. */
 async function releasedFixture(mode) {
   const fixture = await repositoryFixture();
   await changeset(fixture.cwd, 'a');
   await changeset(fixture.cwd, 'b');
   const source = commit(fixture.cwd, 'unreleased records');
   git(fixture.cwd, ['checkout', '-b', releaseBranch]);
-  officialCli(fixture.cwd);
+  await versionedFixture(fixture.cwd);
   let releaseSha = commit(fixture.cwd, 'official versions');
   if (mode === 'rebase') {
     git(
@@ -65,6 +67,64 @@ async function releasedFixture(mode) {
 }
 
 describe('정확한 기록 소비와 main 동기화', /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ () => {
+  test('호출자의 Git identity 없이도 자체 sync는 fixture identity로 commit하고 동시 입력을 보존한다', /** 자체 판단의 입력과 고유 결과를 확인한다. */ async () => {
+    const fixture = await releasedFixture('squash');
+    try {
+      const env = createGitFixtureEnvironment();
+      for (const key of Object.keys(env))
+        if (
+          /^GIT_(AUTHOR|COMMITTER)_/u.test(key) ||
+          /^GIT_CONFIG_(COUNT|KEY_\d+|VALUE_\d+|PARAMETERS)$/u.test(key) ||
+          key === 'EMAIL'
+        )
+          delete env[key];
+      Object.assign(env, {
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'user.useConfigOnly',
+        GIT_CONFIG_VALUE_0: 'true',
+      });
+      const candidate = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            '--input-type=module',
+            '--eval',
+            `import {readFileSync} from 'node:fs'; import {buildSync} from ${JSON.stringify(new URL('./release-sync.mjs', import.meta.url).href)}; process.stdout.write(JSON.stringify(buildSync(JSON.parse(readFileSync(0, 'utf8')))));`,
+          ],
+          {
+            cwd: fixture.cwd,
+            env,
+            encoding: 'utf8',
+            input: JSON.stringify({
+              cwd: fixture.cwd,
+              mainSha: fixture.mainSha,
+              releaseSha: fixture.releaseSha,
+              developSha: fixture.developSha,
+            }),
+          },
+        ),
+      );
+      assert.equal(
+        git(fixture.cwd, [
+          'show',
+          '-s',
+          '--format=%an <%ae>|%cn <%ce>',
+          candidate.head,
+        ]),
+        'Fixture <fixture@example.invalid>|Fixture <fixture@example.invalid>',
+      );
+      assert.match(
+        git(fixture.cwd, ['show', `${candidate.head}:.changeset/f.md`]),
+        /변경 f/u,
+      );
+      assert.equal(
+        git(fixture.cwd, ['show', `${candidate.head}:next-release.mjs`]),
+        'export const next = true;',
+      );
+    } finally {
+      await fixture.dispose();
+    }
+  });
   for (const mode of ['merge', 'squash', 'rebase'])
     test(`${mode} 릴리스 후 동시 추가 f를 동기화하면 f·새 코드가 보존되고 소비한 a·b는 다시 나타나지 않는다`, /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ async () => {
       const fixture = await releasedFixture(mode);
