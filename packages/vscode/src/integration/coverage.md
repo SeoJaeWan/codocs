@@ -36,4 +36,4 @@
 | 실패 이유·중복 억제·출처 버전/닫기/세션·snapshot 세대                                                                            | vscode/src/open-source/open-source.test.ts, vscode-client/vscode-client.test.ts; UI stale-target-rejected-output의 실제 실패 클릭                                                                                     |
 | native-definition                                                                                                                | 외부 TypeScript provider 알고리즘 재검사 제거. Codocs의 등록/라우팅 계약은 vscode-client와 workspace-routing 인접 검사에 유지                                                                                         |
 
-성능 실행기가 사용하는 이전 context·fixtures 및 observer는 다음 제거 task가 소비할 기존 인터페이스다. 새로운 기능 진입점은 `test-runner/ui/run.mjs`이며 그 경로는 이 문서의 실제 UI 검사만 실행한다. 기존 성능 측정은 새로운 driver에 포함되지 않는다.
+기능 진입점은 `test-runner/ui/run.mjs`이며 위 실제 UI 사례만 실행한다. 이전 context·fixtures·관측기와 실행기 제거의 책임 대응은 [removal-coverage.md](removal-coverage.md)에 있다.

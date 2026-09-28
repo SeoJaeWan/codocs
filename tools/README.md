@@ -1,22 +1,21 @@
 # 개발 도구
 
-| 위치                  | 역할                                               |
-| --------------------- | -------------------------------------------------- |
-| `build/build.mjs`     | 빌드·번들·타입 검사                                |
-| `build/check/`        | 최종 제품 구성·MCP 시작/등록 확인                  |
-| `test/runtime/`       | 실제 프로세스·VS Code 다운로드·캐시·읽기 제한 준비 |
-| `test/support/`       | 여러 패키지 테스트가 공유하는 보조 코드            |
-| `toolchain.mjs`       | 저장소 루트와 고정 Node·pnpm 실행 환경 확인        |
-| `development-checks/` | 자체 ESLint 규칙과 인접 회귀 검사                  |
-| `performance/`        | 코어 조회·초기 준비·변경 반영 성능 측정            |
+| 위치                  | 역할                                        |
+| --------------------- | ------------------------------------------- |
+| `build/build.mjs`     | 빌드·번들·타입 검사                         |
+| `build/check/`        | 최종 제품 구성·MCP 시작/등록 확인           |
+| `test/runtime/`       | 최종 CI 후보 준비·실제 읽기 제한 fixture    |
+| `test/support/`       | 여러 패키지 테스트가 공유하는 보조 코드     |
+| `toolchain.mjs`       | 저장소 루트와 고정 Node·pnpm 실행 환경 확인 |
+| `development-checks/` | 자체 ESLint 규칙과 인접 회귀 검사           |
 
 각 도구의 테스트는 구현과 같은 폴더에 둔다. 패키지 전용 보조 코드와 mock은 해당 패키지의 `test-support`에서 관리한다.
 
 - `pnpm test`: Vitest와 Node의 표준 glob으로 제품 로직 및 자체 도구 테스트를 실행한다. `pnpm test:unit --watch`는 Vitest 검사를 감시한다. 파일·이름 선택은 `pnpm exec vitest run <파일>` 또는 `node --test --test-name-pattern=<이름> <파일>`을 사용한다.
 - `pnpm check`: package.json에서 타입·린트·읽기 전용 서식·빌드·인접 테스트·최종 제품 검사를 순서대로 실행한다.
-- `pnpm test:vscode`: [패키지 실행기](../packages/vscode/test-runner/run.mjs)에서 VSIX 설치와 실제 VS Code 기능을 검사한다. 시나리오는 [통합 테스트](../packages/vscode/src/integration/extension.test.cjs)에 있다.
+- `pnpm test:vscode --version <exact-stable> --vsix <absolute-candidate.vsix> --output <absolute-new-evidence-directory>`: GitHub Actions의 Windows·macOS에서 [UI 실행기](../packages/vscode/test-runner/ui/run.mjs)로 같은 고정 버전과 최종 VSIX의 설치·활성화·실제 Hover·링크 클릭을 검사한다. 준비는 공식 helper로 실행별 임시 경로에서 순서대로 진행한다. 인자와 결과 계약은 [검증 안내](../packages/vscode/src/integration/verification.md)에 있다.
 
-VS Code 검사와 성능 측정은 커밋 훅에 포함하지 않는다. 실제 Hover 성능 측정은 [PR #33](https://github.com/SeoJaeWan/codocs/pull/33)의 후속 범위다.
+실제 VS Code UI 검사는 GitHub Actions에서 실행하며 커밋 훅에 포함하지 않는다.
 
 커밋 훅은 `pnpm exec lint-staged` 다음 `pnpm test`를 실행한다. lint-staged가 부분 스테이징을 보존하며, 테스트는 현재 작업 트리를 읽는다.
 

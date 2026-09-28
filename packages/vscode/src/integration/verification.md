@@ -3,7 +3,7 @@
 CI가 한 번 확정한 동일 exact stable 버전과 동일 최종 후보 VSIX를 두 OS에 전달한다. 소스 빌드와 패키징은 UI 실행 전에 끝나 있어야 한다.
 
 ```sh
-node packages/vscode/test-runner/ui/run.mjs --version <exact-stable> --vsix <absolute-candidate.vsix> --output <absolute-new-evidence-directory>
+pnpm test:vscode --version <exact-stable> --vsix <absolute-candidate.vsix> --output <absolute-new-evidence-directory>
 ```
 
 `CI=true`와 Windows/macOS가 필수다. `stable`, `insiders`, 상대 VSIX 경로, 이전 output 디렉터리는 거부한다. 선택적 `--timeout-ms`는 30000–1800000이고 기본 600000이다. 로컬 GUI 실행과 의도한 실패/timeout/cancel lifecycle suite는 지원하지 않는다.

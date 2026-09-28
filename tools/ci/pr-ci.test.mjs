@@ -313,17 +313,6 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
         true,
       );
     }
-    const lifecycle = await readFile(
-      new URL(
-        '../../packages/vscode/test-runner/lifecycle.mjs',
-        import.meta.url,
-      ),
-      'utf8',
-    );
-    assert.match(
-      lifecycle,
-      /\['startup-failure', 'failure', 'timeout', 'cancelled'\]/u,
-    );
     const source = JSON.stringify(workflow);
     assert.equal(source.includes('pnpm check"'), false);
     assert.equal(source.includes('0.0.1.tgz'), false);
