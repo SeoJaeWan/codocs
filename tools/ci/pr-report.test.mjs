@@ -58,7 +58,8 @@ const candidate = {
 const run = {
   id: 123,
   run_attempt: 2,
-  name: 'Tests',
+  name: 'CI PR #35',
+  path: '.github/workflows/test.yml',
   event: 'pull_request',
   head_sha: binding.headSha,
   conclusion: 'success',
@@ -263,6 +264,70 @@ describe('최신 실행과 댓글 순서 확인', /** 입력 조건과 관찰 �
 });
 
 describe('신뢰한 API 결과와 단일 댓글 게시', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ () => {
+  for (const path of [
+    '.github/workflows/test.yml',
+    '.github/workflows/test.yml@main',
+  ])
+    for (const conclusion of ['success', 'failure'])
+      it(`실제 표시 이름과 ${path}의 ${conclusion} 결과를 하나의 댓글로 생성·갱신한다`, /** canonical binding과 실제 API 식별자를 함께 확인한다. */ async () => {
+        const f = fixture();
+        f.trigger.path = path;
+        f.trigger.conclusion = conclusion;
+        assert.equal(
+          await resolveReportPr(
+            f.api,
+            f.readArchive,
+            binding.repository,
+            f.trigger,
+          ),
+          35,
+        );
+        assert.equal(
+          newestRun([{ ...f.trigger, id: 120 }, f.trigger], binding).id,
+          123,
+        );
+        assert.equal(
+          await reportRun(f.api, f.readArchive, binding.repository, f.trigger),
+          'updated',
+        );
+        assert.equal(f.writes.length, 1);
+        assert.match(
+          f.writes[0].body.body,
+          new RegExp(`required-ci: \\*\\*${conclusion}\\*\\*`, 'u'),
+        );
+        f.comments.push({
+          id: 999,
+          user: { type: 'Bot', login: 'github-actions[bot]' },
+          body: f.writes[0].body.body,
+        });
+        assert.equal(
+          await reportRun(f.api, f.readArchive, binding.repository, f.trigger),
+          'updated',
+        );
+        assert.equal(f.writes.length, 2);
+        assert.equal(f.writes[1].method, 'PATCH');
+        assert.match(f.writes[1].route, /comments\/999$/u);
+      });
+  for (const path of [
+    undefined,
+    '.github/workflows/other.yml',
+    '.github/workflows/test.yml.fake',
+    '.github/workflows/test.yml@',
+  ])
+    it(`잘못된 workflow path ${path}를 실제 표시 이름만으로 허용하지 않는다`, /** 표시 이름은 workflow 신뢰 증거가 아니다. */ async () => {
+      const f = fixture();
+      const invalid = { ...f.trigger, path };
+      await assert.rejects(
+        resolveReportPr(f.api, f.readArchive, binding.repository, invalid),
+        /unknown workflow/u,
+      );
+      await assert.rejects(
+        reportRun(f.api, f.readArchive, binding.repository, invalid),
+        /unknown workflow/u,
+      );
+      assert.equal(newestRun([invalid], binding), undefined);
+      assert.equal(f.writes.length, 0);
+    });
   it('성공한 최신 PR의 OS 시간과 실행 링크를 댓글 하나에 쓴다', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ async () => {
     const f = fixture();
     assert.equal(
@@ -431,6 +496,7 @@ describe('신뢰한 API 결과와 단일 댓글 게시', /** 입력 조건과 �
       id: 987,
       run_attempt: 1,
       name: 'Release publish',
+      path: '.github/workflows/release-publish.yml',
       event: 'push',
       conclusion: 'failure',
     };
@@ -485,6 +551,7 @@ describe('신뢰한 API 결과와 단일 댓글 게시', /** 입력 조건과 �
           id: 987,
           run_attempt: 1,
           name: 'Release publish',
+          path: '.github/workflows/release-publish.yml',
         }),
         new RegExp(message, 'u'),
       );
@@ -663,9 +730,10 @@ describe('게시 없는 실행의 reporter 생략', /** 실제 누락과 정상 
     });
     it(`${name}: skipped라도 다른 workflow는 거부한다`, /** 생략 전에 고정 workflow를 확인한다. */ async () => {
       const f = noPublicationFixture('skipped');
+      const trigger = { ...f.current };
       f.current.path = '.github/workflows/fake.yml';
       await assert.rejects(
-        operation(f.api, f.readArchive, binding.repository, f.current),
+        operation(f.api, f.readArchive, binding.repository, trigger),
         /trusted publish workflow required/u,
       );
     });

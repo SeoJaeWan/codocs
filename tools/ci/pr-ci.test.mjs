@@ -102,7 +102,7 @@ function evaluate(
     () => github.cancelled === true,
     (format, ...values) =>
       format.replace(/\{(\d+)\}/gu, (_, i) => values[Number(i)]),
-    (value, prefix) => value.startsWith(prefix),
+    (value, prefix) => String(value ?? '').startsWith(prefix),
   );
 }
 
@@ -364,7 +364,8 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
     const github = {
       event: {
         workflow_run: {
-          name: 'Tests',
+          name: 'CI PR #35',
+          path: '.github/workflows/test.yml',
           event: 'pull_request',
           conclusion: 'success',
           display_title: 'Cancel PR #35',
@@ -377,7 +378,13 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
   it('게시 skipped는 두 reporter job을 막고 실제 성공·실패는 처리한다', /** 실제 YAML의 지원 조건만 검증한다. */ () => {
     for (const conclusion of ['skipped', 'success', 'failure']) {
       const github = {
-        event: { workflow_run: { name: 'Release publish', conclusion } },
+        event: {
+          workflow_run: {
+            name: 'Release publish',
+            path: '.github/workflows/release-publish.yml',
+            conclusion,
+          },
+        },
       };
       assert.equal(
         evaluate(reporter.jobs.resolve.if, github),
@@ -389,15 +396,62 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
       );
     }
   });
+  it('실제 run 표시 이름에 관계없이 bare·qualified 경로만 reporter를 허용한다', /** 파싱한 실제 YAML에서 표시 이름과 경로를 독립시킨다. */ () => {
+    for (const path of [
+      '.github/workflows/test.yml',
+      '.github/workflows/test.yml@main',
+      '.github/workflows/release-publish.yml',
+      '.github/workflows/release-publish.yml@refs/heads/main',
+    ]) {
+      const github = {
+        event: {
+          workflow_run: {
+            name: '실제 표시 이름',
+            path,
+            event: 'pull_request',
+            conclusion: 'success',
+            display_title: 'CI PR #35',
+          },
+        },
+      };
+      assert.equal(evaluate(reporter.jobs.resolve.if, github), true);
+      assert.equal(evaluate(reporter.jobs.report.if, github), true);
+    }
+    for (const path of [
+      undefined,
+      '.github/workflows/test.yml.fake',
+      '.github/workflows/test.yml@',
+      '.github/workflows/other.yml',
+    ]) {
+      const github = {
+        event: {
+          workflow_run: {
+            name: 'Tests',
+            path,
+            event: 'pull_request',
+            conclusion: 'success',
+            display_title: 'CI PR #35',
+          },
+        },
+      };
+      assert.equal(evaluate(reporter.jobs.resolve.if, github), false);
+      assert.equal(evaluate(reporter.jobs.report.if, github), false);
+    }
+  });
   it('준비된 CI는 허용하되 PR 출력이 없으면 writer를 시작하지 않는다', /** resolver 생략 결과를 빈 댓글 그룹으로 실행하지 않는다. */ () => {
     for (const workflow_run of [
       {
-        name: 'Tests',
+        name: 'CI PR #35',
+        path: '.github/workflows/test.yml',
         event: 'pull_request',
         conclusion: 'success',
         display_title: 'CI PR #35',
       },
-      { name: 'Release publish', conclusion: 'success' },
+      {
+        name: 'Release publish',
+        path: '.github/workflows/release-publish.yml',
+        conclusion: 'success',
+      },
     ]) {
       const github = { event: { workflow_run } };
       assert.equal(evaluate(reporter.jobs.resolve.if, github), true);
