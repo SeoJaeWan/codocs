@@ -19,7 +19,7 @@ import {
   readProductVersions,
 } from '../build/release-contract.mjs';
 import { verifyInput } from '../test/runtime/release-ci.mjs';
-import { assertReleasePrSource, git, releaseBranch } from './release-flow.mjs';
+import { assertReleasePrSource, releaseBranch } from './release-flow.mjs';
 import {
   publishProducts,
   validatePublication,
@@ -27,7 +27,13 @@ import {
 } from './release-publish.mjs';
 import { eventPolicy } from './pr-ci.mjs';
 import { shouldUpdate, renderComment, commentMetadata } from './pr-report.mjs';
-import { root, fixtureEnv, changeset, commit } from './release-fixture.mjs';
+import {
+  root,
+  git,
+  fixtureEnv,
+  changeset,
+  commit,
+} from './release-fixture.mjs';
 const pnpm = resolvePnpm();
 const require = createRequire(import.meta.url);
 const yazl = require(
@@ -149,9 +155,7 @@ async function guiEvidence(log, kind, expectedVersion, expectedHash) {
 /** 최종 버전 실물 후보의 관리 소비와 명시적 native GUI 소비를 분리한다. */
 export async function verifyVersionedCandidate({ gui = false } = {}) {
   await mkdir(path.join(root, '.workbench'), { recursive: true });
-  const evidence = await mkdtemp(
-    path.join(root, '.workbench/ci-split-r1-candidate-'),
-  );
+  const evidence = await mkdtemp(path.join(root, '.workbench/candidate-'));
   const cwd = path.join(evidence, 'source');
   // staged snapshot에서도 현재 index의 제품 소스를 독립 Git fixture로 확정한다.
   const tree = git(root, ['write-tree']);
@@ -161,6 +165,8 @@ export async function verifyVersionedCandidate({ gui = false } = {}) {
     { env: fixtureEnv },
   );
   git(cwd, ['read-tree', tree], { env: fixtureEnv });
+  git(cwd, ['config', '--local', 'core.longpaths', 'true']);
+  git(cwd, ['config', '--local', 'core.autocrlf', 'false']);
   git(cwd, ['checkout-index', '--all', '--force'], { env: fixtureEnv });
   git(cwd, ['config', 'user.name', 'Fixture']);
   git(cwd, ['config', 'user.email', 'fixture@example.invalid']);

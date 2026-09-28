@@ -8,12 +8,12 @@ import { sha256 } from '../build/release-contract.mjs';
 import {
   assertActivation,
   assertReleasePrSource,
-  git,
   releaseBranch,
 } from './release-flow.mjs';
 import { createGitFixtureEnvironment } from '../test/git-config.mjs';
 import {
   root,
+  git,
   fixtureEnv,
   repositoryFixture,
   changeset,

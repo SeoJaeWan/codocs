@@ -3,7 +3,6 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test, describe } from 'node:test';
 import {
-  git,
   treeFiles,
   syncBranch,
   releaseBranch,
@@ -12,6 +11,7 @@ import {
 import { consumedChangesets, buildSync, publishSync } from './release-sync.mjs';
 import {
   repositoryFixture,
+  git,
   changeset,
   commit,
   officialCli,

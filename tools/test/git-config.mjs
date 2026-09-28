@@ -17,5 +17,10 @@ export function createGitFixtureEnvironment() {
     ...process.env,
     GIT_CONFIG_GLOBAL: config,
     GIT_CONFIG_SYSTEM: config,
+    GIT_CONFIG_COUNT: '2',
+    GIT_CONFIG_KEY_0: 'core.autocrlf',
+    GIT_CONFIG_VALUE_0: 'false',
+    GIT_CONFIG_KEY_1: 'core.longpaths',
+    GIT_CONFIG_VALUE_1: 'true',
   };
 }

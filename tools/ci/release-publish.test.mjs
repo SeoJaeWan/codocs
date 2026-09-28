@@ -12,7 +12,7 @@ import {
   createReport,
   requiredJobs,
 } from '../build/release-contract.mjs';
-import { git, treeFiles, releaseBranch } from './release-flow.mjs';
+import { treeFiles, releaseBranch } from './release-flow.mjs';
 import {
   changedProducts,
   selectArtifact,
@@ -24,6 +24,7 @@ import {
 } from './release-publish.mjs';
 import {
   root,
+  git,
   repositoryFixture,
   changeset,
   commit,

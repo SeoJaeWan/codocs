@@ -12,7 +12,11 @@ import path from 'node:path';
 import { createGitFixtureEnvironment } from '../test/git-config.mjs';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { actionRevision, releaseBranch, git } from './release-flow.mjs';
+import {
+  actionRevision,
+  releaseBranch,
+  git as repositoryGit,
+} from './release-flow.mjs';
 
 /** 인접 테스트의 독립 Git/API workspace 기준 디렉터리다. */
 export const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -72,6 +76,10 @@ export const fixtureEnv = {
   GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
   GIT_TERMINAL_PROMPT: '0',
 };
+/** 모든 fixture Git 명령에 동일한 설정과 identity를 전달한다. */
+export function git(cwd, args, options = {}) {
+  return repositoryGit(cwd, args, { env: fixtureEnv, ...options });
+}
 /** 각 사례에 자체 workspace와 bare 원격을 만든다. */
 export async function repositoryFixture() {
   await mkdir(path.join(root, '.workbench'), { recursive: true });
@@ -110,6 +118,8 @@ export async function repositoryFixture() {
     );
   }
   git(cwd, ['init', '-b', 'develop'], { env: fixtureEnv });
+  git(cwd, ['config', '--local', 'core.autocrlf', 'false']);
+  git(cwd, ['config', '--local', 'core.longpaths', 'true']);
   git(cwd, ['config', 'user.name', 'Fixture']);
   git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
   commit(cwd, 'initial');
