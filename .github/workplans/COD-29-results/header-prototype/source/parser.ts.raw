@@ -1,4 +1,0 @@
-export function parseInput(value: string) {
-  // @codocs [[A]]
-  return value.trim();
-}
