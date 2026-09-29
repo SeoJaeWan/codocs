@@ -1,14 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import {
-  cp,
-  mkdir,
-  readFile,
-  writeFile,
-  mkdtemp,
-  lstat,
-  readlink,
-} from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { cp, mkdir, readFile, writeFile, mkdtemp } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -17,11 +8,7 @@ import { resolvePnpm, assertNodeVersion } from '../toolchain.mjs';
 import { bundledNotices } from './notices.mjs';
 import { releaseMetadata } from './release-metadata.mjs';
 import { copyReleaseAssets } from './release-assets.mjs';
-import {
-  artifactName,
-  readProductVersions,
-  sourceDigest,
-} from './release-contract.mjs';
+import { artifactName, readProductVersions } from './release-contract.mjs';
 
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -130,7 +117,7 @@ export async function packageMcp(root, output) {
   return archive;
 }
 
-/** 후보 산출물을 한 번 만들고 정확한 입력 소스와 파일 해시를 기록한다. */
+/** 후보 산출물을 새 candidate 디렉터리에 한 번 만들고 그 경로를 반환한다. */
 export async function packageRelease(root = repository, destination) {
   assertNodeVersion();
   const parent = destination ?? path.join(root, '.workbench/release');
@@ -141,145 +128,14 @@ export async function packageRelease(root = repository, destination) {
     [path.join(root, 'tools/build/build.mjs'), 'build'],
     { cwd: root, stdio: 'inherit', windowsHide: true },
   );
-  const tgz = await packageMcp(root, output);
+  await packageMcp(root, output);
   const versions = await readProductVersions(root);
-  const vsix = path.join(output, artifactName('vscode', versions.vscode));
-  await packageVSIX(root, vsix);
-  const artifacts = [];
-  for (const [product, file] of [
-    ['npm', tgz],
-    ['vscode', vsix],
-  ])
-    artifacts.push({
-      product,
-      version: versions[product],
-      basename: path.basename(file),
-      file,
-      sha256: createHash('sha256')
-        .update(await readFile(file))
-        .digest('hex'),
-    });
-  const sourceCommit = execFileSync(
-    'git',
-    ['-c', 'core.longpaths=true', 'rev-parse', 'HEAD'],
-    { cwd: root, encoding: 'utf8' },
-  ).trim();
-  const sourceDiff = execFileSync(
-    'git',
-    ['-c', 'core.longpaths=true', 'diff', 'HEAD', '--'],
-    { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
-  );
-  const sourceFiles = await sourceIdentity(root);
-  const sourceTree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], {
-    cwd: root,
-    encoding: 'utf8',
-  }).trim();
-  const receipt = {
-    schemaVersion: 1,
-    binding: null,
-    artifactName: null,
-    artifactId: null,
-    sourceTree,
-    sourceDigest: sourceDigest(sourceFiles),
-    sourceCommit,
-    sourceDiff,
-    sourceFiles,
-    platform: process.platform,
-    arch: process.arch,
-    node: process.versions.node,
-    artifacts,
-  };
-  await writeFile(
-    path.join(output, 'release.json'),
-    JSON.stringify(receipt, null, 2) + '\n',
+  await packageVSIX(
+    root,
+    path.join(output, artifactName('vscode', versions.vscode)),
   );
   console.log('Release candidate: ' + output);
-  return receipt;
-}
-
-/** 미추적 구현 파일까지 포함한 Git 정규화 blob 목록을 후보에 결합한다. */
-export async function sourceIdentity(root) {
-  const files = execFileSync(
-    'git',
-    [
-      '-c',
-      'core.longpaths=true',
-      'ls-files',
-      '--cached',
-      '--others',
-      '--exclude-standard',
-      '-z',
-    ],
-    { cwd: root, encoding: 'utf8' },
-  )
-    .split('\0')
-    .filter(Boolean)
-    .sort();
-  const statuses = new Map();
-  for (const file of files)
-    statuses.set(file, await lstat(path.join(root, file)));
-  const regularFiles = files.filter(
-    (file) => !statuses.get(file).isSymbolicLink(),
-  );
-  const blobs = regularFiles.length
-    ? execFileSync(
-        'git',
-        ['-c', 'core.longpaths=true', 'hash-object', '--stdin-paths'],
-        {
-          cwd: root,
-          input: regularFiles.join('\n') + '\n',
-          encoding: 'utf8',
-          maxBuffer: 16 * 1024 * 1024,
-          stdio: ['pipe', 'pipe', 'ignore'],
-        },
-      )
-        .trim()
-        .split(/\r?\n/u)
-    : [];
-  assertEqualLength(regularFiles, blobs);
-  const regularBlobs = new Map(
-    regularFiles.map((file, index) => [file, blobs[index]]),
-  );
-  // Git은 Windows에서도 실행 비트와 링크 mode를 보존한다.
-  const indexedModes = new Map(
-    execFileSync('git', ['ls-files', '--stage', '-z'], {
-      cwd: root,
-      encoding: 'utf8',
-    })
-      .split('\0')
-      .filter(Boolean)
-      .map((entry) => {
-        const [metadata, file] = entry.split('\t');
-        return [file, metadata.split(' ')[0]];
-      }),
-  );
-  const result = [];
-  for (const file of files) {
-    const status = statuses.get(file);
-    result.push({
-      file,
-      mode:
-        indexedModes.get(file) ??
-        (status.isSymbolicLink()
-          ? '120000'
-          : status.mode & 0o111
-            ? '100755'
-            : '100644'),
-      gitBlob: status.isSymbolicLink()
-        ? execFileSync('git', ['hash-object', '--stdin'], {
-            cwd: root,
-            encoding: 'utf8',
-            input: await readlink(path.join(root, file)),
-          }).trim()
-        : regularBlobs.get(file),
-    });
-  }
-  return result;
-}
-
-/** 일부 파일 누락으로 소스 식별자가 불완전해지는 것을 막는다. */
-function assertEqualLength(files, blobs) {
-  if (files.length !== blobs.length) throw new Error('소스 blob 목록 불완전');
+  return output;
 }
 
 if (
