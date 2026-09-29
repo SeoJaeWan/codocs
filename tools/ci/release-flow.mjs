@@ -94,7 +94,7 @@ export async function listAll(api, relative, key = null) {
     if (rows.length < 100) return results;
   }
 }
-/** 보호와 App 권한이 확인된 후에만 릴리스 쓰기·게시를 활성화한다. */
+/** 활성화·토큰·보호·게시 인증이 확인된 후에만 릴리스를 진행한다. */
 export async function assertActivation({
   api,
   repository,
@@ -115,18 +115,9 @@ export async function assertActivation({
   const verify =
     protection ?? (await import('./pr-ci.mjs')).assertReleaseProtection;
   await verify(api, repository);
-  const repo = await api('GET', `/repos/${repository}`);
-  if (!publishing)
-    assert.equal(
-      repo.permissions?.push,
-      true,
-      'App contents write permission required',
-    );
-  assert.equal(
-    repo.permissions?.pull,
-    true,
-    'App contents read permission required',
-  );
+  // App 권한은 공식 토큰 Action의 명시적 permission 입력으로 제한한다.
+  // 저장소 역할의 permissions.push/pull은 설치 토큰의 contents 권한이 아니다.
+  await api('GET', `/repos/${repository}`);
   if (publishing) {
     if (requiredProducts.includes('npm'))
       assert.ok(credentials.npm, 'npm publish authentication required');
