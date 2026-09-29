@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile, symlink } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   commentMetadata,
   newestRun,
@@ -766,9 +767,21 @@ describe('게시 없는 실행의 reporter 생략', /** 실제 누락과 정상 
       const output = path.join(directory, 'output');
       await writeFile(event, JSON.stringify({ workflow_run: f.current }));
       await writeFile(output, '');
+      const cliRoot = path.join(directory, 'CLI 한글 %20 # space');
+      await symlink(
+        fileURLToPath(new URL('../../', import.meta.url)),
+        cliRoot,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
       const child = spawn(
         process.execPath,
-        [new URL('./pr-report.mjs', import.meta.url).pathname, 'resolve'],
+        [
+          '--preserve-symlinks-main',
+          fileURLToPath(
+            pathToFileURL(path.join(cliRoot, 'tools/ci/pr-report.mjs')),
+          ),
+          'resolve',
+        ],
         {
           env: {
             ...process.env,

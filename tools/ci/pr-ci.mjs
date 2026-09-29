@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readUiEvidence, validateUiEvidence } from './ui-evidence.mjs';
 import {
   bindUploadedCandidate,
   createReport,
@@ -122,6 +123,13 @@ export function aggregate(binding, candidate, jobs, evidence, stable) {
         jobs[job].result,
         'evidence outcome mismatch',
       );
+      if (evidence[job].result === 'success')
+        validateUiEvidence(
+          evidence[job].ui,
+          candidate,
+          stable,
+          evidence[job].platform,
+        );
     }
   }
   return report;
@@ -146,7 +154,11 @@ export async function writeEvidence(
     ? 'cancelled'
     : outcomes.includes('failure')
       ? 'failure'
-      : 'success';
+      : ['runtime', 'installed', 'stable_ui'].every(
+            (name) => steps[name]?.outcome === 'success',
+          )
+        ? 'success'
+        : 'failure';
   const evidence = {
     schemaVersion: 1,
     job,
@@ -159,6 +171,15 @@ export async function writeEvidence(
     platform: process.platform,
     stable,
     result,
+    ui:
+      result === 'success'
+        ? await readUiEvidence(
+            '.workbench/vscode-ui',
+            candidate,
+            stable,
+            process.platform,
+          )
+        : null,
     failedSteps: Object.entries(steps)
       .filter(([, step]) => step.outcome === 'failure')
       .map(([name]) => name),

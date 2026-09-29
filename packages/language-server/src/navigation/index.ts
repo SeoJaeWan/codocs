@@ -120,7 +120,10 @@ export class SourceSelections {
 
 /** command 링크에 외부 URI나 추가 명령을 넣지 않는다. */
 export function selectionTarget(selection: SourceSelection): string {
-  return `command:${openSourceCommand}?${encodeURIComponent(JSON.stringify([selection]))}`;
+  // Host URI 파싱과 CommandOpener의 추가 디코딩에서 URI 내부의 %를 보존한다.
+  // 서버 resolve의 단일 디코딩도 같은 JSON 값을 복원한다.
+  const argumentsJson = JSON.stringify([selection]).replace(/%/gu, '\\u0025');
+  return `command:${openSourceCommand}?${encodeURIComponent(argumentsJson)}`;
 }
 
 /** JSON 경계에서 토큰과 file 출처의 최소 구조를 확인한다. */

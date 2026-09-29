@@ -10,6 +10,7 @@ import {
   commentMarker,
   evidenceArtifactName,
   releaseFiles,
+  readProductVersions,
   requiredCheck,
   sha256,
   sourceDigest,
@@ -57,6 +58,40 @@ const candidate = {
     },
   ],
 };
+
+test('제품 manifest의 서로 다른 버전을 읽고 잘못된 제품 identity는 거부한다', /** 자체 판단의 입력과 고유 결과를 확인한다. */ async () => {
+  const directory = await mkdtemp(
+    path.join(os.tmpdir(), 'codocs-product-versions-'),
+  );
+  try {
+    for (const [folder, name, version] of [
+      ['mcp', '@codocs/mcp', '1.2.3'],
+      ['vscode', 'codocs', '2.3.4'],
+    ]) {
+      await mkdir(path.join(directory, 'packages', folder), {
+        recursive: true,
+      });
+      await writeFile(
+        path.join(directory, 'packages', folder, 'package.json'),
+        JSON.stringify({ name, version }),
+      );
+    }
+    assert.deepEqual(await readProductVersions(directory), {
+      npm: '1.2.3',
+      vscode: '2.3.4',
+    });
+    await writeFile(
+      path.join(directory, 'packages/mcp/package.json'),
+      JSON.stringify({ name: 'other-product', version: '1.2.3' }),
+    );
+    await assert.rejects(
+      readProductVersions(directory),
+      /manifest product mismatch/u,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test('두 제품의 다른 버전을 전달하면 안전한 파일명과 공유 계약을 고정한다', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ () => {
   assert.equal(artifactName('npm', '1.2.3'), 'co-documentation-1.2.3.tgz');
