@@ -154,6 +154,47 @@ describe('openSource', () => {
       expect(host.openDocument).not.toHaveBeenCalled();
     },
   );
+
+  it.each([
+    {
+      name: '확인된 끝 행이 없으면',
+      destination: { kind: 'rows', startLine: 2, endLine: 8 },
+      text: '첫 행\n끝',
+    },
+    {
+      name: '확인된 범위의 표기가 바뀌면',
+      destination: {
+        kind: 'occurrence',
+        range: {
+          start: { line: 0, character: 0 },
+          end: { line: 0, character: 5 },
+        },
+        markerText: '@codocs [[대상]]',
+      },
+      text: '다른 표기의 원문',
+    },
+  ])(
+    '$name 파일을 열지 않고 목적지 불가 실패를 기록한다',
+    async ({ destination, text }) => {
+      const document = { uri, text };
+      const host: OpenSourceHost = {
+        confirmSource: vi.fn(() => Promise.resolve({ uri, destination })),
+        findOpenDocument: () => document,
+        findExistingViewColumn: vi.fn(),
+        openDocument: vi.fn(),
+        showDocument: vi.fn(),
+        reportError: vi.fn(),
+      };
+      expect(await openSource(argument, host)).toBe(false);
+      expect(host.showDocument).not.toHaveBeenCalled();
+      expect(host.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: openSourceFailureReasons.destinationUnavailable,
+          sourceUri: argument.sourceUri,
+        }),
+      );
+    },
+  );
 });
 
 describe('OpenSourceFailureReporter', () => {

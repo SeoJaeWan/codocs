@@ -65,6 +65,8 @@ const failureMessages = {
     '확인된 원문 파일에 접근하지 못했습니다.',
   [openSourceFailureReasons.displayFailed]:
     '확인된 원문을 편집기에 표시하지 못했습니다.',
+  [openSourceFailureReasons.destinationUnavailable]:
+    '확인된 행·위치가 현재 편집기 원문에 없습니다.',
 };
 
 /** 출처를 보존한 사용자 클릭 실패이며 토큰은 출력하지 않는다. */
@@ -150,7 +152,7 @@ export function trustGeneratedOpenSourceHoverContents(contents: unknown): void {
   }
 }
 
-/** 최신 선택 확인 후 기존 dirty buffer를 보존하며 (0,0) 빈 선택으로 연다. */
+/** 최신 선택 확인 후 기존 dirty buffer를 보존하며 연다. 전체 문서 대상은 (0,0) 빈 선택을 적용하고, 행·위치 대상은 현재 원문에서 그 범위를 선택한다. 확인된 행·위치가 현재 원문에 없으면 선택하지 않고 destination_unavailable 실패를 기록한다. */
 export async function openSource<Document extends OpenSourceDocument>(
   argument: unknown,
   host: OpenSourceHost<Document>,
@@ -186,7 +188,15 @@ export async function openSource<Document extends OpenSourceDocument>(
     const destination =
       'destination' in result ? result.destination : { kind: 'top' };
     const selection = sourceSelection(document.text, destination);
-    if (!selection) return false;
+    if (!selection) {
+      host.reportError(
+        new OpenSourceFailure(
+          openSourceFailureReasons.destinationUnavailable,
+          argument,
+        ),
+      );
+      return false;
+    }
     const viewColumn = host.findExistingViewColumn(uri);
     phase = openSourceFailureReasons.displayFailed;
     await host.showDocument(document, {
