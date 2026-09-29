@@ -94,6 +94,65 @@ export async function listAll(api, relative, key = null) {
     if (rows.length < 100) return results;
   }
 }
+/** 두 브랜치의 관리자 포함 strict 필수 CI·PR 의무가 실제 설정됐는지 확인하며 조회 실패를 전파한다. */
+export async function assertReleaseProtection(api, repository) {
+  assert.match(
+    repository,
+    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u,
+    'invalid repository',
+  );
+  for (const branch of ['main', 'develop']) {
+    const protection = await api(
+      'GET',
+      `/repos/${repository}/branches/${branch}/protection`,
+    );
+    assert.equal(
+      protection.enforce_admins?.enabled,
+      true,
+      `${branch}: admins must be protected`,
+    );
+    assert.ok(
+      protection.required_pull_request_reviews,
+      `${branch}: PR required`,
+    );
+    assert.equal(
+      protection.required_status_checks?.strict,
+      true,
+      `${branch}: latest base required`,
+    );
+    const checks = [
+      ...(protection.required_status_checks.contexts ?? []),
+      ...(protection.required_status_checks.checks ?? []).map(
+        (check) => check.context,
+      ),
+    ];
+    assert.ok(
+      checks.includes(requiredCheck),
+      `${branch}: required-ci required`,
+    );
+    assert.equal(
+      protection.allow_force_pushes?.enabled,
+      false,
+      `${branch}: force push forbidden`,
+    );
+    assert.equal(
+      protection.allow_deletions?.enabled,
+      false,
+      `${branch}: deletion forbidden`,
+    );
+    const bypass =
+      protection.required_pull_request_reviews.bypass_pull_request_allowances ??
+      {};
+    assert.ok(
+      Object.values(bypass).every(
+        (entries) => Array.isArray(entries) && entries.length === 0,
+      ),
+      `${branch}: PR bypass forbidden`,
+    );
+  }
+  return true;
+}
+
 /** 활성화·토큰·보호·게시 인증이 확인된 후에만 릴리스를 진행한다. */
 export async function assertActivation({
   api,
@@ -112,8 +171,7 @@ export async function assertActivation({
     /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u,
     'invalid repository',
   );
-  const verify =
-    protection ?? (await import('./pr-ci.mjs')).assertReleaseProtection;
+  const verify = protection ?? assertReleaseProtection;
   await verify(api, repository);
   // App 권한은 공식 토큰 Action의 명시적 permission 입력으로 제한한다.
   // 저장소 역할의 permissions.push/pull은 설치 토큰의 contents 권한이 아니다.
