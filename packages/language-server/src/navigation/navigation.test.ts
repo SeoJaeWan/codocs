@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { catalogConfirmations } from '@codocs/core';
 import type { WorkspacePathDocumentResult } from '@codocs/workspace';
-import { SourceSelections, type CandidateSession } from './index.js';
+import {
+  SourceSelections,
+  selectionTarget,
+  type CandidateSession,
+} from './index.js';
 
 const target: WorkspacePathDocumentResult = {
   path: '.codocs/target.yaml',
@@ -17,6 +21,29 @@ const target: WorkspacePathDocumentResult = {
 const sourceUri = 'file:///root/source.ts';
 
 describe('SourceSelections', () => {
+  it('인코딩만 다른 출처도 같은 토큰으로 확인하거나 resolve하지 않는다', async () => {
+    const session: CandidateSession = {
+      captureCandidate: () => 'workspace-token',
+      confirmCandidate: vi.fn(),
+      releaseCandidate: vi.fn(),
+    };
+    const selections = new SourceSelections();
+    const selected = selections.capture(
+      'file:///c%3A/space%20/source.ts',
+      1,
+      session,
+      { text: 'target' },
+      target,
+      1,
+    )!;
+    const altered = {
+      ...selected,
+      sourceUri: decodeURIComponent(selected.sourceUri),
+    };
+    expect(selections.has(altered)).toBe(false);
+    expect(await selections.confirm(altered, () => true)).toBeNull();
+    expect(session.confirmCandidate).not.toHaveBeenCalled();
+  });
   it('같은 관측의 반복 Hover는 같은 토큰을 재사용하고 공개 API로 최신 후보를 확인한다', async () => {
     const session: CandidateSession = {
       captureCandidate: vi.fn(() => 'workspace-token'),
@@ -97,4 +124,27 @@ describe('SourceSelections', () => {
     expect(await selections.confirm(selected, () => true)).toBeNull();
     expect(session.confirmCandidate).not.toHaveBeenCalled();
   });
+});
+
+describe('selectionTarget', () => {
+  it.each([
+    'file:///c%3A/Work%20space/source.ts',
+    'file:///C:/%ED%95%9C%EA%B8%80/%E6%96%87%E6%9B%B8.ts',
+    'file:///c%3A/work/percent%25%23source.ts',
+    'file:///c%3A/work/literal%2520%2523%25ED%2595%259C.ts',
+  ])(
+    '출처 %s와 토큰을 서버 resolve와 Host 디코딩에서 그대로 복원한다',
+    (uri) => {
+      const selected = { sourceUri: uri, token: 'a'.repeat(32) };
+      const target = selectionTarget(selected);
+      const query = target.slice(target.indexOf('?') + 1);
+      expect(JSON.parse(decodeURIComponent(query))).toEqual([selected]);
+      // VS Code 1.139.1 URI.parse의 query 디코딩 뒤 CommandOpener가 다시 디코딩한다.
+      // 실제 마우스 클릭 경계는 설치한 VSIX의 양 OS CI가 별도로 확인한다.
+      expect(JSON.parse(decodeURIComponent(decodeURIComponent(query)))).toEqual(
+        [selected],
+      );
+      expect(target.startsWith('command:codocs.openSource?')).toBe(true);
+    },
+  );
 });

@@ -3,10 +3,27 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from 'vitest';
+import { createSourceCli } from '../../test-support/source-cli.js';
 
 let project: string;
 let client: Client;
+let sourceCli: Awaited<ReturnType<typeof createSourceCli>>;
+
+beforeAll(async () => {
+  sourceCli = await createSourceCli();
+});
+afterAll(async () => {
+  await sourceCli.close();
+});
 
 beforeEach(async () => {
   await mkdir('.workbench', { recursive: true });
@@ -15,7 +32,7 @@ beforeEach(async () => {
   await client.connect(
     new StdioClientTransport({
       command: process.execPath,
-      args: [path.resolve('packages/mcp/dist/cli.js')],
+      args: [sourceCli.entry],
       cwd: project,
       stderr: 'pipe',
     }),
