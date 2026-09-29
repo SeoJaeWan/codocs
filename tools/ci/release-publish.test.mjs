@@ -12,7 +12,7 @@ import {
   createReport,
   requiredJobs,
 } from '../build/release-contract.mjs';
-import { git, treeFiles, releaseBranch } from './release-flow.mjs';
+import { treeFiles, releaseBranch } from './release-flow.mjs';
 import {
   changedProducts,
   selectArtifact,
@@ -24,10 +24,11 @@ import {
 } from './release-publish.mjs';
 import {
   root,
+  git,
   repositoryFixture,
   changeset,
   commit,
-  officialCli,
+  versionedFixture,
   fixtureEnv,
 } from './release-fixture.mjs';
 
@@ -37,14 +38,14 @@ const yazl = require(
     paths: [path.dirname(require.resolve('@vscode/vsce/package.json'))],
   }),
 );
-/** 실제 CLI가 만든 최종 소스와 독립 candidate 바이트를 Git 병합 방식에 연결한다. */
+/** 이미 계산된 최종 소스와 독립 candidate 바이트를 Git 병합 방식에 연결한다. */
 async function publicationFixture(mode = 'squash') {
   const fixture = await repositoryFixture();
   await changeset(fixture.cwd, 'a');
   commit(fixture.cwd, 'unreleased patch');
   git(fixture.cwd, ['checkout', '-b', releaseBranch]);
-  officialCli(fixture.cwd);
-  const headSha = commit(fixture.cwd, 'official version');
+  await versionedFixture(fixture.cwd);
+  const headSha = commit(fixture.cwd, 'prepared version');
   if (mode === 'rebase') {
     git(fixture.cwd, ['checkout', '-b', 'rebased-copy']);
     git(

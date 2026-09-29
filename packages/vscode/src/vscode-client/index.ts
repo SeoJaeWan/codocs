@@ -30,6 +30,9 @@ import {
   type OpenSourceDocument,
   type OpenSourceHost,
   type OpenSourceShowOptions,
+  OpenSourceFailure,
+  OpenSourceFailureReporter,
+  openSourceFailureReasons,
 } from '../open-source/index.js';
 import { bundledServerPath } from '../package-assembly/index.js';
 import {
@@ -51,11 +54,16 @@ export class VscodeExtensionRuntime {
   readonly #manager: WorkspaceClientManager;
   readonly #disposables: vscode.Disposable[] = [];
   readonly #clients = new Map<string, VscodeFolderClient>();
+  readonly #sourceFailures: OpenSourceFailureReporter;
 
   /** 확장 context에서 서버 경로와 VS Code host adapter를 구성한다. */
   constructor(context: vscode.ExtensionContext) {
     this.#context = context;
     this.#output = vscode.window.createOutputChannel('Codocs');
+    this.#sourceFailures = new OpenSourceFailureReporter(
+      /** 원문 이동 실패를 패널 표시 없이 기록한다. */ (message) =>
+        this.#output.appendLine(message),
+    );
     const host = this.#workspaceHost();
     /** manager가 요청한 folder를 실제 VS Code client로 만든다. */
     const createFolderClient = (folder: WorkspaceFolderBoundary) =>
@@ -95,13 +103,16 @@ export class VscodeExtensionRuntime {
                 const folder = vscode.workspace.getWorkspaceFolder(
                   vscode.Uri.parse(selection.sourceUri),
                 );
-                return folder
-                  ? this.#clients
-                      .get(folder.uri.toString())
-                      ?.confirmSource(selection)
-                  : null;
+                const client =
+                  folder && this.#clients.get(folder.uri.toString());
+                if (!client)
+                  throw new OpenSourceFailure(
+                    openSourceFailureReasons.sourceInvalidated,
+                    selection,
+                  );
+                return client.confirmSource(selection);
               },
-              (error) => this.#output.appendLine(errorMessage(error)),
+              (error) => this.#sourceFailures.report(error),
             ),
           ),
       ),
@@ -204,20 +215,28 @@ export class VscodeFolderClient implements FolderClientBoundary {
         .getWorkspaceFolder(vscode.Uri.parse(argument.sourceUri))
         ?.uri.toString() !== this.#folder.uri.toString()
     )
-      return null;
+      throw new OpenSourceFailure(
+        openSourceFailureReasons.sourceInvalidated,
+        argument,
+      );
     const result: unknown = await client.sendRequest(
       confirmSourceMethod,
       argument,
     );
-    return this.#client === client &&
+    if (!(
+      this.#client === client &&
       client.isRunning() &&
       generation === this.#sessionGeneration &&
       !document.isClosed &&
       document.version === version &&
       vscode.workspace.getWorkspaceFolder(document.uri)?.uri.toString() ===
         this.#folder.uri.toString()
-      ? result
-      : null;
+    ))
+      throw new OpenSourceFailure(
+        openSourceFailureReasons.sourceInvalidated,
+        argument,
+      );
+    return result;
   }
 
   /** 완료 snapshot 게시 때 provider를 재등록해 Host의 이전 링크 캐시를 무효화한다. */

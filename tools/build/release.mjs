@@ -16,6 +16,7 @@ import { createVSIX } from '@vscode/vsce';
 import { resolvePnpm, assertNodeVersion } from '../toolchain.mjs';
 import { bundledNotices } from './notices.mjs';
 import { releaseMetadata } from './release-metadata.mjs';
+import { copyReleaseAssets } from './release-assets.mjs';
 import {
   artifactName,
   readProductVersions,
@@ -66,6 +67,7 @@ export async function packageVSIX(root, archive) {
     path.join(root, 'packages/vscode/dist'),
     path.join(staging, 'dist'),
   );
+  await copyReleaseAssets(root, path.join(staging, 'dist'));
   await copyReleaseMetadata(root, staging, true);
   await createVSIX({
     cwd: staging,
@@ -114,10 +116,7 @@ export async function packageMcp(root, output) {
     path.join(staging, 'dist/THIRD-PARTY-NOTICES.txt'),
     await bundledNotices(bundled.metafile, root),
   );
-  for (const relative of ['docs/guide', 'examples/.codocs'])
-    await cp(path.join(root, relative), path.join(staging, 'dist', relative), {
-      recursive: true,
-    });
+  await copyReleaseAssets(root, path.join(staging, 'dist'));
   await copyReleaseMetadata(root, staging);
   const archive = path.join(
     output,
