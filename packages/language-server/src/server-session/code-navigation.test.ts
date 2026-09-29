@@ -232,4 +232,40 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
     );
     expect(session.documents.get(uri)!.getText()).toBe(target);
   });
+  it('이전 서버 세션이 발급한 코드 참조 링크를 새 세션에서 확인하면 이동 대상을 반환하지 않는다', async () => {
+    const text = '@codocs [[업무:대상]]#L5-L6';
+    const uri = await open('implementation', text);
+    const links = await vi.waitFor(
+      async () => {
+        const result = await session.documentLinks(uri);
+        expect(result).toHaveLength(1);
+        return result;
+      },
+      { timeout: 5000 },
+    );
+    // 첫 번째 세션에서 토큰이 발급되고 확인되는지 검증한다.
+    const selected = argument(links[0]!.target!);
+    const firstSessionConfirm = await session.confirmSource(selected);
+    expect(firstSessionConfirm).not.toBeNull();
+    // 새로운 세션을 생성한다.
+    const newSession = new LanguageServerSession();
+    try {
+      await newSession.initialize({
+        processId: null,
+        rootUri: pathToFileURL(root).href,
+        capabilities: {},
+      });
+      await newSession.refreshWorkspaces();
+      // 새로운 세션에서 같은 문서를 연다.
+      newSession.openDocument({
+        textDocument: { uri, languageId: 'plaintext', version: 1, text },
+      });
+      // 첫 번째 세션에서 발급한 토큰을 새 세션에서 확인하면 null을 반환한다.
+      const newSessionConfirm = await newSession.confirmSource(selected);
+      expect(newSessionConfirm).toBeNull();
+    } finally {
+      // 새 세션을 정리한다.
+      await newSession.close();
+    }
+  });
 });
