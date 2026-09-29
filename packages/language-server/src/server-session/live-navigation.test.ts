@@ -4,6 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CancellationTokenSource } from 'vscode-languageserver/node.js';
 import { LanguageServerSession } from './index.js';
+import { SourceSelections } from '../navigation/index.js';
 
 let root: string;
 let session: LanguageServerSession;
@@ -31,6 +32,58 @@ afterEach(async () => {
 });
 
 describe('live YAML과 디스크 대상의 연결', () => {
+  it('편집 뒤 native 대상 이름·경로를 바꾸고 이전 선택을 거부하며 새 본문 선택만 확인한다', async () => {
+    const source =
+      'id: source\nname: Source\ndefinition: "[[Old]]"\ndomains: [업무]\n';
+    await writeFile(path.join(root, '.codocs/source.yaml'), source);
+    await writeFile(
+      path.join(root, '.codocs/대상 문서.yaml'),
+      targetText.replace('name: 대상', 'name: Old'),
+    );
+    await writeFile(
+      path.join(root, '.codocs/direct [이름] %.yaml'),
+      'id: direct\nname: "Direct <name>"\ndefinition: Direct body\ndomains: [업무]\n',
+    );
+    await session.refreshWorkspaces();
+    const capture = vi.spyOn(SourceSelections.prototype, 'capture');
+    try {
+      session.openDocument({
+        textDocument: {
+          uri: sourceUri,
+          version: 1,
+          languageId: 'yaml',
+          text: source,
+        },
+      });
+      const oldLinks = await session.documentLinks(sourceUri);
+      expect(oldLinks).toHaveLength(1);
+      expect(oldLinks[0]!.tooltip).toBe(
+        '원문 열기: Old \\(\\.codocs/대상 문서\\.yaml\\)',
+      );
+      const oldSelection: unknown = capture.mock.results.at(-1)!.value;
+      expect(await session.confirmSource(oldSelection)).not.toBeNull();
+      session.changeDocument({
+        textDocument: { uri: sourceUri, version: 2 },
+        contentChanges: [
+          { text: source.replace('[[Old]]', '[[Direct <name>]]') },
+        ],
+      });
+      expect(await session.confirmSource(oldSelection)).toBeNull();
+      const freshLinks = await session.documentLinks(sourceUri);
+      expect(freshLinks).toHaveLength(1);
+      expect(freshLinks[0]!.tooltip).toBe(
+        '원문 열기: Direct \\<name\\> \\(\\.codocs/direct \\[이름\\] %\\.yaml\\)',
+      );
+      expect(freshLinks[0]!.target).toMatch(/^command:codocs\.openSource\?/u);
+      const freshSelection: unknown = capture.mock.results.at(-1)!.value;
+      expect(await session.confirmSource(freshSelection)).toEqual({
+        uri: pathToFileURL(path.join(root, '.codocs/direct [이름] %.yaml'))
+          .href,
+      });
+    } finally {
+      capture.mockRestore();
+    }
+  });
   it.each(['코드 Hover', 'YAML 본문'])(
     '%s의 특수 경로 링크는 resolve와 Host 해석 뒤 같은 출처·토큰으로 대상을 확인한다',
     async (kind) => {

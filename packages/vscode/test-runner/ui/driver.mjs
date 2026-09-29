@@ -334,7 +334,7 @@ export class RendererDriver {
         const nativeReady =
           !nativeLink ||
           (nativeAnchors.length === 1 &&
-            nativeAnchors[0].href !== nativeLink.previousHref);
+            nativeAnchors[0].label === nativeLink.label);
         if (
           state &&
           !state.loading &&

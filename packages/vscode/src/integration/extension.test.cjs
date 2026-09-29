@@ -98,12 +98,9 @@ module.exports.scenarios = [
             .length === 1,
         'deprecated warning',
       );
-      const oldHover = await c.driver.hover('[[Old]]', 'Old', 0, {
-        previousHref: null,
+      await c.driver.hover('[[Old]]', 'Old', 0, {
+        label: '원문 열기: Old (.codocs/old.yaml)',
       });
-      const oldNativeHref = oldHover.anchors.find(
-        (anchor) => anchor.title === 'Execute command codocs.openSource',
-      ).href;
       await c.replace(
         document,
         document.getText().replace('[[Old]]', '[[Direct]]'),
@@ -115,7 +112,7 @@ module.exports.scenarios = [
         'changed-reference warning cleared',
       );
       await c.driver.hover('[[Direct]]', 'Direct', 0, {
-        previousHref: oldNativeHref,
+        label: '원문 열기: Direct (.codocs/direct.yaml)',
       });
       await c.driver.yamlLink('[[Direct]]');
       await c.atTop('.codocs/direct.yaml');
@@ -147,10 +144,7 @@ module.exports.scenarios = [
       c.assert.ok(!saved.anchors.some((anchor) => anchor.label === 'Direct'));
       await c.driver.dismiss();
       c.assert.equal(await c.vscode.window.tabGroups.close(c.tabs(zone)), true);
-      await c.until(
-        () => document.isClosed && c.tabs(zone).length === 0,
-        'saved target document closed',
-      );
+      await c.until(() => c.tabs(zone).length === 0, 'saved target tab closed');
       await c.fs.writeFile(
         document.uri.fsPath,
         'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\n',

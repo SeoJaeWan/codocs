@@ -398,7 +398,18 @@ export class LanguageServerSession {
           result.catalogVersion,
           item,
         );
-        return target ? [{ range: item.occurrence.range, target }] : [];
+        return target
+          ? [
+              {
+                range: item.occurrence.range,
+                target,
+                // Host가 만드는 native 링크의 표시 이름에서도 메타데이터를 서식으로 해석하지 않는다.
+                tooltip: escapeMarkdown(
+                  `원문 열기: ${detailLabel(detail)} (${detail.path.replaceAll('\\', '/')})`,
+                ),
+              },
+            ]
+          : [];
       },
     );
   }

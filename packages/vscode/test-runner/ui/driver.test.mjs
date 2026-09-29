@@ -260,10 +260,10 @@ test('renderer observes opaque data-href and clips anchor hit point to the Hover
   assert.equal(hover.y, 35);
 });
 
-test('fresh Hover contents do not satisfy readiness while native DocumentLink still has the pre-edit href', /** 독립 native 링크가 바뀌기 전에는 클릭 준비를 완료하지 않는다. */ async () => {
+test('fresh Hover contents and a changed opaque href do not satisfy readiness while native target label is still Old', /** 독립 native 링크의 실제 대상 표시가 바뀌기 전에는 준비를 완료하지 않는다. */ async () => {
   const calls = [];
   let observations = 0;
-  const oldHref = 'command:codocs.openSource?opaque-old';
+  const oldHref = 'command:codocs.openSource?opaque-renewed-old';
   const newHref = 'command:codocs.openSource?opaque-new';
   const driver = new RendererDriver(
     /** 준비 중 실제 포인터 입력만 수집한다. */ async (method, params) =>
@@ -287,14 +287,17 @@ test('fresh Hover contents do not satisfy readiness while native DocumentLink st
                 href: 'command:codocs.openSource?opaque-fresh-hover',
               },
               {
-                label: 'Execute command',
+                label:
+                  ++observations < 3
+                    ? '원문 열기: Old (.codocs/old.yaml)'
+                    : '원문 열기: Direct (.codocs/direct.yaml)',
                 title: 'Execute command codocs.openSource',
-                href: ++observations < 3 ? oldHref : newHref,
+                href: observations < 3 ? oldHref : newHref,
               },
             ],
           };
   const state = await driver.hover('[[Direct]]', 'Direct', 0, {
-    previousHref: oldHref,
+    label: '원문 열기: Direct (.codocs/direct.yaml)',
   });
   assert.equal(observations, 3);
   assert.equal(state.anchors[1].href, newHref);
