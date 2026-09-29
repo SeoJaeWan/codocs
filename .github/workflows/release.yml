@@ -27,7 +27,18 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app.outputs.token }}
       - uses: ./.github/actions/setup
+      - id: changesets
+        name: Check for pending changesets
+        shell: bash
+        run: |
+          set -euo pipefail
+          pending=false
+          for file in .changeset/*.md; do
+            if [ -f "$file" ] && [ "$(basename "$file")" != README.md ]; then pending=true; fi
+          done
+          echo "pending=${pending}" | tee -a "$GITHUB_OUTPUT"
       - uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        if: ${{ steps.changesets.outputs.pending == 'true' }}
         with:
           github-token: ${{ steps.app.outputs.token }}
           script: pnpm exec changeset version
