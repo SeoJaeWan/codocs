@@ -7,24 +7,14 @@
   "scripts": {
     "prepare": "husky",
     "build": "node tools/build/build.mjs build",
-    "bundle": "node tools/build/build.mjs bundle",
     "typecheck": "node tools/build/build.mjs typecheck",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier . --write",
-    "test": "pnpm test:unit && pnpm test:node",
-    "test:unit": "vitest run",
-    "test:node": "node --test tools/**/*.test.{mjs,cjs} packages/**/test-runner/**/*.test.{mjs,cjs} packages/**/src/**/test-support/**/*.test.{mjs,cjs}",
+    "test": "vitest run && node --test tools/**/*.test.{mjs,cjs} packages/**/test-runner/**/*.test.{mjs,cjs} packages/**/src/**/test-support/**/*.test.{mjs,cjs}",
     "test:vscode": "node packages/vscode/test-runner/ui/run.mjs",
-    "check": "pnpm check:static && pnpm check:runtime",
-    "release:pack": "node tools/build/release.mjs",
-    "release:verify": "node tools/build/verify-release.mjs",
     "changeset": "changeset",
-    "release:version": "changeset version",
-    "check:static": "pnpm typecheck && pnpm lint && pnpm exec prettier . --check",
-    "check:runtime": "pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs",
-    "test:release-management": "node --test tools/ci/**/*.test.{mjs,cjs} tools/build/**/*.test.{mjs,cjs}",
-    "test:os": "pnpm test:unit && node --test tools/test/**/*.test.{mjs,cjs} tools/toolchain.test.mjs packages/**/test-runner/**/*.test.{mjs,cjs} packages/**/src/**/test-support/**/*.test.{mjs,cjs}",
-    "check:runtime:os": "pnpm build && pnpm test:os && pnpm exec vitest run --config vitest.checks.config.mjs"
+    "release:pack": "node tools/build/release.mjs",
+    "release:verify": "node tools/build/verify-release.mjs"
   },
   "lint-staged": {
     "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}": [
