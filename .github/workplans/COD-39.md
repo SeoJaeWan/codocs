@@ -23,6 +23,7 @@ ready_for_review만 trigger로 남기면 리뷰 준비 PR의 추가 push와 Acti
 - draft run에서 required-ci는 failure이고 원인·복구 메시지가 출력되며 판정은 BLOCKED.
 - 성공/실패 후 늦은 draft run(draft 전환→닫기→다시 열기)이 생겨도 판정은 BLOCKED.
 - ready 재전환으로 새 run이 생기면 통과 후 CLEAN.
+- ready 상태에서 추가 push하면 진행 중인 이전 run이 취소되고 새 커밋이 검사됨.
 
 ## 완료 기준
 
