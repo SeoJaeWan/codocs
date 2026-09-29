@@ -13,7 +13,10 @@ import {
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createWriteStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
+import yauzl from 'yauzl';
 import { releaseMetadata } from './release-metadata.mjs';
 import { readProductVersions } from './release-contract.mjs';
 import { assertReleaseAssets } from './release-assets.mjs';
@@ -24,6 +27,87 @@ const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const {
   StdioClientTransport,
 } = require('@modelcontextprotocol/sdk/client/stdio.js');
+
+/** yauzl로 zip을 열어 게으른 항목 읽기 모드의 핸들을 돌려준다. */
+function openZip(file) {
+  return new Promise(
+    /** 열기 결과를 약속에 연결한다. */ (resolve, reject) => {
+      yauzl.open(file, { lazyEntries: true }, (error, zipfile) =>
+        error ? reject(error) : resolve(zipfile),
+      );
+    },
+  );
+}
+
+/** zip 항목을 하나씩 읽어 visit에 넘기고, 오류나 끝에서 파일을 닫는다. 이름의 대소문자는 그대로 둔다. */
+async function walkZip(file, visit) {
+  const zipfile = await openZip(file);
+  await new Promise(
+    /** 항목 순회 결과를 약속에 연결한다. */ (resolve, reject) => {
+      zipfile.on('error', reject);
+      zipfile.on('end', resolve);
+      zipfile.on(
+        'entry',
+        /** 항목을 방문하고 다음 항목을 읽는다. */ (entry) => {
+          Promise.resolve(visit(entry, zipfile)).then(
+            () => zipfile.readEntry(),
+            reject,
+          );
+        },
+      );
+      zipfile.readEntry();
+    },
+  ).finally(() => zipfile.close());
+}
+
+/** 시스템 tar 없이 zip의 항목 이름을 대소문자 그대로 나열한다. */
+export async function listZip(file) {
+  const names = [];
+  await walkZip(file, (entry) => {
+    names.push(entry.fileName);
+  });
+  return names;
+}
+
+/** 절대 경로나 대상 폴더 밖으로 나가는 항목 이름을 거부하고 안전한 경로를 돌려준다. */
+export function safeZipPath(directory, name) {
+  const target = path.resolve(directory, name);
+  const relative = path.relative(path.resolve(directory), target);
+  if (
+    !name ||
+    /^[\\/]/u.test(name) ||
+    /^[A-Za-z]:/u.test(name) ||
+    name.split(/[\\/]/u).includes('..') ||
+    relative === '' ||
+    relative.startsWith('..') ||
+    path.isAbsolute(relative)
+  )
+    throw new Error('Unsafe zip entry path: ' + name);
+  return target;
+}
+
+/** 시스템 tar 없이 zip을 풀고, 폴더 항목은 폴더만 만들며 안전하지 않은 항목은 실패한다. */
+export async function extractZip(file, directory) {
+  await walkZip(
+    file,
+    /** 항목 하나를 안전하게 해제한다. */ async (entry, zipfile) => {
+      const target = safeZipPath(directory, entry.fileName);
+      if (entry.fileName.endsWith('/')) {
+        await mkdir(target, { recursive: true });
+        return;
+      }
+      await mkdir(path.dirname(target), { recursive: true });
+      const stream = await new Promise(
+        /** 읽기 스트림을 약속에 연결한다. */ (resolve, reject) => {
+          zipfile.openReadStream(entry, (error, opened) =>
+            error ? reject(error) : resolve(opened),
+          );
+        },
+      );
+      await pipeline(stream, createWriteStream(target));
+    },
+  );
+}
 
 /** npm의 실제 JS 진입점을 찾아 shell 해석 없이 설치한다. */
 export async function installMcp(archive, consumer, expectedVersion) {
@@ -189,13 +273,17 @@ export async function verifyRelease(tgz, vsix, versions) {
     artifacts: [],
   };
   try {
-    for (const [file, flags] of [
-      [tgz, '-tzf'],
-      [vsix, '-tf'],
+    for (const [file, list] of [
+      [
+        tgz,
+        /** tgz는 tar로 나열한다. */ () =>
+          execFileSync('tar', ['-tzf', tgz], { encoding: 'utf8' })
+            .split(/\r?\n/u)
+            .filter(Boolean),
+      ],
+      [vsix, /** VSIX는 zip이라 yauzl로 나열한다. */ () => listZip(vsix)],
     ]) {
-      const files = execFileSync('tar', [flags, file], { encoding: 'utf8' })
-        .split(/\r?\n/u)
-        .filter(Boolean);
+      const files = await list();
       assert.ok(
         files.every(
           (entry) =>
@@ -215,7 +303,7 @@ export async function verifyRelease(tgz, vsix, versions) {
     }
     const extracted = path.join(temporary, 'vsix');
     await mkdir(extracted);
-    execFileSync('tar', ['-xf', vsix, '-C', extracted]);
+    await extractZip(vsix, extracted);
     const extension = path.join(extracted, 'extension');
     const manifest = JSON.parse(
       await readFile(path.join(extension, 'package.json'), 'utf8'),
