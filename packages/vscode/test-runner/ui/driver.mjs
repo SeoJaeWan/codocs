@@ -318,7 +318,7 @@ export class RendererDriver {
   }
 
   /** 화면의 실제 문자 범위에 포인터를 올려 표시된 본문을 기다린다. */
-  async hover(text, expectedBody, occurrence = 0, nativeLink) {
+  async hover(text, expectedBody, occurrence = 0, expectedLinks) {
     await this.dismiss();
     let nextArm = 0;
     return until(
@@ -329,16 +329,24 @@ export class RendererDriver {
           state?.anchors.filter(
             (anchor) =>
               anchor.title === 'Execute command codocs.openSource' &&
-              anchor.href?.startsWith('command:codocs.openSource'),
+              anchor.href?.startsWith('command:codocs.openSource') &&
+              anchor.label === expectedLinks?.nativeLabel,
           ) ?? [];
         const nativeReady =
-          !nativeLink ||
-          (nativeAnchors.length === 1 &&
-            nativeAnchors[0].label === nativeLink.label);
+          !expectedLinks?.nativeLabel || nativeAnchors.length === 1;
+        // native 안내 본문만 먼저 떠도 provider의 실제 후보 앵커를 기다린다.
+        const providerReady =
+          !expectedLinks?.providerLabel ||
+          state?.anchors.some(
+            (anchor) =>
+              anchor.label === expectedLinks.providerLabel &&
+              anchor.href?.startsWith('command:codocs.openSource'),
+          );
         if (
           state &&
           !state.loading &&
           state.body.includes(expectedBody) &&
+          providerReady &&
           nativeReady
         )
           return state;

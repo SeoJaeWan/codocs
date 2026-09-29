@@ -297,9 +297,54 @@ test('fresh Hover contents and a changed opaque href do not satisfy readiness wh
             ],
           };
   const state = await driver.hover('[[Direct]]', 'Direct', 0, {
-    label: '원문 열기: Direct (.codocs/direct.yaml)',
+    providerLabel: 'Direct',
+    nativeLabel: '원문 열기: Direct (.codocs/direct.yaml)',
   });
   assert.equal(observations, 3);
   assert.equal(state.anchors[1].href, newHref);
+  assert.ok(calls.every((call) => call.params.type === 'mouseMoved'));
+});
+
+test('native-only tooltip without a loading row waits for the exact provider anchor', /** native와 provider의 독립 렌더링 완료를 검증한다. */ async () => {
+  const calls = [];
+  let observations = 0;
+  const driver = new RendererDriver(
+    /** 실제 준비 입력만 수집한다. */ async (method, params) =>
+      calls.push({ method, params }),
+    'darwin',
+  );
+  driver.dismiss = /** 이전 Hover 준비를 격리한다. */ async () => {};
+  driver.evaluate =
+    /** native 안내가 먼저 뜨고 provider 후보는 나중에 렌더링된다. */ async (
+      fn,
+    ) =>
+      fn.name === 'textPoint'
+        ? { x: 30, y: 40 }
+        : {
+            body: '원문 열기: Zone (.codocs/zone %20 한글#.yaml)',
+            loading: false,
+            anchors: [
+              {
+                label: '원문 열기: Zone (.codocs/zone %20 한글#.yaml)',
+                title: 'Execute command codocs.openSource',
+                href: 'command:codocs.openSource?opaque-native',
+              },
+              ...(++observations < 3
+                ? []
+                : [
+                    {
+                      label: 'Zone',
+                      title: 'Hover provider',
+                      href: 'command:codocs.openSource?opaque-provider',
+                    },
+                  ]),
+            ],
+          };
+  const state = await driver.hover('[[Zone]]', 'Zone', 0, {
+    providerLabel: 'Zone',
+    nativeLabel: '원문 열기: Zone (.codocs/zone %20 한글#.yaml)',
+  });
+  assert.equal(observations, 3);
+  assert.equal(state.anchors[1].label, 'Zone');
   assert.ok(calls.every((call) => call.params.type === 'mouseMoved'));
 });

@@ -34,7 +34,10 @@ module.exports.scenarios = [
     /** 특수 출처·대상 경로의 YAML 링크를 OS 수정 키 클릭으로 연다. */
     async run(c) {
       await c.open(source);
-      const hover = await c.driver.hover('[[Zone]]', 'Zone');
+      const hover = await c.driver.hover('[[Zone]]', 'Zone', 0, {
+        providerLabel: 'Zone',
+        nativeLabel: '원문 열기: Zone (.codocs/zone %20 한글#.yaml)',
+      });
       c.assert.ok(hover.anchors.some((anchor) => anchor.label === 'Zone'));
       c.assert.ok(
         hover.anchors.some(
@@ -99,7 +102,8 @@ module.exports.scenarios = [
         'deprecated warning',
       );
       await c.driver.hover('[[Old]]', 'Old', 0, {
-        label: '원문 열기: Old (.codocs/old.yaml)',
+        providerLabel: 'Old',
+        nativeLabel: '원문 열기: Old (.codocs/old.yaml)',
       });
       await c.replace(
         document,
@@ -112,7 +116,8 @@ module.exports.scenarios = [
         'changed-reference warning cleared',
       );
       await c.driver.hover('[[Direct]]', 'Direct', 0, {
-        label: '원문 열기: Direct (.codocs/direct.yaml)',
+        providerLabel: 'Direct',
+        nativeLabel: '원문 열기: Direct (.codocs/direct.yaml)',
       });
       await c.driver.yamlLink('[[Direct]]');
       await c.atTop('.codocs/direct.yaml');
@@ -123,7 +128,10 @@ module.exports.scenarios = [
       );
       c.assert.equal(await document.save(), true);
       await c.open('.codocs/old-source.yaml');
-      await c.driver.hover('[[Direct]]', 'Direct');
+      await c.driver.hover('[[Direct]]', 'Direct', 0, {
+        providerLabel: 'Direct',
+        nativeLabel: '원문 열기: Direct (.codocs/direct.yaml)',
+      });
     },
   },
   {
