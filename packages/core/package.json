@@ -9,10 +9,6 @@
       "import": "./dist/index.js"
     }
   },
-  "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "tsc -p tsconfig.build.json"
-  },
   "files": [
     "dist"
   ],
