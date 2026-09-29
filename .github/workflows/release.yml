@@ -2,7 +2,6 @@ name: Release
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -11,7 +10,6 @@ concurrency:
 jobs:
   version:
     name: Version PR
-    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -138,30 +136,28 @@ jobs:
 
           summary="$(mktemp)"
           {
-            echo "## Release plan (${GITHUB_EVENT_NAME})"
+            echo "## Release plan"
             echo
             echo "| Product | Version | Published | Publish | Tag exists | Legacy tag | Release |"
             echo "| --- | --- | --- | --- | --- | --- | --- |"
             echo "| co-documentation | ${npm_version} | ${npm_on_registry} | ${npm_publish} | ${npm_tag_exists} | ${npm_legacy} | ${npm_release} |"
             echo "| codocs | ${vscode_version} | ${vscode_on_marketplace} | ${vscode_publish} | ${vscode_tag_exists} | ${vscode_legacy} | ${vscode_release} |"
             echo
-            if [ "$GITHUB_EVENT_NAME" != push ]; then
-              echo "Dry run: nothing is packed, published, tagged or released."
-            elif [ "$any" = false ]; then
+            if [ "$any" = false ]; then
               echo "Nothing to publish or release."
             fi
           } > "$summary"
           cat "$summary"
           cat "$summary" >> "$GITHUB_STEP_SUMMARY"
       - name: Pack the tgz and VSIX
-        if: ${{ github.event_name == 'push' && steps.plan.outputs.any == 'true' }}
+        if: ${{ steps.plan.outputs.any == 'true' }}
         run: pnpm release:pack
       - name: Verify the tgz and VSIX
-        if: ${{ github.event_name == 'push' && steps.plan.outputs.any == 'true' }}
+        if: ${{ steps.plan.outputs.any == 'true' }}
         run: pnpm release:verify
       - id: collect
         name: Collect the tgz and VSIX paths and checksums
-        if: ${{ github.event_name == 'push' && steps.plan.outputs.any == 'true' }}
+        if: ${{ steps.plan.outputs.any == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -180,7 +176,7 @@ jobs:
             echo "vsix=${vsix[0]}"
           } >> "$GITHUB_OUTPUT"
       - name: Publish co-documentation to npm
-        if: ${{ github.event_name == 'push' && steps.plan.outputs.npm_publish == 'true' }}
+        if: ${{ steps.plan.outputs.npm_publish == 'true' }}
         shell: bash
         env:
           NODE_AUTH_TOKEN: ${{ secrets.CODOCS_NPM_TOKEN }}
@@ -192,14 +188,14 @@ jobs:
           npm publish "$TGZ" --access public --ignore-scripts --userconfig "$RUNNER_TEMP/npmrc"
           rm -f "$RUNNER_TEMP/npmrc"
       - name: Publish codocs to the VS Code Marketplace
-        if: ${{ github.event_name == 'push' && steps.plan.outputs.vscode_publish == 'true' }}
+        if: ${{ steps.plan.outputs.vscode_publish == 'true' }}
         shell: bash
         env:
           VSCE_PAT: ${{ secrets.CODOCS_MARKETPLACE_TOKEN }}
           VSIX: ${{ steps.collect.outputs.vsix }}
         run: pnpm exec vsce publish --packagePath "$VSIX" --skip-duplicate
       - name: Create the co-documentation tag and Release
-        if: ${{ github.event_name == 'push' && steps.plan.outputs.npm_release == 'true' }}
+        if: ${{ steps.plan.outputs.npm_release == 'true' }}
         shell: bash
         env:
           VERSION: ${{ steps.plan.outputs.npm_version }}
@@ -224,7 +220,7 @@ jobs:
           gh release create "${TAG_PREFIX}@${VERSION}" "$PRODUCT_FILE" "${PRODUCT_FILE}.sha256" \
             -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "${TAG_PREFIX}@${VERSION}" --notes-file "$notes"
       - name: Create the codocs tag and Release
-        if: ${{ github.event_name == 'push' && steps.plan.outputs.vscode_release == 'true' }}
+        if: ${{ steps.plan.outputs.vscode_release == 'true' }}
         shell: bash
         env:
           VERSION: ${{ steps.plan.outputs.vscode_version }}
