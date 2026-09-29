@@ -39,6 +39,26 @@ exports.uiContext =
       assert.equal(await vscode.workspace.applyEdit(edit), true);
       assert.equal(document.getText(), text);
     }
+    const created = new Set();
+    /** 사례가 만든 임시 파일을 기록하고 복원 대상에 포함한다. */
+    async function create(relative, text) {
+      created.add(relative);
+      await fs.writeFile(uri(relative).fsPath, text);
+    }
+    /** 사례가 만든 임시 파일을 삭제한다. */
+    async function remove(relative) {
+      await fs.rm(uri(relative).fsPath, { force: true });
+      created.delete(relative);
+    }
+    /** 열린 편집기를 모두 닫아 다음 열기가 새 링크 조회를 하게 한다. */
+    async function closeAll() {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+      await until(
+        /** 모든 탭이 실제로 닫혔는지 관측한다. */ () =>
+          vscode.window.tabGroups.all.every((group) => !group.tabs.length),
+        'all editors closed',
+      );
+    }
     /** 클릭 결과의 실제 파일·상단 빈 선택을 관측한다. */
     async function atTop(relative) {
       return until(
