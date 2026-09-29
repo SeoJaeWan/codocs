@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ${{ format('{0}-{1}', github.workflow, github.event.pull_request.number || github.run_id) }}
+  group: ${{ format('{0}-{1}', github.workflow, (github.event.pull_request.draft && github.run_id) || github.event.pull_request.number || github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
   VSCODE_VERSION: 1.139.1
@@ -96,11 +96,17 @@ jobs:
           if-no-files-found: warn
   required-ci:
     name: required-ci
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    if: ${{ always() }}
     needs: [static, pack, os]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: Reject runs started from a draft event
+        if: ${{ github.event.pull_request.draft == true }}
+        run: |
+          echo "::error::이 실행은 PR이 draft 상태였을 때 발생한 이벤트로 시작되었으므로 제품 검사가 실행되지 않았습니다. PR이 이미 리뷰 준비 상태라면 draft로 전환한 후 다시 리뷰 준비로 전환하거나, 새로운 커밋을 push해주세요."
+          echo "이 실행은 PR이 draft 상태였을 때 발생한 이벤트로 시작되었으므로 제품 검사가 실행되지 않았습니다. PR이 이미 리뷰 준비 상태라면 draft로 전환한 후 다시 리뷰 준비로 전환하거나, 새로운 커밋을 push해주세요."
+          exit 1
       - name: Require every job to succeed
         env:
           NEEDS: ${{ toJSON(needs) }}
