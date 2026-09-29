@@ -112,7 +112,7 @@ jobs:
     timeout-minutes: 50
     env:
       CODOCS_EXPECTED_STABLE: ${{ needs.prepare.outputs.stable }}
-      CODOCS_ARTIFACT_ID: ${{ github.event_name == 'pull_request' && needs.prepare.outputs.artifact_id || '' }}
+      CODOCS_ARTIFACT_ID: ${{ needs.prepare.outputs.artifact_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, node24
         with:
@@ -141,22 +141,25 @@ jobs:
         name: Standalone installed MCP and VSIX metadata
         if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
         run: pnpm release:verify .workbench/release-input/${{ needs.prepare.outputs.npm_file }} .workbench/release-input/${{ needs.prepare.outputs.vsix_file }}
-      - id: minimum_feature
-        name: VS Code minimum feature
+      - id: stable_ui
+        name: Installed VSIX activation and actual stable UI
         if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
-        run: node packages/vscode/test-runner/run.mjs --vscode-version 1.100.0 --vsix .workbench/release-input/${{ needs.prepare.outputs.vsix_file }} --mcp-tgz .workbench/release-input/${{ needs.prepare.outputs.npm_file }}
-      - id: minimum_cleanup
-        name: VS Code minimum cleanup
-        if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
-        run: node packages/vscode/test-runner/lifecycle.mjs --vscode-version 1.100.0 --vsix .workbench/release-input/${{ needs.prepare.outputs.vsix_file }}
-      - id: stable_feature
-        name: VS Code stable feature
-        if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
-        run: node packages/vscode/test-runner/run.mjs --vscode-version ${{ needs.prepare.outputs.stable }} --vsix .workbench/release-input/${{ needs.prepare.outputs.vsix_file }} --mcp-tgz .workbench/release-input/${{ needs.prepare.outputs.npm_file }}
-      - id: stable_cleanup
-        name: VS Code stable cleanup
-        if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
-        run: node packages/vscode/test-runner/lifecycle.mjs --vscode-version ${{ needs.prepare.outputs.stable }} --vsix .workbench/release-input/${{ needs.prepare.outputs.vsix_file }}
+        run: |
+          $candidate = (Resolve-Path -LiteralPath '.workbench/release-input/${{ needs.prepare.outputs.vsix_file }}').Path
+          $output = Join-Path $env:GITHUB_WORKSPACE '.workbench/vscode-ui'
+          pnpm test:vscode --version '${{ needs.prepare.outputs.stable }}' --vsix $candidate --output $output
+      - id: os_evidence
+        name: Verify successful UI and candidate execution identity
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.installed.outcome == 'success' && steps.stable_ui.outcome == 'success' }}
+        run: node tools/test/runtime/release-ci.mjs evidence
+        env:
+          CODOCS_JOB: windows
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1, node24
+        if: ${{ !cancelled() && steps.os_evidence.outcome == 'success' }}
+        with:
+          name: codocs-ui-windows-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .workbench/os-evidence/windows/evidence.json
+          if-no-files-found: error
       - id: evidence
         name: Record candidate and OS verification evidence
         if: ${{ always() && github.event_name == 'pull_request' && steps.identity.outcome == 'success' }}
@@ -171,15 +174,13 @@ jobs:
           path: .workbench/pr-evidence/windows/evidence.json
           if-no-files-found: error
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1, node24
-        if: failure()
+        if: ${{ failure() || cancelled() }}
         with:
           name: failure-windows-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             .workbench/release-input/test-environment.json
             .workbench/release-verification/**/result.json
-            .workbench/vscode-tests/**/result.json
-            .workbench/vscode-lifecycle/**/result.json
-            .workbench/vscode-lifecycle/**/process*.json
+            .workbench/vscode-ui/
             .workbench/write-race-*/evidence/
           include-hidden-files: true
           if-no-files-found: warn
@@ -191,7 +192,7 @@ jobs:
     timeout-minutes: 50
     env:
       CODOCS_EXPECTED_STABLE: ${{ needs.prepare.outputs.stable }}
-      CODOCS_ARTIFACT_ID: ${{ github.event_name == 'pull_request' && needs.prepare.outputs.artifact_id || '' }}
+      CODOCS_ARTIFACT_ID: ${{ needs.prepare.outputs.artifact_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, node24
         with:
@@ -220,22 +221,25 @@ jobs:
         name: Standalone installed MCP and VSIX metadata
         if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
         run: pnpm release:verify .workbench/release-input/${{ needs.prepare.outputs.npm_file }} .workbench/release-input/${{ needs.prepare.outputs.vsix_file }}
-      - id: minimum_feature
-        name: VS Code minimum feature
+      - id: stable_ui
+        name: Installed VSIX activation and actual stable UI
         if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
-        run: node packages/vscode/test-runner/run.mjs --vscode-version 1.100.0 --vsix .workbench/release-input/${{ needs.prepare.outputs.vsix_file }} --mcp-tgz .workbench/release-input/${{ needs.prepare.outputs.npm_file }}
-      - id: minimum_cleanup
-        name: VS Code minimum cleanup
-        if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
-        run: node packages/vscode/test-runner/lifecycle.mjs --vscode-version 1.100.0 --vsix .workbench/release-input/${{ needs.prepare.outputs.vsix_file }}
-      - id: stable_feature
-        name: VS Code stable feature
-        if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
-        run: node packages/vscode/test-runner/run.mjs --vscode-version ${{ needs.prepare.outputs.stable }} --vsix .workbench/release-input/${{ needs.prepare.outputs.vsix_file }} --mcp-tgz .workbench/release-input/${{ needs.prepare.outputs.npm_file }}
-      - id: stable_cleanup
-        name: VS Code stable cleanup
-        if: ${{ !cancelled() && steps.identity.outcome == 'success' }}
-        run: node packages/vscode/test-runner/lifecycle.mjs --vscode-version ${{ needs.prepare.outputs.stable }} --vsix .workbench/release-input/${{ needs.prepare.outputs.vsix_file }}
+        run: |
+          $candidate = (Resolve-Path -LiteralPath '.workbench/release-input/${{ needs.prepare.outputs.vsix_file }}').Path
+          $output = Join-Path $env:GITHUB_WORKSPACE '.workbench/vscode-ui'
+          pnpm test:vscode --version '${{ needs.prepare.outputs.stable }}' --vsix $candidate --output $output
+      - id: os_evidence
+        name: Verify successful UI and candidate execution identity
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.installed.outcome == 'success' && steps.stable_ui.outcome == 'success' }}
+        run: node tools/test/runtime/release-ci.mjs evidence
+        env:
+          CODOCS_JOB: macos
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1, node24
+        if: ${{ !cancelled() && steps.os_evidence.outcome == 'success' }}
+        with:
+          name: codocs-ui-macos-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .workbench/os-evidence/macos/evidence.json
+          if-no-files-found: error
       - id: evidence
         name: Record candidate and OS verification evidence
         if: ${{ always() && github.event_name == 'pull_request' && steps.identity.outcome == 'success' }}
@@ -250,15 +254,13 @@ jobs:
           path: .workbench/pr-evidence/macos/evidence.json
           if-no-files-found: error
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1, node24
-        if: failure()
+        if: ${{ failure() || cancelled() }}
         with:
           name: failure-macos-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             .workbench/release-input/test-environment.json
             .workbench/release-verification/**/result.json
-            .workbench/vscode-tests/**/result.json
-            .workbench/vscode-lifecycle/**/result.json
-            .workbench/vscode-lifecycle/**/process*.json
+            .workbench/vscode-ui/
             .workbench/write-race-*/evidence/
           include-hidden-files: true
           if-no-files-found: warn

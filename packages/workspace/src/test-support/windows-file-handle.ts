@@ -44,7 +44,7 @@ export async function holdWindowsFile(
         /** 준비가 멈추면 소유 자식을 정리하도록 실패한다. */ (_, reject) => {
           timer = setTimeout(
             () => reject(new Error('Windows 핸들 준비 시간 초과')),
-            10000,
+            20000,
           );
         },
       ),

@@ -157,6 +157,7 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
       boundary.afterDirectory = async (selected) => {
         if (selected !== directory) return;
         boundary.afterDirectory = undefined;
+        const beforeMutation = events.length;
         if (operation === '추가')
           await writeFile(
             path.join(directory, 'beta.yaml'),
@@ -184,10 +185,15 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
         await vi.waitFor(
           () =>
             expect(
-              events.some(
-                (event) =>
-                  event === directory || event.startsWith(directory + path.sep),
-              ),
+              operation === '추가'
+                ? events
+                    .slice(beforeMutation)
+                    .includes(path.join(directory, 'beta.yaml'))
+                : events.some(
+                    (event) =>
+                      event === directory ||
+                      event.startsWith(directory + path.sep),
+                  ),
             ).toBe(true),
           { timeout: 5_000 },
         );

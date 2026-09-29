@@ -31,6 +31,12 @@ const boundary = vi.hoisted(() => {
     notify: vi.fn().mockResolvedValue(undefined),
     start: vi.fn().mockResolvedValue(undefined),
     dispose: vi.fn().mockResolvedValue(undefined),
+    commands: new Map<string, (argument?: unknown) => unknown>(),
+    output: vi.fn(),
+    revealOutput: vi.fn(),
+    showError: vi.fn(),
+    showDocument: vi.fn(),
+    openDocument: vi.fn(),
     options: undefined as LanguageClientOptions | undefined,
     state: undefined as ((event: { newState: number }) => void) | undefined,
     links: undefined as
@@ -47,6 +53,13 @@ const boundary = vi.hoisted(() => {
 vi.mock('vscode', () => ({
   ['StatusBarAlignment']: { ['Left']: 1 },
   window: {
+    createOutputChannel: () => ({
+      appendLine: boundary.output,
+      show: boundary.revealOutput,
+      dispose: vi.fn(),
+    }),
+    showErrorMessage: boundary.showError,
+    showTextDocument: boundary.showDocument,
     createStatusBarItem: () => ({
       name: '',
       text: '',
@@ -60,6 +73,8 @@ vi.mock('vscode', () => ({
     workspaceFolders: [boundary.folder],
     textDocuments: [boundary.document],
     getWorkspaceFolder: () => boundary.owner,
+    onDidChangeWorkspaceFolders: () => boundary.disposable,
+    openTextDocument: boundary.openDocument,
     createFileSystemWatcher: () => ({
       ...boundary.disposable,
       onDidCreate: () => boundary.disposable,
@@ -80,6 +95,15 @@ vi.mock('vscode', () => ({
       provider: { provideHover: typeof boundary.hover },
     ) => {
       boundary.hover = provider.provideHover;
+      return boundary.disposable;
+    },
+  },
+  commands: {
+    registerCommand: (
+      name: string,
+      callback: (argument?: unknown) => unknown,
+    ) => {
+      boundary.commands.set(name, callback);
       return boundary.disposable;
     },
   },
@@ -140,7 +164,8 @@ vi.mock('vscode-languageclient/node.js', () => ({
     }
   },
 }));
-import { VscodeFolderClient } from './index.js';
+import { VscodeExtensionRuntime, VscodeFolderClient } from './index.js';
+import { openSourceFailureReasons } from '../open-source/index.js';
 import type * as vscode from 'vscode';
 
 beforeEach(() => {
@@ -151,9 +176,80 @@ beforeEach(() => {
   boundary.notify.mockReset().mockResolvedValue(undefined);
   boundary.start.mockReset().mockResolvedValue(undefined);
   boundary.dispose.mockReset().mockResolvedValue(undefined);
+  boundary.output.mockReset();
+  boundary.revealOutput.mockReset();
+  boundary.showError.mockReset();
+  boundary.showDocument.mockReset();
+  boundary.openDocument.mockReset();
+  boundary.commands.clear();
+});
+
+describe('VscodeExtensionRuntime 원문 이동 실패 출력', () => {
+  it.each([
+    {
+      failure: '대상 확인 거부',
+      reason: openSourceFailureReasons.confirmationRejected,
+    },
+    {
+      failure: '출처 닫기',
+      reason: openSourceFailureReasons.sourceInvalidated,
+    },
+    { failure: '파일 접근', reason: openSourceFailureReasons.fileAccessFailed },
+  ])(
+    '$failure 클릭 실패는 Output에 한 번 기록하고 패널·팝업·편집기를 열지 않는다',
+    async ({ failure, reason }) => {
+      const runtime = new VscodeExtensionRuntime({
+        extensionPath: '/unused',
+      } as vscode.ExtensionContext);
+      await runtime.activate();
+      boundary.document.text = '저장하지 않은 현재 작업';
+      boundary.document.isClosed = failure === '출처 닫기';
+      boundary.send.mockResolvedValue(
+        failure === '대상 확인 거부'
+          ? null
+          : { uri: 'file:///fixture/target.yaml' },
+      );
+      boundary.openDocument.mockRejectedValue(
+        Object.assign(new Error('EACCES'), { code: 'EACCES' }),
+      );
+      const command = boundary.commands.get('codocs.openSource')!;
+      const selection = {
+        sourceUri: boundary.document.uri.toString(),
+        token: 'a'.repeat(32),
+      };
+      expect(await command(selection)).toBe(false);
+      expect(await command(selection)).toBe(false);
+      expect(boundary.output).toHaveBeenCalledTimes(1);
+      expect(boundary.output.mock.calls[0]![0]).toContain(reason);
+      expect(boundary.output.mock.calls[0]![0]).toContain(selection.sourceUri);
+      expect(boundary.revealOutput).not.toHaveBeenCalled();
+      expect(boundary.showError).not.toHaveBeenCalled();
+      expect(boundary.showDocument).not.toHaveBeenCalled();
+      expect(boundary.document.text).toBe('저장하지 않은 현재 작업');
+      await runtime.deactivate();
+    },
+  );
 });
 
 describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
+  it('같은 파일을 가리켜도 출처 URI 문자열이 다르면 서버 확인 요청을 보내지 않는다', async () => {
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    await expect(
+      client.confirmSource({
+        sourceUri: 'file:///fixture/%73ource.yaml',
+        token: 'a'.repeat(32),
+      }),
+    ).rejects.toMatchObject({
+      reason: openSourceFailureReasons.sourceInvalidated,
+    });
+    expect(boundary.send).not.toHaveBeenCalled();
+    await client.stop();
+  });
   it('이전 서버 종료가 시간 초과되어도 수동 재시작은 새 세션을 시작한다', async () => {
     const appendLine = vi.fn();
     const client = new VscodeFolderClient(
@@ -419,7 +515,9 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
       if (change === '서버 재시작') boundary.state!({ newState: 2 });
       if (change === '서버 중지') await client.stop();
       finish({ uri: 'file:///fixture/target.yaml' });
-      expect(await pending).toBeNull();
+      await expect(pending).rejects.toMatchObject({
+        reason: openSourceFailureReasons.sourceInvalidated,
+      });
       await client.stop();
     },
   );

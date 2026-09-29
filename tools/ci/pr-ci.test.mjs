@@ -66,6 +66,15 @@ const candidate = {
 };
 /** 독립적인 후보 계약 fixture로 OS 증거를 작성한다. */
 function evidence(job, result = 'success') {
+  const platform = job === 'macos' ? 'darwin' : 'win32';
+  const environment = {
+    vscode: '1.110.0',
+    platform,
+    packageKind: 'installed-vsix',
+    renderedUi: true,
+    vsixSha256: 'f'.repeat(64),
+    extensionVersion: '0.0.2',
+  };
   return {
     schemaVersion: 1,
     job,
@@ -75,9 +84,41 @@ function evidence(job, result = 'success') {
     sourceDigest: candidate.sourceDigest,
     artifactId: '456',
     artifacts: candidate.artifacts,
-    platform: job === 'macos' ? 'darwin' : 'win32',
+    platform,
     stable: '1.110.0',
     result,
+    ui: {
+      result: {
+        version: '1.110.0',
+        platform,
+        vsixSha256: 'f'.repeat(64),
+        passed: true,
+        status: 'passed',
+        phase: 'complete',
+        cleaned: true,
+        exit: { code: 0, signal: null },
+      },
+      installation: {
+        ...environment,
+        active: true,
+        serverResponse: 'published-diagnostics',
+        passed: true,
+      },
+      functional: {
+        environment,
+        results: [
+          'hover-content-and-relations',
+          'yaml-single-special-path',
+          'yaml-multiple-candidates',
+          'dirty-target-tab',
+          'changed-reference-and-save',
+          'saved-and-external-refresh',
+          'stale-target-latest-content',
+          'stale-target-rejected-output',
+          'nested-workspace-owner',
+        ].map((id) => ({ id, passed: true, input: 'renderer-mouse' })),
+      },
+    },
   };
 }
 /** 실제 YAML의 조건을 제한된 GitHub context fixture에서 평가한다. */
@@ -225,7 +266,7 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
       'Tests-pr-35',
     );
   });
-  it('문서 경로 분기 없이 정적 한 번과 양 OS·두 버전·네 lifecycle을 유지한다', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ async () => {
+  it('문서 경로 분기 없이 정적 한 번과 양 OS의 같은 stable·최종 VSIX를 검사한다', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ async () => {
     assert.equal(workflow.on.pull_request.paths, undefined);
     assert.equal(workflow.on.pull_request['paths-ignore'], undefined);
     assert.deepEqual(Object.keys(workflow.jobs), [
@@ -277,22 +318,22 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
       assert.equal(job.needs, 'prepare');
       assert.ok(job.steps.some((step) => step.run === 'pnpm check:runtime:os'));
       assert.equal(
-        job.steps.filter((step) =>
-          step.run?.includes('run.mjs --vscode-version'),
-        ).length,
-        2,
+        job.steps.filter((step) => step.run?.includes('pnpm test:vscode'))
+          .length,
+        1,
       );
       assert.equal(
         job.steps.filter((step) =>
           step.run?.includes('lifecycle.mjs --vscode-version'),
         ).length,
-        2,
+        0,
       );
-      assert.ok(
-        job.steps.some((step) =>
-          step.run?.includes('--vscode-version 1.100.0'),
-        ),
-      );
+      const ui = job.steps.find((step) => step.id === 'stable_ui');
+      assert.ok(ui.run.includes('--version'));
+      assert.ok(ui.run.includes('Resolve-Path -LiteralPath'));
+      assert.ok(ui.run.includes('$env:GITHUB_WORKSPACE'));
+      assert.ok(ui.run.includes('needs.prepare.outputs.vsix_file'));
+      assert.equal(ui.run.includes('--mcp-tgz'), false);
       assert.ok(
         job.steps.some((step) =>
           step.run?.includes('needs.prepare.outputs.stable'),
@@ -305,26 +346,29 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
             step.run.includes('needs.prepare.outputs.npm_file'),
         ),
       );
-      assert.ok(job.steps.some((step) => step.if === 'failure()'));
+      assert.ok(
+        job.steps.some((step) => step.if === '${{ failure() || cancelled() }}'),
+      );
       assert.equal(
-        job.env.CODOCS_ARTIFACT_ID.includes(
-          "github.event_name == 'pull_request'",
+        job.env.CODOCS_ARTIFACT_ID,
+        '${{ needs.prepare.outputs.artifact_id }}',
+      );
+      assert.ok(
+        job.steps.some(
+          (step) =>
+            step.run === 'node tools/test/runtime/release-ci.mjs evidence',
         ),
-        true,
       );
     }
-    const lifecycle = await readFile(
-      new URL(
-        '../../packages/vscode/test-runner/lifecycle.mjs',
-        import.meta.url,
-      ),
-      'utf8',
-    );
-    assert.match(
-      lifecycle,
-      /\['startup-failure', 'failure', 'timeout', 'cancelled'\]/u,
-    );
     const source = JSON.stringify(workflow);
+    assert.equal(source.includes('1.100.0'), false);
+    assert.equal(source.includes('vscode-lifecycle'), false);
+    assert.equal(
+      workflow.jobs.prepare.steps.filter(
+        (step) => step.run === 'node tools/test/runtime/release-ci.mjs prepare',
+      ).length,
+      1,
+    );
     assert.equal(source.includes('pnpm check"'), false);
     assert.equal(source.includes('0.0.1.tgz'), false);
     assert.equal(source.includes('cache: true'), false);
@@ -467,6 +511,44 @@ describe('PR 이벤트와 실제 workflow 러너 조건', /** 입력 조건과 �
 });
 
 describe('필수 CI 후보와 OS 증거 집계', /** 입력 조건과 관찰 결과를 계약에 대조한다. */ () => {
+  for (const defect of [
+    'missing',
+    'candidate',
+    'cleanup',
+    'activation',
+    'case',
+    'duplicate',
+    'restoration',
+    'input',
+    'exit',
+  ])
+    it(`job 성공이어도 UI ${defect} 증거는 필수 통과로 인정하지 않는다`, /** 성공 표시와 실제 UI 증거의 불일치를 거부한다. */ () => {
+      const windows = evidence('windows');
+      const ui = windows.ui;
+      if (defect === 'missing') delete windows.ui;
+      if (defect === 'candidate') ui.result.vsixSha256 = '0'.repeat(64);
+      if (defect === 'cleanup') ui.result.cleaned = false;
+      if (defect === 'activation') ui.installation.active = false;
+      if (defect === 'case') ui.functional.results.pop();
+      if (defect === 'duplicate')
+        ui.functional.results[0] = ui.functional.results[1];
+      if (defect === 'restoration')
+        ui.functional.results[0].cleanupError = 'restore failed';
+      if (defect === 'input') ui.functional.results[0].input = 'command-api';
+      if (defect === 'exit') ui.result.exit.code = 1;
+      assert.throws(
+        /** 성공 job에서도 불완전한 UI 계약을 거부한다. */ () =>
+          aggregate(
+            binding,
+            candidate,
+            Object.fromEntries(
+              requiredJobs.map((job) => [job, { result: 'success' }]),
+            ),
+            { macos: evidence('macos'), windows },
+            '1.110.0',
+          ),
+      );
+    });
   for (const result of ['failure', 'cancelled', 'skipped', 'missing'])
     it(`릴리스 관리가 ${result}이면 OS 성공에도 필수 CI가 통과하지 않는다`, /** 누락은 성공 job 집합으로 인정하지 않는다. */ () => {
       const jobs = Object.fromEntries(

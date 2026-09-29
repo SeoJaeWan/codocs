@@ -17,7 +17,6 @@ import {
   snapshotChangedMethod,
 } from '../navigation/index.js';
 import { diagnosticStatusMethod } from '../diagnostics/index.js';
-import { observePerformanceEvent } from '../performance-observation/index.js';
 
 /** 프로토콜 외 로그를 stdout과 분리하는 최소 로거다. */
 export interface ServerLogger {
@@ -203,7 +202,6 @@ export function bindLanguageServer(
 
 /** argv에서 선택한 stdio 또는 Node IPC 전송으로 실제 서버를 시작한다. */
 export function runLanguageServer(): LanguageServerRuntime {
-  observePerformanceEvent('server-start', { folder: process.cwd() });
   const runtime = bindLanguageServer(createConnection(ProposedFeatures.all));
   runtime.listen();
   return runtime;
