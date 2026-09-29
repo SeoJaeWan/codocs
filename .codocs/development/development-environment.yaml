@@ -11,6 +11,7 @@ definition: |
   Vitest는 TypeScript 설정과 선택 실행의 편의성으로 선정했으며 Jest 대비 보편적인 속도 우위를 약속하지 않는다.
   pnpm test는 코드 옆의 제품 로직·IO·프로토콜·자체 도구 테스트를 표준 러너로 실행한다. 자체 수집기 대신 러너의 설정과 선택 기능을 사용한다.
   package.json 스크립트는 사람이 직접 실행하는 진입점만 둔다. prepare·build·typecheck·lint·format·test·test:vscode·changeset·release:pack·release:verify로 구성하며, 여러 검사를 묶는 check류 스크립트나 CI 전용 조합 스크립트는 두지 않는다. 빠른 검사는 커밋 훅이, 전체 검사는 PR CI가 담당한다.
+  각 패키지의 package.json에는 스크립트를 두지 않는다. 타입 검사와 빌드는 루트 pnpm typecheck·pnpm build가 패키지 의존 순서에 따라 선언 파일부터 만들어 처리한다. 패키지 단위로 실행하면 이전에 빌드한 선언 파일로 검사하여 다른 패키지의 변경을 놓칠 수 있다.
   서식 검사는 CI에서 prettier . --check로 파일을 수정하지 않고 확인한다. 별도 format:check 스크립트를 두지 않으며 pnpm format은 서식을 수정한다. 별도 개발 규칙 검사와 비공개 내부 패키지 소비 검사는 두지 않는다. 게시 단계는 [[배포]]에 따라 package.json 스크립트로 두지 않는다.
   pnpm test:vscode는 GitHub Actions의 실제 VS Code UI 검사 진입점으로 사용한다. 설치한 VSIX의 활성화·서버 연결 API 확인과 실제 Hover·링크 클릭 검사의 역할은 [[테스트 컨벤션]]에서 정한다. 로컬 자동 실행은 지원하지 않으며 수동 개발은 [[VS Code에서 직접 실행하기]]를 따른다.
   CI의 VS Code 검사 버전은 workflow에 정확한 버전으로 고정하고 Windows·macOS job이 같은 버전을 사용한다. 검사 버전은 PR로 변경한다. 최소 버전의 별도 실행과 의도한 실패·시간 초과·취소의 lifecycle 시험은 두지 않는다.

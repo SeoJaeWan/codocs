@@ -12,10 +12,6 @@
       "import": "./dist/index.js"
     }
   },
-  "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "tsc -p tsconfig.build.json"
-  },
   "dependencies": {
     "@codocs/core": "workspace:*",
     "@codocs/workspace": "workspace:*",

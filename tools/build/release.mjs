@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cp, mkdir, readFile, writeFile, mkdtemp } from 'node:fs/promises';
+import { cp, mkdir, readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -31,12 +31,17 @@ export async function copyRuntime(source, target) {
   });
 }
 
+/** 최종 산출물과 섞이지 않도록 저장소 안의 고정 staging 아래에 실행별 임시 디렉터리를 만든다. */
+async function createStaging(root, prefix) {
+  const parent = path.join(root, '.workbench/release-staging');
+  await mkdir(parent, { recursive: true });
+  return mkdtemp(path.join(parent, prefix));
+}
+
 /** 이미 빌드한 확장을 고유 staging에서 패키징하며 메타데이터 누락을 숨기지 않는다. */
 export async function packageVSIX(root, archive) {
   await mkdir(path.dirname(archive), { recursive: true });
-  const staging = await mkdtemp(
-    path.join(path.dirname(archive), 'vsix-staging-'),
-  );
+  const staging = await createStaging(root, 'vsix-staging-');
   const manifest = JSON.parse(
     await readFile(path.join(root, 'packages/vscode/package.json'), 'utf8'),
   );
@@ -67,7 +72,7 @@ export async function packageVSIX(root, archive) {
 
 /** 내부 패키지를 ESM CLI에 묶어 공개 npm 하나만으로 실행 가능하게 조립한다. */
 export async function packageMcp(root, output) {
-  const staging = await mkdtemp(path.join(output, 'npm-staging-'));
+  const staging = await createStaging(root, 'npm-staging-');
   const source = JSON.parse(
     await readFile(path.join(root, 'packages/mcp/package.json'), 'utf8'),
   );
@@ -117,24 +122,30 @@ export async function packageMcp(root, output) {
   return archive;
 }
 
-/** 후보 산출물을 새 candidate 디렉터리에 한 번 만들고 그 경로를 반환한다. */
+/** 고정 출력 폴더를 비운 뒤 tgz와 VSIX만 남기고 그 경로를 반환한다. */
 export async function packageRelease(root = repository, destination) {
   assertNodeVersion();
-  const parent = destination ?? path.join(root, '.workbench/release');
-  await mkdir(parent, { recursive: true });
-  const output = await mkdtemp(path.join(parent, 'candidate-'));
-  execFileSync(
-    process.execPath,
-    [path.join(root, 'tools/build/build.mjs'), 'build'],
-    { cwd: root, stdio: 'inherit', windowsHide: true },
-  );
-  await packageMcp(root, output);
-  const versions = await readProductVersions(root);
-  await packageVSIX(
-    root,
-    path.join(output, artifactName('vscode', versions.vscode)),
-  );
-  console.log('Release candidate: ' + output);
+  const output = destination ?? path.join(root, '.workbench/release');
+  const staging = path.join(root, '.workbench/release-staging');
+  await rm(output, { recursive: true, force: true });
+  await rm(staging, { recursive: true, force: true });
+  await mkdir(output, { recursive: true });
+  try {
+    execFileSync(
+      process.execPath,
+      [path.join(root, 'tools/build/build.mjs'), 'build'],
+      { cwd: root, stdio: 'inherit', windowsHide: true },
+    );
+    await packageMcp(root, output);
+    const versions = await readProductVersions(root);
+    await packageVSIX(
+      root,
+      path.join(output, artifactName('vscode', versions.vscode)),
+    );
+  } finally {
+    await rm(staging, { recursive: true, force: true });
+  }
+  console.log('Release output: ' + output);
   return output;
 }
 

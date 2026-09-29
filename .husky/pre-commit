@@ -2,4 +2,5 @@
 pnpm exec lint-staged || exit $?
 git_local_env_vars=$(git rev-parse --local-env-vars) || exit $?
 unset $git_local_env_vars
+pnpm typecheck || exit $?
 pnpm test
