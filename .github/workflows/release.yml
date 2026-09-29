@@ -142,28 +142,25 @@ jobs:
           } > "$summary"
           cat "$summary"
           cat "$summary" >> "$GITHUB_STEP_SUMMARY"
-      - name: Pack release candidate
+      - name: Pack the tgz and VSIX
         if: ${{ github.event_name == 'push' && steps.plan.outputs.any == 'true' }}
         run: pnpm release:pack
+      - name: Verify the tgz and VSIX
+        if: ${{ github.event_name == 'push' && steps.plan.outputs.any == 'true' }}
+        run: pnpm release:verify
       - id: collect
-        name: Collect and verify the tgz and VSIX
+        name: Collect the tgz and VSIX paths and checksums
         if: ${{ github.event_name == 'push' && steps.plan.outputs.any == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          candidates=(.workbench/release/candidate-*/)
-          if [ "${#candidates[@]}" -ne 1 ]; then
-            echo "::error::expected exactly one release candidate directory, found ${#candidates[@]}"
-            exit 1
-          fi
-          tgz=("${candidates[0]}"*.tgz)
-          vsix=("${candidates[0]}"*.vsix)
+          tgz=(.workbench/release/*.tgz)
+          vsix=(.workbench/release/*.vsix)
           if [ "${#tgz[@]}" -ne 1 ] || [ "${#vsix[@]}" -ne 1 ]; then
             echo "::error::expected exactly one .tgz and one .vsix, found ${#tgz[@]} and ${#vsix[@]}"
             exit 1
           fi
-          pnpm release:verify "${tgz[0]}" "${vsix[0]}"
           for file in "${tgz[0]}" "${vsix[0]}"; do
             (cd "$(dirname "$file")" && sha256sum "$(basename "$file")" > "$(basename "$file").sha256")
           done

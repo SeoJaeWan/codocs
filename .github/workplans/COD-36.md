@@ -19,18 +19,19 @@ package.json 스크립트 20개 → 10개
 
 배포 파일 검사
 
-- release:pack의 출력 위치를 고정하고, release:verify는 인자가 없으면 그 결과를 검사한다.
-- build-checks.test.ts의 dist 출력 검사(테스트 파일 제외, 서버 번들 동일성)를 release:verify로 옮기고, release:verify와 겹치는 패키징·설치 검증과 vitest.checks.config.mjs를 없앤다.
+- release:pack은 출력을 .workbench/release/로 고정하고 실행 때마다 비운 뒤 co-documentation tgz와 codocs VSIX만 남긴다. 임시 작업 폴더는 .workbench/release-staging/에 두고 끝나면 지운다.
+- release:verify는 인자가 없으면 .workbench/release/의 tgz와 VSIX를 하나씩 골라 검사한다. 개수가 맞지 않으면 개수를 밝히고 실패하며, 두 경로를 직접 주는 방식도 유지한다.
+- build-checks.test.ts와 vitest.checks.config.mjs는 release:verify가 이미 같은 검사를 하므로 옮기지 않고 삭제한다. tools/build/check/README.md도 함께 삭제해 tools/build/check/ 폴더를 없앤다.
 
 CI 명령
 
-- Windows·macOS job의 명령을 build → pnpm test → release:verify → test:vscode로 바꾼다.
-- 그 밖의 워크플로 스크립트 호출도 새 이름으로 바꾼다.
+- ci.yml: static job에서 test:release-management 단계를 없애고, pack job은 release:pack 결과인 .workbench/release/를 artifact(release-<run_id>-<run_attempt>)로 올린다. Windows·macOS job은 그 artifact를 같은 위치로 내려받아 build → pnpm test → release:verify → test:vscode 순서로 실행한다.
+- release.yml: candidate 폴더 탐색을 없애고 release:pack 뒤에 인자 없는 release:verify를 실행한다. collect 단계는 게시와 Release 단계가 쓸 파일 경로 출력과 .sha256 생성만 맡는다.
 
 그 밖
 
-- 각 패키지 package.json의 typecheck·build 스크립트 사용처를 확인하고, 쓰이지 않으면 정리한다.
-- 삭제된 스크립트를 언급하는 tools/README.md, tools/build/check/README.md, packages/vscode/src/integration 문서를 갱신한다.
+- 각 패키지 package.json의 typecheck·build 스크립트 5개는 사용처가 없어 삭제한다.
+- 문서 범위는 삭제된 스크립트와 파일을 언급하는 tools/README.md와 Codocs 가이드의 배포 파일 검사 링크다. packages/vscode/src/integration 문서는 이 작업의 범위가 아니다.
 
 h2. 선행
 

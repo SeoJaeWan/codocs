@@ -46,6 +46,6 @@ definition: |
   ## 코드와 검증 위치
 
   createCodocsGuideHandler와 CodocsGuideResponse는 [가이드 구현](../../../packages/mcp/src/guide/index.ts), 원문·입력 검증은 [인접 테스트](../../../packages/mcp/src/guide/guide.test.ts)에서 확인한다.
-  색인 독립성과 복구 전송은 [MCP 상태 검사](../../../packages/mcp/src/server/state.test.ts), 실제 배포 자산은 [패키지 검사](../../../tools/build/check/build-checks.test.ts)에서 확인한다.
+  색인 독립성과 복구 전송은 [MCP 상태 검사](../../../packages/mcp/src/server/state.test.ts), 실제 배포 자산은 [배포 파일 검사](../../../tools/build/verify-release.mjs)에서 확인한다.
 
   공개 co-documentation 패키지에서는 ESM 실행 번들 옆의 상대 자산 경로를 유지한다. 모든 가이드 주제와 예시는 설치 위치에서 읽을 수 있어야 하며 모노레포 원문이나 작업 디렉터리로 대체하지 않는다. [[배포]]의 단독 설치 검사가 실제 bin을 통해 이를 확인한다.

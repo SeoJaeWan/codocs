@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import {
   mkdir,
+  readdir,
   mkdtemp,
   readFile,
   writeFile,
@@ -146,6 +147,27 @@ export async function verifyMcp(archive, temporary, expectedVersion) {
   return { ...installed, tools, stderr, closed: true };
 }
 
+/** 고정 출력 폴더에서 tgz와 VSIX를 하나씩 고르며 개수가 다르면 개수를 밝히고 실패한다. */
+export async function releaseFiles(directory) {
+  const names = await readdir(directory);
+  const tgz = names.filter((name) => name.endsWith('.tgz'));
+  const vsix = names.filter((name) => name.endsWith('.vsix'));
+  if (tgz.length !== 1 || vsix.length !== 1)
+    throw new Error(
+      'Expected exactly one .tgz and one .vsix in ' +
+        directory +
+        ', found ' +
+        tgz.length +
+        ' .tgz and ' +
+        vsix.length +
+        ' .vsix',
+    );
+  return {
+    tgz: path.join(directory, tgz[0]),
+    vsix: path.join(directory, vsix[0]),
+  };
+}
+
 /** 명시한 기존 산출물을 재빌드 없이 검사하고 외부 소비자 증거를 남긴다. */
 export async function verifyRelease(tgz, vsix, versions) {
   assert.equal(process.versions.node.split('.')[0], '24');
@@ -282,8 +304,14 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  const [tgz, vsix, ...extra] = process.argv.slice(2);
-  if (!tgz || !vsix || extra.length)
-    throw new Error('Usage: node tools/build/verify-release.mjs <tgz> <vsix>');
-  await verifyRelease(path.resolve(tgz), path.resolve(vsix));
+  const args = process.argv.slice(2);
+  if (args.length !== 0 && args.length !== 2)
+    throw new Error(
+      'Usage: node tools/build/verify-release.mjs [<tgz> <vsix>]',
+    );
+  const files =
+    args.length === 0
+      ? await releaseFiles(path.join(root, '.workbench/release'))
+      : { tgz: path.resolve(args[0]), vsix: path.resolve(args[1]) };
+  await verifyRelease(files.tgz, files.vsix);
 }
