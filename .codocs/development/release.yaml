@@ -41,7 +41,7 @@ definition: |
   준비 중인 버전과 changelog 변경은 릴리스 브랜치에만 존재하며 Action은 main에 직접 쓰지 않는다.
 
   Version PR은 GitHub App 토큰으로 생성·갱신하여 그 PR의 CI가 실제로 시작되게 한다. 기본 GITHUB_TOKEN으로 만든 PR에서는 workflow가 시작되지 않는다. App 토큰은 App의 Client ID와 private key로 발급한다. App은 PR만 만들고 main에 직접 쓰거나 병합 조건을 우회하지 않는다.
-  Action이 Version PR을 만들거나 갱신한 사실은 출시 승인이 아니다. Draft Version PR에서는 CI를 실행하지 않는다. 출시할 작업이 준비되면 Version PR을 리뷰 준비로 전환하여 포함 작업·제품별 버전·changelog를 확인하고, [[개발 환경]]의 기능 PR과 같은 전체 CI와 병합 조건을 적용한다.
+  Action이 Version PR을 만들거나 갱신한 사실은 출시 승인이 아니다. Draft Version PR에서는 제품 검사를 실행하지 않으며 required-ci는 [[개발 환경]]에 따라 실패로 표시된다. 출시할 작업이 준비되면 Version PR을 리뷰 준비로 전환하여 포함 작업·제품별 버전·changelog를 확인하고, [[개발 환경]]의 기능 PR과 같은 전체 CI와 병합 조건을 적용한다.
   리뷰 준비 후 main이 바뀌어 Action이 같은 PR을 갱신하면 최신 내용으로 다시 검사한다. 공식 Action의 갱신을 막거나 자동으로 Draft로 되돌리지 않는다.
 
   ## 버전 변경과 자동 게시
