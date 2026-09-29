@@ -23,6 +23,6 @@ MCP의 도구 입력·결과 계산은 `packages/mcp/src/tool-input`과 `query`�
 
 Node glob은 도구의 `.mjs`·`.cjs`, 패키지 실행기의 인접 테스트와 중첩 `test-support` 테스트를 포함한다. 실제 ExtensionHost 진입점 `extension.test.cjs`는 `pnpm test:vscode`에서 실행한다. 최종 산출물 검사는 `vitest.checks.config.mjs`의 별도 구성으로 유지한다.
 
-CI의 `test:release-management`는 자체 CI·릴리스 판단을 Ubuntu에서 한 번 검사한다. `test:os`는 제품·OS 도구와 UI 입력 보조 테스트를 표준 glob으로 실행하며 관리 검사를 반복하지 않는다. 기본 `pnpm test`는 두 범위를 모두 포함한다. `release-ci.mjs prepare`가 stable과 최종 tgz/VSIX를 한 번 고정하고, 양 OS의 `verify`는 전송한 소스·바이트·실행 식별자를 확인한다. `evidence`는 설치·아홉 UI 사례·정리 성공을 같은 후보에 연결한다. 성공 artifact에는 이 식별 정보와 최소 결과만 보관하고, 실패 artifact에는 UI 로그와 화면 등 필요한 진단을 보관한다.
+CI의 `test:release-management`는 `tools/build`의 node 테스트를 Ubuntu에서 한 번 검사한다. `test:os`는 제품·OS 도구와 UI 입력 보조 테스트를 표준 glob으로 실행하며 관리 검사를 반복하지 않는다. 기본 `pnpm test`는 두 범위를 모두 포함한다. `pack` job이 `release:pack`으로 최종 tgz/VSIX를 한 번만 만들어 artifact로 전달하고, 양 OS job은 그 파일을 내려받아 `release:verify`와 `test:vscode`를 실행한다. UI 성공 여부는 runner의 종료 코드로 판정한다. 성공 artifact에는 이 식별 정보와 최소 결과만 보관하고, 실패 artifact에는 UI 로그와 화면 등 필요한 진단을 보관한다.
 
 최종 배포물은 MCP tarball 하나와 VSIX 하나다. `vitest.checks.config.mjs`는 이미 빌드한 결과를 포장하고 `verify-release.mjs`로 manifest·진입점·가이드·예제·메타데이터·notice·서버 번들을 검사한다. 저장소 밖 MCP 설치는 SDK 연결과 `listTools`의 여섯 도구 등록까지만 확인하며 설치 fixture는 종료 뒤 제거한다. 로컬 VS Code 창을 실행하지 않는다. [제거 검사 대응표](build/check/README.md)는 상세 기능과 자체 릴리스 판단의 최종 소유자를 기록한다.
