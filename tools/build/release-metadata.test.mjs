@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { packageMcp, packageVSIX } from './release.mjs';
 import { releaseMetadata } from './release-metadata.mjs';
+import { readZip } from '@vscode/vsce/out/zip.js';
+import { assertReleaseAssets } from './release-assets.mjs';
 
 for (const eol of ['\n', '\r\n'])
   test(`${eol === '\n' ? 'LF' : 'CRLF'} 체크아웃의 실제 tgz·VSIX가 같은 LF 설명·라이선스와 원본 바이너리를 담는다`, /** 실제 격리 자원을 준비하고 관측 뒤 정리한다. */ async () => {
@@ -61,6 +63,20 @@ for (const eol of ['\n', '\r\n'])
         'MIT fixture\nCopyright fixture\n'.replaceAll('\n', eol),
       );
       await writeFile(path.join(root, 'logo.png'), logo);
+      const guide = '# Guide\n\n[Binary](image.bin)\n';
+      const example = 'id: fixture\nname: Fixture\ndefinition: Example\n';
+      await writeFile(
+        path.join(root, 'docs/guide/README.md'),
+        guide.replaceAll('\n', eol),
+      );
+      await writeFile(
+        path.join(root, 'examples/.codocs/fixture.yaml'),
+        example.replaceAll('\n', eol),
+      );
+      await writeFile(
+        path.join(root, 'docs/guide/image.bin'),
+        Buffer.from([0, 255, 13, 10, 128]),
+      );
       const vsix = path.join(root, 'out/fixture.vsix');
       await packageVSIX(root, vsix);
       const tgz = await packageMcp(root, path.join(root, 'out'));
@@ -70,13 +86,57 @@ for (const eol of ['\n', '\r\n'])
       ]) {
         const extracted = path.join(root, web ? 'vsix' : 'npm');
         await mkdir(extracted);
-        execFileSync(
-          process.platform === 'win32'
-            ? path.join(process.env.SystemRoot, 'System32/tar.exe')
-            : 'tar',
-          ['-xf', archive, '-C', extracted],
-        );
+        const zipped = web
+          ? await readZip(archive, (entry) => !entry.endsWith('/'))
+          : undefined;
+        if (zipped) {
+          for (const [entry, bytes] of zipped) {
+            // readZip 키는 소문자지만 실제 fixture의 원래 자산 경로로만 복원한다.
+            const original =
+              entry === 'extension/dist/docs/guide/readme.md'
+                ? 'extension/dist/docs/guide/README.md'
+                : entry;
+            const target = path.join(extracted, original);
+            await mkdir(path.dirname(target), { recursive: true });
+            await writeFile(target, bytes);
+          }
+        } else {
+          execFileSync(
+            process.platform === 'win32'
+              ? path.join(process.env.SystemRoot, 'System32/tar.exe')
+              : 'tar',
+            ['-xf', archive, '-C', extracted],
+          );
+        }
         const directory = path.join(extracted, prefix);
+        /** 실제 압축 파일의 원본 엔트리 바이트를 읽는다. */
+        const archiveBytes = (file) =>
+          zipped
+            ? Promise.resolve(zipped.get((prefix + '/' + file).toLowerCase()))
+            : readFile(path.join(directory, file));
+        assert.deepEqual(
+          await archiveBytes('dist/docs/guide/README.md'),
+          Buffer.from(guide),
+        );
+        assert.deepEqual(
+          await archiveBytes('dist/examples/.codocs/fixture.yaml'),
+          Buffer.from(example),
+        );
+        assert.deepEqual(
+          await archiveBytes('dist/docs/guide/image.bin'),
+          Buffer.from([0, 255, 13, 10, 128]),
+        );
+        // 예상 원본만 반대 줄바꿈으로 바꾸어도 제품 자체의 LF 바이트를 그대로 비교한다.
+        await writeFile(
+          path.join(root, 'docs/guide/README.md'),
+          guide.replaceAll('\n', eol === '\n' ? '\r\n' : '\n'),
+        );
+        await writeFile(
+          path.join(root, 'examples/.codocs/fixture.yaml'),
+          example.replaceAll('\n', eol === '\n' ? '\r\n' : '\n'),
+        );
+
+        await assertReleaseAssets(root, path.join(directory, 'dist'));
         const expected =
           '# Fixture\n\n[Guide](' +
           (web
@@ -84,12 +144,7 @@ for (const eol of ['\n', '\r\n'])
             : 'dist/docs/guide/README.md') +
           ')\nIssue #123\n';
         for (const file of ['README.md', 'README.ko.md']) {
-          const bytes = await readFile(
-            path.join(
-              directory,
-              web && file === 'README.md' ? 'readme.md' : file,
-            ),
-          );
+          const bytes = await archiveBytes(file);
           assert.deepEqual(bytes, Buffer.from(expected));
           // 반대 OS 체크아웃에서도 예상 바이트가 실제 압축 파일과 같아야 한다.
           await writeFile(
@@ -102,21 +157,15 @@ for (const eol of ['\n', '\r\n'])
           assert.deepEqual(bytes, await releaseMetadata(root, file, web));
         }
         assert.equal(
-          await readFile(
-            path.join(directory, web ? 'LICENSE.txt' : 'LICENSE'),
+          (await archiveBytes(web ? 'LICENSE.txt' : 'LICENSE')).toString(
             'utf8',
           ),
           'MIT fixture\nCopyright fixture\n',
         );
-        assert.deepEqual(
-          await readFile(path.join(directory, 'logo.png')),
-          logo,
-        );
+        assert.deepEqual(await archiveBytes('logo.png'), logo);
         if (web)
           assert.deepEqual(
-            await readFile(
-              path.join(directory, 'dist/THIRD-PARTY-NOTICES.txt'),
-            ),
+            await archiveBytes('dist/THIRD-PARTY-NOTICES.txt'),
             notice,
           );
       }

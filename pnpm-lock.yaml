@@ -11,6 +11,9 @@ importers:
       '@changesets/cli':
         specifier: 3.0.3
         version: 3.0.3
+      '@codocs/core':
+        specifier: workspace:*
+        version: link:packages/core
       '@types/node':
         specifier: 22.19.3
         version: 22.19.3

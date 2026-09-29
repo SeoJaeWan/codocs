@@ -125,7 +125,7 @@ const plugin = {
           /** 동적 import 표현식의 패키지 경계를 검사한다. */
           ImportExpression: (node) => check(node, node.source),
           /** TypeScript import type의 패키지 경계를 검사한다. */
-          TSImportType: (node) => check(node, node.argument),
+          TSImportType: (node) => check(node, node.source),
           /** require 호출의 패키지 경계를 검사한다. */
           CallExpression: (node) => {
             if (

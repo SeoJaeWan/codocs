@@ -31,7 +31,6 @@ import type {
   WorkspaceFolder,
 } from 'vscode-languageserver/node.js';
 import path from 'node:path';
-import { observePerformanceEvent } from '../performance-observation/index.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
 import {
@@ -168,14 +167,7 @@ interface WorkspaceBinding {
 
 /** 실제 WorkspaceQuerySession을 선택한 루트에 고정해 만든다. */
 const defaultSessionFactory: WorkspaceSessionFactory = (rootPath) =>
-  createWorkspaceQuerySession(
-    { cwd: rootPath },
-    /** 실제 workspace 경계를 폴더별 서버 관측에 연결한다. */ (kind, detail) =>
-      observePerformanceEvent(kind, {
-        ...detail,
-        folder: detail.folder ?? rootPath,
-      }),
-  );
+  createWorkspaceQuerySession({ cwd: rootPath });
 
 /** LSP 연결과 분리해 문서·작업 공간·비동기 최신성을 관리한다. */
 export class LanguageServerSession {
@@ -406,7 +398,18 @@ export class LanguageServerSession {
           result.catalogVersion,
           item,
         );
-        return target ? [{ range: item.occurrence.range, target }] : [];
+        return target
+          ? [
+              {
+                range: item.occurrence.range,
+                target,
+                // Host가 만드는 native 링크의 표시 이름에서도 메타데이터를 서식으로 해석하지 않는다.
+                tooltip: escapeMarkdown(
+                  `원문 열기: ${detailLabel(detail)} (${detail.path.replaceAll('\\', '/')})`,
+                ),
+              },
+            ]
+          : [];
       },
     );
   }

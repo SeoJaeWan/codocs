@@ -21,6 +21,7 @@ import {
   verifyCandidate,
 } from '../../build/release-contract.mjs';
 import { resolveStableVersion } from '../../../packages/vscode/test-runner/cli.mjs';
+import { readUiEvidence } from '../../ci/ui-evidence.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const input = path.join(root, '.workbench/release-input');
@@ -71,17 +72,60 @@ export async function verifyInput(
       expected.binding,
       'selection run mismatch',
     );
-  if (expected.artifactId && receipt.artifactId === null)
-    receipt = bindUploadedCandidate(
-      receipt,
-      expected.binding ?? receipt.binding,
-      expected.artifactId,
+  if (Object.hasOwn(expected, 'execution'))
+    assert.deepEqual(
+      selection.execution,
+      expected.execution,
+      'execution run mismatch',
     );
+  if (expected.artifactId) {
+    assert.match(expected.artifactId, /^[1-9]\d*$/u, 'invalid artifactId');
+    assert.ok(
+      receipt.artifactId === null || receipt.artifactId === expected.artifactId,
+      'artifactId mismatch',
+    );
+    receipt = receipt.binding
+      ? bindUploadedCandidate(
+          receipt,
+          expected.binding ?? receipt.binding,
+          expected.artifactId,
+        )
+      : { ...receipt, artifactId: expected.artifactId };
+  }
   await verifyCandidate(directory, receipt, {
     ...expected,
     sourceCommit: expectedCommit,
   });
   return { receipt, selection };
+}
+
+/** 수동·push 실행 식별자를 PR 필수 증거와 분리하여 고정한다. */
+export function executionBinding(head, environment) {
+  assert.match(head, /^[a-f0-9]{40}$/u, 'exact source required');
+  assert.match(
+    environment.GITHUB_REPOSITORY,
+    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u,
+    'repository required',
+  );
+  for (const key of ['GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT'])
+    assert.match(
+      environment[key],
+      /^[1-9]\d*$/u,
+      'execution identity required',
+    );
+  assert.ok(
+    ['pull_request', 'workflow_dispatch', 'push'].includes(
+      environment.GITHUB_EVENT_NAME,
+    ),
+    'unsupported execution event',
+  );
+  return {
+    repository: environment.GITHUB_REPOSITORY,
+    sourceCommit: head,
+    eventName: environment.GITHUB_EVENT_NAME,
+    runId: environment.GITHUB_RUN_ID,
+    runAttempt: environment.GITHUB_RUN_ATTEMPT,
+  };
 }
 
 /** GitHub 환경에서 PR head/base와 실행 시도를 명시적으로 읽는다. */
@@ -116,6 +160,7 @@ async function main(mode) {
     { cwd: root, encoding: 'utf8' },
   ).trim();
   assert.equal(head, process.env.CODOCS_SOURCE_SHA ?? process.env.GITHUB_SHA);
+  const execution = executionBinding(head, process.env);
   if (mode === 'prepare') {
     const stable = await resolveStableVersion();
     const resolvedAt = new Date().toISOString();
@@ -140,7 +185,13 @@ async function main(mode) {
     await writeFile(
       path.join(input, releaseFiles.selection),
       JSON.stringify(
-        { sourceCommit: head, binding: receipt.binding, stable, resolvedAt },
+        {
+          sourceCommit: head,
+          binding: receipt.binding,
+          execution,
+          stable,
+          resolvedAt,
+        },
         null,
         2,
       ) + '\n',
@@ -159,7 +210,7 @@ async function main(mode) {
         `stable=${stable}\nnpm_file=${filenames.npm}\nvsix_file=${filenames.vscode}\ncandidate_directory=${input}\ncandidate_artifact=${receipt.artifactName ?? ''}\n`,
       );
     }
-  } else if (mode === 'verify') {
+  } else if (mode === 'verify' || mode === 'evidence') {
     const entries = execFileSync(
       'git',
       ['-c', 'core.longpaths=true', 'ls-tree', '-r', '-z', head],
@@ -191,16 +242,53 @@ async function main(mode) {
       sourceFiles,
       sourceTree,
       versions: await readProductVersions(root),
+      execution,
+      binding,
     };
-    if (binding) expected.binding = binding;
     if (process.env.CODOCS_ARTIFACT_ID)
       expected.artifactId = process.env.CODOCS_ARTIFACT_ID;
-    const { receipt } = await verifyInput(
+    const { receipt, selection } = await verifyInput(
       input,
       head,
       process.env.CODOCS_EXPECTED_STABLE,
       expected,
     );
+    if (mode === 'evidence') {
+      const job = process.env.CODOCS_JOB;
+      assert.equal(
+        job,
+        process.platform === 'win32' ? 'windows' : 'macos',
+        'OS job mismatch',
+      );
+      const ui = await readUiEvidence(
+        path.join(root, '.workbench/vscode-ui'),
+        receipt,
+        selection.stable,
+        process.platform,
+      );
+      const output = path.join(root, '.workbench/os-evidence', job);
+      await mkdir(output, { recursive: true });
+      await writeFile(
+        path.join(output, 'evidence.json'),
+        JSON.stringify(
+          {
+            schemaVersion: 1,
+            execution,
+            job,
+            stable: selection.stable,
+            sourceCommit: receipt.sourceCommit,
+            sourceTree: receipt.sourceTree,
+            sourceDigest: receipt.sourceDigest,
+            artifactId: receipt.artifactId,
+            artifacts: receipt.artifacts,
+            ui,
+          },
+          null,
+          2,
+        ) + '\n',
+      );
+      return;
+    }
     await writeFile(
       path.join(input, 'test-environment.json'),
       JSON.stringify(
@@ -212,12 +300,14 @@ async function main(mode) {
           cpu: os.cpus()[0]?.model,
           node: process.version,
           artifacts: receipt.artifacts,
+          execution,
+          artifactId: receipt.artifactId,
         },
         null,
         2,
       ) + '\n',
     );
-  } else throw new Error('Usage: release-ci.mjs prepare|verify');
+  } else throw new Error('Usage: release-ci.mjs prepare|verify|evidence');
 }
 if (
   process.argv[1] &&
