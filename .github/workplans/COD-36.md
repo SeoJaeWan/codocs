@@ -8,35 +8,44 @@ h2. 범위
 
 package.json 스크립트 20개 → 10개
 
-* 유지: prepare, build, typecheck, lint, format, test, test:vscode, changeset, release:pack, release:verify
-* test는 test:unit과 test:node의 내용을 직접 포함한다. watch는 pnpm exec vitest를 사용한다.
-* 삭제: check, check:static, check:runtime, check:runtime:os, test:unit, test:node, test:os, test:release-management, bundle, release:version
+- 유지: prepare, build, typecheck, lint, format, test, test:vscode, changeset, release:pack, release:verify
+- test는 test:unit과 test:node의 내용을 직접 포함한다. watch는 pnpm exec vitest를 사용한다.
+- 삭제: check, check:static, check:runtime, check:runtime:os, test:unit, test:node, test:os, test:release-management, bundle, release:version
 
 커밋 훅
 
-* .husky/pre-commit을 lint-staged → pnpm typecheck → pnpm test 순서로 바꾼다.
-* 추가 전후 커밋 소요 시간을 측정해 PR에 기록한다.
+- .husky/pre-commit을 lint-staged → pnpm typecheck → pnpm test 순서로 바꾼다.
+- 추가 전후 커밋 소요 시간을 측정해 PR에 기록한다.
 
 배포 파일 검사
 
-* release:pack의 출력 위치를 고정하고, release:verify는 인자가 없으면 그 결과를 검사한다.
-* build-checks.test.ts와 vitest.checks.config.mjs에서 release:verify와 겹치는 패키징·설치 검증을 없앤다. dist 출력 검사(테스트 파일 제외, 서버 번들 동일성)는 release:verify로 옮길 수 있는지 확인한다.
+- release:pack의 출력 위치를 고정하고, release:verify는 인자가 없으면 그 결과를 검사한다.
+- build-checks.test.ts의 dist 출력 검사(테스트 파일 제외, 서버 번들 동일성)를 release:verify로 옮기고, release:verify와 겹치는 패키징·설치 검증과 vitest.checks.config.mjs를 없앤다.
+
+CI 명령
+
+- Windows·macOS job의 명령을 build → pnpm test → release:verify → test:vscode로 바꾼다.
+- 그 밖의 워크플로 스크립트 호출도 새 이름으로 바꾼다.
 
 그 밖
 
-* 워크플로의 스크립트 호출을 새 이름으로 바꾼다.
-* 각 패키지 package.json의 typecheck·build 스크립트 사용처를 확인하고, 쓰이지 않으면 정리한다.
-* 삭제된 스크립트를 언급하는 tools/README.md, tools/build/check/README.md, packages/vscode/src/integration 문서를 갱신한다.
+- 각 패키지 package.json의 typecheck·build 스크립트 사용처를 확인하고, 쓰이지 않으면 정리한다.
+- 삭제된 스크립트를 언급하는 tools/README.md, tools/build/check/README.md, packages/vscode/src/integration 문서를 갱신한다.
 
 h2. 선행
 
-* PR CI 교체 작업(COD-34) 머지. 배포 플로우 교체 작업(COD-35)과는 순서를 바꿔도 된다.
+- COD-34와 COD-35의 develop 머지. COD-35가 릴리스 관리 테스트를 지운 뒤여야 OS job의 pnpm test가 그 테스트를 Windows에서 실행하지 않는다.
+
+h2. 진행 기준
+
+- develop을 대상으로 PR을 보내고 merge commit으로 머지한다.
+- 이 작업까지 develop에 머지한 뒤 develop → main PR 하나(merge commit)로 COD-34~36을 main에 옮긴다.
 
 h2. 완료 기준
 
-* 루트 스크립트가 위 10개이고, 문서에 삭제된 스크립트 언급이 남아 있지 않다.
-* 커밋 훅이 typecheck를 실행하고 통과한다.
-* CI가 새 스크립트 이름으로 통과한다.
+- 루트 스크립트가 위 10개이고, 문서에 삭제된 스크립트 언급이 남아 있지 않다.
+- 커밋 훅이 typecheck를 실행하고 통과한다.
+- CI가 새 스크립트 이름으로 통과한다.
 
 ## Jira
 
