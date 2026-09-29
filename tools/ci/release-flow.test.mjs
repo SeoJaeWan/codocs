@@ -487,7 +487,7 @@ describe('준비 소스와 필수 검사 최신성', /** 입력 조건과 관찰
 });
 
 describe('수동 활성화와 권한 확인', /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ () => {
-  test('실제 공유 보호 gate는 main·develop의 strict 필수 검사와 쓰기 권한이 모두 있어야 허용한다', /** 자체 판단의 입력과 고유 결과를 확인한다. */ async () => {
+  test('활성화·토큰과 main·develop의 strict 필수 검사 보호가 확인되면 허용한다', /** 자체 판단의 입력과 고유 결과를 확인한다. */ async () => {
     const routes = [];
     /** 두 보호 브랜치의 API 응답만 준비한다. */
     async function api(method, route) {
@@ -503,7 +503,7 @@ describe('수동 활성화와 권한 확인', /** 입력 조건과 관찰 결과
             allow_force_pushes: { enabled: false },
             allow_deletions: { enabled: false },
           }
-        : { permissions: { pull: true, push: true } };
+        : { permissions: { pull: true, push: false } };
     }
     const input = {
       enabled: 'true',
@@ -547,9 +547,9 @@ describe('수동 활성화와 권한 확인', /** 입력 조건과 관찰 결과
         enabled: 'true',
         appToken: 'fixture',
         repository: 'Fixture/release',
-        /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ api: async () => ({
-          permissions: { push: true, pull: true },
-        }),
+        /** 보호 실패 전에는 저장소를 조회하지 않는다. */ api: async () => {
+          throw new Error('must not call repository API');
+        },
         /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ protection:
           async () => {
             throw new Error('required-ci missing');
@@ -558,19 +558,47 @@ describe('수동 활성화와 권한 확인', /** 입력 조건과 관찰 결과
       /required-ci missing/u,
     );
   });
-  test('App에 contents 쓰기 권한이 없으면 준비와 동기화를 차단한다', /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ async () => {
+  test('App 토큰이 없으면 API 호출 전에 차단한다', /** 필수 토큰 누락을 권한 응답과 독립적으로 확인한다. */ async () => {
     await assert.rejects(
       assertActivation({
         enabled: 'true',
-        appToken: 'fixture',
+        appToken: '',
         repository: 'Fixture/release',
-        /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ api: async () => ({
-          permissions: { pull: true },
-        }),
-        /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ protection:
+        /** 토큰이 없으면 보호·저장소 API에 도달하지 않는다. */ api: async () => {
+          throw new Error('must not call API');
+        },
+      }),
+      /GitHub App token required/u,
+    );
+  });
+  for (const publishing of [false, true])
+    for (const permissions of [undefined, { push: false, pull: false }])
+      test(`${publishing ? '게시' : '준비·동기화'}에서 저장소 역할 permissions가 ${permissions ? 'false' : '없어도'} 발급된 App 토큰을 권한 부족으로 거부하지 않는다`, /** 설치 토큰 권한과 저장소 역할 응답을 혼동한 회귀를 확인한다. */ async () => {
+        await assertActivation({
+          enabled: 'true',
+          appToken: 'issued-installation-token',
+          repository: 'Fixture/release',
+          publishing,
+          requiredProducts: [],
+          /** 저장소 역할 필드의 실제 실패 조건만 재현한다. */ api: async () =>
+            permissions === undefined ? {} : { permissions },
+          /** 보호 검증의 독립 회귀는 공유 gate 테스트에서 확인한다. */ protection:
+            async () => {},
+        });
+      });
+  test('저장소 API 접근이 거부되면 발급된 토큰이 있어도 중단한다', /** 권한 오류를 저장소 역할 false와 구분한다. */ async () => {
+    await assert.rejects(
+      assertActivation({
+        enabled: 'true',
+        appToken: 'issued-installation-token',
+        repository: 'Fixture/release',
+        /** 실제 접근 실패는 계속 전파한다. */ api: async () => {
+          throw new Error('GitHub API GET /repos/Fixture/release: 403');
+        },
+        /** 보호 검증은 이 접근 거부보다 앞서 성공한 상태다. */ protection:
           async () => {},
       }),
-      /contents write permission required/u,
+      /GitHub API GET \/repos\/Fixture\/release: 403/u,
     );
   });
   test('게시 인증이 없으면 보호가 확인되어도 게시를 차단한다', /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ async () => {
@@ -581,9 +609,7 @@ describe('수동 활성화와 권한 확인', /** 입력 조건과 관찰 결과
         repository: 'Fixture/release',
         publishing: true,
         credentials: { npm: 'fixture' },
-        /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ api: async () => ({
-          permissions: { pull: true },
-        }),
+        /** 저장소 접근이 성공한 상태에서 게시 인증을 확인한다. */ api: async () => ({}),
         /** 입력 조건과 관찰 결과를 인접 계약에 대조한다. */ protection:
           async () => {},
       }),
