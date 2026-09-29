@@ -1,0 +1,246 @@
+name: Release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  version:
+    name: Version PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0, node24
+        id: app
+        with:
+          client-id: ${{ vars.CODOCS_RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CODOCS_RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, node24
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+      - uses: ./.github/actions/setup
+      - id: changesets
+        name: Check for pending changesets
+        shell: bash
+        run: |
+          set -euo pipefail
+          pending=false
+          for file in .changeset/*.md; do
+            if [ -f "$file" ] && [ "$(basename "$file")" != README.md ]; then pending=true; fi
+          done
+          echo "pending=${pending}" | tee -a "$GITHUB_OUTPUT"
+      - uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        if: ${{ steps.changesets.outputs.pending == 'true' }}
+        with:
+          github-token: ${{ steps.app.outputs.token }}
+          script: pnpm exec changeset version
+          pr-base-branch: main
+          pr-draft: create
+          push-with-git-cli: false
+  publish:
+    name: Publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, node24
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - id: plan
+        name: Plan publish and release
+        shell: bash
+        run: |
+          set -euo pipefail
+          err="$(mktemp)"
+          npm_version="$(node -p "require('./packages/mcp/package.json').version")"
+          vscode_version="$(node -p "require('./packages/vscode/package.json').version")"
+
+          # npm: only E404 means the version is absent; any other failure fails the job.
+          if npm view "co-documentation@${npm_version}" version > /dev/null 2> "$err"; then
+            npm_on_registry=true
+          elif grep -q 'E404' "$err"; then
+            npm_on_registry=false
+          else
+            cat "$err" >&2
+            echo "::error::npm view failed for co-documentation@${npm_version}"
+            exit 1
+          fi
+
+          # Marketplace: a failing vsce show fails the job.
+          pnpm exec vsce show seojaewan.codocs --json > "$RUNNER_TEMP/vsce-show.json"
+          vscode_on_marketplace="$(node -e 'const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); console.log((j.versions ?? []).some((v) => v.version === process.argv[2]) ? "true" : "false");' "$RUNNER_TEMP/vsce-show.json" "$vscode_version")"
+
+          # GitHub Release: only "release not found" means the tag is absent.
+          release_exists() {
+            if gh release view "$1" -R "$GITHUB_REPOSITORY" > /dev/null 2> "$err"; then
+              echo true
+            elif grep -q 'release not found' "$err"; then
+              echo false
+            else
+              cat "$err" >&2
+              echo "::error::gh release view failed for $1"
+              return 1
+            fi
+          }
+          # Legacy tag v<version>: only HTTP 404 means absent.
+          legacy_exists() {
+            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v$1" > /dev/null 2> "$err"; then
+              echo true
+            elif grep -q 'HTTP 404' "$err"; then
+              echo false
+            else
+              cat "$err" >&2
+              echo "::error::gh api failed for tag v$1"
+              return 1
+            fi
+          }
+          npm_tag="co-documentation@${npm_version}"
+          vscode_tag="codocs@${vscode_version}"
+          npm_tag_exists="$(release_exists "$npm_tag")"
+          vscode_tag_exists="$(release_exists "$vscode_tag")"
+          npm_legacy="$(legacy_exists "$npm_version")"
+          vscode_legacy="$(legacy_exists "$vscode_version")"
+
+          npm_publish=false
+          if [ "$npm_on_registry" = false ]; then npm_publish=true; fi
+          vscode_publish=false
+          if [ "$vscode_on_marketplace" = false ]; then vscode_publish=true; fi
+          # Release when the tag is missing, the version is (or is being) published and no legacy tag exists.
+          npm_release=false
+          if [ "$npm_tag_exists" = false ] && [ "$npm_legacy" = false ] && { [ "$npm_on_registry" = true ] || [ "$npm_publish" = true ]; }; then npm_release=true; fi
+          vscode_release=false
+          if [ "$vscode_tag_exists" = false ] && [ "$vscode_legacy" = false ] && { [ "$vscode_on_marketplace" = true ] || [ "$vscode_publish" = true ]; }; then vscode_release=true; fi
+          any=false
+          if [ "$npm_publish" = true ] || [ "$vscode_publish" = true ] || [ "$npm_release" = true ] || [ "$vscode_release" = true ]; then any=true; fi
+
+          {
+            echo "npm_publish=${npm_publish}"
+            echo "vscode_publish=${vscode_publish}"
+            echo "npm_release=${npm_release}"
+            echo "vscode_release=${vscode_release}"
+            echo "any=${any}"
+            echo "npm_version=${npm_version}"
+            echo "vscode_version=${vscode_version}"
+          } >> "$GITHUB_OUTPUT"
+
+          summary="$(mktemp)"
+          {
+            echo "## Release plan"
+            echo
+            echo "| Product | Version | Published | Publish | Tag exists | Legacy tag | Release |"
+            echo "| --- | --- | --- | --- | --- | --- | --- |"
+            echo "| co-documentation | ${npm_version} | ${npm_on_registry} | ${npm_publish} | ${npm_tag_exists} | ${npm_legacy} | ${npm_release} |"
+            echo "| codocs | ${vscode_version} | ${vscode_on_marketplace} | ${vscode_publish} | ${vscode_tag_exists} | ${vscode_legacy} | ${vscode_release} |"
+            echo
+            if [ "$any" = false ]; then
+              echo "Nothing to publish or release."
+            fi
+          } > "$summary"
+          cat "$summary"
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+      - name: Pack the tgz and VSIX
+        if: ${{ steps.plan.outputs.any == 'true' }}
+        run: pnpm release:pack
+      - name: Verify the tgz and VSIX
+        if: ${{ steps.plan.outputs.any == 'true' }}
+        run: pnpm release:verify
+      - id: collect
+        name: Collect the tgz and VSIX paths and checksums
+        if: ${{ steps.plan.outputs.any == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          tgz=(.workbench/release/*.tgz)
+          vsix=(.workbench/release/*.vsix)
+          if [ "${#tgz[@]}" -ne 1 ] || [ "${#vsix[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one .tgz and one .vsix, found ${#tgz[@]} and ${#vsix[@]}"
+            exit 1
+          fi
+          for file in "${tgz[0]}" "${vsix[0]}"; do
+            (cd "$(dirname "$file")" && sha256sum "$(basename "$file")" > "$(basename "$file").sha256")
+          done
+          {
+            echo "tgz=${tgz[0]}"
+            echo "vsix=${vsix[0]}"
+          } >> "$GITHUB_OUTPUT"
+      - name: Publish co-documentation to npm
+        if: ${{ steps.plan.outputs.npm_publish == 'true' }}
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.CODOCS_NPM_TOKEN }}
+          TGZ: ${{ steps.collect.outputs.tgz }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$NODE_AUTH_TOKEN" > "$RUNNER_TEMP/npmrc"
+          npm publish "$TGZ" --access public --ignore-scripts --userconfig "$RUNNER_TEMP/npmrc"
+          rm -f "$RUNNER_TEMP/npmrc"
+      - name: Publish codocs to the VS Code Marketplace
+        if: ${{ steps.plan.outputs.vscode_publish == 'true' }}
+        shell: bash
+        env:
+          VSCE_PAT: ${{ secrets.CODOCS_MARKETPLACE_TOKEN }}
+          VSIX: ${{ steps.collect.outputs.vsix }}
+        run: pnpm exec vsce publish --packagePath "$VSIX" --skip-duplicate
+      - name: Create the co-documentation tag and Release
+        if: ${{ steps.plan.outputs.npm_release == 'true' }}
+        shell: bash
+        env:
+          VERSION: ${{ steps.plan.outputs.npm_version }}
+          PRODUCT_FILE: ${{ steps.collect.outputs.tgz }}
+          CHANGELOG: packages/mcp/CHANGELOG.md
+          TAG_PREFIX: co-documentation
+          INSTALL_LINE: npm install co-documentation@${{ steps.plan.outputs.npm_version }}
+        run: |
+          set -euo pipefail
+          notes="$(mktemp)"
+          section=""
+          if [ -f "$CHANGELOG" ]; then
+            section="$(awk -v heading="## ${VERSION}" '$0 == heading { found = 1; next } found && /^## / { exit } found' "$CHANGELOG")"
+          fi
+          if ! printf '%s' "$section" | grep -q '[^[:space:]]'; then
+            section="No changelog entry."
+          fi
+          {
+            printf '%s\n\n' "$section"
+            echo "$INSTALL_LINE"
+          } > "$notes"
+          gh release create "${TAG_PREFIX}@${VERSION}" "$PRODUCT_FILE" "${PRODUCT_FILE}.sha256" \
+            -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "${TAG_PREFIX}@${VERSION}" --notes-file "$notes"
+      - name: Create the codocs tag and Release
+        if: ${{ steps.plan.outputs.vscode_release == 'true' }}
+        shell: bash
+        env:
+          VERSION: ${{ steps.plan.outputs.vscode_version }}
+          PRODUCT_FILE: ${{ steps.collect.outputs.vsix }}
+          CHANGELOG: packages/vscode/CHANGELOG.md
+          TAG_PREFIX: codocs
+          INSTALL_LINE: https://marketplace.visualstudio.com/items?itemName=seojaewan.codocs
+        run: |
+          set -euo pipefail
+          notes="$(mktemp)"
+          section=""
+          if [ -f "$CHANGELOG" ]; then
+            section="$(awk -v heading="## ${VERSION}" '$0 == heading { found = 1; next } found && /^## / { exit } found' "$CHANGELOG")"
+          fi
+          if ! printf '%s' "$section" | grep -q '[^[:space:]]'; then
+            section="No changelog entry."
+          fi
+          {
+            printf '%s\n\n' "$section"
+            echo "$INSTALL_LINE"
+          } > "$notes"
+          gh release create "${TAG_PREFIX}@${VERSION}" "$PRODUCT_FILE" "${PRODUCT_FILE}.sha256" \
+            -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "${TAG_PREFIX}@${VERSION}" --notes-file "$notes"

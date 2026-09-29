@@ -284,7 +284,7 @@ export class CodeNavigation {
     const boundaries = new Set<number>();
     for (const item of snapshot.occurrences)
       if (
-        item.target?.path === owner.path &&
+        item.target?.path.split(path.sep).join('/') === owner.path &&
         item.destination?.kind === codeReferenceDestinationKinds.rows
       ) {
         boundaries.add(item.destination.startLine);

@@ -7,14 +7,12 @@
   "scripts": {
     "prepare": "husky",
     "build": "node tools/build/build.mjs build",
-    "bundle": "node tools/build/build.mjs bundle",
     "typecheck": "node tools/build/build.mjs typecheck",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier . --write",
-    "test": "node tools/test/run.mjs",
-    "test:vscode": "node packages/vscode/test-runner/run.mjs",
-    "check": "pnpm typecheck && pnpm lint && pnpm exec prettier . --check && pnpm build && pnpm test && pnpm exec vitest run --config vitest.checks.config.mjs",
-    "bench": "node tools/performance/runner.mjs",
+    "test": "vitest run && node --test tools/**/*.test.{mjs,cjs} packages/**/test-runner/**/*.test.{mjs,cjs} packages/**/src/**/test-support/**/*.test.{mjs,cjs}",
+    "test:vscode": "node packages/vscode/test-runner/ui/run.mjs",
+    "changeset": "changeset",
     "release:pack": "node tools/build/release.mjs",
     "release:verify": "node tools/build/verify-release.mjs"
   },
@@ -26,6 +24,8 @@
     "*.{json,jsonc,md,mdx,yaml,yml,css,scss,html,svg}": "prettier --write"
   },
   "devDependencies": {
+    "@changesets/cli": "3.0.3",
+    "@codocs/core": "workspace:*",
     "@types/node": "22.19.3",
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.6.2",
@@ -39,7 +39,8 @@
     "prettier": "3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0",
-    "vitest": "5.0.0"
+    "vitest": "5.0.0",
+    "yauzl": "2.10.0"
   },
   "license": "MIT",
   "repository": {

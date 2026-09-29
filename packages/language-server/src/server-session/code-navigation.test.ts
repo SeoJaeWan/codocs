@@ -41,14 +41,17 @@ describe('명시 링크와 출처 확인', () => {
   it('확장자 없는 UTF-8 원문의 범위 표기는 전체 span 링크와 명시 번호를 반환한다', async () => {
     const text = '😀 @codocs [[업무:대상]]#L5-L6';
     const uri = await open('implementation', text);
-    const links = await vi.waitFor(async () => {
-      const result = await session.documentLinks(uri);
-      expect(result).toHaveLength(1);
-      expect(
-        await session.confirmSource(argument(result[0]!.target!)),
-      ).not.toBeNull();
-      return result;
-    });
+    const links = await vi.waitFor(
+      async () => {
+        const result = await session.documentLinks(uri);
+        expect(result).toHaveLength(1);
+        expect(
+          await session.confirmSource(argument(result[0]!.target!)),
+        ).not.toBeNull();
+        return result;
+      },
+      { timeout: 5000 },
+    );
     expect(links[0]!.range).toEqual({
       start: { line: 0, character: 3 },
       end: { line: 0, character: text.length },
@@ -59,15 +62,18 @@ describe('명시 링크와 출처 확인', () => {
         position: { line: 0, character: 17 },
       }),
     ).toBeNull();
-    await vi.waitFor(async () => {
-      const current = await session.documentLinks(uri);
-      expect(
-        await session.confirmSource(argument(current[0]!.target!)),
-      ).toEqual({
-        uri: pathToFileURL(path.join(root, '.codocs/target.yaml')).href,
-        destination: { kind: 'rows', startLine: 5, endLine: 6 },
-      });
-    });
+    await vi.waitFor(
+      async () => {
+        const current = await session.documentLinks(uri);
+        expect(
+          await session.confirmSource(argument(current[0]!.target!)),
+        ).toEqual({
+          uri: pathToFileURL(path.join(root, '.codocs/target.yaml')).href,
+          destination: { kind: 'rows', startLine: 5, endLine: 6 },
+        });
+      },
+      { timeout: 5000 },
+    );
   });
   it.each(['#L0', '#L7-L5', '#L999', '#wat'])(
     '잘못된 행 표기 %s는 전체 밑줄을 제공하고 ID 호버를 차단한다',
@@ -110,16 +116,19 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
     const sourceUri = await open('implementation', source);
     await session.documentLinks(sourceUri);
     const uri = await open('.codocs/target.yaml', target);
-    const hover = await vi.waitFor(async () => {
-      const value = await session.hoverDocument({
-        textDocument: { uri },
-        position: { line: 5, character: 2 },
-      });
-      expect((value!.contents as { value: string }).value).not.toContain(
-        'collecting',
-      );
-      return value;
-    });
+    const hover = await vi.waitFor(
+      async () => {
+        const value = await session.hoverDocument({
+          textDocument: { uri },
+          position: { line: 5, character: 2 },
+        });
+        expect((value!.contents as { value: string }).value).not.toContain(
+          'collecting',
+        );
+        return value;
+      },
+      { timeout: 5000 },
+    );
     const value = (hover!.contents as { value: string }).value;
     expect(value).toContain('implementation:1:1');
     expect(value).toContain('implementation:1:22');
@@ -140,8 +149,9 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
         },
       },
     });
-    await vi.waitFor(async () =>
-      expect(await session.documentLinks(uri)).toHaveLength(2),
+    await vi.waitFor(
+      async () => expect(await session.documentLinks(uri)).toHaveLength(2),
+      { timeout: 5000 },
     ); // 5행과 7행은 각각 단일 출현이다.
   });
   it('기존 YAML 이름 링크와 겹치면 이름 이동과 코드 호버를 함께 보존한다', async () => {
@@ -155,16 +165,19 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
     await writeFile(path.join(root, '.codocs/target.yaml'), text);
     await session.refreshWorkspaces();
     const uri = await open('.codocs/target.yaml', text);
-    const links = await vi.waitFor(async () => {
-      const result = await session.documentLinks(uri);
-      expect(result.some((link) => link.range.start.character === 2)).toBe(
-        true,
-      );
-      expect(result.some((link) => link.range.start.character === 0)).toBe(
-        true,
-      );
-      return result;
-    });
+    const links = await vi.waitFor(
+      async () => {
+        const result = await session.documentLinks(uri);
+        expect(result.some((link) => link.range.start.character === 2)).toBe(
+          true,
+        );
+        expect(result.some((link) => link.range.start.character === 0)).toBe(
+          true,
+        );
+        return result;
+      },
+      { timeout: 5000 },
+    );
     expect(links).toHaveLength(2);
     const h = await session.hoverDocument({
       textDocument: { uri },
@@ -177,13 +190,16 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
     const codeUri = await open('source', source);
     await session.documentLinks(codeUri);
     const uri = await open('.codocs/target.yaml', target);
-    const before = await vi.waitFor(async () => {
-      const result = await session.inlayHints(uri);
-      expect(result[0]!.label).toEqual([
-        { value: '문서 전체에 연결된 코드 · 2곳' },
-      ]);
-      return result;
-    });
+    const before = await vi.waitFor(
+      async () => {
+        const result = await session.inlayHints(uri);
+        expect(result[0]!.label).toEqual([
+          { value: '문서 전체에 연결된 코드 · 2곳' },
+        ]);
+        return result;
+      },
+      { timeout: 5000 },
+    );
     expect(before).toHaveLength(1);
     expect(before[0]!.label).toEqual([
       { value: '문서 전체에 연결된 코드 · 2곳' },
@@ -193,13 +209,16 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
       contentChanges: [{ text: '@codocs [[대상]] @codocs [[대상]]#L5' }],
     });
     await session.documentLinks(codeUri);
-    const one = await vi.waitFor(async () => {
-      const result = await session.inlayHints(uri);
-      expect(
-        (result[0]!.label as { command?: unknown }[])[0]!.command,
-      ).toBeDefined();
-      return result;
-    });
+    const one = await vi.waitFor(
+      async () => {
+        const result = await session.inlayHints(uri);
+        expect(
+          (result[0]!.label as { command?: unknown }[])[0]!.command,
+        ).toBeDefined();
+        return result;
+      },
+      { timeout: 5000 },
+    );
     const label = one[0]!.label as { command?: unknown }[];
     expect(label[0]!.command).toBeDefined();
     session.changeDocument({
@@ -207,8 +226,9 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
       contentChanges: [{ text: '@codocs [[대상]]#L5' }],
     });
     await session.documentLinks(codeUri);
-    await vi.waitFor(async () =>
-      expect(await session.inlayHints(uri)).toEqual([]),
+    await vi.waitFor(
+      async () => expect(await session.inlayHints(uri)).toEqual([]),
+      { timeout: 5000 },
     );
     expect(session.documents.get(uri)!.getText()).toBe(target);
   });

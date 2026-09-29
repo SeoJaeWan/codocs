@@ -593,6 +593,8 @@ export class WorkspaceCodeReferenceIndex {
     this.#pendingBuffers.clear();
     this.#owners.clear();
     this.#selections.clear();
+    // 진행 중인 수집과 감시 시작이 만든 프로세스·핸들이 끝난 뒤에만 종료를 완료한다.
+    await Promise.allSettled([this.#operation, this.#starting]);
     await this.#watcher?.close();
   }
 }

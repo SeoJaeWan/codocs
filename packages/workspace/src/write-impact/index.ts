@@ -1,3 +1,4 @@
+import path from 'node:path';
 import {
   calculateChangeImpact,
   catalogConfirmations,
@@ -106,6 +107,8 @@ export function createWorkspaceWriteImpactNotice(
     basis: writeImpactBases.savedFiles,
     target: {
       ...target,
+      // 공개 안내의 경로는 플랫폼과 무관하게 프로젝트 상대 '/' 표기다.
+      path: target.path.split(path.sep).join('/'),
       ...(context?.baseRevision
         ? { beforeRevision: context.baseRevision }
         : {}),

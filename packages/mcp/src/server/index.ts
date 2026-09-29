@@ -1,3 +1,4 @@
+import { getMcpVersion } from './version.js';
 import {
   createWorkspaceQuerySession,
   type WorkspaceQuerySession,
@@ -105,7 +106,7 @@ export function createCodocsServer(
     ],
   ]);
   const server = new Server(
-    { name: 'co-documentation', version: '0.0.1' },
+    { name: 'co-documentation', version: getMcpVersion() },
     { capabilities: { tools: {} } },
   );
   server.setRequestHandler(

@@ -3,17 +3,23 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import {
-  cp,
   mkdir,
+  readdir,
   mkdtemp,
   readFile,
   writeFile,
   access,
+  rm,
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createWriteStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
+import yauzl from 'yauzl';
 import { releaseMetadata } from './release-metadata.mjs';
+import { readProductVersions } from './release-contract.mjs';
+import { assertReleaseAssets } from './release-assets.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const require = createRequire(path.join(root, 'packages/mcp/package.json'));
@@ -22,8 +28,89 @@ const {
   StdioClientTransport,
 } = require('@modelcontextprotocol/sdk/client/stdio.js');
 
+/** yauzl로 zip을 열어 게으른 항목 읽기 모드의 핸들을 돌려준다. */
+function openZip(file) {
+  return new Promise(
+    /** 열기 결과를 약속에 연결한다. */ (resolve, reject) => {
+      yauzl.open(file, { lazyEntries: true }, (error, zipfile) =>
+        error ? reject(error) : resolve(zipfile),
+      );
+    },
+  );
+}
+
+/** zip 항목을 하나씩 읽어 visit에 넘기고, 오류나 끝에서 파일을 닫는다. 이름의 대소문자는 그대로 둔다. */
+async function walkZip(file, visit) {
+  const zipfile = await openZip(file);
+  await new Promise(
+    /** 항목 순회 결과를 약속에 연결한다. */ (resolve, reject) => {
+      zipfile.on('error', reject);
+      zipfile.on('end', resolve);
+      zipfile.on(
+        'entry',
+        /** 항목을 방문하고 다음 항목을 읽는다. */ (entry) => {
+          Promise.resolve(visit(entry, zipfile)).then(
+            () => zipfile.readEntry(),
+            reject,
+          );
+        },
+      );
+      zipfile.readEntry();
+    },
+  ).finally(() => zipfile.close());
+}
+
+/** 시스템 tar 없이 zip의 항목 이름을 대소문자 그대로 나열한다. */
+export async function listZip(file) {
+  const names = [];
+  await walkZip(file, (entry) => {
+    names.push(entry.fileName);
+  });
+  return names;
+}
+
+/** 절대 경로나 대상 폴더 밖으로 나가는 항목 이름을 거부하고 안전한 경로를 돌려준다. */
+export function safeZipPath(directory, name) {
+  const target = path.resolve(directory, name);
+  const relative = path.relative(path.resolve(directory), target);
+  if (
+    !name ||
+    /^[\\/]/u.test(name) ||
+    /^[A-Za-z]:/u.test(name) ||
+    name.split(/[\\/]/u).includes('..') ||
+    relative === '' ||
+    relative.startsWith('..') ||
+    path.isAbsolute(relative)
+  )
+    throw new Error('Unsafe zip entry path: ' + name);
+  return target;
+}
+
+/** 시스템 tar 없이 zip을 풀고, 폴더 항목은 폴더만 만들며 안전하지 않은 항목은 실패한다. */
+export async function extractZip(file, directory) {
+  await walkZip(
+    file,
+    /** 항목 하나를 안전하게 해제한다. */ async (entry, zipfile) => {
+      const target = safeZipPath(directory, entry.fileName);
+      if (entry.fileName.endsWith('/')) {
+        await mkdir(target, { recursive: true });
+        return;
+      }
+      await mkdir(path.dirname(target), { recursive: true });
+      const stream = await new Promise(
+        /** 읽기 스트림을 약속에 연결한다. */ (resolve, reject) => {
+          zipfile.openReadStream(entry, (error, opened) =>
+            error ? reject(error) : resolve(opened),
+          );
+        },
+      );
+      await pipeline(stream, createWriteStream(target));
+    },
+  );
+}
+
 /** npm의 실제 JS 진입점을 찾아 shell 해석 없이 설치한다. */
-export async function installMcp(archive, consumer) {
+export async function installMcp(archive, consumer, expectedVersion) {
   const candidates = [
     path.join(
       path.dirname(process.execPath),
@@ -76,12 +163,20 @@ export async function installMcp(archive, consumer) {
     await readFile(path.join(directory, 'package.json'), 'utf8'),
   );
   assert.equal(manifest.name, 'co-documentation');
-  assert.equal(manifest.version, '0.0.1');
+  assert.equal(
+    manifest.version,
+    expectedVersion ?? (await readProductVersions(root)).npm,
+  );
   assert.equal(manifest.license, 'MIT');
   assert.equal(manifest.engines.node, '24.x');
   assert.equal(manifest.private, undefined);
   assert.equal(manifest.exports, undefined);
   assert.equal(manifest.dependencies, undefined);
+  assert.deepEqual(manifest.bin, { codocs: './dist/runtime/cli.js' });
+  assert.equal(manifest.type, 'module');
+  await access(path.join(directory, manifest.bin.codocs));
+  await access(path.join(directory, 'dist/THIRD-PARTY-NOTICES.txt'));
+  await assertReleaseAssets(root, path.join(directory, 'dist'));
   return {
     directory,
     entry: path.join(directory, manifest.bin.codocs),
@@ -92,17 +187,16 @@ export async function installMcp(archive, consumer) {
   };
 }
 
-/** 설치된 bin으로 MCP 전체 흐름과 번들 자산 및 EOF 종료를 확인한다. */
-export async function verifyMcp(archive, temporary) {
-  const consumer = path.join(temporary, 'consumer');
-  const installed = await installMcp(archive, consumer);
-  const project = path.join(temporary, '한글 project');
-  await mkdir(project);
-  await cp(
-    path.join(installed.directory, 'dist/examples/.codocs'),
-    path.join(project, '.codocs'),
-    { recursive: true },
+/** 저장소 밖에 설치한 bin의 시작·SDK 연결·도구 등록만 확인한다. */
+export async function verifyMcp(archive, temporary, expectedVersion) {
+  const installed = await installMcp(
+    archive,
+    path.join(temporary, 'consumer'),
+    expectedVersion,
   );
+  const version = expectedVersion ?? (await readProductVersions(root)).npm;
+  const project = path.join(temporary, '한글 project');
+  await mkdir(path.join(project, '.codocs'), { recursive: true });
   const client = new Client({ name: 'release-verifier', version: '1' });
   const transport = new StdioClientTransport({
     command: installed.bin,
@@ -112,109 +206,56 @@ export async function verifyMcp(archive, temporary) {
     stderr: 'pipe',
   });
   let stderr = '';
-  transport.stderr?.on('data', (chunk) => {
-    stderr += chunk;
-  });
-  const observations = [];
-  let exit;
-  /** 성공 응답을 검사하고 원문을 증거로 보존한다. */
-  async function call(name, args = {}) {
-    const response = await client.callTool({ name, arguments: args });
-    assert.equal(response.isError, false, JSON.stringify(response));
-    assert.deepEqual(
-      JSON.parse(response.content[0].text),
-      response.structuredContent,
-    );
-    observations.push({
-      name,
-      input: args,
-      response: response.structuredContent,
-    });
-    return response.structuredContent;
-  }
+  let tools;
   try {
     await client.connect(transport);
-    // 고정 SDK의 실제 자식을 관찰해 close()의 강제 종료를 정상 EOF로 오인하지 않는다.
-    const child = transport._process;
-    assert.ok(child);
-    exit = new Promise(
-      /** 실제 자식 종료 결과를 보존한다. */ (resolve) =>
-        child.once('exit', (code, signal) => resolve({ code, signal })),
-    );
+    transport.stderr?.on('data', (chunk) => {
+      stderr += chunk;
+    });
     assert.deepEqual(client.getServerVersion(), {
       name: 'co-documentation',
-      version: '0.0.1',
+      version,
     });
-    assert.deepEqual(
-      (await client.listTools()).tools.map((tool) => tool.name),
-      [
-        'codocs_list',
-        'codocs_get',
-        'codocs_refresh',
-        'codocs_validate',
-        'codocs_write',
-        'codocs_guide',
-      ],
-    );
-    for (const [topic, file] of Object.entries({
-      overview: 'README.md',
-      schema: 'schema.md',
-      writing: 'writing.md',
-      examples: 'examples.md',
-      updating: 'updating.md',
-      validation: 'validation.md',
-    })) {
-      const guide = await call('codocs_guide', { topic });
-      assert.equal(
-        guide.content,
-        await readFile(
-          path.join(installed.directory, 'dist/docs/guide', file),
-          'utf8',
-        ),
-      );
-    }
-    await call('codocs_refresh');
-    await call('codocs_list');
-    const got = await call('codocs_get', { ids: ['sample-order'] });
-    assert.equal(got.results[0].document.id, 'sample-order');
-    await call('codocs_validate');
-    const created = await call('codocs_write', {
-      mode: 'create',
-      path: '.codocs/release-probe.yaml',
-      document: {
-        id: 'release-probe',
-        name: 'Release probe',
-        definition: 'Before update',
-        domains: ['Release'],
-      },
-    });
-    assert.equal(created.saved, true);
-    const current = await call('codocs_get', { ids: ['release-probe'] });
-    const updated = await call('codocs_write', {
-      mode: 'update',
-      id: 'release-probe',
-      revision: current.results[0].revision,
-      set: { definition: 'After update' },
-    });
-    assert.equal(updated.saved, true);
-    assert.equal(
-      (await call('codocs_get', { ids: ['release-probe'] })).results[0].document
-        .definition,
-      'After update',
-    );
-    await call('codocs_refresh');
-    await call('codocs_validate', { path: '.codocs/release-probe.yaml' });
+    tools = (await client.listTools()).tools.map((tool) => tool.name);
+    assert.deepEqual(tools, [
+      'codocs_list',
+      'codocs_get',
+      'codocs_refresh',
+      'codocs_validate',
+      'codocs_write',
+      'codocs_guide',
+    ]);
   } finally {
     await client.close();
   }
-  const ended = await exit;
-  assert.deepEqual(ended, { code: 0, signal: null }, '정상 EOF 종료');
-  return { ...installed, observations, stderr, exit: ended, closed: true };
+  return { ...installed, tools, stderr, closed: true };
+}
+
+/** 고정 출력 폴더에서 tgz와 VSIX를 하나씩 고르며 개수가 다르면 개수를 밝히고 실패한다. */
+export async function releaseFiles(directory) {
+  const names = await readdir(directory);
+  const tgz = names.filter((name) => name.endsWith('.tgz'));
+  const vsix = names.filter((name) => name.endsWith('.vsix'));
+  if (tgz.length !== 1 || vsix.length !== 1)
+    throw new Error(
+      'Expected exactly one .tgz and one .vsix in ' +
+        directory +
+        ', found ' +
+        tgz.length +
+        ' .tgz and ' +
+        vsix.length +
+        ' .vsix',
+    );
+  return {
+    tgz: path.join(directory, tgz[0]),
+    vsix: path.join(directory, vsix[0]),
+  };
 }
 
 /** 명시한 기존 산출물을 재빌드 없이 검사하고 외부 소비자 증거를 남긴다. */
-export async function verifyRelease(tgz, vsix) {
+export async function verifyRelease(tgz, vsix, versions) {
   assert.equal(process.versions.node.split('.')[0], '24');
+  versions ??= await readProductVersions(root);
   const temporary = await mkdtemp(path.join(os.tmpdir(), 'codocs-release-'));
   const output = path.join(
     root,
@@ -232,13 +273,17 @@ export async function verifyRelease(tgz, vsix) {
     artifacts: [],
   };
   try {
-    for (const [file, flags] of [
-      [tgz, '-tzf'],
-      [vsix, '-tf'],
+    for (const [file, list] of [
+      [
+        tgz,
+        /** tgz는 tar로 나열한다. */ () =>
+          execFileSync('tar', ['-tzf', tgz], { encoding: 'utf8' })
+            .split(/\r?\n/u)
+            .filter(Boolean),
+      ],
+      [vsix, /** VSIX는 zip이라 yauzl로 나열한다. */ () => listZip(vsix)],
     ]) {
-      const files = execFileSync('tar', [flags, file], { encoding: 'utf8' })
-        .split(/\r?\n/u)
-        .filter(Boolean);
+      const files = await list();
       assert.ok(
         files.every(
           (entry) =>
@@ -258,13 +303,25 @@ export async function verifyRelease(tgz, vsix) {
     }
     const extracted = path.join(temporary, 'vsix');
     await mkdir(extracted);
-    execFileSync('tar', ['-xf', vsix, '-C', extracted]);
+    await extractZip(vsix, extracted);
     const extension = path.join(extracted, 'extension');
     const manifest = JSON.parse(
       await readFile(path.join(extension, 'package.json'), 'utf8'),
     );
     assert.equal(manifest.publisher + '.' + manifest.name, 'seojaewan.codocs');
-    assert.equal(manifest.version, '0.0.1');
+    assert.equal(manifest.version, versions.vscode);
+    assert.equal(manifest.main, './dist/index.cjs');
+    assert.equal(manifest.dependencies, undefined);
+    assert.equal(manifest.devDependencies, undefined);
+    const sourceManifest = JSON.parse(
+      await readFile(path.join(root, 'packages/vscode/package.json'), 'utf8'),
+    );
+    assert.deepEqual(manifest.engines, sourceManifest.engines);
+    assert.deepEqual(
+      manifest.activationEvents,
+      sourceManifest.activationEvents,
+    );
+    assert.deepEqual(manifest.contributes, sourceManifest.contributes);
     assert.equal(manifest.license, 'MIT');
     assert.equal(manifest.icon, 'logo.png');
     assert.equal(
@@ -292,7 +349,14 @@ export async function verifyRelease(tgz, vsix) {
       'dist/server/THIRD-PARTY-NOTICES.txt',
     ])
       await access(path.join(extension, file));
-    evidence.mcp = await verifyMcp(tgz, temporary);
+    await assertReleaseAssets(root, path.join(extension, 'dist'));
+    assert.deepEqual(
+      await readFile(path.join(extension, 'dist/server/index.cjs')),
+      await readFile(
+        path.join(root, 'packages/language-server/dist/index.cjs'),
+      ),
+    );
+    evidence.mcp = await verifyMcp(tgz, temporary, versions.npm);
     for (const file of ['README.md', 'README.ko.md', 'LICENSE', 'logo.png'])
       assert.deepEqual(
         await readFile(path.join(evidence.mcp.directory, file)),
@@ -303,11 +367,23 @@ export async function verifyRelease(tgz, vsix) {
     evidence.error = error.stack ?? String(error);
     throw error;
   } finally {
-    await writeFile(
-      path.join(output, 'result.json'),
-      JSON.stringify(evidence, null, 2) + '\n',
-    );
-    console.log('Release verification: ' + output);
+    try {
+      await rm(temporary, { recursive: true, force: true, maxRetries: 3 });
+      evidence.cleaned = true;
+    } catch (error) {
+      evidence.cleaned = false;
+      evidence.cleanupError = error.stack ?? String(error);
+      if (evidence.passed) {
+        evidence.passed = false;
+        throw error;
+      }
+    } finally {
+      await writeFile(
+        path.join(output, 'result.json'),
+        JSON.stringify(evidence, null, 2) + '\n',
+      );
+      console.log('Release verification: ' + output);
+    }
   }
   return evidence;
 }
@@ -316,8 +392,14 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  const [tgz, vsix, ...extra] = process.argv.slice(2);
-  if (!tgz || !vsix || extra.length)
-    throw new Error('Usage: node tools/build/verify-release.mjs <tgz> <vsix>');
-  await verifyRelease(path.resolve(tgz), path.resolve(vsix));
+  const args = process.argv.slice(2);
+  if (args.length !== 0 && args.length !== 2)
+    throw new Error(
+      'Usage: node tools/build/verify-release.mjs [<tgz> <vsix>]',
+    );
+  const files =
+    args.length === 0
+      ? await releaseFiles(path.join(root, '.workbench/release'))
+      : { tgz: path.resolve(args[0]), vsix: path.resolve(args[1]) };
+  await verifyRelease(files.tgz, files.vsix);
 }

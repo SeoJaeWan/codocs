@@ -620,14 +620,15 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         );
         const session = createWorkspaceQuerySession({ cwd: project });
 
-        const result = await session.get(ids);
+        const requestedIds = ids.slice().reverse();
+        const result = await session.get(requestedIds);
 
         expect(result).toMatchObject({
           success: true,
           scanStatus: scanStatuses.complete,
         });
         if (result.success)
-          expect(result.results.map((item) => item.id)).toEqual(ids);
+          expect(result.results.map((item) => item.id)).toEqual(requestedIds);
       },
     );
 
@@ -819,8 +820,20 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       'other.yaml',
       'id: other\nname: other\ndomains: [기타]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
     );
+    await file(
+      'other-kind.yaml',
+      'id: other-kind\nname: other-kind\ndomains: [업무]\nkind: decision\nstatus: confirmed\ndefinition: 본문\n',
+    );
+    await file(
+      'other-status.yaml',
+      'id: other-status\nname: other-status\ndomains: [업무]\nkind: policy\nstatus: proposed\ndefinition: 본문\n',
+    );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const first = await session.list({ domain: '업무' });
+    const first = await session.list({
+      domain: '업무',
+      kind: documentKinds.policy,
+      status: documentStatuses.confirmed,
+    });
     expect(first).toMatchObject({
       success: true,
       totalCount: 60,
@@ -841,6 +854,12 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       returnedCount: 10,
       nextCursor: null,
     });
+    expect(second.success && second.items.map((item) => item.id)).toEqual(
+      Array.from(
+        { length: 10 },
+        (_, index) => `doc-${String(index + 50).padStart(2, '0')}`,
+      ),
+    );
   });
 
   describe('목록 표시 변경에 따른 cursor 유효성', () => {

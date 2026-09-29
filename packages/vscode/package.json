@@ -2,7 +2,7 @@
   "name": "codocs",
   "displayName": "Codocs",
   "description": "Connect code in a workspace to its local .codocs knowledge files.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "publisher": "seojaewan",
   "type": "module",
@@ -33,10 +33,6 @@
       "import": "./dist/index.cjs",
       "require": "./dist/index.cjs"
     }
-  },
-  "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "node ../../tools/build/build.mjs build"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

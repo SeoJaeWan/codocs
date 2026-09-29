@@ -5,9 +5,19 @@ import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { CodocsWriteResponse } from '../query/index.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from 'vitest';
+import { createSourceCli } from '../../test-support/source-cli.js';
 
-const cli = path.resolve('packages/mcp/dist/cli.js');
+let sourceCli: Awaited<ReturnType<typeof createSourceCli>>;
+let cli: string;
 const original =
   'id: target\nname: 계약\ndomains: [업무]\ndefinition: |\n  alpha\n  beta\n  gamma\n  omega\n';
 const code =
@@ -15,6 +25,17 @@ const code =
 let project: string;
 let client: Client;
 let transport: StdioClientTransport;
+/** 제품 dist와 분리한 소스 CLI 번들을 이 파일의 사례가 함께 사용한다. */
+beforeAll(async () => {
+  sourceCli = await createSourceCli();
+  cli = sourceCli.entry;
+});
+
+/** 사례가 끝난 뒤 실행별 소스 CLI 번들을 정리한다. */
+afterAll(async () => {
+  await sourceCli.close();
+});
+
 /** VS Code 환경이나 세션 없이 저장 코드가 있는 사유 프로젝트에 stdio를 고정한다. */
 beforeEach(async () => {
   await mkdir('.workbench', { recursive: true });

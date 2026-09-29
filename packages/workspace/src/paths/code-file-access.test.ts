@@ -1,4 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ioFailures, simulatedFileLinks } from '../test-support/file-system.js';
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
+});
 import { mkdir, mkdtemp, rm, writeFile, symlink } from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
@@ -17,6 +23,8 @@ beforeEach(async () => {
   vi.stubEnv('GIT_CEILING_DIRECTORIES', path.dirname(project));
 });
 afterEach(async () => {
+  ioFailures.clear();
+  simulatedFileLinks.clear();
   vi.unstubAllEnvs();
   await rm(project, { recursive: true, force: true });
 });
@@ -158,7 +166,12 @@ describe('discoverCodeFiles: 프로젝트 코드 읽기 적격성', () => {
     await mkdir(path.join(project, '.git'));
     await writeFile(path.join(project, '.git', 'secret'), 'no');
     await writeFile(path.join(project, 'real'), 'yes');
-    await symlink(path.join(project, 'real'), path.join(project, 'link'));
+    // 파일 링크 거부 계약은 링크 생성 권한 없이 lstat 연결 응답 주입으로 확인한다.
+    await writeFile(
+      path.join(project, 'link'),
+      '파일 연결을 대신하는 열거 항목',
+    );
+    simulatedFileLinks.add(path.join(project, 'link'));
     await symlink(
       path.dirname(project),
       path.join(project, 'folder'),
