@@ -10,42 +10,49 @@ h2. 범위
 
 release.yml (main push)
 
-* 공식 changesets version Action으로 Draft Version PR을 만들고 갱신한다. PR은 GitHub App 토큰으로 만들어 그 PR에서 CI가 시작되게 한다.
-* Version PR이 머지되면 main에서 build, release:pack, release:verify를 거쳐 게시한다.
+- 공식 changesets version Action으로 Draft Version PR을 만들고 갱신한다. PR은 GitHub App 토큰으로 만들어 그 PR에서 CI가 시작되게 한다.
+- Version PR이 머지되면 main에서 build, release:pack, release:verify를 거쳐 게시한다.
 
 tools/build/publish.mjs
 
-* npm·Marketplace에 이미 게시된 버전은 건너뛴다. 실패 job을 다시 실행해도 중복 게시되지 않는다.
-* 게시한 제품마다 co-documentation@버전, codocs@버전 형식의 태그와 GitHub Release를 만든다. Release에는 배포 파일과 SHA-256만 첨부한다.
-* package.json 스크립트로 두지 않고 워크플로에서만 호출한다.
+- npm·Marketplace에 이미 게시된 버전은 건너뛴다. 실패 job을 다시 실행해도 중복 게시되지 않는다.
+- 게시한 제품마다 co-documentation@버전, codocs@버전 형식의 태그와 GitHub Release를 만든다. Release에는 배포 파일과 SHA-256만 첨부한다.
+- package.json 스크립트로 두지 않고 워크플로에서만 호출한다.
 
 Changesets 설정
 
-* .changeset/config.json의 baseBranch를 main으로 바꾸고 .changeset/README.md를 갱신한다.
+- .changeset/config.json의 baseBranch를 main으로 바꾸고 .changeset/README.md를 갱신한다.
 
 삭제
 
-* .github/workflows/release-prepare.yml, release-sync.yml, release-publish.yml
-* tools/ci의 나머지(release-flow, release-sync, release-publish, release-fixture, release-contract.test)와 테스트
-* tools/build/release-contract.mjs의 CI 전용 부분(job·workflow 이름, 후보·증거·보고서 스키마). products·assertVersion·artifactName·readProductVersions는 유지한다.
-* tools/build/release.mjs의 packageRelease·sourceIdentity, release-source.test.mjs
-* tools/test/git-config.mjs와 테스트
+- .github/workflows/release-prepare.yml, release-sync.yml, release-publish.yml
+- tools/ci의 나머지(release-flow, release-sync, release-publish, release-fixture, release-contract.test)와 테스트
+- CI의 Ubuntu job에서 실행하던 pnpm test:release-management step
+- tools/build/release-contract.mjs의 CI 전용 부분(job·workflow 이름, 후보·증거·보고서 스키마). products·assertVersion·artifactName·readProductVersions는 유지한다.
+- tools/build/release.mjs의 packageRelease·sourceIdentity, release-source.test.mjs
+- tools/test/git-config.mjs와 테스트
 
 h2. 선행
 
-* PR CI 교체 작업(COD-34) 머지
+- COD-34 develop 머지
 
-h2. 머지 후
+h2. 진행 기준
 
-* co-documentation 0.0.2, codocs 0.0.2가 담긴 Draft Version PR이 만들어졌는지 확인한다.
-* develop 브랜치를 삭제하고, main에 Rulesets(PR 필수, required-ci, 최신 main 반영, 관리자 포함 우회 금지)를 설정한다.
-* 쓰이지 않게 된 CODOCS_RELEASE_ENABLED 변수를 삭제한다.
+- develop을 대상으로 PR을 보내고 merge commit으로 머지한다. COD-36보다 먼저 머지한다.
+- COD-34 → COD-35 → COD-36을 develop에 머지한 뒤 develop → main PR 하나(merge commit)로 main에 옮긴다. release.yml은 main push에서 동작하므로 실제 동작은 이 머지 뒤에 확인한다.
+
+h2. develop → main 머지 후
+
+- co-documentation 0.0.2, codocs 0.0.2가 담긴 Draft Version PR이 만들어졌는지 확인한다.
+- develop 대상 draft PR #36, #29, #27의 base를 main으로 바꾼다.
+- develop 브랜치를 삭제하고, main에 Rulesets(PR 필수, required-ci, 최신 main 반영, 관리자 포함 우회 금지)를 설정한다.
+- 쓰이지 않게 된 CODOCS_RELEASE_ENABLED 변수를 삭제한다.
 
 h2. 완료 기준
 
-* main push로 Draft Version PR이 생성되고, ready로 바꾸면 CI가 시작된다.
-* Version PR을 머지하면 두 제품이 게시되고, 재실행해도 중복 게시되지 않는다.
-* pnpm test가 통과한다.
+- develop → main 머지 후 main push로 Draft Version PR이 생성되고, ready로 바꾸면 CI가 시작된다.
+- Version PR을 머지하면 두 제품이 게시되고, 재실행해도 중복 게시되지 않는다.
+- pnpm test가 통과한다.
 
 ## Jira
 
