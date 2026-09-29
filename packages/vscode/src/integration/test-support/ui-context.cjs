@@ -11,10 +11,11 @@ exports.uiContext =
     driver,
     until,
   ) {
-    // 8.3 TEMP 별칭과 VS Code의 정규 경로를 같은 파일 URI로 준비한다.
-    const workspace = realpathSync(config.workspace);
+    // 실제 파일 경계 확인만 정규 경로를 사용하고 VS Code URI는 workspace 표기를 보존한다.
+    const physicalWorkspace = realpathSync.native(config.workspace);
     /** 실제 파일 URI를 만든다. */
-    const uri = (relative) => vscode.Uri.file(path.join(workspace, relative));
+    const uri = (relative) =>
+      vscode.Uri.file(path.join(config.workspace, relative));
     /** 화면에 파일과 목표 행을 준비한다. */
     async function open(relative) {
       const document = await vscode.workspace.openTextDocument(uri(relative));
@@ -114,7 +115,7 @@ exports.uiContext =
       for (const document of vscode.workspace.textDocuments) {
         if (!document.isDirty || document.uri.scheme !== 'file') continue;
         const relative = path.relative(
-          workspace,
+          physicalWorkspace,
           await fs.realpath(document.uri.fsPath),
         );
         assert.ok(

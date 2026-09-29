@@ -108,7 +108,7 @@ test('훅의 저장소·index·설정을 상속해도 fixture init·config·add�
     writeFileSync(path.join(cwd, 'owned.txt'), 'fixture\\n');
     git(['add', '.']);
     git(['commit', '-m', 'fixture']);
-    assert.equal(realpathSync(git(['rev-parse', '--show-toplevel'])), realpathSync(cwd));
+    assert.equal(realpathSync.native(git(['rev-parse', '--show-toplevel'])), realpathSync.native(cwd));
     git(['init', '--bare', path.join(cwd, 'remote.git')]);
     assert.equal(git(['config', '--local', 'core.bare']), 'false');
   `;
