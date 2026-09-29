@@ -98,7 +98,12 @@ module.exports.scenarios = [
             .length === 1,
         'deprecated warning',
       );
-      await c.driver.hover('[[Old]]', 'Old');
+      const oldHover = await c.driver.hover('[[Old]]', 'Old', 0, {
+        previousHref: null,
+      });
+      const oldNativeHref = oldHover.anchors.find(
+        (anchor) => anchor.title === 'Execute command codocs.openSource',
+      ).href;
       await c.replace(
         document,
         document.getText().replace('[[Old]]', '[[Direct]]'),
@@ -109,7 +114,9 @@ module.exports.scenarios = [
             .length === 0,
         'changed-reference warning cleared',
       );
-      await c.driver.hover('[[Direct]]', 'Direct');
+      await c.driver.hover('[[Direct]]', 'Direct', 0, {
+        previousHref: oldNativeHref,
+      });
       await c.driver.yamlLink('[[Direct]]');
       await c.atTop('.codocs/direct.yaml');
       c.assert.ok(document.isDirty);
@@ -139,7 +146,11 @@ module.exports.scenarios = [
       c.assert.ok(saved.anchors.some((anchor) => anchor.label === 'Auxiliary'));
       c.assert.ok(!saved.anchors.some((anchor) => anchor.label === 'Direct'));
       await c.driver.dismiss();
-      await c.vscode.window.tabGroups.close(c.tabs(zone));
+      c.assert.equal(await c.vscode.window.tabGroups.close(c.tabs(zone)), true);
+      await c.until(
+        () => document.isClosed && c.tabs(zone).length === 0,
+        'saved target document closed',
+      );
       await c.fs.writeFile(
         document.uri.fsPath,
         'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\n',
@@ -147,7 +158,12 @@ module.exports.scenarios = [
       await c.driver.hover('zone', 'External body');
       await c.driver.clickAnchor('원문 열기');
       const editor = await c.atTop(zone);
+      await c.until(
+        () => editor.document.getText().includes('External body'),
+        'opened external text settled',
+      );
       c.assert.ok(editor.document.getText().includes('External body'));
+      await c.atTop(zone);
     },
   },
   {

@@ -318,13 +318,29 @@ export class RendererDriver {
   }
 
   /** 화면의 실제 문자 범위에 포인터를 올려 표시된 본문을 기다린다. */
-  async hover(text, expectedBody, occurrence = 0) {
+  async hover(text, expectedBody, occurrence = 0, nativeLink) {
     await this.dismiss();
     let nextArm = 0;
     return until(
       /** 실제 화면 관측과 입력 순서를 확인한다. */ async () => {
         const state = await this.evaluate(hoverState);
-        if (state && !state.loading && state.body.includes(expectedBody))
+        // Hover provider와 독립인 Monaco 본문 링크의 실제 표시 선택을 확인한다.
+        const nativeAnchors =
+          state?.anchors.filter(
+            (anchor) =>
+              anchor.title === 'Execute command codocs.openSource' &&
+              anchor.href?.startsWith('command:codocs.openSource'),
+          ) ?? [];
+        const nativeReady =
+          !nativeLink ||
+          (nativeAnchors.length === 1 &&
+            nativeAnchors[0].href !== nativeLink.previousHref);
+        if (
+          state &&
+          !state.loading &&
+          state.body.includes(expectedBody) &&
+          nativeReady
+        )
           return state;
         // 초기 provider 준비나 완료 관측 교체 뒤 실제 포인터를 다시 올린다.
         // 동일 시나리오의 클릭/결과를 반복하지 않고 Hover 표시 준비만 제한한다.
