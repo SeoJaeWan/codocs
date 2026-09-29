@@ -115,7 +115,7 @@ definition: |
 
   ## 배포 파일 조립과 검증
 
-  pnpm release:pack은 현재 소스를 빌드한 뒤 실행별 고유 staging에서 각 대상 manifest 버전의 co-documentation tarball과 seojaewan.codocs VSIX를 조립하고 고정된 출력 위치에 둔다. 파일명과 검증 기대값도 대상별 버전을 따른다. 내부 workspace 패키지는 비공개로 유지한다. 공개 MCP는 의존성을 포함한 ESM codocs bin이며 Node 24.x에서 실행하고 별도 공개 JS API를 약속하지 않는다.
+  pnpm release:pack은 현재 소스를 빌드한 뒤 실행별 고유 staging에서 각 대상 manifest 버전의 co-documentation tarball과 seojaewan.codocs VSIX를 조립하고 고정된 출력 위치에 둔다. 출력 위치는 실행마다 비워 그 실행의 두 파일만 남기며 이전 실행의 파일을 보관하지 않는다. 파일명과 검증 기대값도 대상별 버전을 따른다. 내부 workspace 패키지는 비공개로 유지한다. 공개 MCP는 의존성을 포함한 ESM codocs bin이며 Node 24.x에서 실행하고 별도 공개 JS API를 약속하지 않는다.
   배포 목록은 실행 코드·가이드·예시·양언어 README·MIT LICENSE·원본 logo.png·번들 의존성 라이선스 원문으로 제한한다. 원본 로고를 변형하지 않으며 프롬프트·소스·테스트·개발용 map/선언 파일을 포함하지 않는다. npm README의 가이드·예시 상대 링크는 staging의 실제 dist 경로로 조정하고 Marketplace README는 저장소의 공개 원문 링크를 사용한다.
   자체 README·한국어 README·MIT LICENSE는 체크아웃 줄바꿈과 무관하게 UTF-8 LF로 패키징한다. 상대 링크는 배포 위치에 맞춰 한 번 변환하고 VSCE의 추가 링크·issue 변환을 끈다. 검증은 같은 규칙의 예상 바이트와 압축 파일을 정확히 비교하며 실제 산출물을 관대하게 정규화하지 않는다. 제3자 라이선스 원문과 PNG 바이트는 정규화 대상이 아니다.
 
