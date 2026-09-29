@@ -27,7 +27,7 @@ Changesets
 
 - .github/workflows/release-prepare.yml, release-sync.yml, release-publish.yml
 - tools/ci의 나머지(release-flow, release-sync, release-publish, release-fixture, release-contract.test)와 테스트
-- CI의 Ubuntu job에서 실행하던 pnpm test:release-management step
+- CI의 test:release-management step은 COD-35에서 유지하고, COD-36에서 OS job이 pnpm test로 바뀔 때 제거한다. 그동안 tools/build의 node 테스트가 CI에서 계속 실행된다.
 - tools/build/release-contract.mjs의 CI 전용 부분(job·workflow 이름, 후보·증거·보고서 스키마). products·assertVersion·artifactName·readProductVersions는 유지한다.
 - tools/build/release.mjs의 packageRelease·sourceIdentity, release-source.test.mjs
 - tools/test/git-config.mjs와 테스트
