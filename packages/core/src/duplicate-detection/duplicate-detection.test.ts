@@ -20,25 +20,50 @@ import {
 // 아래 fixture는 COD-30 고정 사례(.github/workplans/evidence/COD-30-duplicate-cases.json)의 원문 YAML이다.
 // 각 파일은 `git show <커밋>:<경로>`로 한 번 추출해 커밋했으며, 테스트는 git을 호출하지 않는다.
 // 출처 커밋과 경로는 사례마다 아래 fixtureSources 주석에 적었다.
-import duplicateIdBeforeA from './fixtures/duplicate-id-response/before-a.yaml?raw';
-import duplicateIdBeforeB from './fixtures/duplicate-id-response/before-b.yaml?raw';
-import duplicateIdAfterA from './fixtures/duplicate-id-response/after-a.yaml?raw';
-import duplicateIdAfterB from './fixtures/duplicate-id-response/after-b.yaml?raw';
-import guideScopeBeforeA from './fixtures/guide-scope/before-a.yaml?raw';
-import guideScopeBeforeB from './fixtures/guide-scope/before-b.yaml?raw';
-import guideScopeAfterA from './fixtures/guide-scope/after-a.yaml?raw';
-import guideScopeAfterB from './fixtures/guide-scope/after-b.yaml?raw';
-import statusBeforeA from './fixtures/status-meaning/before-a.yaml?raw';
-import statusBeforeB from './fixtures/status-meaning/before-b.yaml?raw';
-import statusAfterA from './fixtures/status-meaning/after-a.yaml?raw';
-import statusAfterB from './fixtures/status-meaning/after-b.yaml?raw';
-import redundantReference from './fixtures/redundant-reference-guidance/before.yaml?raw';
-import fieldPathBeforeA from './fixtures/field-path-definition/before-a.yaml?raw';
-import fieldPathBeforeB from './fixtures/field-path-definition/before-b.yaml?raw';
-import leftoverA from './fixtures/leftover-after-split/after-a.yaml?raw';
-import leftoverB from './fixtures/leftover-after-split/after-b.yaml?raw';
-import contextualA from './fixtures/contextual-reference-navigation/snapshot-a.yaml?raw';
-import contextualB from './fixtures/contextual-reference-navigation/snapshot-b.yaml?raw';
+import duplicateIdBeforeASource from './fixtures/duplicate-id-response/before-a.yaml?raw';
+import duplicateIdBeforeBSource from './fixtures/duplicate-id-response/before-b.yaml?raw';
+import duplicateIdAfterASource from './fixtures/duplicate-id-response/after-a.yaml?raw';
+import duplicateIdAfterBSource from './fixtures/duplicate-id-response/after-b.yaml?raw';
+import guideScopeBeforeASource from './fixtures/guide-scope/before-a.yaml?raw';
+import guideScopeBeforeBSource from './fixtures/guide-scope/before-b.yaml?raw';
+import guideScopeAfterASource from './fixtures/guide-scope/after-a.yaml?raw';
+import guideScopeAfterBSource from './fixtures/guide-scope/after-b.yaml?raw';
+import statusBeforeASource from './fixtures/status-meaning/before-a.yaml?raw';
+import statusBeforeBSource from './fixtures/status-meaning/before-b.yaml?raw';
+import statusAfterASource from './fixtures/status-meaning/after-a.yaml?raw';
+import statusAfterBSource from './fixtures/status-meaning/after-b.yaml?raw';
+import redundantReferenceSource from './fixtures/redundant-reference-guidance/before.yaml?raw';
+import fieldPathBeforeASource from './fixtures/field-path-definition/before-a.yaml?raw';
+import fieldPathBeforeBSource from './fixtures/field-path-definition/before-b.yaml?raw';
+import leftoverASource from './fixtures/leftover-after-split/after-a.yaml?raw';
+import leftoverBSource from './fixtures/leftover-after-split/after-b.yaml?raw';
+import contextualASource from './fixtures/contextual-reference-navigation/snapshot-a.yaml?raw';
+import contextualBSource from './fixtures/contextual-reference-navigation/snapshot-b.yaml?raw';
+
+/** fixture 원문의 줄바꿈을 LF로 맞춘다. 사례의 위치는 LF 원문 기준이고 Windows 체크아웃은 CRLF로 바뀔 수 있다. */
+function lf(source: string): string {
+  return source.replace(/\r\n/gu, '\n');
+}
+
+const duplicateIdBeforeA = lf(duplicateIdBeforeASource);
+const duplicateIdBeforeB = lf(duplicateIdBeforeBSource);
+const duplicateIdAfterA = lf(duplicateIdAfterASource);
+const duplicateIdAfterB = lf(duplicateIdAfterBSource);
+const guideScopeBeforeA = lf(guideScopeBeforeASource);
+const guideScopeBeforeB = lf(guideScopeBeforeBSource);
+const guideScopeAfterA = lf(guideScopeAfterASource);
+const guideScopeAfterB = lf(guideScopeAfterBSource);
+const statusBeforeA = lf(statusBeforeASource);
+const statusBeforeB = lf(statusBeforeBSource);
+const statusAfterA = lf(statusAfterASource);
+const statusAfterB = lf(statusAfterBSource);
+const redundantReference = lf(redundantReferenceSource);
+const fieldPathBeforeA = lf(fieldPathBeforeASource);
+const fieldPathBeforeB = lf(fieldPathBeforeBSource);
+const leftoverA = lf(leftoverASource);
+const leftoverB = lf(leftoverBSource);
+const contextualA = lf(contextualASource);
+const contextualB = lf(contextualBSource);
 
 /** 원문 YAML을 문서 입력으로 만든다. 파싱은 호출자 몫이라는 계약대로 테스트가 한 번 파싱해 넘긴다. */
 function input(

@@ -427,9 +427,8 @@ describe('WorkspaceQuerySession.duplicates: 초안 검사', () => {
     expect(result.candidates).toHaveLength(1);
     for (const candidate of result.candidates)
       expect(draftLocationCount(candidate)).toBeGreaterThanOrEqual(1);
-    expect(result.candidates[0]?.b.path).toBe(
-      path.join('.codocs', 'draft.yaml'),
-    );
+    // 생성 초안의 경로는 요청한 '/' 구분 경로 그대로이고 저장 문서의 경로는 OS 구분자를 따른다.
+    expect(result.candidates[0]?.b.path).toBe('.codocs/draft.yaml');
     expect(result.candidates[0]?.a.path).toBe(
       path.join('.codocs', 'alpha.yaml'),
     );
