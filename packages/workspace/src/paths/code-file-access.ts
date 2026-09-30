@@ -27,6 +27,8 @@ export interface CodeCollectionFailure {
 }
 interface IgnoreLayer {
   directory: string;
+  /** 감시 규칙 비교를 위해 규칙의 원문을 보존한다. */
+  text: string;
   matcher: Ignore;
 }
 /** 프로젝트의 추적·ignore 집합을 한 번 확인한 읽기 전용 정책이다. */
@@ -34,8 +36,19 @@ export interface CodeFilePolicy {
   projectRoot: string;
   repositoryKind: (typeof codeRepositoryKinds)[keyof typeof codeRepositoryKinds];
   tracked: ReadonlySet<string>;
+  /** 추적 파일을 하나 이상 가진 모든 상위 디렉터리다(프로젝트 root 제외). */
+  trackedDirectories: ReadonlySet<string>;
   layers: readonly IgnoreLayer[];
   unknownIgnoreDirectories: ReadonlySet<string>;
+}
+/** 파일 원문을 읽지 않고 확인한 정책과 읽기 후보 파일이다. */
+export interface CodeFilePolicyComputation {
+  policy: CodeFilePolicy;
+  /** 정책 계산 중 확인한 Git·ignore·탐색 실패다. */
+  failures: readonly CodeCollectionFailure[];
+  gitDirectory?: string;
+  /** 수집 대상이 될 수 있는 일반 파일의 프로젝트 상대 경로다. */
+  candidates: readonly string[];
 }
 /** 정책과 확인한 적격 파일만 함께 게시한다. */
 export interface CodeFileDiscovery {
@@ -98,6 +111,58 @@ export function isCodeFileIgnored(
     if (excluded) return true;
   }
   return false;
+}
+/** 추적 파일이 하나라도 들어 있는 디렉터리인지 미리 계산한 집합에서 확인한다. */
+export function hasTrackedDescendant(
+  policy: CodeFilePolicy,
+  relative: string,
+): boolean {
+  return policy.trackedDirectories.has(relative);
+}
+/** 추적 파일의 모든 상위 디렉터리를 한 번에 모은다. */
+function trackedAncestors(tracked: ReadonlySet<string>): Set<string> {
+  const directories = new Set<string>();
+  for (const file of tracked) {
+    let end = file.lastIndexOf('/');
+    while (end > 0) {
+      const directory = file.slice(0, end);
+      if (directories.has(directory)) break;
+      directories.add(directory);
+      end = file.lastIndexOf('/', end - 1);
+    }
+  }
+  return directories;
+}
+/**
+ * 수집 대상이 될 수 없는 경로를 감시하지 않도록 수집과 같은 정책으로 판단한다.
+ * 파일인지 디렉터리인지 정해지지 않은 첫 호출은 stats 없이 판단 가능한 경우에만 제외한다.
+ */
+export function isCodeWatchIgnored(
+  policy: CodeFilePolicy,
+  input: string,
+  stats?: { isDirectory(): boolean },
+): boolean {
+  const relative = codeFileRelativePath(policy.projectRoot, input);
+  if (!relative || path.posix.basename(relative) === '.gitignore') return false;
+  const asFile = isCodeFileIgnored(policy, relative);
+  const asDirectory =
+    isCodeFileIgnored(policy, relative + '/') &&
+    !hasTrackedDescendant(policy, relative);
+  if (asFile === asDirectory) return asFile;
+  if (!stats) return false;
+  return stats.isDirectory() ? asDirectory : asFile;
+}
+/**
+ * 감시 규칙은 .gitignore 계층의 원문과 추적 파일 때문에 감시하는 제외 폴더 집합이다.
+ * 두 규칙이 같으면 감시 대상도 같다.
+ */
+export function codeWatchRuleKey(policy: CodeFilePolicy): string {
+  return JSON.stringify([
+    policy.layers.map((layer) => [layer.directory, layer.text]),
+    [...policy.trackedDirectories]
+      .filter((directory) => isCodeFileIgnored(policy, directory + '/'))
+      .sort(),
+  ]);
 }
 /** 프로젝트와 모든 경로 성분의 링크·특수 파일을 열기 전에 거부한다. */
 async function regularFile(
@@ -207,18 +272,18 @@ export async function readEligibleCodeFile(
   }
 }
 /**
- * Git 상태 실패와 명시적 비 Git을 구분하고 프로젝트 .gitignore만 적용한다.
- * @codocs [[작업 공간:코드 참조 색인]]#L14-L18
+ * 파일 원문을 읽지 않고 Git 추적 집합과 프로젝트 .gitignore 계층만 확인한다.
+ * 감시 등록과 수집이 같은 정책 계산을 공유한다.
  */
-export async function discoverCodeFiles(
+export async function computeCodeFilePolicy(
   projectRoot: string,
-  cache: ReadonlyMap<string, CodeFileObservation> = new Map(),
-): Promise<CodeFileDiscovery> {
+): Promise<CodeFilePolicyComputation> {
   projectRoot = path.resolve(projectRoot);
   const tracked = new Set<string>();
   const layers: IgnoreLayer[] = [];
   const unknownIgnoreDirectories = new Set<string>();
   const failures: CodeCollectionFailure[] = [];
+  const candidates: string[] = [];
   let repositoryKind: CodeFilePolicy['repositoryKind'] =
     codeRepositoryKinds.unknown;
   let gitDirectory: string | undefined;
@@ -252,10 +317,10 @@ export async function discoverCodeFiles(
     projectRoot,
     repositoryKind,
     tracked,
+    trackedDirectories: trackedAncestors(tracked),
     layers,
     unknownIgnoreDirectories,
   };
-  const files: CodeFileObservation[] = [];
   /** 추적 파일이 있는 ignored 폴더만 내려가며 각 폴더 규칙을 순서대로 보존한다. */
   async function visit(directory: string): Promise<void> {
     const absolute = path.join(projectRoot, directory);
@@ -273,11 +338,10 @@ export async function discoverCodeFiles(
       if (!directory || !isCodeFileIgnored(policy, directory + '/')) {
         try {
           const ignoreStat = await lstat(ignorePath);
-          if (ignoreStat.isFile() && !ignoreStat.isSymbolicLink())
-            layers.push({
-              directory,
-              matcher: ignore().add(await readFile(ignorePath, 'utf8')),
-            });
+          if (ignoreStat.isFile() && !ignoreStat.isSymbolicLink()) {
+            const text = await readFile(ignorePath, 'utf8');
+            layers.push({ directory, text, matcher: ignore().add(text) });
+          }
         } catch (error: unknown) {
           if (!(
             typeof error === 'object' &&
@@ -302,21 +366,14 @@ export async function discoverCodeFiles(
         if (item.isDirectory()) {
           if (
             !isCodeFileIgnored(policy, relative + '/') ||
-            [...tracked].some((file) => file.startsWith(relative + '/'))
+            hasTrackedDescendant(policy, relative)
           )
             await visit(relative);
         } else if (
           item.isFile() &&
           repositoryKind !== codeRepositoryKinds.unknown
-        ) {
-          const observed = await readEligibleCodeFile(
-            policy,
-            relative,
-            cache.get(relative),
-          );
-          if (observed && 'text' in observed) files.push(observed);
-          else if (observed) failures.push(observed);
-        }
+        )
+          candidates.push(relative);
       }
     } catch (error: unknown) {
       failures.push({
@@ -327,6 +384,34 @@ export async function discoverCodeFiles(
     }
   }
   await visit('');
+  return {
+    policy,
+    failures,
+    candidates,
+    ...(gitDirectory ? { gitDirectory } : {}),
+  };
+}
+/**
+ * Git 상태 실패와 명시적 비 Git을 구분하고 프로젝트 .gitignore만 적용한다.
+ * @codocs [[작업 공간:코드 참조 색인]]#L14-L18
+ */
+export async function discoverCodeFiles(
+  projectRoot: string,
+  cache: ReadonlyMap<string, CodeFileObservation> = new Map(),
+): Promise<CodeFileDiscovery> {
+  const { policy, candidates, gitDirectory, ...computed } =
+    await computeCodeFilePolicy(projectRoot);
+  const failures = [...computed.failures];
+  const files: CodeFileObservation[] = [];
+  for (const relative of candidates) {
+    const observed = await readEligibleCodeFile(
+      policy,
+      relative,
+      cache.get(relative),
+    );
+    if (observed && 'text' in observed) files.push(observed);
+    else if (observed) failures.push(observed);
+  }
   return {
     status: failures.length
       ? codeCollectionStatuses.incomplete

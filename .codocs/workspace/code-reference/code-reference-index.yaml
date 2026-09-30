@@ -77,3 +77,4 @@ definition: |
   저장·편집 출현과 역참조·확인은 [담당 구현](../../../packages/workspace/src/code-reference/index.ts)에서 확인한다.
   실제 IO·overlay·불완전 상태·감시·클릭의 계약은 [인접 테스트](../../../packages/workspace/src/code-reference/code-reference.test.ts)에서 확인한다.
   프로젝트 전용 적격성은 [코드 파일 읽기](../../../packages/workspace/src/paths/code-file-access.ts)와 [인접 테스트](../../../packages/workspace/src/paths/code-file-access.test.ts)에서 확인한다.
+  감시 범위와 규칙 기반 재구성, 감시 오류의 자동 복구 상태는 [인접 테스트](../../../packages/workspace/src/code-reference/code-reference.test.ts)에서 확인한다. 감시 대상 판단과 추적 폴더 집합은 [정책 테스트](../../../packages/workspace/src/paths/code-file-access.test.ts)에서 확인한다.
