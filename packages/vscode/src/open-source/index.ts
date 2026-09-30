@@ -88,7 +88,8 @@ export class OpenSourceFailure extends Error {
   }
 }
 
-/** 현재 확장 실행의 최근 실패만 기억하여 반복 클릭 로그를 억제한다. */
+/** 현재 확장 실행의 최근 실패만 기억하여 반복 클릭 로그를 억제한다.
+ * @codocs [[VS Code:원문 열기]]#L21 */
 export class OpenSourceFailureReporter {
   readonly #appendLine: (message: string) => void;
   readonly #reported = new Set<string>();
@@ -114,7 +115,8 @@ export class OpenSourceFailureReporter {
   }
 }
 
-/** 외부 입력에서 source URI와 서버 토큰의 형태를 확인한다. */
+/** 외부 입력에서 source URI와 서버 토큰의 형태를 확인한다.
+ * @codocs [[VS Code:원문 열기]] */
 export function validSourceArgument(
   value: unknown,
 ): value is OpenSourceCommandArgument {
@@ -152,7 +154,9 @@ export function trustGeneratedOpenSourceHoverContents(contents: unknown): void {
   }
 }
 
-/** 최신 선택 확인 후 기존 dirty buffer를 보존하며 연다. 전체 문서 대상은 (0,0) 빈 선택을 적용하고, 행·위치 대상은 현재 원문에서 그 범위를 선택한다. 확인된 행·위치가 현재 원문에 없으면 선택하지 않고 destination_unavailable 실패를 기록한다. */
+/** 최신 선택 확인 후 기존 dirty buffer를 보존하며 연다. 전체 문서 대상은 (0,0) 빈 선택을 적용하고, 행·위치 대상은 현재 원문에서 그 범위를 선택한다. 확인된 행·위치가 현재 원문에 없으면 선택하지 않고 destination_unavailable 실패를 기록한다.
+ * @codocs [[VS Code:원문 열기]]
+ * @codocs [[VS Code:원문 열기]]#L25-L30 */
 export async function openSource<Document extends OpenSourceDocument>(
   argument: unknown,
   host: OpenSourceHost<Document>,
@@ -216,7 +220,9 @@ export async function openSource<Document extends OpenSourceDocument>(
   }
 }
 
-/** 실제 현재 buffer의 두 끝이 존재할 때만 선택하며 범위를 보정하지 않는다. */
+/** 실제 현재 buffer의 두 끝이 존재할 때만 선택하며 범위를 보정하지 않는다.
+ * @codocs [[VS Code:원문 열기]]#L35-L38
+ * @codocs [[VS Code:원문 열기]]#L44 */
 export function sourceSelection(
   text: string,
   destination: unknown,

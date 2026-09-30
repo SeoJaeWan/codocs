@@ -14,6 +14,7 @@ export interface DuplicatePreparationLookup {
 /**
  * 저장 문서의 준비 자료를 경로별로 한 건씩 보관하는 세션 수명 캐시다.
  * 경로·원문 버전·설정 버전이 모두 같을 때만 재사용하며 초안은 넣지 않는다.
+ * @codocs [[작업 공간:작업 공간 중복 검사]]#L32-L37
  */
 export class DuplicatePreparationCache {
   readonly #entries = new Map<

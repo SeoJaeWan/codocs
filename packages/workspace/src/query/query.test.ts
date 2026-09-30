@@ -709,6 +709,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   });
 
   describe('부분 스캔 후 이전 조회 결과 보존', () => {
+    /** @codocs [[작업 공간:미확인 문서]]#L12-L13 */
     it('문서 경로의 확인이 실패하면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
       const raw =
         "id: alpha\nname: 알파\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: '이전 본문'\n";
@@ -742,6 +743,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
+    /** @codocs [[작업 공간:작업 공간 조회 세션]]#L56 */
     it('부분 스캔에서 색인 밖 ID를 조회하면 부재로 확정하지 않는다', async () => {
       const target = await file(
         'alpha.yaml',
@@ -863,6 +865,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   });
 
   describe('목록 표시 변경에 따른 cursor 유효성', () => {
+    /** @codocs [[작업 공간:목록 페이지 조회]]#L19 @codocs [[작업 공간:조회 커서]]#L15 */
     it('본문만 변경하면 기존 cursor로 다음 페이지를 조회한다', async () => {
       for (let index = 0; index < 51; index++)
         await file(
@@ -899,6 +902,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
+    /** @codocs [[작업 공간:목록 페이지 조회]]#L13 */
     it('cursor와 최초 목록의 도메인과 다른 필터를 전달하면 입력 오류를 반환한다', async () => {
       for (let index = 0; index < 51; index++)
         await file(
@@ -1207,6 +1211,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
+    /** @codocs [[작업 공간:목록 페이지 조회]]#L20 */
     it('새 세션에서 이전 cursor를 사용하면 만료 오류를 반환한다', async () => {
       for (let index = 0; index < 51; index++)
         await file(

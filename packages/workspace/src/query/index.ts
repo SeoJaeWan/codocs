@@ -508,7 +508,10 @@ function fingerprint(items: readonly CatalogListItem[]): string {
     .digest('hex');
 }
 
-/** HMAC 입력과 payload를 분리할 수 있는 URL-safe 토큰으로 만든다. */
+/**
+ * HMAC 입력과 payload를 분리할 수 있는 URL-safe 토큰으로 만든다.
+ * @codocs [[작업 공간:조회 커서]]#L11-L12
+ */
 function encodeCursor(payload: CursorPayload): string {
   return encodeSignedCursor(payload);
 }
@@ -553,7 +556,10 @@ function decodeCursor(token: string): CursorPayload | undefined {
   return cursorPayload(decodeSignedCursor(token));
 }
 
-/** 커서가 만료되었음을 첫 페이지 대체 없이 반환한다. */
+/**
+ * 커서가 만료되었음을 첫 페이지 대체 없이 반환한다.
+ * @codocs [[작업 공간:목록 페이지 조회]]#L23-L24
+ */
 function cursorExpired(
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>,
 ): WorkspaceQueryFailure {
@@ -651,7 +657,10 @@ function scanRevisions(scan: WorkspaceScanResult): Map<string, string> {
   );
 }
 
-/** 미확인 문서에 최신성 비보장 진단을 추가한다. */
+/**
+ * 미확인 문서에 최신성 비보장 진단을 추가한다.
+ * @codocs [[작업 공간:미확인 문서]]#L12-L13
+ */
 function withConfirmationDiagnostic(
   result: CatalogGetResult,
 ): WorkspaceGetResult {
@@ -740,7 +749,10 @@ export interface WorkspaceDiagnosticsSnapshot {
   failures: readonly { path?: string; message: string }[];
 }
 
-/** 실제 scan과 이전 Catalog를 직렬로 연결하는 process 범위 조회 세션이다. */
+/**
+ * 실제 scan과 이전 Catalog를 직렬로 연결하는 process 범위 조회 세션이다.
+ * @codocs [[작업 공간:작업 공간 조회 세션]]
+ */
 export class WorkspaceQuerySession {
   readonly #input: unknown;
   readonly #options: WorkspaceQuerySessionOptions;
@@ -814,7 +826,10 @@ export class WorkspaceQuerySession {
       void this.#synchronize(false).catch(() => undefined);
   }
 
-  /** 프로젝트 선택 후 첫 문서 IO 전에 구독과 감시 준비를 완료한다. */
+  /**
+   * 프로젝트 선택 후 첫 문서 IO 전에 구독과 감시 준비를 완료한다.
+   * @codocs [[작업 공간:색인 갱신]]#L39-L41
+   */
   async #prepare(): Promise<WorkspaceScanResult | undefined> {
     if (this.#watcher || this.#closed) return;
     const selected = await resolveProjectRoot(this.#input);
@@ -1076,7 +1091,10 @@ export class WorkspaceQuerySession {
     return false;
   }
 
-  /** 저장은 한 번만 수행하고 색인 관측 실패에만 범위 재읽기를 추가 한 번 시도한다. */
+  /**
+   * 저장은 한 번만 수행하고 색인 관측 실패에만 범위 재읽기를 추가 한 번 시도한다.
+   * @codocs [[작업 공간:저장 후 색인 갱신 실패를 복구하는 절차]]
+   */
   async write(input: unknown): Promise<WorkspaceWriteResult> {
     if (this.#closed || this.#explicitRefreshPromise)
       return this.#writeFailure([workspaceIndexNotReady().error]);
@@ -1218,7 +1236,10 @@ export class WorkspaceQuerySession {
     };
   }
 
-  /** 최신 실제 scan에서 필터 snapshot을 50개씩 반환한다. */
+  /**
+   * 최신 실제 scan에서 필터 snapshot을 50개씩 반환한다.
+   * @codocs [[작업 공간:목록 페이지 조회]]
+   */
   async list(input: WorkspaceListInput = {}): Promise<WorkspaceListResult> {
     if (this.#scan && this.#explicitRefreshPromise)
       return workspaceIndexNotReady();
@@ -2198,7 +2219,10 @@ export class WorkspaceQuerySession {
       : undefined;
   }
 
-  /** 명시 refresh는 결과 변화와 무관하게 기존 커서 generation을 만료한다. */
+  /**
+   * 명시 refresh는 결과 변화와 무관하게 기존 커서 generation을 만료한다.
+   * @codocs [[작업 공간:색인 갱신]]#L33-L35
+   */
   refresh(): Promise<WorkspaceRefreshResult> {
     if (this.#closed) return Promise.resolve(superseded());
     if (this.#explicitRefreshPromise) return this.#explicitRefreshPromise;

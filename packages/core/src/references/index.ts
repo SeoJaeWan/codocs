@@ -84,7 +84,7 @@ function bodyPaths(data: Record<string, unknown>): FieldPath[] {
         paths.push([documentFields.examples, index]);
   return paths;
 }
-/** YAML 성공 결과의 정해진 본문만 추출한다. 스키마 검증·ID·파일 IO에 의존하지 않고 입력을 변경하지 않는다. */
+/** YAML 성공 결과의 정해진 본문만 추출한다. 스키마 검증·ID·파일 IO에 의존하지 않고 입력을 변경하지 않는다. @codocs [[참조 추출]] */
 export function extractReferences(
   parsed: YamlParseResult,
   path?: string,
@@ -102,7 +102,7 @@ export function extractReferences(
     if (!mapping) continue;
     const value = mapping.value;
     let start: number | undefined;
-    /** 실제 문자열 범위의 등장과 문법 오류를 함께 기록한다. */
+    /** 실제 문자열 범위의 등장과 문법 오류를 함께 기록한다. @codocs [[참조 추출]]#L20-L32 */
     function record(end: number, closed: boolean): void {
       if (start === undefined) return;
       const decodedRange = { start, end };

@@ -88,7 +88,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
     }
   });
 
-  it('이전 형식을 검사하면 새 필수 필드를 대신 채우지 않고 이전 속성을 경고한다', /** 호환 변환 없이 사용자 속성으로 보존하며 필수 속성 누락을 진단한다. */ () => {
+  it('이전 형식을 검사하면 새 필수 필드를 대신 채우지 않고 이전 속성을 경고한다', /** 호환 변환 없이 사용자 속성으로 보존하며 필수 속성 누락을 진단한다. @codocs [[문서 검증]]#L18-L20 */ () => {
     const legacy = {
       type: 'knowledge',
       id: 'legacy',
@@ -158,7 +158,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
     if (result.success) expect(result.data).toEqual(data);
   });
 
-  it('현재 ID와 같은 이전 ID는 값을 삭제하지 않고 해당 id 경로에 경고한다', /** 직접 YAML 편집으로 생긴 중복의 자동 정리를 수행하지 않는다. */ () => {
+  it('현재 ID와 같은 이전 ID는 값을 삭제하지 않고 해당 id 경로에 경고한다', /** 직접 YAML 편집으로 생긴 중복의 자동 정리를 수행하지 않는다. @codocs [[문서 검증]]#L39 */ () => {
     const data = {
       ...term,
       deprecatedAliases: [{ id: term.id, message: '기존 안내' }],
@@ -634,7 +634,7 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
     },
   );
 
-  it('최상위 필수 필드를 생략하면 문서 표시·독립 주석을 제외한 rootRange를 지목한다', /** 확인된 최상위 AST 매핑을 누락 속성의 부모로 사용한다. */ () => {
+  it('최상위 필수 필드를 생략하면 문서 표시·독립 주석을 제외한 rootRange를 지목한다', /** 확인된 최상위 AST 매핑을 누락 속성의 부모로 사용한다. @codocs [[진단]]#L24-L25 */ () => {
     const source =
       '# 앞\n---\n{id: order, definition: 정의, domains: [영역]} # 뒤\n';
     const parsed = parseYaml(source, 'terms.yaml');

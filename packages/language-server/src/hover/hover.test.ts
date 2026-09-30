@@ -330,6 +330,7 @@ describe('createHover: 대표 본문과 같은 식별자 보조 링크', () => {
     const leftMarkdown = markdown(createHover(left!, match, projected));
     const rightMarkdown = markdown(createHover(right!, match, projected));
 
+    // @codocs [[코드 호버]]#L17-L18
     expect(leftMarkdown).toContain('예약 본문');
     expect(leftMarkdown).not.toContain('반납 본문');
     expect(leftMarkdown).toContain('반납 구역');
@@ -822,6 +823,7 @@ describe('createHover: 직접 관계와 안전한 원문 링크', () => {
     ]);
 
     const value = markdown(createHover(selected!, match, projected));
+    // @codocs [[코드 호버]]#L45
     expect(value).not.toContain('](command:evil.run)');
     expect(value).toContain(`](command:${openSourceCommand}?`);
     expect(value).not.toContain('<script>');

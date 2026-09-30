@@ -55,16 +55,20 @@ export type CodocsListResponse = WorkspaceListResult;
 /** codocs_get의 공통 success 응답이다. */
 export type CodocsGetResponse = WorkspaceGetResponse;
 
-/** codocs_validate의 공통 결과이며 문서 오류 진단도 요청 성공이다. */
+/** codocs_validate의 공통 결과이며 문서 오류 진단도 요청 성공이다.
+ * @codocs [[MCP:문서 검증 요청]] */
 export type CodocsValidationResponse = WorkspaceValidationResult;
 
-/** codocs_write의 저장 여부와 색인 게시 여부를 구분하는 공통 결과다. */
+/** codocs_write의 저장 여부와 색인 게시 여부를 구분하는 공통 결과다.
+ * @codocs [[MCP:도구 결과]]#L42-L45 */
 export type CodocsWriteResponse = WorkspaceWriteResult;
 
-/** codocs_duplicates의 공통 결과이며 부분·실패 결과도 중복 없음이 아니다. */
+/** codocs_duplicates의 공통 결과이며 부분·실패 결과도 중복 없음이 아니다.
+ * @codocs [[MCP:본문 중복 검토 요청]]#L39-L42 */
 export type CodocsDuplicatesResponse = WorkspaceDuplicateResponse;
 
-/** SDK 등록과 독립적으로 직접 호출할 수 있는 조회 handler 모음이다. */
+/** SDK 등록과 독립적으로 직접 호출할 수 있는 조회 handler 모음이다.
+ * @codocs [[MCP:조회]] */
 export interface CodocsQueryHandlers {
   readonly access: CodocsAccessState;
   codocsList(input?: unknown): Promise<CodocsListResponse>;
@@ -117,6 +121,7 @@ function accessState(session: WorkspaceQuerySession): CodocsAccessState {
 }
 
 /** 한 workspace 세션을 codocs_list/codocs_get 직접 handler로 감싼다.
+ * @codocs [[MCP:조회]]
  * @param session 서버 또는 호출자가 소유하며 종료하는 프로젝트 세션이다.
  */
 export function createCodocsQueryHandlers(
@@ -144,19 +149,22 @@ export function createCodocsQueryHandlers(
     get access(): CodocsAccessState {
       return accessState(session);
     },
-    /** 유효한 목록 입력만 workspace scan과 조회로 전달한다. */
+    /** 유효한 목록 입력만 workspace scan과 조회로 전달한다.
+     * @codocs [[MCP:조회]]#L14-L15 */
     async codocsList(input?: unknown): Promise<CodocsListResponse> {
       const parsed = parseListInput(arguments.length === 0 ? {} : input);
       if (!parsed) return invalidInput();
       return session.list(parsed);
     },
-    /** 유효한 상세 입력 전체만 workspace scan과 조회로 전달한다. */
+    /** 유효한 상세 입력 전체만 workspace scan과 조회로 전달한다.
+     * @codocs [[MCP:조회]]#L26-L27 */
     async codocsGet(input: unknown): Promise<CodocsGetResponse> {
       const parsed = parseGetInput(input);
       if (!parsed) return invalidInput();
       return session.get(parsed.ids);
     },
-    /** 같은 세션의 완료 색인과 경로 검사로 검증 범위를 결정한다. */
+    /** 같은 세션의 완료 색인과 경로 검사로 검증 범위를 결정한다.
+     * @codocs [[MCP:문서 검증 요청]]#L11-L12 */
     async codocsValidate(input?: unknown): Promise<CodocsValidationResponse> {
       const parsed = parseValidateInput(arguments.length === 0 ? {} : input);
       if (!parsed) return invalidInput();
@@ -164,7 +172,8 @@ export function createCodocsQueryHandlers(
     },
     /** 같은 세션의 명시 refresh로 기존 목록 cursor를 만료한다. */
     codocsRefresh: refresh,
-    /** 형식 오류만 여기서 거부하고 문서 진단은 workspace 변경 계획에서 보존한다. */
+    /** 형식 오류만 여기서 거부하고 문서 진단은 workspace 변경 계획에서 보존한다.
+     * @codocs [[MCP:MCP 도구 호출]]#L29 */
     async codocsWrite(input: unknown): Promise<CodocsWriteResponse> {
       const parsed = parseWriteInput(input);
       if (!parsed) {
@@ -179,7 +188,8 @@ export function createCodocsQueryHandlers(
       }
       return session.write(parsed);
     },
-    /** draft는 write 입력으로 풀어 전달하고 취소 신호는 세션 검사까지 잇는다. */
+    /** draft는 write 입력으로 풀어 전달하고 취소 신호는 세션 검사까지 잇는다.
+     * @codocs [[MCP:본문 중복 검토 요청]]#L10-L11 */
     async codocsDuplicates(
       input?: unknown,
       options: { signal?: AbortSignal } = {},

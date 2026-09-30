@@ -81,6 +81,7 @@ function payload(response: unknown): Record<string, unknown> {
 }
 
 describe('소스 MCP stdio 서버', () => {
+  // @codocs [[MCP:MCP 도구 호출]]#L11-L12
   it('초기화 후 쓰기를 포함한 도구를 제공하고 실제 문서를 목록·상세·검증·갱신한다', async () => {
     const { client, transport } = await clientFor(projectA);
     try {
@@ -141,6 +142,7 @@ describe('소스 MCP stdio 서버', () => {
     }
   });
 
+  // @codocs [[MCP:검증 오류가 있는 문서를 조회하고 수정하는 절차]]#L15-L17
   it('큰 정상 문서와 .inf 원문을 혼합 조회해 본문·직접 참조·revision·진단을 전부 보존한다', async () => {
     const selected = path.join(fixture, 'large');
     const folder = path.join(selected, '.codocs');

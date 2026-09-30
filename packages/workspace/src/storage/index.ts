@@ -115,7 +115,10 @@ function failure(
   return { success: false, saved: false, changed: false, diagnostics };
 }
 
-/** 저장 대상의 실제 상태를 재확인하고 update의 디스크 바이트를 기준 버전과 비교한다. */
+/**
+ * 저장 대상의 실제 상태를 재확인하고 update의 디스크 바이트를 기준 버전과 비교한다.
+ * @codocs [[작업 공간:저장]]#L19-L21
+ */
 async function inspectTarget(
   root: ProjectRoot,
   sourcePath: string,
@@ -191,6 +194,8 @@ async function inspectTarget(
  * 검증된 단일 문서 후보를 같은 폴더의 배타적 임시 파일에 기록한 뒤 실제 파일에 반영한다.
  * update는 최신 바이트·ID·경로를 확인하고 rename하며 create는 비덮어쓰기 하드링크로 등록한다.
  * 파일 반영 뒤 임시 정리 실패는 저장 성공으로 반환한다. 색인 갱신과 프로세스 간 잠금은 수행하지 않는다.
+ * @codocs [[작업 공간:저장]]
+ * @codocs [[작업 공간:쓰기 조정]]#L15-L24
  */
 export async function saveWorkspaceChange(
   input: unknown,

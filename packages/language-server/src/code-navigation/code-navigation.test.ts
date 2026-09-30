@@ -110,6 +110,7 @@ describe('미완료 단일 출현과 저장 문서 탐색', () => {
     const owner: CodeOwner = { ...ownerBase, session };
     const navigation = new CodeNavigation();
     const hints = await navigation.hints(owner);
+    // @codocs [[IDE 지원]]#L51-L54
     expect(hints[0]!.label).toEqual([{ value: '확인된 코드 1곳 · 수집 중' }]);
     expect((hints[0]!.tooltip as { value: string }).value).toContain(
       'source\\.ts:1:4',
