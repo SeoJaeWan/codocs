@@ -8,7 +8,7 @@ AI도 `codocs_guide`를 호출하면 이 디렉터리의 같은 원문을 읽는
 1. `codocs_list`로 필요한 문서를 고르고 `codocs_get`으로 현재 내용·참조·revision을 읽는다. 기존 담당 원문이 있으면 먼저 보완한다.
 2. [문서 형식](schema.md)과 [작성 원칙](writing.md)에 맞춰 설명을 작성한다. 제품은 고정된 폴더 계층을 요구하지 않는다.
 3. [네 문서 연결 예시](examples.md)로 용어·정책·절차의 책임과 참조를 확인한다.
-4. [수정 절차](updating.md)에 따라 최신 revision으로 set/unset을 요청하고 저장 여부와 색인 상태를 확인한다.
+4. [수정 절차](updating.md)에 따라 저장 전에 `codocs_duplicates`로 초안을 검토하고(저장을 막지 않는 검토 정보), 최신 revision으로 set/unset을 요청하고 저장 여부와 색인 상태를 확인한다.
 5. [검증과 복구](validation.md)에서 오류·경고를 확인하고 필요한 수정과 refresh를 수행한다.
 
 `status: confirmed`는 합의된 내용이라는 뜻이다. 구현 완료나 AI가 사실을 자동 검증했다는 보장이 아니다.

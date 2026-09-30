@@ -5,8 +5,10 @@ import {
   scanStatuses,
 } from '@codocs/core';
 import {
+  workspaceDuplicateStatuses,
   workspaceLifecycleStates,
   type WorkspaceReadiness,
+  type WorkspaceDuplicateResponse,
   type WorkspaceGetResponse,
   type WorkspaceListInput,
   type WorkspaceListResult,
@@ -19,6 +21,7 @@ import {
 } from '@codocs/workspace';
 import {
   acceptsToolInput,
+  parseDuplicatesInput,
   parseGetInput,
   parseListInput,
   parseValidateInput,
@@ -58,6 +61,9 @@ export type CodocsValidationResponse = WorkspaceValidationResult;
 /** codocs_write의 저장 여부와 색인 게시 여부를 구분하는 공통 결과다. */
 export type CodocsWriteResponse = WorkspaceWriteResult;
 
+/** codocs_duplicates의 공통 결과이며 부분·실패 결과도 중복 없음이 아니다. */
+export type CodocsDuplicatesResponse = WorkspaceDuplicateResponse;
+
 /** SDK 등록과 독립적으로 직접 호출할 수 있는 조회 handler 모음이다. */
 export interface CodocsQueryHandlers {
   readonly access: CodocsAccessState;
@@ -66,6 +72,10 @@ export interface CodocsQueryHandlers {
   codocsValidate(input?: unknown): Promise<CodocsValidationResponse>;
   codocsRefresh(input?: unknown): Promise<WorkspaceRefreshResult>;
   codocsWrite(input: unknown): Promise<CodocsWriteResponse>;
+  codocsDuplicates(
+    input?: unknown,
+    options?: { signal?: AbortSignal },
+  ): Promise<CodocsDuplicatesResponse>;
   refresh(input?: unknown): Promise<WorkspaceRefreshResult>;
 }
 
@@ -168,6 +178,22 @@ export function createCodocsQueryHandlers(
         };
       }
       return session.write(parsed);
+    },
+    /** draft는 write 입력으로 풀어 전달하고 취소 신호는 세션 검사까지 잇는다. */
+    async codocsDuplicates(
+      input?: unknown,
+      options: { signal?: AbortSignal } = {},
+    ): Promise<CodocsDuplicatesResponse> {
+      const parsed = parseDuplicatesInput(input === undefined ? {} : input);
+      if (!parsed)
+        return {
+          ...invalidInput(),
+          status: workspaceDuplicateStatuses.failed,
+        };
+      return session.duplicates(
+        parsed,
+        options.signal ? { signal: options.signal } : {},
+      );
     },
     /** 직접 호출자를 위한 codocsRefresh 별칭이다. */
     refresh,
