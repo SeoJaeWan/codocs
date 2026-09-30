@@ -76,6 +76,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
       expect(result.observations[0]?.path).toBe(source.source.path);
     });
 
+    /** @codocs [[작업 공간:작업 공간 색인 구성]]#L12 */
     it('필수 ID가 빠진 문서를 변환하면 확인된 파싱 데이터와 원문을 보존한다', async () => {
       const raw = "name: 오류\r\ndomains: [업무]\r\ndefinition: '[[정상]]'\r\n";
       await file('invalid.yaml', raw);
@@ -432,6 +433,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
       ]);
     });
 
+    /** @codocs [[작업 공간:불완전한 탐색에서 색인과 연결을 유지하는 절차]]#L12-L18 @codocs [[작업 공간:미확인 문서]]#L6-L8 */
     it('부분·실패 스캔 뒤 복구하면 이전 자료를 미확인으로 보존한 뒤 연결을 다시 확인한다', async () => {
       await file(
         'a.yaml',
