@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "purpose": "이 저장소의 현재 .codocs를 codocs_duplicates 전체 검사로 확인한 후보 목록. 사람이 각 후보를 판정하기 전의 원자료이며 정확도·재현율의 근거가 아니다.",
+  "check": {
+    "date": "2026-09-30",
+    "tool": "codocs_duplicates",
+    "input": {},
+    "transport": "stdio MCP (packages/mcp/dist/cli.js, 프로젝트=이 작업 트리)",
+    "node": "v24.21.0",
+    "commit": "5419f69cd4841c67502a6b77e864c5b07778e9f2",
+    "commitNote": "검사한 .codocs는 이 커밋의 트리이며, 이 evidence를 담은 커밋은 그 위에 문서 두 개만 추가한다.",
+    "configVersion": 1,
+    "catalogVersion": 1,
+    "status": "complete",
+    "scope": "all",
+    "scanStatus": "complete",
+    "incompleteReasons": [],
+    "progress": {
+      "completedUnits": 5895,
+      "totalUnits": 5895
+    },
+    "comparedDocumentCount": 79,
+    "uncheckedCount": 0,
+    "unchecked": [],
+    "exclusions": {
+      "heading": 324,
+      "code_fence": 34,
+      "table_separator": 7,
+      "too_short": 288,
+      "too_long": 1
+    },
+    "totalCandidates": 2,
+    "pages": 1,
+    "indexChangedDuringCheck": false
+  },
+  "coordinates": {
+    "startLine": "1 기반 시작 행 (도구가 돌려준 range.start.line + 1)",
+    "startCharacter": "1 기반 시작 열 (range.start.character + 1)",
+    "offsetRange": "원본 YAML 전체 문자열의 0 기반 UTF-16 offset, 시작 포함·끝 제외"
+  },
+  "judgement": {
+    "allowedValues": ["유용", "정상 반복", "잡음"],
+    "note": "judgement와 note는 사용자가 채운다. 이 파일을 만든 작업은 판정하지 않았다."
+  },
+  "candidates": [
+    {
+      "no": 1,
+      "kind": "exact",
+      "scores": {
+        "jaccard": 1,
+        "ordered": 1
+      },
+      "linkDestinationsDiffer": false,
+      "linkDestinations": {
+        "a": [],
+        "b": [],
+        "differ": false
+      },
+      "groupIndex": 0,
+      "a": {
+        "path": ".codocs/core/change-plan/document-change-plan.yaml",
+        "id": "plan-document-change",
+        "revision": "f52153ae9df1fbcad2e5d1a68f032eb54b01cc71edddf47b636ce3c73e11a10f",
+        "fieldPath": ["definition"],
+        "startLine": 14,
+        "startCharacter": 18,
+        "offsetRange": {
+          "start": 383,
+          "end": 430
+        },
+        "passage": "create 실패를 update로 바꾸거나 없는 update를 자동 생성하지 않는다.",
+        "origin": "saved"
+      },
+      "b": {
+        "path": ".codocs/workspace/storage/storage.yaml",
+        "id": "storage",
+        "revision": "6f7be48d58b319ecbfd0106031b27ae360d6002a07a4211f197c1298dc103c47",
+        "fieldPath": ["definition"],
+        "startLine": 27,
+        "startCharacter": 3,
+        "offsetRange": {
+          "start": 1085,
+          "end": 1132
+        },
+        "passage": "create 실패를 update로 바꾸거나 없는 update를 자동 생성하지 않는다.",
+        "origin": "saved"
+      },
+      "judgement": "",
+      "note": ""
+    },
+    {
+      "no": 2,
+      "kind": "similar",
+      "scores": {
+        "jaccard": 0.6833333333333333,
+        "ordered": 0.8727272727272727
+      },
+      "linkDestinationsDiffer": false,
+      "linkDestinations": {
+        "a": [],
+        "b": [],
+        "differ": false
+      },
+      "groupIndex": null,
+      "a": {
+        "path": ".codocs/core/query/query-projection.yaml",
+        "id": "project-catalog",
+        "revision": "33421a923c993151c17000fdb77268aa3fe900a1ff28fdf425f77d1c3a1af41b",
+        "fieldPath": ["definition"],
+        "startLine": 64,
+        "startCharacter": 3,
+        "offsetRange": {
+          "start": 2356,
+          "end": 2415
+        },
+        "passage": "이 결과로 오류를 고치는 사용 순서는 [[검증 오류가 있는 문서를 조회하고 수정하는 절차]]에서 확인한다.",
+        "origin": "saved"
+      },
+      "b": {
+        "path": ".codocs/mcp/validation/document-validation-request.yaml",
+        "id": "codocs-validate",
+        "revision": "bce91dd2ee9c03e2293a1664ba5a71418965a805c077764c01872f487629c7ed",
+        "fieldPath": ["definition"],
+        "startLine": 26,
+        "startCharacter": 3,
+        "offsetRange": {
+          "start": 998,
+          "end": 1049
+        },
+        "passage": "오류를 수정하는 순서는 [[검증 오류가 있는 문서를 조회하고 수정하는 절차]]에서 확인한다.",
+        "origin": "saved"
+      },
+      "judgement": "",
+      "note": ""
+    }
+  ]
+}
