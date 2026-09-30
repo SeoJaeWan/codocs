@@ -6,7 +6,9 @@ import {
   routeOwnedRequest,
 } from './index.js';
 
+// @codocs [[VS Code:언어 서버 연결]]
 describe('nearestWorkspaceRoot: workspace 문서 소유권', () => {
+  // @codocs [[VS Code:언어 서버 연결]]#L20
   it('중첩된 workspace에서는 문서에 가장 가까운 루트를 선택한다', () => {
     const parent = { fsPath: path.resolve('/projects/app'), uri: 'parent' };
     const nested = {
@@ -24,6 +26,7 @@ describe('nearestWorkspaceRoot: workspace 문서 소유권', () => {
     );
   });
 
+  // @codocs [[VS Code:언어 서버 연결]]#L21
   it('workspace 밖 문서와 이름 접두사만 같은 경로는 선택하지 않는다', () => {
     const root = { fsPath: path.resolve('/projects/app'), uri: 'root' };
 
