@@ -12,6 +12,8 @@ export const openSourceFailureReasons = {
   fileAccessFailed: 'file_access_failed',
   /** 확인된 문서를 편집기에 표시하지 못했다. */
   displayFailed: 'display_failed',
+  /** 확인된 행·위치가 현재 편집기 원문에 없다. */
+  destinationUnavailable: 'destination_unavailable',
 } as const;
 
 /** 실패 경계의 원본 상수에서 도출한 사유다. */
