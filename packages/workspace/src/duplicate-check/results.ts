@@ -181,7 +181,16 @@ function withOrigin(
   };
 }
 
-/** core 결과를 결정적으로 정렬한 후보와 묶음으로 바꾼다. 묶음 index는 정렬 후에도 원래 값을 유지한다. */
+/** 위치가 초안 출처인지 확인한다. */
+function isDraftLocation(location: WorkspaceDuplicateLocation): boolean {
+  return location.origin === workspaceDuplicateLocationOrigins.draft;
+}
+
+/**
+ * core 결과를 결정적으로 정렬한 후보와 묶음으로 바꾼다. 묶음 index는 정렬 후에도 원래 값을 유지한다.
+ * draftPath가 있으면 초안 위치가 하나 이상 있는 후보와 초안 발생 위치를 포함한 묶음만 남긴다.
+ * 남긴 묶음의 저장 문서 발생 위치는 같은 구절이 있는 곳을 알리기 위해 그대로 둔다.
+ */
 export function projectDuplicateResult(
   result: DuplicateDetectionResult,
   draftPath: string | undefined,
@@ -189,14 +198,14 @@ export function projectDuplicateResult(
   candidates: WorkspaceDuplicateCandidate[];
   exactGroups: WorkspaceDuplicateExactGroup[];
 } {
-  const candidates = [...result.candidates].sort(compareCandidate).map(
+  const projectedCandidates = [...result.candidates].sort(compareCandidate).map(
     /** 두 위치에 출처를 붙인다. */ (candidate) => ({
       ...candidate,
       a: withOrigin(candidate.a, draftPath),
       b: withOrigin(candidate.b, draftPath),
     }),
   );
-  const exactGroups = result.exactGroups.map(
+  const projectedGroups = result.exactGroups.map(
     /** 묶음의 모든 발생 위치에 출처를 붙인다. */ (
       group: DuplicateExactGroup,
       groupIndex,
@@ -208,7 +217,17 @@ export function projectDuplicateResult(
         .map((location) => withOrigin(location, draftPath)),
     }),
   );
-  return { candidates, exactGroups };
+  if (draftPath === undefined)
+    return { candidates: projectedCandidates, exactGroups: projectedGroups };
+  return {
+    candidates: projectedCandidates.filter(
+      (candidate) =>
+        isDraftLocation(candidate.a) || isDraftLocation(candidate.b),
+    ),
+    exactGroups: projectedGroups.filter((group) =>
+      group.occurrences.some(isDraftLocation),
+    ),
+  };
 }
 
 /** 보관할 결과에 식별자를 붙인다. */

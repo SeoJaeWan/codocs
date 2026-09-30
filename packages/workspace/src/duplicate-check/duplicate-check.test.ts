@@ -84,10 +84,42 @@ function succeeded(
   return response;
 }
 
+/** 여러 문서가 같은 문장을 가져 페이지 크기를 넘는 후보를 만든다. */
+async function repeatedDocuments(count: number): Promise<void> {
+  for (let index = 1; index <= count; index++)
+    await file(`doc-${index}.yaml`, raw(`doc-${index}`, repeated));
+}
+
 /** 여덟 문서가 같은 문장을 가져 페이지 크기를 넘는 후보를 만든다. */
 async function eightRepeatedDocuments(): Promise<void> {
-  for (let index = 1; index <= 8; index++)
-    await file(`doc-${index}.yaml`, raw(`doc-${index}`, repeated));
+  await repeatedDocuments(8);
+}
+
+/** 후보의 두 위치 중 초안 위치의 수를 센다. */
+function draftLocationCount(
+  candidate: WorkspaceDuplicateSuccess['candidates'][number],
+): number {
+  return [candidate.a, candidate.b].filter(
+    (item) => item.origin === workspaceDuplicateLocationOrigins.draft,
+  ).length;
+}
+
+/** 같은 문장을 가진 저장 문서와 무관한 문장을 가진 생성 초안 요청이다. */
+function createDraft(definition: string): {
+  mode: string;
+  path: string;
+  document: Record<string, unknown>;
+} {
+  return {
+    mode: 'create',
+    path: '.codocs/draft.yaml',
+    document: {
+      id: 'draft',
+      name: '초안 문서',
+      domains: ['업무'],
+      definition,
+    },
+  };
 }
 
 beforeEach(async () => {
@@ -340,6 +372,183 @@ describe('WorkspaceQuerySession.duplicates: 초안 검사', () => {
     );
     expect(draftLocation?.path).toBe(path.join('.codocs', 'alpha.yaml'));
     expect(savedLocation?.path).toBe(path.join('.codocs', 'beta.yaml'));
+  });
+
+  it('저장 문서 두 개만 같은 문장을 가지고 초안이 무관하면 초안 검사는 complete와 빈 후보를 반환하고 전체 검사는 그 후보를 유지한다', async () => {
+    await file('alpha.yaml', raw('alpha', repeated));
+    await file('beta.yaml', raw('beta', repeated));
+    const target = session();
+
+    const draft = succeeded(await target.duplicates(createDraft(shipping)));
+    const full = succeeded(await target.duplicates());
+
+    expect(draft.status).toBe(workspaceDuplicateStatuses.complete);
+    expect(draft.scope).toBe(workspaceDuplicateScopes.draft);
+    expect(draft.totalCandidates).toBe(0);
+    expect(draft.candidates).toEqual([]);
+    expect(draft.exactGroups).toEqual([]);
+    expect(draft.returnedCount).toBe(0);
+    expect(draft.remainingCount).toBe(0);
+    expect(draft.nextCursor).toBeNull();
+    expect(full.scope).toBe(workspaceDuplicateScopes.all);
+    expect(full.totalCandidates).toBe(1);
+    expect(full.candidates[0]?.a.path).toBe(path.join('.codocs', 'alpha.yaml'));
+    expect(full.candidates[0]?.b.path).toBe(path.join('.codocs', 'beta.yaml'));
+    expect(full.exactGroups).toHaveLength(1);
+  });
+
+  it('변경 없는 수정 초안을 검사하면 저장 문서끼리의 후보를 반환하지 않는다', async () => {
+    await file('alpha.yaml', raw('alpha', repeated));
+    await file('beta.yaml', raw('beta', repeated));
+    const gamma = await file('gamma.yaml', raw('gamma', shipping));
+
+    const result = succeeded(
+      await session().duplicates({
+        mode: 'update',
+        id: 'gamma',
+        revision: calculateRevision(await readFile(gamma)),
+        set: { name: '문서 gamma' },
+      }),
+    );
+
+    expect(result.status).toBe(workspaceDuplicateStatuses.complete);
+    expect(result.totalCandidates).toBe(0);
+    expect(result.candidates).toEqual([]);
+  });
+
+  it('초안이 저장 문서의 문장을 반복하면 저장 문서끼리의 후보는 빼고 초안이 포함된 후보만 반환한다', async () => {
+    await file('alpha.yaml', raw('alpha', repeated));
+    await file('beta.yaml', raw('beta', shipping));
+    await file('gamma.yaml', raw('gamma', shipping));
+
+    const result = succeeded(await session().duplicates(createDraft(repeated)));
+
+    expect(result.totalCandidates).toBe(1);
+    expect(result.candidates).toHaveLength(1);
+    for (const candidate of result.candidates)
+      expect(draftLocationCount(candidate)).toBeGreaterThanOrEqual(1);
+    expect(result.candidates[0]?.b.path).toBe(
+      path.join('.codocs', 'draft.yaml'),
+    );
+    expect(result.candidates[0]?.a.path).toBe(
+      path.join('.codocs', 'alpha.yaml'),
+    );
+  });
+
+  it('초안 내부 반복 후보는 두 위치 모두 초안 출처로 유지한다', async () => {
+    await file('alpha.yaml', raw('alpha', shipping));
+    await file('beta.yaml', raw('beta', shipping));
+    const request = createDraft(settlement);
+    request.document.examples = [settlement];
+
+    const result = succeeded(await session().duplicates(request));
+
+    expect(result.totalCandidates).toBe(1);
+    expect(draftLocationCount(result.candidates[0]!)).toBe(2);
+  });
+
+  it('같은 구절이 저장 문서 두 곳과 초안에 있으면 초안 쌍만 반환하고 묶음에는 세 발생 위치를 모두 남긴다', async () => {
+    await file('alpha.yaml', raw('alpha', repeated));
+    await file('beta.yaml', raw('beta', repeated));
+
+    const result = succeeded(await session().duplicates(createDraft(repeated)));
+
+    expect(result.totalCandidates).toBe(2);
+    for (const candidate of result.candidates)
+      expect(draftLocationCount(candidate)).toBe(1);
+    expect(
+      result.candidates.some(
+        (candidate) =>
+          candidate.a.path === path.join('.codocs', 'alpha.yaml') &&
+          candidate.b.path === path.join('.codocs', 'beta.yaml'),
+      ),
+    ).toBe(false);
+    expect(result.exactGroups).toHaveLength(1);
+    const occurrences = result.exactGroups[0]?.occurrences ?? [];
+    expect(occurrences).toHaveLength(3);
+    expect(
+      occurrences.filter(
+        (item) => item.origin === workspaceDuplicateLocationOrigins.draft,
+      ),
+    ).toHaveLength(1);
+    expect(
+      occurrences
+        .filter(
+          (item) => item.origin === workspaceDuplicateLocationOrigins.saved,
+        )
+        .map((item) => item.path),
+    ).toEqual([
+      path.join('.codocs', 'alpha.yaml'),
+      path.join('.codocs', 'beta.yaml'),
+    ]);
+  });
+
+  it('초안과 무관한 저장 문서끼리의 묶음은 초안 검사의 exactGroups에 포함하지 않는다', async () => {
+    await file('alpha.yaml', raw('alpha', repeated));
+    await file('beta.yaml', raw('beta', repeated));
+    await file('gamma.yaml', raw('gamma', shipping));
+    await file('delta.yaml', raw('delta', shipping));
+
+    const result = succeeded(await session().duplicates(createDraft(shipping)));
+
+    expect(result.totalCandidates).toBe(2);
+    expect(result.exactGroups).toHaveLength(1);
+    expect(
+      result.exactGroups[0]?.occurrences.every(
+        (item) => item.path !== path.join('.codocs', 'alpha.yaml'),
+      ),
+    ).toBe(true);
+  });
+
+  it('초안 관련 후보가 페이지 크기보다 많으면 커서로 넘긴 후보 수가 totalCandidates와 같고 저장 문서끼리의 후보가 섞이지 않는다', async () => {
+    await repeatedDocuments(24);
+    const target = session();
+
+    const first = succeeded(await target.duplicates(createDraft(repeated)));
+    const second = succeeded(
+      await target.duplicates({ cursor: first.nextCursor ?? '' }),
+    );
+
+    expect(first.totalCandidates).toBe(24);
+    expect(first.returnedCount).toBe(workspaceDuplicateCheckDefaults.pageSize);
+    expect(first.remainingCount).toBe(4);
+    expect(second.returnedCount).toBe(4);
+    expect(second.remainingCount).toBe(0);
+    expect(second.nextCursor).toBeNull();
+    expect(first.returnedCount + second.returnedCount).toBe(
+      first.totalCandidates,
+    );
+    for (const candidate of [...first.candidates, ...second.candidates])
+      expect(draftLocationCount(candidate)).toBeGreaterThanOrEqual(1);
+  });
+
+  it('시간 제한으로 partial이 된 초안 검사는 걸러진 후보가 0개여도 partial과 중단 이유를 유지한다', async () => {
+    await file('alpha.yaml', raw('alpha', repeated));
+    await file('beta.yaml', raw('beta', repeated));
+
+    const result = succeeded(
+      await session({ duplicateCheck: { timeLimitMs: 0 } }).duplicates(
+        createDraft(shipping),
+      ),
+    );
+
+    expect(result.status).toBe(workspaceDuplicateStatuses.partial);
+    expect(result.stopReason).toBe(workspaceDuplicateStopReasons.timeLimit);
+    expect(result.totalCandidates).toBe(0);
+  });
+
+  it('검사하지 못한 문서가 있는 초안 검사는 걸러진 후보가 0개여도 partial을 유지한다', async () => {
+    await file('alpha.yaml', raw('alpha', repeated));
+    await file('beta.yaml', raw('beta', repeated));
+    await file('broken.yaml', 'id: [broken\n');
+
+    const result = succeeded(await session().duplicates(createDraft(shipping)));
+
+    expect(result.status).toBe(workspaceDuplicateStatuses.partial);
+    expect(result.incompleteReasons).toContain(
+      workspaceDuplicateIncompleteReasons.uncheckedDocuments,
+    );
+    expect(result.totalCandidates).toBe(0);
   });
 
   it('수정 초안이 원래 본문을 바꾸면 수정 전 원래 파일은 비교에서 빠진다', async () => {
@@ -767,7 +976,7 @@ describe('WorkspaceQuerySession.duplicates: 결과 페이지와 커서 만료', 
   });
 
   it('초안 검사 결과의 커서도 초안 원문 버전 기준으로 보관되어 다음 페이지를 제공한다', async () => {
-    await eightRepeatedDocuments();
+    await repeatedDocuments(24);
     const target = session();
     const request = {
       mode: 'create',
@@ -785,7 +994,7 @@ describe('WorkspaceQuerySession.duplicates: 결과 페이지와 커서 만료', 
       await target.duplicates({ cursor: first.nextCursor ?? '' }),
     );
 
-    expect(first.totalCandidates).toBe(36);
-    expect(second.returnedCount).toBe(16);
+    expect(first.totalCandidates).toBe(24);
+    expect(second.returnedCount).toBe(4);
   });
 });
