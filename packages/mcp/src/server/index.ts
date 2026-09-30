@@ -55,7 +55,10 @@ export function createCodocsServer(
     CodocsToolName,
     {
       description: string;
-      execute: (input: unknown) => Promise<CodocsToolResult>;
+      execute: (
+        input: unknown,
+        options?: { signal?: AbortSignal },
+      ) => Promise<CodocsToolResult>;
     }
   >([
     [
@@ -97,6 +100,14 @@ export function createCodocsServer(
       },
     ],
     [
+      'codocs_duplicates',
+      {
+        description:
+          '프로젝트 전체 또는 저장 전 초안(draft)의 반복 구절 후보와 양쪽 원문 위치를 조회합니다. 입력 없음은 전체 검토, draft는 codocs_write와 같은 create/update 입력의 초안 검토, cursor는 다음 페이지 요청이며 draft와 함께 보낼 수 없습니다. 결과는 검토 정보이며 저장을 막지 않고 파일이나 색인을 바꾸지 않습니다. status가 complete가 아니면 중복 없음이 아닙니다. 위치의 range 줄·문자는 0부터 시작하고 offsetRange는 원문 YAML의 UTF-16 오프셋입니다.',
+        execute: handlers.codocsDuplicates.bind(handlers),
+      },
+    ],
+    [
       'codocs_guide',
       {
         description:
@@ -127,12 +138,14 @@ export function createCodocsServer(
   );
   server.setRequestHandler(
     CallToolRequestSchema,
-    /** 알려진 도구만 공통 결과로 포장한다. */ async (request) => {
+    /** 알려진 도구만 공통 결과로 포장한다. */ async (request, extra) => {
       const name = request.params.name;
       const entry = executionRegistry.get(name as CodocsToolName);
       if (!entry)
         throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${name}`);
-      const result = await entry.execute(request.params.arguments ?? {});
+      const result = await entry.execute(request.params.arguments ?? {}, {
+        signal: extra.signal,
+      });
       return wrapCodocsResult(result);
     },
   );

@@ -38,16 +38,17 @@ On Windows, use `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd` as the J
 
 ### Available tools
 
-| Tool              | Purpose                                                       |
-| ----------------- | ------------------------------------------------------------- |
-| `codocs_list`     | Find documents using filters and paginated results            |
-| `codocs_get`      | Read document content, references, and revisions              |
-| `codocs_write`    | Create documents or update them using a read revision         |
-| `codocs_validate` | Check documents for errors and warnings                       |
-| `codocs_refresh`  | Rebuild the project's knowledge index                         |
-| `codocs_guide`    | Read guidance for writing, updating, and recovering documents |
+| Tool                | Purpose                                                             |
+| ------------------- | ------------------------------------------------------------------- |
+| `codocs_list`       | Find documents using filters and paginated results                  |
+| `codocs_get`        | Read document content, references, and revisions                    |
+| `codocs_write`      | Create documents or update them using a read revision               |
+| `codocs_duplicates` | Review repeated passages in the project or in a draft before saving |
+| `codocs_validate`   | Check documents for errors and warnings                             |
+| `codocs_refresh`    | Rebuild the project's knowledge index                               |
+| `codocs_guide`      | Read guidance for writing, updating, and recovering documents       |
 
-For example, ask your assistant to “find the definition of an order,” “check the project documents for errors,” or “document this business rule.” When updating a document, the assistant first reads it with `codocs_get`, then passes its revision to `codocs_write`.
+For example, ask your assistant to “find the definition of an order,” “check the project documents for errors,” or “document this business rule.” When updating a document, the assistant first reads it with `codocs_get`, can review the draft with `codocs_duplicates` for repeated passages (review information only, it never blocks saving), then passes the revision to `codocs_write`.
 
 ## VS Code
 

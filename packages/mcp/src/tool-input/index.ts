@@ -50,7 +50,8 @@ export type CodocsToolName =
   | 'codocs_refresh'
   | 'codocs_validate'
   | 'codocs_guide'
-  | 'codocs_write';
+  | 'codocs_write'
+  | 'codocs_duplicates';
 
 const listSchema = z.strictObject({
   cursor: z.string().optional(),
@@ -76,6 +77,17 @@ const writeSchema = z.discriminatedUnion('mode', [
   }),
 ]);
 
+const duplicatesSchema = z
+  .strictObject({
+    draft: writeSchema.optional(),
+    cursor: z.string().optional(),
+  })
+  .refine(
+    /** 초안 검토와 다음 페이지 요청을 한 호출에 함께 보내지 못하게 한다. */ (
+      value,
+    ) => !(value.draft !== undefined && value.cursor !== undefined),
+  );
+
 /** 형식만 확인해 문서 자체의 상세 검증 진단은 변경 계획에 맡긴다. */
 export function parseWriteInput(
   input: unknown,
@@ -85,7 +97,7 @@ export function parseWriteInput(
   return result.success ? result.data : undefined;
 }
 
-/** 여섯 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다. */
+/** 일곱 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다. */
 export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_list', listSchema],
   ['codocs_get', getSchema],
@@ -93,6 +105,7 @@ export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_validate', validateSchema],
   ['codocs_guide', guideSchema],
   ['codocs_write', writeSchema],
+  ['codocs_duplicates', duplicatesSchema],
 ]);
 
 /** SDK에 제공하는 JSON Schema는 실행 검증과 동일한 Zod 원본에서 생성한다. */
@@ -145,6 +158,22 @@ export function parseGuideInput(
   if (!dataOnly(input)) return undefined;
   const result = guideSchema.safeParse(input);
   return result.success ? result.data : undefined;
+}
+
+/** 중복 검토 입력을 세션 입력으로 바꾼다. draft는 write와 같은 객체로 풀고 cursor는 그대로 전달한다. */
+export function parseDuplicatesInput(
+  input: unknown,
+):
+  | z.infer<typeof writeSchema>
+  | { cursor: string }
+  | Record<string, never>
+  | undefined {
+  if (!dataOnly(input)) return undefined;
+  const result = duplicatesSchema.safeParse(input);
+  if (!result.success) return undefined;
+  const { draft, cursor } = result.data;
+  if (draft !== undefined) return draft;
+  return cursor === undefined ? {} : { cursor };
 }
 
 /** 입력 형태만 확인하고 문서 내용 진단은 변경 계획에 맡긴다. */

@@ -35,6 +35,9 @@ update 요청의 `set`/`unset`으로는 `deprecatedAliases`를 직접 바꿀 수
 `codocs_write`의 set은 지정 속성만 바꾸고 unset은 선택 속성이나 사용자 속성을 삭제한다.
 필수 속성을 삭제할 수 없으며 같은 속성을 set과 unset에 함께 지정하지 않는다.
 `deprecatedAliases`는 이 요청으로 직접 편집하지 않는다. YAML 직접 편집과 ID 변경의 차이는 위 내용을 확인한다.
+저장 전에 `codocs_duplicates({"draft":{...}})`로 같은 초안의 반복 구절 후보를 확인할 수 있다. `draft`에는 위와 같은 `codocs_write` 입력을 그대로 넣는다.
+이 결과는 검토 정보이며 저장을 막지 않는다. `codocs_write`는 중복 검토를 실행하지 않고, 파일이나 색인도 바꾸지 않는다.
+`status`가 `complete`가 아니면 중복이 없다는 뜻이 아니다. 후보가 여러 페이지면 `nextCursor`를 `{"cursor":"..."}`로 보내 다음 페이지를 읽고, 원문이 바뀌어 `cursor_expired`가 오면 처음부터 다시 요청한다. 위치의 줄·문자 번호는 0부터 시작한다.
 저장 뒤 `codocs_validate({"path":".codocs/order.yaml"})` 또는 `codocs_validate({})`로 진단을 읽는다.
 경고는 저장을 막지 않을 수 있으므로 성공 여부와 별도로 확인한다.
 

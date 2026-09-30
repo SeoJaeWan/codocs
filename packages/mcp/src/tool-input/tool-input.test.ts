@@ -3,12 +3,13 @@ import {
   acceptsToolInput,
   codocsInputSchemas,
   codocsJsonInputSchema,
+  parseDuplicatesInput,
   parseGetInput,
   parseValidateInput,
 } from './index.js';
 
-describe('MCP 여섯 입력 계약', () => {
-  it('여섯 스키마를 정의하고 알 수 없는 최상위 속성을 거부한다', () => {
+describe('MCP 일곱 입력 계약', () => {
+  it('일곱 스키마를 정의하고 알 수 없는 최상위 속성을 거부한다', () => {
     expect([...codocsInputSchemas.keys()]).toEqual([
       'codocs_list',
       'codocs_get',
@@ -16,6 +17,7 @@ describe('MCP 여섯 입력 계약', () => {
       'codocs_validate',
       'codocs_guide',
       'codocs_write',
+      'codocs_duplicates',
     ]);
     for (const name of codocsInputSchemas.keys())
       expect(codocsJsonInputSchema(name)).toBeTruthy();
@@ -36,6 +38,25 @@ describe('MCP 여섯 입력 계약', () => {
         extra: true,
       }),
     ).toBe(false);
+  });
+
+  it('중복 검토 입력은 draft를 write 입력으로 풀고 draft와 cursor의 동시 지정을 거부한다', () => {
+    const draft = {
+      mode: 'update',
+      id: 'sample',
+      revision: 'r1',
+      set: { definition: '본문' },
+    };
+    expect(parseDuplicatesInput({})).toEqual({});
+    expect(parseDuplicatesInput({ cursor: 'abc' })).toEqual({ cursor: 'abc' });
+    expect(parseDuplicatesInput({ draft })).toEqual(draft);
+    expect(parseDuplicatesInput({ draft, cursor: 'abc' })).toBeUndefined();
+    expect(parseDuplicatesInput({ extra: 1 })).toBeUndefined();
+    expect(parseDuplicatesInput({ draft: { mode: 'other' } })).toBeUndefined();
+    expect(acceptsToolInput('codocs_duplicates', { draft, cursor: 'a' })).toBe(
+      false,
+    );
+    expect(acceptsToolInput('codocs_duplicates', { cursor: 1 })).toBe(false);
   });
 
   it('ID는 중복 제거 후 상한을 검사하며 사용자 속성은 삭제하지 않는다', () => {
