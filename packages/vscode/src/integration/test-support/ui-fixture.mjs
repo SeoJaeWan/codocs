@@ -95,6 +95,15 @@ export function uiFiles() {
       'ReverseSingle',
       '@codocs [[Reverse Single]]#L3',
     ),
+    '.codocs/reverse-recreate.yaml': inlineDocument(
+      'reverse-recreate',
+      'Reverse Recreate',
+      'Reverse recreate row',
+    ),
+    'navigation/recreate/reverse-recreate.java': codeMarker(
+      'ReverseRecreate',
+      '@codocs [[Reverse Recreate]]#L3',
+    ),
     '.codocs/reverse-multiple.yaml': inlineDocument(
       'reverse-multiple',
       'Reverse Multiple',
