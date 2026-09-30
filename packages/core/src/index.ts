@@ -1,6 +1,7 @@
 export * from './catalog/index.js';
 export * from './change-plan/index.js';
 export * from './diagnostics/index.js';
+export * from './duplicate-detection/index.js';
 export * from './parser/index.js';
 export * from './matcher/index.js';
 export * from './query/index.js';
