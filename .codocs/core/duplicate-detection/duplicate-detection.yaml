@@ -2,7 +2,7 @@ id: duplicate-detection
 name: '본문 중복 탐지'
 domains:
   - 'Core'
-status: proposed
+status: confirmed
 definition: |
   문서 본문의 반복된 구절을 찾아 같은 설명을 여러 원문에서 관리하는지 검토할 근거를 제공하는 계산이다.
   문장이 같거나 비슷하다는 사실과 설명을 한 곳으로 합쳐야 한다는 판단을 구분한다.
