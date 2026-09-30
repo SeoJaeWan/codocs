@@ -85,3 +85,6 @@ definition: |
   코드와 Git 신호 연결은 [별도 구현](../../../packages/workspace/src/watcher/code-reference-watcher.ts)에서 확인한다. 실제 코드·ignore·Git 변경 갱신은 [코드 참조 통합 테스트](../../../packages/workspace/src/code-reference/code-reference.test.ts)에서 확인한다.
 
   Git index의 같은 바이트·mtime 원자 교체와 준비 중 종료는 [인접 테스트](../../../packages/workspace/src/watcher/code-reference-watcher.test.ts)에서 확인한다.
+
+  코드 감시의 제외 폴더·추적 파일·.gitignore 범위, 규칙이 바뀔 때만 이루어지는 재구성, 오류 뒤 재등록·재시도 간격·명시 refresh·종료 정리는 [코드 참조 통합 테스트](../../../packages/workspace/src/code-reference/code-reference.test.ts)에서 확인한다.
+  수집과 같은 규칙의 감시 대상 판단은 [정책 테스트](../../../packages/workspace/src/paths/code-file-access.test.ts)에서, 제외 경로가 신호를 보내지 않는 실제 감시는 [인접 테스트](../../../packages/workspace/src/watcher/code-reference-watcher.test.ts)에서 확인한다. 오류 복구 검증은 가짜 감시 연결과 재시도 시각 주입을 쓰며 실제 OS 오류의 재현을 대신하지 않는다.
