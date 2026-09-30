@@ -16,6 +16,7 @@ definition: |
   다른 필드가 틀려도 확인된 문자열은 유지하고 examples의 자료형이 잘못된 원소만 제외한다.
   문자열로 강제 변환하지 않으며 YAML 파싱 실패에서는 원문 검색으로 참조를 추측하지 않는다.
 
+  일반 텍스트의 `@codocs [[이름]]` 표기는 [명시적 코드 참조](../code-reference/code-reference.yaml)에서 정의하며, 같은 이름·도메인 문법을 재사용한다. YAML 대상 필드와 자기 문서 제한은 적용하지 않는다.
   잘못된 참조 뒤의 독립된 정상 참조도 계속 찾는다.
   반복 등장은 각각의 위치로 보존하고 문법 진단과 등장 기록을 반환한다.
 
@@ -33,4 +34,5 @@ definition: |
   ## 코드와 검증 위치
 
   대표 함수 extractReferences와 등장·진단 결과는 [참조 추출 구현](../../../packages/core/src/references/index.ts)에서 확인한다.
+  일반 텍스트 참조의 이름·도메인 문법 공유는 [parseReferenceComponents](../../../packages/core/src/references/index.ts)와 [코드 참조 테스트](../../../packages/core/src/code-reference/code-reference.test.ts)에서 확인한다.
   문법·오류 복구·반복 등장·YAML 표기별 위치 사례는 [인접 테스트](../../../packages/core/src/references/references.test.ts)에서 확인한다.
