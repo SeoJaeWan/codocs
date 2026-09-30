@@ -77,6 +77,7 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
       ],
     });
   });
+  /** @codocs [[작업 공간:코드 참조 색인]]#L35-L37 */
   it('적격 buffer를 편집하면 disk 출현을 대체하고 중복 집계하지 않는다', async () => {
     await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
     const index = createIndex();
@@ -193,6 +194,7 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     ).toEqual([0, 21]);
     expect((await index.reverse(targetPath)).confirmedCount).toBe(1);
   });
+  /** @codocs [[작업 공간:코드 참조 색인]]#L54-L55 */
   it('개별 파일 읽기가 실패하면 확인한 다른 출현은 유지하고 유일성을 확정하지 않는다', async () => {
     await writeFile(path.join(project, 'source'), '@codocs [[대상]]');
     await writeFile(path.join(project, 'unreadable'), '@codocs [[대상]]');
