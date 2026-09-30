@@ -102,14 +102,6 @@ export class CodeNavigation {
       }
     if (uri === undefined) this.#ready.clear();
   }
-  /** 코드 세대 변경에서 같은 세션의 오래된 표시 토큰을 정리한다. */
-  invalidate(session: CodeSession): void {
-    for (const [key, selected] of this.#selected)
-      if (selected.owner.session === session) {
-        session.releaseCodeReference(selected.token);
-        this.#selected.delete(key);
-      }
-  }
   /** 닫힌 출처의 원문 동기화 캐시도 제거한다. */
   forget(uri: string): void {
     this.release(uri);

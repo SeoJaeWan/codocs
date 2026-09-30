@@ -4,7 +4,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const { withIoFailures } = await import('../test-support/file-system.js');
   return withIoFailures(actual);
 });
-import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   buildCatalog,
@@ -296,6 +296,119 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
       sourcePath: 'source',
       marker: { text: '@codocs [[대상]]#L2' },
     });
+  });
+  it('관련 없는 파일이 바뀌어 다시 수집되고 세대가 올라도 같은 token을 확인한다', async () => {
+    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    const index = createIndex();
+    const snapshot = await index.snapshot();
+    index.setOwner('source', 1);
+    const token = (await index.capture({
+      occurrenceId: snapshot.occurrences[0]!.occurrenceId,
+      ownerPath: 'source',
+      ownerVersion: 1,
+    }))!;
+    await writeFile(path.join(project, 'unrelated'), '표기 없는 다른 파일');
+    await index.refresh(['unrelated']);
+    index.setCatalog(
+      buildCatalog({
+        status: scanStatuses.complete,
+        observations: [{ path: targetPath, parsed: parseYaml(targetText) }],
+      }),
+      2,
+    );
+    const after = await index.snapshot();
+    expect(after.codeGeneration).toBeGreaterThan(snapshot.codeGeneration);
+    expect(after.documentGeneration).toBe(2);
+    expect(
+      await index.confirm(token, { sourcePath: 'source', documentVersion: 1 }),
+    ).toMatchObject({
+      sourcePath: 'source',
+      marker: { text: '@codocs [[대상]]#L2' },
+    });
+  });
+  it('수집이 진행 중일 때 클릭하면 완료를 기다린 뒤 확인한다', async () => {
+    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    const gate: { wait?: Promise<void> } = {};
+    const observed: string[] = [];
+    const index = createIndex({
+      beforeRead: async () => {
+        await gate.wait;
+      },
+      observe: (kind) => observed.push(kind),
+    });
+    const snapshot = await index.snapshot();
+    index.setOwner('source', 1);
+    const token = (await index.capture({
+      occurrenceId: snapshot.occurrences[0]!.occurrenceId,
+      ownerPath: 'source',
+      ownerVersion: 1,
+    }))!;
+    let resume!: () => void;
+    gate.wait = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const operation = index.refresh();
+    let settled = false;
+    const confirmation = index
+      .confirm(token, { sourcePath: 'source', documentVersion: 1 })
+      .finally(() => {
+        settled = true;
+      });
+    try {
+      // 실제 파일 IO를 여러 번 왕복해도 수집이 끝나기 전에는 클릭이 끝나지 않는다.
+      for (let round = 0; round < 20; round++)
+        await stat(path.join(project, 'source'));
+      expect(settled).toBe(false);
+    } finally {
+      resume();
+    }
+    expect(await confirmation).toMatchObject({
+      sourcePath: 'source',
+      marker: { text: '@codocs [[대상]]#L2' },
+    });
+    expect(observed).toEqual(['code-index-published', 'code-index-published']);
+    await operation;
+  });
+  it('표기 위치가 실제로 이동하면 거부한다', async () => {
+    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    const index = createIndex();
+    const snapshot = await index.snapshot();
+    index.setOwner('source', 1);
+    const token = (await index.capture({
+      occurrenceId: snapshot.occurrences[0]!.occurrenceId,
+      ownerPath: 'source',
+      ownerVersion: 1,
+    }))!;
+    await writeFile(
+      path.join(project, 'source'),
+      '앞줄 추가\n@codocs [[대상]]#L2',
+    );
+    expect(
+      await index.confirm(token, { sourcePath: 'source', documentVersion: 1 }),
+    ).toBeUndefined();
+  });
+  it('대상 문서가 실제로 바뀌어 새 catalog가 게시되어도 거부한다', async () => {
+    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    const index = createIndex();
+    const snapshot = await index.snapshot();
+    index.setOwner('source', 1);
+    const token = (await index.capture({
+      occurrenceId: snapshot.occurrences[0]!.occurrenceId,
+      ownerPath: 'source',
+      ownerVersion: 1,
+    }))!;
+    const changed = targetText.replace('대상', '다른 이름');
+    await writeFile(path.join(project, targetPath), changed);
+    index.setCatalog(
+      buildCatalog({
+        status: scanStatuses.complete,
+        observations: [{ path: targetPath, parsed: parseYaml(changed) }],
+      }),
+      2,
+    );
+    expect(
+      await index.confirm(token, { sourcePath: 'source', documentVersion: 1 }),
+    ).toBeUndefined();
   });
   it.each([
     'source',

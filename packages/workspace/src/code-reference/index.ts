@@ -337,25 +337,94 @@ export class WorkspaceCodeReferenceIndex {
     });
     return token;
   }
-  /** 최신 source·version·marker·target·file identity를 모두 확인하며 stale 토큰은 거부한다. */
+  /**
+   * 세대 변화만으로 거부하지 않고 최신 완료 관측에서 source·version·marker·target·file identity를
+   * 다시 확인한다. 진행 중 수집은 기다리고, 확인 중 관측이 교체되면 최대 3회·2초 안에서 재확인한다.
+   */
   async confirm(
     token: string,
     owner: { sourcePath: string; documentVersion: number },
   ): Promise<WorkspaceCodeReferenceOccurrence | undefined> {
+    if (this.#closed || !this.#selections.has(token)) return undefined;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2_000);
+    /** 일시 관측 교체만 최신 완료 관측으로 제한해 재확인한다. */
+    const retry = async (): Promise<
+      WorkspaceCodeReferenceOccurrence | undefined
+    > => {
+      for (
+        let attempt = 0;
+        attempt < 3 && !controller.signal.aborted;
+        attempt++
+      ) {
+        const result = await this.#confirmOnce(token, owner, controller.signal);
+        if (result !== false) return result;
+      }
+      return undefined;
+    };
+    try {
+      return await Promise.race([
+        retry(),
+        new Promise<undefined>(
+          /** 시간 제한은 공유 수집을 취소하지 않고 클릭만 끝낸다. */ (
+            resolve,
+          ) => {
+            controller.signal.addEventListener(
+              'abort',
+              () => resolve(undefined),
+              { once: true },
+            );
+          },
+        ),
+      ]);
+    } finally {
+      clearTimeout(timer);
+      controller.abort();
+    }
+  }
+  /** 진행 중이거나 예약된 수집이 끝나 최신 완료 관측이 될 때까지 기다린다. */
+  async #settled(signal: AbortSignal): Promise<void> {
+    while (
+      !this.#closed &&
+      !signal.aborted &&
+      (this.#operation || this.#timer || this.#pending.size)
+    ) {
+      if (this.#timer) {
+        clearTimeout(this.#timer);
+        this.#timer = undefined;
+      }
+      await this.refresh([...this.#pending]);
+    }
+  }
+  /** false는 관측 교체, undefined는 무효 선택이다. 무효 선택은 재시도하지 않는다. */
+  async #confirmOnce(
+    token: string,
+    owner: { sourcePath: string; documentVersion: number },
+    signal: AbortSignal,
+  ): Promise<WorkspaceCodeReferenceOccurrence | undefined | false> {
+    await this.#settled(signal);
     const selection = this.#selections.get(token);
     if (
       !selection ||
       !this.#discovery ||
       this.#closed ||
+      signal.aborted ||
       codeFileRelativePath(this.projectRoot, owner.sourcePath) !==
         selection.ownerPath ||
       owner.documentVersion !== selection.ownerVersion ||
-      this.#owners.get(selection.ownerPath) !== selection.ownerVersion ||
-      selection.codeGeneration !== this.#codeGeneration ||
-      selection.documentGeneration !== this.#documentGeneration
+      this.#owners.get(selection.ownerPath) !== selection.ownerVersion
     )
       return undefined;
     const epoch = this.#epoch;
+    /** 확인 중 수집이 시작되었거나 예약되었다면 재시도, 아니면 무효 선택이다. */
+    const fail = (): undefined | false =>
+      !this.#closed &&
+      (epoch !== this.#epoch ||
+        this.#operation ||
+        this.#timer ||
+        this.#pending.size)
+        ? false
+        : undefined;
     const source = await readEligibleCodeFile(
       this.#discovery.policy,
       selection.occurrence.sourcePath,
@@ -365,7 +434,7 @@ export class WorkspaceCodeReferenceIndex {
       !('text' in source) ||
       source.identity !== selection.occurrence.sourceIdentity
     )
-      return undefined;
+      return fail();
     const targetPath = selection.occurrence.target!.path;
     const target = await readEligibleCodeFile(
       {
@@ -380,7 +449,7 @@ export class WorkspaceCodeReferenceIndex {
       target.identity !== selection.targetIdentity ||
       target.revision !== selection.targetRevision
     )
-      return undefined;
+      return fail();
     const buffer = this.#buffers.get(source.path);
     const text = buffer?.text ?? source.text;
     if (
@@ -388,7 +457,7 @@ export class WorkspaceCodeReferenceIndex {
         selection.occurrence.sourceRevision ||
       buffer?.documentVersion !== selection.occurrence.documentVersion
     )
-      return undefined;
+      return fail();
     const marker = extractCodeReferences(text).find(
       /** 캡처한 정확한 위치와 표기의 연속성을 확인한다. */ (item) =>
         item.offsetRange.start ===
@@ -396,19 +465,27 @@ export class WorkspaceCodeReferenceIndex {
         item.offsetRange.end === selection.occurrence.marker.offsetRange.end &&
         item.text === selection.occurrence.marker.text,
     );
-    if (!marker || !this.#catalog) return undefined;
+    if (!marker || !this.#catalog) return fail();
     const current = resolveCodeReference(this.#catalog, marker);
     if (
       current.status !== codeReferenceStatuses.resolved ||
-      current.target?.path !== targetPath ||
-      epoch !== this.#epoch ||
+      current.target?.path !== targetPath
+    )
+      return fail();
+    if (
       this.#closed ||
+      signal.aborted ||
       this.#selections.get(token) !== selection ||
-      this.#owners.get(selection.ownerPath) !== selection.ownerVersion ||
-      selection.codeGeneration !== this.#codeGeneration ||
-      selection.documentGeneration !== this.#documentGeneration
+      this.#owners.get(selection.ownerPath) !== selection.ownerVersion
     )
       return undefined;
+    if (
+      epoch !== this.#epoch ||
+      this.#operation ||
+      this.#timer ||
+      this.#pending.size
+    )
+      return false;
     return { ...selection.occurrence, ...current };
   }
   /** source 소유자의 토큰만 폐기한다. */

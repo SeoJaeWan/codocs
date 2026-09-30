@@ -45,9 +45,6 @@ describe('명시 링크와 출처 확인', () => {
       async () => {
         const result = await session.documentLinks(uri);
         expect(result).toHaveLength(1);
-        expect(
-          await session.confirmSource(argument(result[0]!.target!)),
-        ).not.toBeNull();
         return result;
       },
       { timeout: 5000 },
@@ -62,18 +59,10 @@ describe('명시 링크와 출처 확인', () => {
         position: { line: 0, character: 17 },
       }),
     ).toBeNull();
-    await vi.waitFor(
-      async () => {
-        const current = await session.documentLinks(uri);
-        expect(
-          await session.confirmSource(argument(current[0]!.target!)),
-        ).toEqual({
-          uri: pathToFileURL(path.join(root, '.codocs/target.yaml')).href,
-          destination: { kind: 'rows', startLine: 5, endLine: 6 },
-        });
-      },
-      { timeout: 5000 },
-    );
+    expect(await session.confirmSource(argument(links[0]!.target!))).toEqual({
+      uri: pathToFileURL(path.join(root, '.codocs/target.yaml')).href,
+      destination: { kind: 'rows', startLine: 5, endLine: 6 },
+    });
   });
   it.each(['#L0', '#L7-L5', '#L999', '#wat'])(
     '잘못된 행 표기 %s는 전체 밑줄을 제공하고 ID 호버를 차단한다',
@@ -99,19 +88,19 @@ describe('명시 링크와 출처 확인', () => {
   );
   it('출처 표기를 편집하거나 닫으면 화면에 남은 링크를 거부한다', async () => {
     const uri = await open('source', '@codocs [[대상]]');
-    // 파일 감시의 새 세대에서 발급·확인된 링크가 준비된 뒤 무효화를 검증한다.
     const links = await vi.waitFor(
       async () => {
         const result = await session.documentLinks(uri);
         expect(result).toHaveLength(1);
-        expect(
-          await session.confirmSource(argument(result[0]!.target!)),
-        ).not.toBeNull();
         return result;
       },
       { timeout: 5000 },
     );
     const selected = argument(links[0]!.target!);
+    expect(await session.confirmSource(selected)).toEqual({
+      uri: pathToFileURL(path.join(root, '.codocs/target.yaml')).href,
+      destination: { kind: 'top' },
+    });
     session.changeDocument({
       textDocument: { uri, version: 2 },
       contentChanges: [{ text: '표기 제거' }],
@@ -127,9 +116,7 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
     const sourceUri = await open('implementation', source);
     await session.documentLinks(sourceUri);
     const uri = await open('.codocs/target.yaml', target);
-    // 발급 직후 수집 세대가 바뀌면 이전 토큰이 거부되므로, Hover를 다시 요청해
-    // 새로 발급된 두 번째 링크가 기대 위치로 확인될 때까지 기다린다.
-    await vi.waitFor(
+    const matches = await vi.waitFor(
       async () => {
         const value = await session.hoverDocument({
           textDocument: { uri },
@@ -142,28 +129,29 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
         expect(markdown).not.toContain('수집 중');
         expect(markdown).toContain('implementation:1:1');
         expect(markdown).toContain('implementation:1:22');
-        const matches = [
+        const found = [
           ...markdown.matchAll(/command:codocs.openSource\?([^)]*)/gu),
         ];
-        expect(matches).toHaveLength(2);
-        expect(
-          await session.confirmSource(
-            (JSON.parse(decodeURIComponent(matches[1]![1]!)) as unknown[])[0],
-          ),
-        ).toEqual({
-          uri: sourceUri,
-          destination: {
-            kind: 'occurrence',
-            markerText: '@codocs [[대상]]#L6-L7',
-            range: {
-              start: { line: 0, character: 21 },
-              end: { line: 0, character: source.length },
-            },
-          },
-        });
+        expect(found).toHaveLength(2);
+        return found;
       },
       { timeout: 5000 },
     );
+    expect(
+      await session.confirmSource(
+        (JSON.parse(decodeURIComponent(matches[1]![1]!)) as unknown[])[0],
+      ),
+    ).toEqual({
+      uri: sourceUri,
+      destination: {
+        kind: 'occurrence',
+        markerText: '@codocs [[대상]]#L6-L7',
+        range: {
+          start: { line: 0, character: 21 },
+          end: { line: 0, character: source.length },
+        },
+      },
+    });
     await vi.waitFor(
       async () => expect(await session.documentLinks(uri)).toHaveLength(2),
       { timeout: 5000 },
@@ -254,10 +242,6 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
       async () => {
         const result = await session.documentLinks(uri);
         expect(result).toHaveLength(1);
-        // 발급 직후 수집 세대가 바뀌는 구간을 지나 현재 세션 확인까지 기다린다.
-        expect(
-          await session.confirmSource(argument(result[0]!.target!)),
-        ).not.toBeNull();
         return result;
       },
       { timeout: 5000 },
@@ -265,7 +249,10 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
     // 첫 번째 세션에서 토큰이 발급되고 확인되는지 검증한다.
     const selected = argument(links[0]!.target!);
     const firstSessionConfirm = await session.confirmSource(selected);
-    expect(firstSessionConfirm).not.toBeNull();
+    expect(firstSessionConfirm).toEqual({
+      uri: pathToFileURL(path.join(root, '.codocs/target.yaml')).href,
+      destination: { kind: 'rows', startLine: 5, endLine: 6 },
+    });
     // 새로운 세션을 생성한다.
     const newSession = new LanguageServerSession();
     try {

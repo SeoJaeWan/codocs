@@ -1093,7 +1093,6 @@ export class LanguageServerSession {
       session,
     });
     let codeObservation = '';
-    let codeGeneration = '';
     session.onDidChangeCodeReferences?.(
       /** 변경된 코드 관측만 갱신하며 동일 catalog 게시의 재조회 순환을 막는다. */ (
         snapshot,
@@ -1107,10 +1106,7 @@ export class LanguageServerSession {
           snapshot.failures,
         ]);
         if (observation === codeObservation) return;
-        if (generation !== codeGeneration)
-          this.#code.invalidate(session as CodeSession);
         codeObservation = observation;
-        codeGeneration = generation;
         for (const listener of this.#changes) listener();
       },
     );
