@@ -2,7 +2,7 @@
   "name": "codocs",
   "displayName": "Codocs",
   "description": "Connect code in a workspace to its local .codocs knowledge files.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "publisher": "seojaewan",
   "type": "module",
