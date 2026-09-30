@@ -59,7 +59,8 @@ export function readDiagnosticFailures(
   return failures;
 }
 
-/** 한 작업 공간의 표시 수명과 과거 결과를 독립적으로 관리한다. */
+/** 한 작업 공간의 표시 수명과 과거 결과를 독립적으로 관리한다.
+ * @codocs [[VS Code:언어 서버 연결]]#L39-L44 */
 export class DiagnosticStatus {
   readonly #folder: vscode.WorkspaceFolder;
   readonly #item: vscode.StatusBarItem;
@@ -80,7 +81,8 @@ export class DiagnosticStatus {
     };
   }
 
-  /** 알림은 자기 workspace에 적용하며 성공 시 그 항목만 숨긴다. */
+  /** 알림은 자기 workspace에 적용하며 성공 시 그 항목만 숨긴다.
+   * @codocs [[VS Code:언어 서버 연결]]#L41-L43 */
   update(input: unknown): void {
     const failures = readDiagnosticFailures(input, this.#folder.uri.toString());
     if (failures === undefined) return;

@@ -97,7 +97,9 @@ export function parseWriteInput(
   return result.success ? result.data : undefined;
 }
 
-/** 일곱 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다. */
+/** 일곱 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다.
+ * @codocs [[MCP:MCP 도구 호출]]
+ * @codocs [[MCP:MCP 도구 호출]]#L22-L24 */
 export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_list', listSchema],
   ['codocs_get', getSchema],
@@ -108,7 +110,8 @@ export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_duplicates', duplicatesSchema],
 ]);
 
-/** SDK에 제공하는 JSON Schema는 실행 검증과 동일한 Zod 원본에서 생성한다. */
+/** SDK에 제공하는 JSON Schema는 실행 검증과 동일한 Zod 원본에서 생성한다.
+ * @codocs [[MCP:MCP 도구 호출]]#L22-L24 */
 export function codocsJsonInputSchema(
   name: CodocsToolName,
 ): Record<string, unknown> {
@@ -132,7 +135,8 @@ export function parseListInput(input: unknown): WorkspaceListInput | undefined {
   };
 }
 
-/** ID를 첫 등장 순서로 중복 제거한 뒤 1~20개를 허용한다. */
+/** ID를 첫 등장 순서로 중복 제거한 뒤 1~20개를 허용한다.
+ * @codocs [[MCP:조회]]#L26-L27 */
 export function parseGetInput(input: unknown): { ids: string[] } | undefined {
   if (!dataOnly(input)) return undefined;
   const result = getSchema.safeParse(input);
@@ -160,7 +164,8 @@ export function parseGuideInput(
   return result.success ? result.data : undefined;
 }
 
-/** 중복 검토 입력을 세션 입력으로 바꾼다. draft는 write와 같은 객체로 풀고 cursor는 그대로 전달한다. */
+/** 중복 검토 입력을 세션 입력으로 바꾼다. draft는 write와 같은 객체로 풀고 cursor는 그대로 전달한다.
+ * @codocs [[MCP:본문 중복 검토 요청]] */
 export function parseDuplicatesInput(
   input: unknown,
 ):

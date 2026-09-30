@@ -5,7 +5,8 @@ export * from './open-source/index.js';
 
 let runtime: VscodeExtensionRuntime | undefined;
 
-/** VS Code Extension Host에서 폴더별 language client를 시작한다. */
+/** VS Code Extension Host에서 폴더별 language client를 시작한다.
+ * @codocs [[VS Code:VS Code]] */
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {

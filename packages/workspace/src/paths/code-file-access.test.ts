@@ -40,6 +40,7 @@ describe('discoverCodeFiles: 프로젝트 코드 읽기 적격성', () => {
       'memo',
     ]);
   });
+  /** @codocs [[작업 공간:코드 참조 색인]]#L15 */
   it('Git 추적 파일이 ignore와 일치하면 수집한다', async () => {
     await execute('git', ['init', project]);
     await writeFile(path.join(project, 'tracked'), '@codocs [[대상]]');
@@ -148,6 +149,7 @@ describe('discoverCodeFiles: 프로젝트 코드 읽기 적격성', () => {
       (await discoverCodeFiles(project)).files.map((file) => file.path),
     ).toContain('hidden');
   });
+  /** @codocs [[작업 공간:코드 참조 색인]]#L25 */
   it('NUL 및 UTF-16 디스크 바이트면 텍스트로 수집하지 않는다', async () => {
     await writeFile(path.join(project, 'binary'), Buffer.from([65, 0, 66]));
     await writeFile(

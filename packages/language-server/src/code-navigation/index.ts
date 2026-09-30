@@ -66,14 +66,14 @@ interface Selected {
   key: string;
 }
 
-/** source-owned 토큰으로 명시 링크·역참조·힌트를 표현한다. */
+/** source-owned 토큰으로 명시 링크·역참조·힌트를 표현한다. @codocs [[IDE 지원]]#L16-L54 */
 export class CodeNavigation {
   readonly #selected = new Map<string, Selected>();
   readonly #ready = new Map<
     string,
     { owner: CodeOwner; promise: Promise<void> }
   >();
-  /** 최신 열린 원문을 한 번만 동기화하고 같은 버전의 요청은 공유한다. */
+  /** 최신 열린 원문을 한 번만 동기화하고 같은 버전의 요청은 공유한다. @codocs [[문서 동기화]]#L37 @codocs [[문서 동기화]]#L61 */
   prepare(owner: CodeOwner): Promise<void> {
     const previous = this.#ready.get(owner.uri);
     if (previous && sameOwner(previous.owner, owner)) return previous.promise;
@@ -154,7 +154,7 @@ export class CodeNavigation {
     this.#selected.set(key, { owner, token, reverse, key: identity });
     return selectionTarget({ sourceUri: owner.uri, token: key });
   }
-  /** 클릭 전후 현재 출처 버전·서버와 양쪽 파일 정체를 재확인한다. */
+  /** 클릭 전후 현재 출처 버전·서버와 양쪽 파일 정체를 재확인한다. @codocs [[IDE 지원]]#L94-L96 */
   async confirm(
     input: unknown,
     current: (owner: CodeOwner) => boolean,
@@ -200,14 +200,14 @@ export class CodeNavigation {
           : { kind: 'top' },
     };
   }
-  /** 유효·무효 전체 span을 ID Hover보다 먼저 확인한다. */
+  /** 유효·무효 전체 span을 ID Hover보다 먼저 확인한다. @codocs [[코드 호버]]#L8 */
   markerAt(owner: CodeOwner, offset: number): boolean {
     return extractCodeReferences(owner.text).some(
       (item) =>
         item.offsetRange.start <= offset && offset < item.offsetRange.end,
     );
   }
-  /** 무효 명시 표기에는 ID 설명 대신 구별 가능한 오류 이유만 제공한다. */
+  /** 무효 명시 표기에는 ID 설명 대신 구별 가능한 오류 이유만 제공한다. @codocs [[IDE 지원]]#L19-L22 */
   async markerHover(owner: CodeOwner, offset: number): Promise<Hover | null> {
     await this.prepare(owner);
     const snapshot = await owner.session.codeReferenceSnapshot();
@@ -226,7 +226,7 @@ export class CodeNavigation {
       range: item.marker.range,
     };
   }
-  /** 적격 source의 확인한 출현만 직접 링크로 만든다. */
+  /** 적격 source의 확인한 출현만 직접 링크로 만든다. @codocs [[IDE 지원]]#L100-L101 */
   async forward(
     owner: CodeOwner,
   ): Promise<{ links: DocumentLink[]; diagnostics: Diagnostic[] }> {
@@ -265,7 +265,7 @@ export class CodeNavigation {
     );
     return this.render(owner, query);
   }
-  /** 완료 단일 구간만 직접 연결하며 문서 이름 링크와 겹친 구간은 양보한다. */
+  /** 완료 단일 구간만 직접 연결하며 문서 이름 링크와 겹친 구간은 양보한다. @codocs [[IDE 지원]]#L29-L36 */
   async reverseLinks(
     owner: CodeOwner,
     yamlLinks: readonly DocumentLink[],
@@ -340,7 +340,7 @@ export class CodeNavigation {
     }
     return links;
   }
-  /** 문서 전체 출현만 실제 첫 행 앞에 표시한다. */
+  /** 문서 전체 출현만 실제 첫 행 앞에 표시한다. @codocs [[IDE 지원]]#L40-L45 */
   async hints(owner: CodeOwner): Promise<InlayHint[]> {
     await this.prepare(owner);
     const query = await owner.session.codeReferencesForDocument(owner.path);
@@ -392,7 +392,7 @@ export class CodeNavigation {
     );
     return result.success && result.scanStatus === scanStatuses.complete;
   }
-  /** 개별 위치와 수집 상태를 Markdown에 안전하게 표시한다. */
+  /** 개별 위치와 수집 상태를 Markdown에 안전하게 표시한다. @codocs [[IDE 지원]]#L51-L54 */
   async render(
     owner: CodeOwner,
     query: WorkspaceCodeReferenceQuery,

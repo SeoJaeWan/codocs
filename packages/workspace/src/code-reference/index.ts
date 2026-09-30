@@ -84,7 +84,10 @@ export interface WorkspaceCodeReferenceIndexOptions {
   beforeRead?: (paths: readonly string[] | undefined) => Promise<void>;
   observe?: (kind: string, detail: Record<string, unknown>) => void;
 }
-/** 코드 수집·overlay·재해석·안전한 클릭을 저장 catalog와 분리한다. */
+/**
+ * 코드 수집·overlay·재해석·안전한 클릭을 저장 catalog와 분리한다.
+ * @codocs [[작업 공간:코드 참조 색인]]
+ */
 export class WorkspaceCodeReferenceIndex {
   #catalog: Catalog | undefined;
   #documentGeneration = 0;

@@ -192,7 +192,10 @@ function pathFailure(
   };
 }
 
-/** 실제 읽기·열거 실패에서 이미 확인한 경로와 시스템 오류 코드만 보존한다. */
+/**
+ * 실제 읽기·열거 실패에서 이미 확인한 경로와 시스템 오류 코드만 보존한다.
+ * @codocs [[작업 공간:불완전한 탐색]]#L11-L13
+ */
 function readFailure(
   target: ResolvedPath,
   error: unknown,
@@ -245,6 +248,8 @@ export type WorkspaceLoadResult = WorkspaceScanResult & {
  * 읽은 내용 오류와 미지원 하위 연결은 누락 실패가 아니다. 상위 프로젝트는 탐색하지 않는다.
  * 캐시는 감시 신호로 무효화된 초기화 작업 안에서만 공유한다.
  * 수동 전체 refresh는 새 캐시를 사용하거나 .codocs 전체를 먼저 무효화한다.
+ * @codocs [[작업 공간:문서 탐색]]
+ * @codocs [[작업 공간:탐색 상태]]#L10-L15
  */
 export async function loadWorkspace(
   input: unknown = {},
@@ -283,7 +288,11 @@ export async function loadWorkspace(
   };
 }
 
-/** 같은 프로젝트의 발견 경로만 재확인한다. 외부 이벤트 실경로는 직접 입력할 수 없다. */
+/**
+ * 같은 프로젝트의 발견 경로만 재확인한다. 외부 이벤트 실경로는 직접 입력할 수 없다.
+ * @codocs [[작업 공간:문서 탐색]]#L24-L27
+ * @codocs [[작업 공간:파일 접근 범위]]#L21-L22
+ */
 export function loadWorkspacePath(
   root: ProjectRoot,
   input: unknown,

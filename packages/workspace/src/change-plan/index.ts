@@ -16,7 +16,10 @@ export type WorkspaceChangePlanResult =
       { status: typeof changePlanStatuses.candidate }
     > & { revision: string });
 
-/** 같은 스캔의 원문·revision·확인 상태로 순수 core 후보 계산을 연결한다. 디스크를 다시 읽거나 쓰지 않는다. */
+/**
+ * 같은 스캔의 원문·revision·확인 상태로 순수 core 후보 계산을 연결한다. 디스크를 다시 읽거나 쓰지 않는다.
+ * @codocs [[작업 공간:작업 공간 변경 계획]]
+ */
 export function planWorkspaceChange(
   input: unknown,
   scan: WorkspaceScanResult,

@@ -21,6 +21,7 @@ describe('SynchronizedDocuments: 전체 원문과 단조 버전 동기화', () =
     });
 
     expect(result.accepted).toBe(true);
+    // @codocs [[문서 동기화]]#L18-L21
     expect(documents.get('file:///workspace/source.unusual')?.getText()).toBe(
       text,
     );
@@ -59,6 +60,7 @@ describe('SynchronizedDocuments: 전체 원문과 단조 버전 동기화', () =
       accepted: false,
       reason: documentUpdateRejections.staleVersion,
     });
+    // @codocs [[문서 동기화]]#L14
     expect(documents.get(uri)?.getText()).toBe('new');
     expect(documents.get(uri)?.version).toBe(8);
   });
@@ -105,6 +107,7 @@ describe('utf16OffsetsToRange: UTF-16 offset의 LSP 좌표 변환', () => {
       '😀alpha',
     );
 
+    // @codocs [[문서 동기화]]#L12-L13
     expect(utf16OffsetsToRange(document, { start: 2, end: 7 })).toEqual({
       start: { line: 0, character: 2 },
       end: { line: 0, character: 7 },

@@ -124,6 +124,7 @@ describe('WorkspaceWatcher 신호 병합과 구독 수명', () => {
     expect(contentWatcher.close).not.toHaveBeenCalled();
   });
 
+  /** @codocs [[작업 공간:작업 공간 파일 감시]]#L17 */
   it('같은 경로의 변경 알림이 한 배치에 모이면 경로를 한 번만 전달한다', async () => {
     watcher = await createWorkspaceWatcher(project);
     const listener = vi.fn();
@@ -138,6 +139,7 @@ describe('WorkspaceWatcher 신호 병합과 구독 수명', () => {
     expect(listener).toHaveBeenCalledExactlyOnceWith({ paths: [target] });
   });
 
+  /** @codocs [[작업 공간:작업 공간 파일 감시]]#L18 */
   it('구독을 해제하면 이후 변경 배치를 해당 구독자에게 전달하지 않는다', async () => {
     watcher = await createWorkspaceWatcher(project);
     const listener = vi.fn();
@@ -212,6 +214,7 @@ describe('WorkspaceWatcher 감시 오류 복구', () => {
       );
     });
 
+    /** @codocs [[작업 공간:작업 공간 파일 감시]]#L54 */
     it('자동 재연결도 실패하면 실패 원인과 수동 복구 안내를 제공한다', async () => {
       watcher = await createWorkspaceWatcher(project);
       fake.failNext = true;
