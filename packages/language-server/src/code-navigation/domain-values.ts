@@ -19,3 +19,11 @@ export const codeReferenceMessages = {
   /** 대상 탐색이 불완전하다. */
   [codeReferenceStatuses.unconfirmed]: '대상 문서를 아직 확인하지 못했습니다.',
 } as const;
+/** 코드 수집 상태 표시의 고정 안내다. @domainValues */
+export const codeCollectionMessages = {
+  /** 감시 실패만 있어 재연결이 진행 중인 상태의 상단 표시다. */
+  reconnectingLabel: '감시 재연결 중',
+  /** 감시 재연결 진행 중임을 알리는 호버 안내다. */
+  reconnectingGuidance:
+    '코드 변경 감시를 다시 연결하고 있습니다. 완료되면 자동으로 갱신됩니다.',
+} as const;

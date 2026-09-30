@@ -14,7 +14,12 @@ import {
   codeFileReasons,
   codeRepositoryKinds,
 } from '../code-reference/domain-values.js';
-import { discoverCodeFiles, readEligibleCodeFile } from './code-file-access.js';
+import {
+  computeCodeFilePolicy,
+  discoverCodeFiles,
+  isCodeWatchIgnored,
+  readEligibleCodeFile,
+} from './code-file-access.js';
 const execute = promisify(execFile);
 let project: string;
 beforeEach(async () => {
@@ -235,5 +240,89 @@ describe('discoverCodeFiles: 프로젝트 root 전제', () => {
         (failure) => failure.reason === codeFileReasons.boundary,
       ),
     ).toBe(true);
+  });
+});
+
+describe('computeCodeFilePolicy: 파일을 읽지 않는 정책 계산', () => {
+  it('추적 파일이 있으면 모든 상위 디렉터리를 미리 계산한 집합에 담는다', async () => {
+    await execute('git', ['init', project]);
+    await mkdir(path.join(project, 'a', 'b'), { recursive: true });
+    await writeFile(path.join(project, 'a', 'b', 'file'), 'text');
+    await writeFile(path.join(project, 'top'), 'text');
+    await execute('git', ['-C', project, 'add', '.']);
+    const { policy } = await computeCodeFilePolicy(project);
+    expect([...policy.trackedDirectories].sort()).toEqual(['a', 'a/b']);
+  });
+  it('정책만 계산하면 원문을 읽지 않고 읽기 후보 경로만 제공한다', async () => {
+    await writeFile(path.join(project, 'source'), 'text');
+    ioFailures.set(path.join(project, 'source'), {
+      operations: ['readFile', 'lstat'],
+      code: 'EACCES',
+    });
+    const result = await computeCodeFilePolicy(project);
+    expect(result.candidates).toEqual(['source']);
+    expect(result.failures).toEqual([]);
+  });
+});
+
+describe('isCodeWatchIgnored: 수집과 같은 감시 대상 판단', () => {
+  const file = { isDirectory: () => false };
+  const directory = { isDirectory: () => true };
+  it('미추적 ignore 파일이면 감시하지 않는다', async () => {
+    await writeFile(path.join(project, '.gitignore'), '*.log\n');
+    const { policy } = await computeCodeFilePolicy(project);
+    expect(isCodeWatchIgnored(policy, path.join(project, 'a.log'), file)).toBe(
+      true,
+    );
+  });
+  it('추적 파일이 없는 ignore 폴더이면 감시하지 않는다', async () => {
+    await writeFile(path.join(project, '.gitignore'), 'dist/\n');
+    const { policy } = await computeCodeFilePolicy(project);
+    expect(
+      isCodeWatchIgnored(policy, path.join(project, 'dist'), directory),
+    ).toBe(true);
+  });
+  it('추적 파일이 있는 ignore 폴더이면 감시한다', async () => {
+    await execute('git', ['init', project]);
+    await mkdir(path.join(project, 'dist'));
+    await writeFile(path.join(project, 'dist', 'keep'), 'text');
+    await execute('git', ['-C', project, 'add', '-f', 'dist/keep']);
+    await writeFile(path.join(project, '.gitignore'), 'dist/\n');
+    const { policy } = await computeCodeFilePolicy(project);
+    expect(
+      isCodeWatchIgnored(policy, path.join(project, 'dist'), directory),
+    ).toBe(false);
+    expect(
+      isCodeWatchIgnored(policy, path.join(project, 'dist', 'keep'), file),
+    ).toBe(false);
+  });
+  it('제외한 폴더 안의 미추적 파일이면 감시하지 않는다', async () => {
+    await execute('git', ['init', project]);
+    await mkdir(path.join(project, 'dist'));
+    await writeFile(path.join(project, 'dist', 'keep'), 'text');
+    await execute('git', ['-C', project, 'add', '-f', 'dist/keep']);
+    await writeFile(path.join(project, '.gitignore'), 'dist/\n');
+    const { policy } = await computeCodeFilePolicy(project);
+    expect(
+      isCodeWatchIgnored(policy, path.join(project, 'dist', 'junk'), file),
+    ).toBe(true);
+  });
+  it('.gitignore 파일이면 항상 감시한다', async () => {
+    await writeFile(path.join(project, '.gitignore'), '.gitignore\n');
+    const { policy } = await computeCodeFilePolicy(project);
+    expect(
+      isCodeWatchIgnored(policy, path.join(project, '.gitignore'), file),
+    ).toBe(false);
+  });
+  it('폴더인지 파일인지 정해지지 않은 첫 호출이면 제외하지 않고 stats가 오면 폴더로 판단한다', async () => {
+    await writeFile(path.join(project, '.gitignore'), 'dist/\n');
+    const { policy } = await computeCodeFilePolicy(project);
+    const undecided = isCodeWatchIgnored(policy, path.join(project, 'dist'));
+    const decided = isCodeWatchIgnored(
+      policy,
+      path.join(project, 'dist'),
+      directory,
+    );
+    expect([undecided, decided]).toEqual([false, true]);
   });
 });

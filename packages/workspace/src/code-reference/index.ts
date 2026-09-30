@@ -13,15 +13,23 @@ import {
   type CodeReferenceResolution,
 } from '@codocs/core';
 import {
+  codeWatchRuleKey,
+  computeCodeFilePolicy,
   discoverCodeFiles,
+  hasTrackedDescendant,
+  isCodeFileIgnored,
+  isCodeWatchIgnored,
   readEligibleCodeFile,
   codeFileRelativePath,
-  isCodeFileIgnored,
   type CodeCollectionFailure,
   type CodeFileDiscovery,
   type CodeFileObservation,
+  type CodeFilePolicy,
 } from '../paths/code-file-access.js';
-import { CodeReferenceWatcher } from '../watcher/code-reference-watcher.js';
+import {
+  CodeReferenceWatcher,
+  type CodeWatchExclusion,
+} from '../watcher/code-reference-watcher.js';
 import {
   codeCollectionStatuses,
   codeFileReasons,
@@ -79,10 +87,43 @@ interface Selection {
   targetIdentity: string;
   targetRevision: string;
 }
-/** 실제 IO 경합 제어와 관측 계수만 제공하는 검사 경계다. */
+/** 코드 감시 연결이 수집 계층에 요구하는 최소 계약이다. */
+export interface CodeWatchConnection {
+  start(): Promise<void>;
+  close(): Promise<void>;
+}
+/** 실제 IO 경합 제어, 감시 연결·재시도 시각 교체와 관측 계수만 제공하는 검사 경계다. */
 export interface WorkspaceCodeReferenceIndexOptions {
   beforeRead?: (paths: readonly string[] | undefined) => Promise<void>;
   observe?: (kind: string, detail: Record<string, unknown>) => void;
+  /** 기본값은 실제 chokidar 감시다. */
+  createWatcher?: (
+    projectRoot: string,
+    changed: (paths: readonly string[]) => void,
+    failed: (error: unknown) => void,
+    excluded: CodeWatchExclusion,
+  ) => CodeWatchConnection;
+  /** 재시도 예약을 교체하며 반환값은 예약 취소 함수다. 기본값은 setTimeout이다. */
+  schedule?: (callback: () => void, delay: number) => () => void;
+}
+/** 감시 재등록 재시도는 1초에서 시작해 두 배씩 늘리며 30초를 넘지 않는다. */
+const watchRetryDelay = { initial: 1_000, maximum: 30_000 } as const;
+/** 기본 감시는 실제 chokidar 연결이다. */
+function createChokidarWatcher(
+  ...args: ConstructorParameters<typeof CodeReferenceWatcher>
+): CodeWatchConnection {
+  return new CodeReferenceWatcher(...args);
+}
+/** 기본 재시도 예약은 타이머이며 반환값으로 취소한다. */
+function scheduleTimer(callback: () => void, delay: number): () => void {
+  const timer = setTimeout(callback, delay);
+  return /** 예약한 타이머를 해제한다. */ () => clearTimeout(timer);
+}
+/** 한 번의 수집 중 규칙 변화로 감시를 다시 구성하는 최대 횟수다. */
+const maximumWatchRebuilds = 3;
+/** 등록 실패를 값으로 전달해 falsy 오류도 구분한다. */
+interface WatchRegistrationFailure {
+  error: unknown;
 }
 /**
  * 코드 수집·overlay·재해석·안전한 클릭을 저장 catalog와 분리한다.
@@ -100,7 +141,12 @@ export class WorkspaceCodeReferenceIndex {
   #pendingBuffers = new Map<string, WorkspaceCodeBufferInput>();
   #selections = new Map<string, Selection>();
   #listeners = new Set<(snapshot: WorkspaceCodeReferenceSnapshot) => void>();
-  #watcher: CodeReferenceWatcher | undefined;
+  #watcher: CodeWatchConnection | undefined;
+  #registeredRules: string | undefined;
+  #recovering: Promise<void> | undefined;
+  #cancelRetry: (() => void) | undefined;
+  #failedAttempts = 0;
+  #brokenAgain = false;
   #watchFailure: CodeCollectionFailure | undefined;
   #status: WorkspaceCodeReferenceSnapshot['status'] =
     codeCollectionStatuses.collecting;
@@ -529,9 +575,7 @@ export class WorkspaceCodeReferenceIndex {
           return true;
         return (
           !isCodeFileIgnored(this.#discovery.policy, relative) ||
-          [...this.#discovery.policy.tracked].some((file) =>
-            file.startsWith(relative + '/'),
-          )
+          hasTrackedDescendant(this.#discovery.policy, relative)
         );
       },
     );
@@ -547,50 +591,182 @@ export class WorkspaceCodeReferenceIndex {
           this.#timer = undefined;
           this.refresh([...this.#pending]).catch(
             /** 감시 실패를 수집 상태로 게시한다. */ (error) =>
-              this.#failed(error),
+              this.#watchBroken(error),
           );
         },
         30,
       );
   }
-  /** 실패는 확인한 출현을 보존하면서 incomplete로 끝낸다. */
-  #failed(error: unknown): void {
+  /**
+   * 경로를 알 수 없는 오류도 감시 연결의 손상으로 보고 확인한 출현을 보존한 채 incomplete로 게시한다.
+   * 복구가 진행 중이거나 예약되어 있으면 새 복구를 만들지 않고 합친다.
+   */
+  #watchBroken(error: unknown): void {
     if (this.#closed) return;
+    const first =
+      !this.#watchFailure || this.#status !== codeCollectionStatuses.incomplete;
     this.#watchFailure = {
       reason: codeFileReasons.watch,
       message: String(error),
     };
     this.#status = codeCollectionStatuses.incomplete;
-    this.#publish();
+    if (first) this.#publish();
+    if (this.#recovering) this.#brokenAgain = true;
+    else if (!this.#cancelRetry) this.#recoverInBackground();
   }
-  /** 시작 watch를 공유하고 등록 완료 후 최초 스캔을 실행한다. */
-  async #start(): Promise<void> {
-    if (this.#starting) return this.#starting;
-    this.#watcher = new CodeReferenceWatcher(
-      this.projectRoot,
-      /** 등록 후 변경 경로를 병합한다. */ (paths) => this.#changed(paths),
-      /** 감시 실패를 수집 상태로 게시한다. */ (error) => this.#failed(error),
+  /** 호출자가 기다리지 않는 복구의 예외는 기록하고 삼키지 않는다. */
+  #recoverInBackground(): void {
+    this.#recover().catch(
+      /** 복구 자체가 실패하면 원인을 남긴다. */ (error: unknown) => {
+        console.error('Code watch recovery failed', error);
+      },
     );
-    this.#starting = this.#watcher.start();
+  }
+  /**
+   * 정책을 먼저 계산해 수집할 수 있는 경로만 감시하고, 모든 연결의 ready·error 뒤에 반환한다.
+   * 등록 중 도착한 오류는 등록 실패로 반환하며 이전 연결은 새 연결이 대체한다.
+   */
+  async #register(
+    known?: CodeFilePolicy,
+  ): Promise<WatchRegistrationFailure | undefined> {
+    let policy: CodeFilePolicy;
+    try {
+      policy = known ?? (await computeCodeFilePolicy(this.projectRoot)).policy;
+    } catch (error: unknown) {
+      return { error };
+    }
+    if (this.#closed) return undefined;
+    let registering = true;
+    let failure: WatchRegistrationFailure | undefined;
+    const watcher: CodeWatchConnection = (
+      this.options.createWatcher ?? createChokidarWatcher
+    )(
+      this.projectRoot,
+      /** 등록 중 신호도 버리지 않고 병합한다. */ (paths) =>
+        this.#changed(paths),
+      /** 현재 연결의 오류만 등록 실패 또는 연결 손상으로 다룬다. */ (
+        error,
+      ) => {
+        if (this.#closed || watcher !== this.#watcher) return;
+        if (registering) failure ??= { error };
+        else this.#watchBroken(error);
+      },
+      /** 수집과 같은 정책으로 감시 제외를 판단한다. */ (input, stats) =>
+        isCodeWatchIgnored(policy, input, stats),
+    );
+    const replaced = this.#watcher;
+    this.#watcher = watcher;
+    this.#registeredRules = codeWatchRuleKey(policy);
+    await replaced?.close();
+    try {
+      await watcher.start();
+    } catch (error: unknown) {
+      failure ??= { error };
+    }
+    registering = false;
+    if (failure && watcher === this.#watcher) {
+      this.#watcher = undefined;
+      this.#registeredRules = undefined;
+      await watcher.close();
+    }
+    return failure;
+  }
+  /** 기존 연결을 종료하고 다시 등록한다. */
+  async #reregister(
+    known?: CodeFilePolicy,
+  ): Promise<WatchRegistrationFailure | undefined> {
+    const previous = this.#watcher;
+    this.#watcher = undefined;
+    this.#registeredRules = undefined;
+    await previous?.close();
+    if (this.#closed) return undefined;
+    return this.#register(known);
+  }
+  /** 최초 등록을 공유하며 실패는 복구로 넘긴다. */
+  async #start(): Promise<void> {
+    this.#starting ??= this.#register()
+      .then(
+        /** 등록 실패를 감시 손상으로 게시한다. */ (failure) => {
+          if (failure) this.#watchBroken(failure.error);
+        },
+      )
+      .catch(
+        /** 예외도 감시 손상으로 게시한다. */ (error: unknown) =>
+          this.#watchBroken(error),
+      );
     await this.#starting;
   }
-  /** Full reconciliation은 메타데이터가 같은 cached 원문을 다시 읽지 않는다. */
+  /**
+   * 진행 중인 복구를 공유하거나 예약된 재시도를 취소하고 즉시 시작한다.
+   * 재등록 뒤 전체 재확인이 끝나고 다른 오류가 없으면 성공이다.
+   */
+  #recover(): Promise<void> {
+    if (this.#closed) return Promise.resolve();
+    if (this.#recovering) return this.#recovering;
+    this.#cancelRetry?.();
+    this.#cancelRetry = undefined;
+    const run: Promise<void> = this.#recoverOnce().finally(() => {
+      if (this.#recovering === run) this.#recovering = undefined;
+    });
+    this.#recovering = run;
+    return run;
+  }
+  /** 한 번의 재등록·재확인을 수행하고 실패하면 다음 재시도를 예약한다. */
+  async #recoverOnce(): Promise<void> {
+    let failure: WatchRegistrationFailure | undefined;
+    try {
+      failure = await this.#reregister();
+      if (!failure && !this.#closed) {
+        this.#brokenAgain = false;
+        // 재등록 전에 시작한 수집이 complete를 게시하지 않도록 끝난 뒤 실패를 해제한다.
+        while (this.#operation) await this.#operation;
+        if (!this.#brokenAgain) this.#watchFailure = undefined;
+        await this.#collect();
+      }
+    } catch (error: unknown) {
+      failure = { error };
+    }
+    if (this.#closed) return;
+    if (!failure && !this.#brokenAgain) {
+      this.#failedAttempts = 0;
+      return;
+    }
+    if (failure)
+      this.#watchFailure = {
+        reason: codeFileReasons.watch,
+        message: String(failure.error),
+      };
+    this.#status = codeCollectionStatuses.incomplete;
+    const delay = Math.min(
+      watchRetryDelay.initial * 2 ** this.#failedAttempts,
+      watchRetryDelay.maximum,
+    );
+    this.#failedAttempts++;
+    this.#cancelRetry = (this.options.schedule ?? scheduleTimer)(() => {
+      this.#cancelRetry = undefined;
+      this.#recoverInBackground();
+    }, delay);
+  }
+  /** 경로 없는 명시 refresh는 감시 손상 중이면 예약을 취소하고 바로 복구한다. */
   refresh(paths?: readonly string[]): Promise<WorkspaceCodeReferenceSnapshot> {
     if (this.#closed) return Promise.resolve(this.#snapshot());
+    if (!paths && (this.#watchFailure || this.#recovering))
+      return this.#recover().then(() => this.#snapshot());
+    return this.#collect(paths);
+  }
+  /** Full reconciliation은 메타데이터가 같은 cached 원문을 다시 읽지 않는다. */
+  #collect(paths?: readonly string[]): Promise<WorkspaceCodeReferenceSnapshot> {
     if (paths) for (const input of paths) this.#pending.add(input);
     if (this.#operation) return this.#operation;
     this.#status = codeCollectionStatuses.collecting;
     this.#codeGeneration++;
     /** 수집 중 신호는 새 pass로 처리하며 완료 전에 draining한다. */
     const reconcile = async (): Promise<WorkspaceCodeReferenceSnapshot> => {
-      if (!paths && this.#watchFailure) {
-        await this.#watcher?.close();
-        this.#watcher = undefined;
-        this.#starting = undefined;
-        this.#watchFailure = undefined;
-      }
       await this.#start();
+      let rebuilds = 0;
+      let rerun: boolean;
       do {
+        rerun = false;
         const affected = [...this.#pending];
         this.#pending.clear();
         const epoch = this.#epoch;
@@ -606,6 +782,20 @@ export class WorkspaceCodeReferenceIndex {
         const discovery = await discoverCodeFiles(this.projectRoot, cache);
         if (this.#closed) return this.#snapshot();
         if (epoch !== this.#epoch) continue;
+        const rules = codeWatchRuleKey(discovery.policy);
+        if (
+          this.#watcher &&
+          this.#registeredRules !== undefined &&
+          this.#registeredRules !== rules &&
+          rebuilds < maximumWatchRebuilds
+        ) {
+          // 감시 규칙이 달라졌다면 새 정책으로 전체 감시를 다시 구성하고 재확인한다.
+          rebuilds++;
+          const failure = await this.#reregister(discovery.policy);
+          if (failure) this.#watchBroken(failure.error);
+          rerun = true;
+          continue;
+        }
         this.#discovery = discovery;
         const disk = new Map(discovery.files.map((file) => [file.path, file]));
         for (const file of discovery.files)
@@ -628,7 +818,7 @@ export class WorkspaceCodeReferenceIndex {
           affected,
         });
         this.#publish();
-      } while (this.#pending.size && !this.#closed);
+      } while ((rerun || this.#pending.size) && !this.#closed);
       return this.#snapshot();
     };
     const operation = reconcile().catch(
@@ -648,13 +838,14 @@ export class WorkspaceCodeReferenceIndex {
       if (this.#pending.size && !this.#closed)
         this.refresh([...this.#pending]).catch(
           /** 감시 실패를 수집 상태로 게시한다. */ (error) =>
-            this.#failed(error),
+            this.#watchBroken(error),
         );
     };
     operation
       .then(clear, clear)
       .catch(
-        /** 감시 실패를 수집 상태로 게시한다. */ (error) => this.#failed(error),
+        /** 감시 실패를 수집 상태로 게시한다. */ (error) =>
+          this.#watchBroken(error),
       );
     return operation;
   }
@@ -663,13 +854,19 @@ export class WorkspaceCodeReferenceIndex {
     this.#closed = true;
     this.#epoch++;
     if (this.#timer) clearTimeout(this.#timer);
+    this.#cancelRetry?.();
+    this.#cancelRetry = undefined;
     this.#listeners.clear();
     this.#buffers.clear();
     this.#pendingBuffers.clear();
     this.#owners.clear();
     this.#selections.clear();
     // 진행 중인 수집과 감시 시작이 만든 프로세스·핸들이 끝난 뒤에만 종료를 완료한다.
-    await Promise.allSettled([this.#operation, this.#starting]);
+    await Promise.allSettled([
+      this.#operation,
+      this.#starting,
+      this.#recovering,
+    ]);
     await this.#watcher?.close();
   }
 }

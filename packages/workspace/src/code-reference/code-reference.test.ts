@@ -5,6 +5,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   return withIoFailures(actual);
 });
 import { mkdir, mkdtemp, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import {
   buildCatalog,
@@ -13,15 +15,21 @@ import {
   codeReferenceStatuses,
 } from '@codocs/core';
 import { ioFailures } from '../test-support/file-system.js';
+import { createFakeCodeWatch } from '../test-support/code-watch.js';
+import { CodeReferenceWatcher } from '../watcher/code-reference-watcher.js';
 import {
   WorkspaceCodeReferenceIndex,
   codeCollectionStatuses,
+  codeFileReasons,
   codeObservationKinds,
+  type WorkspaceCodeReferenceIndexOptions,
+  type WorkspaceCodeReferenceSnapshot,
 } from './index.js';
 import {
   createWorkspaceQuerySession,
   type WorkspaceQuerySession,
 } from '../query/index.js';
+const executeGit = promisify(execFile);
 let project: string;
 const indexes: WorkspaceCodeReferenceIndex[] = [];
 const sessions: WorkspaceQuerySession[] = [];
@@ -692,5 +700,302 @@ describe('WorkspaceCodeReferenceIndex: 확인 전제 보존', () => {
     expect(
       await index.confirm(token!, { sourcePath: 'source', documentVersion: 1 }),
     ).toMatchObject({ sourcePath: 'source' });
+  });
+});
+
+/** 다음 게시 중 조건을 만족하는 snapshot을 기다린다. */
+function published(
+  index: WorkspaceCodeReferenceIndex,
+  matches: (snapshot: WorkspaceCodeReferenceSnapshot) => boolean,
+): Promise<WorkspaceCodeReferenceSnapshot> {
+  return new Promise((resolve) => {
+    const stop = index.onDidChange((snapshot) => {
+      if (!matches(snapshot)) return;
+      stop();
+      resolve(snapshot);
+    });
+  });
+}
+/** 실제 감시를 만들면서 생성 횟수와 전달된 오류를 기록한다. */
+function countingWatchers(): {
+  created: CodeReferenceWatcher[];
+  errors: unknown[];
+  createWatcher: NonNullable<
+    WorkspaceCodeReferenceIndexOptions['createWatcher']
+  >;
+} {
+  const created: CodeReferenceWatcher[] = [];
+  const errors: unknown[] = [];
+  return {
+    created,
+    errors,
+    /** 실제 감시를 만들어 오류를 기록한 뒤 수집 계층에 넘긴다. */
+    createWatcher: (root, changed, failed, excluded) => {
+      const watcher = new CodeReferenceWatcher(
+        root,
+        changed,
+        (error) => {
+          errors.push(error);
+          failed(error);
+        },
+        excluded,
+      );
+      created.push(watcher);
+      return watcher;
+    },
+  };
+}
+const marker = '@codocs [[대상]]';
+
+describe('WorkspaceCodeReferenceIndex: 수집 범위만 감시', () => {
+  /** @codocs [[작업 공간:작업 공간 파일 감시]]#L67 */
+  it('제외한 dist 폴더를 삭제하고 다시 만들어도 감시 오류 없이 complete를 유지한다', async () => {
+    await writeFile(path.join(project, '.gitignore'), 'dist/\n');
+    await mkdir(path.join(project, 'dist'));
+    await writeFile(path.join(project, 'dist', 'out.js'), 'text');
+    const watchers = countingWatchers();
+    const index = createIndex({ createWatcher: watchers.createWatcher });
+    await index.snapshot();
+    await rm(path.join(project, 'dist'), { recursive: true });
+    await mkdir(path.join(project, 'dist'));
+    await writeFile(path.join(project, 'dist', 'out.js'), 'text');
+    const later = published(index, (snapshot) =>
+      snapshot.occurrences.some((item) => item.sourcePath === 'later'),
+    );
+    await writeFile(path.join(project, 'later'), marker);
+    expect(await later).toMatchObject({
+      status: codeCollectionStatuses.complete,
+      failures: [],
+    });
+    expect(watchers.errors).toEqual([]);
+  });
+  it('제외한 폴더 안의 추적 파일을 수정하면 새 출현을 게시한다', async () => {
+    await executeGit('git', ['init', project]);
+    await mkdir(path.join(project, 'dist'));
+    await writeFile(path.join(project, 'dist', 'keep'), marker);
+    await writeFile(path.join(project, '.gitignore'), 'dist/\n');
+    await executeGit('git', ['-C', project, 'add', '-f', 'dist/keep']);
+    const index = createIndex();
+    await index.snapshot();
+    const changed = published(
+      index,
+      (snapshot) =>
+        snapshot.status === codeCollectionStatuses.complete &&
+        snapshot.occurrences.length === 2,
+    );
+    await writeFile(path.join(project, 'dist', 'keep'), marker + '\n' + marker);
+    await changed;
+    expect((await index.reverse(targetPath)).confirmedCount).toBe(2);
+  });
+  it('제외한 폴더 안의 미추적 파일을 수정하면 다시 수집하지 않는다', async () => {
+    await executeGit('git', ['init', project]);
+    await mkdir(path.join(project, 'dist'));
+    await writeFile(path.join(project, 'dist', 'keep'), marker);
+    await writeFile(path.join(project, 'dist', 'junk'), marker);
+    await writeFile(path.join(project, '.gitignore'), 'dist/\n');
+    await executeGit('git', ['-C', project, 'add', '-f', 'dist/keep']);
+    const observed: string[] = [];
+    const index = createIndex({ observe: (kind) => observed.push(kind) });
+    await index.snapshot();
+    await writeFile(path.join(project, 'dist', 'junk'), marker + marker);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(observed).toEqual(['code-index-published']);
+  });
+});
+
+describe('WorkspaceCodeReferenceIndex: 감시 규칙이 바뀔 때만 재구성', () => {
+  it('제외 규칙을 제거하면 감시를 다시 구성하고 새로 포함한 폴더의 변경을 관측한다', async () => {
+    await writeFile(path.join(project, '.gitignore'), 'included/\n');
+    await mkdir(path.join(project, 'included'));
+    await writeFile(path.join(project, 'included', 'source'), marker);
+    const watchers = countingWatchers();
+    const index = createIndex({ createWatcher: watchers.createWatcher });
+    await index.snapshot();
+    const included = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 1,
+    );
+    await writeFile(path.join(project, '.gitignore'), '');
+    await included;
+    const edited = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 2,
+    );
+    await writeFile(
+      path.join(project, 'included', 'source'),
+      marker + '\n' + marker,
+    );
+    await edited;
+    expect(watchers.created).toHaveLength(2);
+  });
+  it('제외 규칙을 추가하면 감시를 다시 구성하고 이전 출현을 제거한다', async () => {
+    await mkdir(path.join(project, 'later'));
+    await writeFile(path.join(project, 'later', 'source'), marker);
+    const watchers = countingWatchers();
+    const index = createIndex({ createWatcher: watchers.createWatcher });
+    await index.snapshot();
+    const removed = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 0,
+    );
+    await writeFile(path.join(project, '.gitignore'), 'later/\n');
+    await removed;
+    expect(watchers.created).toHaveLength(2);
+  });
+  it('새 폴더를 만들어도 규칙이 같으면 감시를 다시 구성하지 않는다', async () => {
+    const watchers = countingWatchers();
+    const index = createIndex({ createWatcher: watchers.createWatcher });
+    await index.snapshot();
+    const added = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 1,
+    );
+    await mkdir(path.join(project, 'created'));
+    await writeFile(path.join(project, 'created', 'source'), marker);
+    await added;
+    expect(watchers.created).toHaveLength(1);
+  });
+  it('Git index가 갱신되어도 규칙이 같으면 감시를 다시 구성하지 않는다', async () => {
+    await executeGit('git', ['init', project]);
+    await writeFile(path.join(project, 'source'), marker);
+    const observed: string[] = [];
+    const watchers = countingWatchers();
+    const index = createIndex({
+      createWatcher: watchers.createWatcher,
+      observe: (kind) => observed.push(kind),
+    });
+    await index.snapshot();
+    await executeGit('git', ['-C', project, 'add', 'source']);
+    await vi.waitFor(() => expect(observed.length).toBeGreaterThan(1));
+    expect(watchers.created).toHaveLength(1);
+  });
+});
+
+describe('WorkspaceCodeReferenceIndex: 감시 오류 자동 복구', () => {
+  /** 오류를 주입할 수 있는 가짜 감시로 색인을 만들고 최초 수집을 마친다. */
+  async function startedIndex(): Promise<{
+    index: WorkspaceCodeReferenceIndex;
+    fake: ReturnType<typeof createFakeCodeWatch>;
+  }> {
+    await writeFile(path.join(project, 'source'), marker);
+    const fake = createFakeCodeWatch();
+    const index = createIndex({
+      createWatcher: fake.createWatcher,
+      schedule: fake.schedule,
+    });
+    await index.snapshot();
+    return { index, fake };
+  }
+  it('감시 오류가 도착하면 확인한 출현을 보존한 채 watch 실패와 incomplete로 게시한다', async () => {
+    const { index, fake } = await startedIndex();
+    const seen: WorkspaceCodeReferenceSnapshot[] = [];
+    index.onDidChange((snapshot) => seen.push(snapshot));
+    fake.connections[0]!.failed(new Error('EPERM: watch'));
+    expect(seen[0]).toMatchObject({
+      status: codeCollectionStatuses.incomplete,
+      confirmedCount: 1,
+      failures: [{ reason: codeFileReasons.watch }],
+    });
+  });
+  it('감시 오류 뒤에는 즉시 다시 등록하고 전체 재확인으로 complete를 회복한다', async () => {
+    const { index, fake } = await startedIndex();
+    const recovered = published(
+      index,
+      (snapshot) => snapshot.status === codeCollectionStatuses.complete,
+    );
+    fake.connections[0]!.failed(new Error('EPERM: watch'));
+    expect(await recovered).toMatchObject({ confirmedCount: 1, failures: [] });
+    expect(fake.connections.map((item) => item.closed)).toEqual([true, false]);
+    expect(fake.schedules).toEqual([]);
+  });
+  it('연달아 도착한 감시 오류는 한 번의 재등록으로 합친다', async () => {
+    const { index, fake } = await startedIndex();
+    const recovered = published(
+      index,
+      (snapshot) => snapshot.status === codeCollectionStatuses.complete,
+    );
+    for (const message of ['first', 'second', 'third'])
+      fake.connections[0]!.failed(new Error(message));
+    await recovered;
+    expect(fake.connections).toHaveLength(2);
+  });
+  it('재등록이 연달아 실패하면 1초부터 두 배씩 늘려 30초를 넘지 않게 계속 재시도한다', async () => {
+    const { fake } = await startedIndex();
+    fake.behavior.failRegistrations = 7;
+    fake.connections[0]!.failed(new Error('EPERM: watch'));
+    const delays: number[] = [];
+    for (let attempt = 0; attempt < 7; attempt++) {
+      await vi.waitFor(() => expect(fake.schedules).toHaveLength(attempt + 1));
+      delays.push(fake.schedules[attempt]!.delay);
+      fake.schedules[attempt]!.run();
+    }
+    expect(delays).toEqual([
+      1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000,
+    ]);
+  });
+  it('재등록에 성공하면 다음 실패의 재시도 간격을 1초로 되돌린다', async () => {
+    const { index, fake } = await startedIndex();
+    fake.behavior.failRegistrations = 2;
+    fake.connections[0]!.failed(new Error('EPERM: watch'));
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(1));
+    fake.schedules[0]!.run();
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(2));
+    const recovered = published(
+      index,
+      (snapshot) => snapshot.status === codeCollectionStatuses.complete,
+    );
+    fake.schedules[1]!.run();
+    await recovered;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fake.behavior.failRegistrations = 1;
+    fake.connections.at(-1)!.failed(new Error('EPERM: watch'));
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(3));
+    expect(fake.schedules.map((item) => item.delay)).toEqual([
+      1_000, 2_000, 1_000,
+    ]);
+  });
+  it('예약된 재시도 중 경로 없는 refresh를 호출하면 예약을 취소하고 즉시 복구한다', async () => {
+    const { index, fake } = await startedIndex();
+    fake.behavior.failRegistrations = 1;
+    fake.connections[0]!.failed(new Error('EPERM: watch'));
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(1));
+    const result = await index.refresh();
+    expect(result).toMatchObject({
+      status: codeCollectionStatuses.complete,
+      failures: [],
+    });
+    expect(fake.schedules[0]!.cancelled).toBe(true);
+    expect(fake.connections).toHaveLength(3);
+  });
+  it('예약된 재시도 중 close하면 예약을 취소하고 이후 재등록하지 않는다', async () => {
+    const { index, fake } = await startedIndex();
+    fake.behavior.failRegistrations = 1;
+    fake.connections[0]!.failed(new Error('EPERM: watch'));
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(1));
+    await index.close();
+    fake.schedules[0]!.run();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fake.schedules[0]!.cancelled).toBe(true);
+    expect(fake.connections).toHaveLength(2);
+  });
+  it('폴더를 삭제하고 곧바로 다시 만든 뒤 기존 파일을 수정해도 다시 관측해 complete로 돌아간다', async () => {
+    await mkdir(path.join(project, 'nested'));
+    await writeFile(path.join(project, 'nested', 'source'), marker);
+    const index = createIndex();
+    await index.snapshot();
+    await rm(path.join(project, 'nested'), { recursive: true });
+    await mkdir(path.join(project, 'nested'));
+    await writeFile(path.join(project, 'nested', 'source'), marker);
+    const edited = published(
+      index,
+      (snapshot) =>
+        snapshot.status === codeCollectionStatuses.complete &&
+        snapshot.occurrences.length === 2,
+    );
+    await writeFile(
+      path.join(project, 'nested', 'source'),
+      marker + '\n' + marker,
+    );
+    expect(await edited).toMatchObject({ failures: [] });
   });
 });

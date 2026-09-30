@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CodeNavigation, type CodeOwner, type CodeSession } from './index.js';
 import { codeCollectionStatuses, codeFileReasons } from '@codocs/workspace';
 import type { WorkspaceCodeReferenceQuery } from '@codocs/workspace';
+import { codeCollectionMessages } from './domain-values.js';
 const ownerBase = {
   uri: 'file:///fixture/.codocs/target.yaml',
   path: '.codocs/target.yaml',
@@ -72,6 +73,74 @@ describe('완료되지 않은 코드 수집 표현', () => {
     expect((hints[0]!.tooltip as { value: string }).value).toContain(
       '읽기 거부',
     );
+  });
+});
+
+describe('코드 변경 감시 실패의 표현', () => {
+  const watchFailure = {
+    path: '',
+    reason: codeFileReasons.watch,
+    message: 'EPERM: operation not permitted, watch',
+  };
+  const readFailure = {
+    path: 'locked',
+    reason: codeFileReasons.read,
+    message: '읽기 거부',
+  };
+  /** 실패 목록을 가진 미완료 수집의 Hint를 만든다. */
+  async function present(failures: WorkspaceCodeReferenceQuery['failures']) {
+    const query: WorkspaceCodeReferenceQuery = {
+      status: codeCollectionStatuses.incomplete,
+      codeGeneration: 1,
+      documentGeneration: 1,
+      occurrences: [],
+      confirmedCount: 0,
+      failures,
+      unique: false,
+      absent: false,
+    };
+    const session = {
+      getByPaths: vi
+        .fn()
+        .mockResolvedValue({ success: true, scanStatus: 'complete' }),
+      setCodeReferenceOwner: vi.fn(),
+      updateCodeBuffer: vi.fn(),
+      codeReferencesForDocument: vi.fn().mockResolvedValue(query),
+    } as unknown as CodeSession;
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const hints = await new CodeNavigation().hints({ ...ownerBase, session });
+    const logged = error.mock.calls.flat().join(' ');
+    error.mockRestore();
+    return {
+      label: (hints[0]!.label as { value: string }[])[0]!.value,
+      tooltip: (hints[0]!.tooltip as { value: string }).value,
+      logged,
+    };
+  }
+  it('감시 실패만 있으면 상단 표시가 감시 재연결 중이 된다', async () => {
+    const { label } = await present([watchFailure]);
+    expect(label).toBe(
+      `확인된 코드 0곳 · ${codeCollectionMessages.reconnectingLabel}`,
+    );
+  });
+  it('감시 실패만 있으면 호버에 재연결 안내를 두고 원문 오류를 숨긴다', async () => {
+    const { tooltip } = await present([watchFailure]);
+    expect(tooltip).toContain(codeCollectionMessages.reconnectingGuidance);
+    expect(tooltip).not.toContain('EPERM');
+  });
+  it('감시 실패의 원문 메시지는 콘솔 오류로 남긴다', async () => {
+    const { logged } = await present([watchFailure]);
+    expect(logged).toContain('EPERM');
+  });
+  it('읽기 실패가 함께 있으면 상단 표시가 수집 불완전을 유지한다', async () => {
+    const { label } = await present([watchFailure, readFailure]);
+    expect(label).toBe('확인된 코드 0곳 · 수집 불완전');
+  });
+  it('읽기 실패가 함께 있으면 호버에 읽기 실패와 재연결 안내를 함께 둔다', async () => {
+    const { tooltip } = await present([watchFailure, readFailure]);
+    expect(tooltip).toContain('읽기 거부');
+    expect(tooltip).toContain(codeCollectionMessages.reconnectingGuidance);
+    expect(tooltip).not.toContain('EPERM');
   });
 });
 
