@@ -22,6 +22,7 @@ import {
   type WorkspaceTargetKind,
 } from './domain-values.js';
 export * from './domain-values.js';
+export * from './code-file-access.js';
 
 /** 실제 .codocs 디렉터리가 부여한 현 시점 접근 범위다. */
 export interface WorkspaceAccessScope {
