@@ -300,7 +300,13 @@ export class DuplicateComparison {
   private readonly totalUnits: number;
   private completedUnits = 0;
   private exactCursor = { classIndex: 0, left: 0, right: 1 };
-  private similarCursor = { left: 0, right: 1 };
+  /** 각 묶음의 접두 4-gram이다. 전역 희귀도 순으로 앞쪽만 남긴다. */
+  private readonly prefixes: string[][] = [];
+  /** 접두 4-gram에서 그 gram을 접두로 가진 묶음 순번(오름차순)으로의 역색인이다. */
+  private readonly postings = new Map<string, number[]>();
+  /** 같은 탐색에서 후보 묶음을 한 번만 평가하기 위한 표식이다. */
+  private readonly seen: Int32Array;
+  private similarCursor = 0;
 
   /** 준비 결과에서 필드와 같은 구간의 묶음을 만든다. 구간 쌍 비교는 하지 않는다. */
   constructor(documents: readonly PreparedDuplicateDocument[]) {
@@ -357,8 +363,47 @@ export class DuplicateComparison {
         total += (count * (count - 1)) / 2;
       },
     );
-    const classCount = this.classes.length;
-    this.totalUnits = total + (classCount * (classCount - 1)) / 2;
+    this.buildPrefixIndex();
+    this.seen = new Int32Array(this.classes.length).fill(-1);
+    // 유사 비교의 단위는 묶음 하나의 탐색이다. 전체 묶음 쌍을 세지 않는다.
+    this.totalUnits = total + this.classes.length;
+  }
+
+  /**
+   * 접두 필터용 역색인을 만든다. Jaccard가 t 이상이면 두 집합의 접두(길이 n-ceil(t*n)+1, 같은 전역 순서)는
+   * 반드시 하나 이상 공유하므로 접두를 공유하지 않는 쌍은 기준을 넘을 수 없다. 부동소수점 오차에는 접두를 늘리는 쪽으로 대비한다.
+   */
+  private buildPrefixIndex(): void {
+    const frequency = new Map<string, number>();
+    for (const segmentClass of this.classes)
+      for (const gram of segmentClass.grams)
+        frequency.set(gram, (frequency.get(gram) ?? 0) + 1);
+    this.classes.forEach(
+      /** 묶음의 4-gram을 희귀한 순으로 정렬해 접두를 색인한다. */ (
+        segmentClass,
+        index,
+      ) => {
+        const ordered = [...segmentClass.grams].sort(
+          (left, right) =>
+            (frequency.get(left) ?? 0) - (frequency.get(right) ?? 0) ||
+            (left < right ? -1 : left > right ? 1 : 0),
+        );
+        const size = ordered.length;
+        const length = Math.min(
+          size,
+          size -
+            Math.ceil(duplicateDetectionConfig.minJaccard * size - 1e-9) +
+            1,
+        );
+        const prefix = ordered.slice(0, Math.max(1, length));
+        this.prefixes.push(prefix);
+        for (const gram of prefix) {
+          const list = this.postings.get(gram);
+          if (list) list.push(index);
+          else this.postings.set(gram, [index]);
+        }
+      },
+    );
   }
 
   /** 현재 진행 상황이다. */
@@ -421,16 +466,18 @@ export class DuplicateComparison {
     }
   }
 
-  /** 서로 다른 두 묶음의 유사도를 계산하고 기준을 넘으면 모든 구간 조합을 유사 후보로 기록한다. */
+  /** 묶음 하나의 접두를 공유하는 뒤쪽 묶음만 골라 유사도를 계산한다. 접두를 공유하지 않는 쌍은 기준을 넘을 수 없어 건너뛴다. */
   private compareSimilarPair(): void {
-    const cursor = this.similarCursor;
-    const left = this.classes[cursor.left];
-    const right = this.classes[cursor.right];
-    if (left && right) this.recordSimilar(left, right);
-    cursor.right++;
-    if (cursor.right >= this.classes.length) {
-      cursor.left++;
-      cursor.right = cursor.left + 1;
+    const index = this.similarCursor++;
+    const left = this.classes[index];
+    if (!left) return;
+    for (const gram of this.prefixes[index] ?? []) {
+      for (const other of this.postings.get(gram) ?? []) {
+        if (other <= index || this.seen[other] === index) continue;
+        this.seen[other] = index;
+        const right = this.classes[other];
+        if (right) this.recordSimilar(left, right);
+      }
     }
   }
 

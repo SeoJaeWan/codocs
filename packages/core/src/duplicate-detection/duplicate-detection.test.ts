@@ -11,6 +11,7 @@ import {
   type DuplicateDocumentInput,
 } from './index.js';
 import { duplicateDetectionConfig } from './config.js';
+import { jaccard, orderedSimilarity } from './similarity.js';
 import {
   duplicateComparisonStatuses,
   duplicateMatchKinds,
@@ -775,5 +776,82 @@ describe('문서별 준비와 예산 비교', () => {
     const copy = JSON.stringify(early);
     comparison.step(Number.POSITIVE_INFINITY);
     expect(JSON.stringify(early)).toBe(copy);
+  });
+});
+
+describe('유사 후보 사전 필터', () => {
+  /** 재현 가능한 의사 난수다. */
+  function random(seed: number): () => number {
+    let state = seed;
+    return () => {
+      state = (state * 1664525 + 1013904223) % 4294967296;
+      return state / 4294967296;
+    };
+  }
+
+  it('서로 무관한 문서가 많아도 비교 단위는 전체 쌍 수보다 훨씬 적고 결과는 전수 비교와 같다', () => {
+    const next = random(7);
+    const syllables = Array.from(
+      '가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허',
+    );
+    const word = (): string =>
+      Array.from(
+        { length: 2 + Math.floor(next() * 3) },
+        () => syllables[Math.floor(next() * syllables.length)],
+      ).join('');
+    const sentences: string[] = [];
+    for (let index = 0; index < 300; index++) {
+      const previous = sentences[Math.floor(next() * sentences.length)];
+      if (previous && next() < 0.25) {
+        const words = previous.slice(0, -1).split(' ');
+        if (next() < 0.5) words[Math.floor(next() * words.length)] = word();
+        sentences.push(`${words.join(' ')}.`);
+      } else sentences.push(`${Array.from({ length: 9 }, word).join(' ')}.`);
+    }
+    const prepared = sentences.map((sentence, index) =>
+      prepareDuplicateDocument(input(`d${index}.yaml`, yamlOf(sentence))),
+    );
+    const comparison = createDuplicateComparison(prepared);
+    const allPairs = (sentences.length * (sentences.length - 1)) / 2;
+    expect(comparison.getProgress().totalUnits).toBeLessThan(allPairs / 20);
+    comparison.step(Number.POSITIVE_INFINITY);
+    const actual = comparison
+      .snapshot()
+      .candidates.map((candidate) =>
+        [
+          candidate.a.path,
+          candidate.b.path,
+          candidate.kind,
+          candidate.scores.jaccard,
+          candidate.scores.ordered,
+        ].join('|'),
+      )
+      .sort();
+    const segments = prepared.map((item) => item.fields[0]?.segments[0]);
+    const expected: string[] = [];
+    segments.forEach((left, i) => {
+      segments.slice(i + 1).forEach((right, offset) => {
+        if (!left || !right) return;
+        const j = i + 1 + offset;
+        const isExact = left.text === right.text;
+        const score = isExact ? 1 : jaccard(left.grams, right.grams);
+        if (score < duplicateDetectionConfig.minJaccard) return;
+        const ordered = isExact
+          ? 1
+          : orderedSimilarity(Array.from(left.text), Array.from(right.text));
+        if (ordered < duplicateDetectionConfig.minOrdered) return;
+        expected.push(
+          [
+            `d${i}.yaml`,
+            `d${j}.yaml`,
+            isExact ? duplicateMatchKinds.exact : duplicateMatchKinds.similar,
+            score,
+            ordered,
+          ].join('|'),
+        );
+      });
+    });
+    expect(expected.length).toBeGreaterThan(10);
+    expect(actual).toEqual(expected.sort());
   });
 });
