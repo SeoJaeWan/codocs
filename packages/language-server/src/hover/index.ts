@@ -173,7 +173,7 @@ function stableHoverRange(
   return { start: start ?? group.start, end: end ?? group.end };
 }
 
-/** 최신 열린 문서의 커서에 걸리는 최상위 동률과 같은 식별자 후보를 선택한다. */
+/** 최신 열린 문서의 커서에 걸리는 최상위 동률과 같은 식별자 후보를 선택한다. @codocs [[코드 호버]]#L12-L19 */
 export function selectHover(
   document: TextDocument,
   match: HoverMatchSnapshot,
@@ -250,7 +250,7 @@ export function hoverDetailPaths(
   return [...paths];
 }
 
-/** Markdown의 사용자 제공 텍스트가 링크·명령·서식을 만들지 못하게 이스케이프한다. */
+/** Markdown의 사용자 제공 텍스트가 링크·명령·서식을 만들지 못하게 이스케이프한다. @codocs [[코드 호버]]#L45 */
 export function escapeMarkdown(value: string): string {
   return value
     .replaceAll('\\', '\\\\')
@@ -275,7 +275,7 @@ function pathLabel(documentPath: string): string {
   return documentPath.split(/[\\/]/u).at(-1) ?? documentPath;
 }
 
-/** 상세 결과에서 이름·현재 ID·경로 순서로 링크 이름을 선택한다. */
+/** 상세 결과에서 이름·현재 ID·경로 순서로 링크 이름을 선택한다. @codocs [[IDE 지원]]#L82-L86 */
 export function detailLabel(
   result: WorkspacePathDocumentResult,
   peers: readonly WorkspacePathDocumentResult[] = [],
@@ -435,7 +435,7 @@ function linkSection(
     : undefined;
 }
 
-/** 이전 ID 근거를 유효한 message 또는 현재 ID 기본 안내로 표현한다. */
+/** 이전 ID 근거를 유효한 message 또는 현재 ID 기본 안내로 표현한다. @codocs [[코드 호버]]#L32-L35 */
 function previousEvidenceMarkdown(
   evidence: HoverMatchEvidence,
   currentId: string | undefined,
@@ -448,7 +448,7 @@ function previousEvidenceMarkdown(
   }${evidence.message ? ` — ${escapeMarkdown(evidence.message)}` : ''}`;
 }
 
-/** 후보별 기본 정보·관계·오류를 안전한 Markdown 섹션으로 만든다. */
+/** 후보별 기본 정보·관계·오류를 안전한 Markdown 섹션으로 만든다. @codocs [[코드 호버]]#L12-L35 */
 function candidateMarkdown(
   selected: HoverSelectedCandidate,
   detail: WorkspacePathDocumentResult,
@@ -539,7 +539,7 @@ function candidateMarkdown(
   return parts.join('\n\n');
 }
 
-/** 중복 현재 ID는 대표 본문 없이 오류와 모든 충돌 원문 링크를 만든다. */
+/** 중복 현재 ID는 대표 본문 없이 오류와 모든 충돌 원문 링크를 만든다. @codocs [[코드 호버]]#L36 */
 function conflictMarkdown(
   details: readonly WorkspacePathDocumentResult[],
   byPath: ReadonlyMap<string, WorkspacePathDocumentResult>,
@@ -570,7 +570,7 @@ function conflictMarkdown(
     .join('\n\n');
 }
 
-/** 같은 catalog 관측의 경로 상세를 표준 LSP Hover로 표현한다. */
+/** 같은 catalog 관측의 경로 상세를 표준 LSP Hover로 표현한다. @codocs [[코드 호버]] */
 export function createHover(
   selection: HoverSelection,
   match: HoverMatchSnapshot,
@@ -668,7 +668,7 @@ export function createStatusHover(
   };
 }
 
-/** 완전한 관측에서 매칭이 없으면 null, 부분 관측이면 누락 안내를 반환한다. */
+/** 완전한 관측에서 매칭이 없으면 null, 부분 관측이면 누락 안내를 반환한다. @codocs [[코드 호버]]#L41 */
 export function createEmptyHover(match: HoverMatchSnapshot): Hover | null {
   if (!match.partial) return null;
   return {
