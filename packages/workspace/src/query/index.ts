@@ -7,6 +7,8 @@ import {
   isDocumentKind,
   isDocumentStatus,
   matchCode,
+  parseYaml,
+  changePlanStatuses,
   projectCatalogGet,
   projectCatalogDiagnostics,
   projectCatalogList,
@@ -37,12 +39,7 @@ import {
   type RequestResult,
   type ScanStatus,
 } from '@codocs/core';
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { open, readFile } from 'node:fs/promises';
 import {
@@ -86,7 +83,26 @@ import {
   resolveProjectRoot,
   type ProjectRoot,
 } from '../project-root/index.js';
+import { planWorkspaceChange } from '../change-plan/index.js';
+import {
+  classifyDuplicateInput,
+  WorkspaceDuplicateChecker,
+  workspaceDuplicateDiagnosticCodes,
+  workspaceDuplicateDiagnosticMessages,
+  workspaceDuplicateExpiryReasons,
+  workspaceDuplicateStatuses,
+  type DuplicateCheckerOutcome,
+  type DuplicateDraftInput,
+  type DuplicateSnapshot,
+  type WorkspaceDuplicateCheckOptions,
+  type WorkspaceDuplicateFailure,
+  type WorkspaceDuplicateResponse,
+  type WorkspaceDuplicatesInput,
+  type WorkspaceDuplicatesOptions,
+  type WorkspaceDuplicateExpiryReason,
+} from '../duplicate-check/index.js';
 import { QueryObservations } from './observations.js';
+import { decodeSignedCursor, encodeSignedCursor } from './signed-cursor.js';
 import {
   workspaceLifecycleStates,
   type WorkspaceReadiness,
@@ -94,7 +110,6 @@ import {
 
 const pageSize = 50;
 const cursorVersion = 1;
-const processCursorSecret = randomBytes(32);
 
 /** 목록 커서가 현재 process 또는 snapshot에서 더 이상 유효하지 않을 때 사용하는 코드다. @domainValues */
 export const workspaceQueryDiagnosticCodes = {
@@ -195,6 +210,8 @@ export type WorkspaceWriteResult =
 export interface WorkspaceQuerySessionOptions {
   storage?: WorkspaceStorageOptions;
   beforeIndexUpdate?: (attempt: 1 | 2) => Promise<void>;
+  /** 중복 검사의 시간 제한·조각 시간과 테스트용 관측 지점을 주입한다. */
+  duplicateCheck?: WorkspaceDuplicateCheckOptions;
 }
 
 /** 상세 조회 결과다. */
@@ -483,13 +500,7 @@ function fingerprint(items: readonly CatalogListItem[]): string {
 
 /** HMAC 입력과 payload를 분리할 수 있는 URL-safe 토큰으로 만든다. */
 function encodeCursor(payload: CursorPayload): string {
-  const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString(
-    'base64url',
-  );
-  const signature = createHmac('sha256', processCursorSecret)
-    .update(encoded, 'utf8')
-    .digest('base64url');
-  return `${encoded}.${signature}`;
+  return encodeSignedCursor(payload);
 }
 
 /** JSON payload를 own data property 확인 뒤 계약 타입으로 좁힌다. */
@@ -529,29 +540,7 @@ function cursorPayload(value: unknown): CursorPayload | undefined {
 
 /** 서명과 payload 구조를 검증하며 실패 이유를 외부에 구분해 노출하지 않는다. */
 function decodeCursor(token: string): CursorPayload | undefined {
-  const parts = token.split('.');
-  if (parts.length !== 2) return undefined;
-  const [encoded, signature] = parts;
-  if (!encoded || !signature) return undefined;
-  let actual: Buffer;
-  try {
-    actual = Buffer.from(signature, 'base64url');
-  } catch {
-    return undefined;
-  }
-  if (actual.toString('base64url') !== signature) return undefined;
-  const expected = createHmac('sha256', processCursorSecret)
-    .update(encoded, 'utf8')
-    .digest();
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected))
-    return undefined;
-  try {
-    return cursorPayload(
-      JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')),
-    );
-  } catch {
-    return undefined;
-  }
+  return cursorPayload(decodeSignedCursor(token));
 }
 
 /** 커서가 만료되었음을 첫 페이지 대체 없이 반환한다. */
@@ -768,6 +757,7 @@ export class WorkspaceQuerySession {
   >();
   readonly #liveDocuments = new Map<string, WorkspaceLiveReferenceInput>();
   readonly #selections = new Map<string, CandidateSelection>();
+  readonly #duplicateChecker: WorkspaceDuplicateChecker;
 
   /** 프로젝트 선택의 own data 값만 고정하고 IO는 각 요청 시 수행한다. */
   constructor(
@@ -778,6 +768,9 @@ export class WorkspaceQuerySession {
     this.#input = sessionInput(input);
     this.#observe = observe;
     this.#options = options;
+    this.#duplicateChecker = new WorkspaceDuplicateChecker(
+      options.duplicateCheck,
+    );
   }
 
   /** .codocs 감시 신호로 진행 중 읽기의 세대를 무효화한다. */
@@ -1591,6 +1584,178 @@ export class WorkspaceQuerySession {
         ...(watchFailure ? [{ message: watchFailure.message }] : []),
       ],
     };
+  }
+
+  /** 중복 검사 실패 응답을 공통 요청 실패에서 만든다. */
+  #duplicateFailure(
+    status: WorkspaceDuplicateFailure['status'],
+    failure: { scanStatus: ScanStatus; error: Diagnostic<string> },
+    extra: Partial<WorkspaceDuplicateFailure> = {},
+  ): WorkspaceDuplicateFailure {
+    return {
+      success: false,
+      status,
+      scanStatus: failure.scanStatus,
+      error: failure.error,
+      ...extra,
+    };
+  }
+
+  /** checker 결과를 세션 응답으로 바꾼다. 만료 이유별 안내와 취소·계산 오류의 진단을 붙인다. */
+  #duplicateResponse(
+    outcome: DuplicateCheckerOutcome,
+    snapshot: DuplicateSnapshot,
+  ): WorkspaceDuplicateResponse {
+    if (outcome.kind === 'page')
+      return {
+        ...outcome.page,
+        success: true,
+        refreshing: !!this.#refreshPromise,
+      };
+    if (outcome.kind === 'cancelled')
+      return this.#duplicateFailure(workspaceDuplicateStatuses.cancelled, {
+        ...superseded(),
+        scanStatus: snapshot.scanStatus,
+      });
+    if (outcome.kind === 'error')
+      return this.#duplicateFailure(workspaceDuplicateStatuses.failed, {
+        scanStatus: snapshot.scanStatus,
+        error: {
+          code: workspaceDuplicateDiagnosticCodes.checkFailed,
+          severity: diagnosticSeverities.error,
+          message: workspaceDuplicateDiagnosticMessages.checkFailed,
+        },
+      });
+    const messages: Record<WorkspaceDuplicateExpiryReason, string> = {
+      [workspaceDuplicateExpiryReasons.sourceChanged]:
+        workspaceDuplicateDiagnosticMessages.expiredSourceChanged,
+      [workspaceDuplicateExpiryReasons.resultReplaced]:
+        workspaceDuplicateDiagnosticMessages.expiredResultReplaced,
+      [workspaceDuplicateExpiryReasons.unrecognized]:
+        workspaceDuplicateDiagnosticMessages.expiredUnrecognized,
+    };
+    return this.#duplicateFailure(
+      workspaceDuplicateStatuses.expired,
+      {
+        scanStatus: snapshot.scanStatus,
+        error: {
+          code: workspaceQueryDiagnosticCodes.cursorExpired,
+          severity: diagnosticSeverities.error,
+          message: messages[outcome.reason],
+        },
+      },
+      { expiryReason: outcome.reason },
+    );
+  }
+
+  /**
+   * 현재 색인 전체(입력 없음) 또는 생성·수정 초안(mode 포함)의 본문 반복을 검사하거나 cursor로 보관한 결과의 다음 페이지를 제공한다.
+   * 파일을 쓰거나 색인에 초안을 반영하지 않고, 계산은 조각으로 나눠 다른 요청과 감시 반영을 처리한다.
+   * 취소하면 계산을 멈추고 cancelled를 반환한다. partial·failed 응답은 중복 없음이 아니다.
+   */
+  async duplicates(
+    input?: WorkspaceDuplicatesInput,
+    options: WorkspaceDuplicatesOptions = {},
+  ): Promise<WorkspaceDuplicateResponse> {
+    const signal = options.signal;
+    /** 취소 신호가 이미 발생했거나 세션이 닫힌 요청의 응답이다. */
+    const cancelled = (): WorkspaceDuplicateResponse =>
+      this.#duplicateFailure(
+        workspaceDuplicateStatuses.cancelled,
+        superseded(),
+      );
+    if (this.#closed || signal?.aborted) return cancelled();
+    if (this.#scan && this.#explicitRefreshPromise)
+      return this.#duplicateFailure(
+        workspaceDuplicateStatuses.notReady,
+        workspaceIndexNotReady(),
+      );
+    const scan = await this.#current();
+    if (this.#closed || signal?.aborted) return cancelled();
+    if (this.#explicitRefreshPromise)
+      return this.#duplicateFailure(
+        workspaceDuplicateStatuses.notReady,
+        workspaceIndexNotReady(),
+      );
+    if (scan.status === scanStatuses.failed)
+      return this.#duplicateFailure(
+        workspaceDuplicateStatuses.failed,
+        scanFailure(scan),
+      );
+    const watchFailure = this.#watchFailure();
+    if (watchFailure && !this.#completed)
+      return this.#duplicateFailure(
+        workspaceDuplicateStatuses.failed,
+        this.#watchFailureResult(watchFailure),
+      );
+    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
+    if (!catalog)
+      return this.#duplicateFailure(
+        workspaceDuplicateStatuses.failed,
+        scanFailure(scan),
+      );
+    const snapshot: DuplicateSnapshot = {
+      scanStatus: watchFailure ? scanStatuses.partial : scan.status,
+      catalog,
+      revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
+      catalogVersion: watchFailure
+        ? this.#completed!.version
+        : this.#catalogVersion,
+    };
+    const classified = classifyDuplicateInput(input);
+    if (classified.kind === 'invalid')
+      return this.#duplicateFailure(
+        workspaceDuplicateStatuses.failed,
+        invalidInput(snapshot.scanStatus),
+      );
+    if (classified.kind === 'page')
+      return this.#duplicateResponse(
+        this.#duplicateChecker.page(classified.cursor, snapshot),
+        snapshot,
+      );
+    let draft: DuplicateDraftInput | undefined;
+    if (classified.kind === 'draft') {
+      if (watchFailure)
+        return this.#duplicateFailure(
+          workspaceDuplicateStatuses.failed,
+          this.#watchFailureResult(watchFailure),
+        );
+      const plan = planWorkspaceChange(classified.request, scan, catalog);
+      if (plan.status === changePlanStatuses.failed)
+        return this.#duplicateFailure(
+          workspaceDuplicateStatuses.failed,
+          {
+            scanStatus: snapshot.scanStatus,
+            error: plan.diagnostics[0] ?? workspaceIndexNotReady().error,
+          },
+          { diagnostics: plan.diagnostics },
+        );
+      const raw =
+        plan.status === changePlanStatuses.candidate
+          ? plan.raw
+          : scan.documents.find((item) => item.source.path === plan.path)?.raw;
+      if (raw === undefined)
+        return this.#duplicateFailure(
+          workspaceDuplicateStatuses.notReady,
+          workspaceIndexNotReady(),
+        );
+      draft = {
+        document: {
+          path: plan.path,
+          id: plan.id,
+          revision: plan.revision,
+          parsed: parseYaml(raw, plan.path),
+        },
+        excludedPath: plan.path,
+      };
+    }
+    return this.#duplicateResponse(
+      await this.#duplicateChecker.check(snapshot, draft, signal, () => ({
+        catalogVersion: this.#catalogVersion,
+        closed: this.#closed,
+      })),
+      snapshot,
+    );
   }
 
   /** 열린 문서의 전체 원문을 현재 프로젝트 catalog snapshot으로 매칭한다. */
