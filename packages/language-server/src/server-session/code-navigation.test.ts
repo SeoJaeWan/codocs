@@ -127,7 +127,9 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
     const sourceUri = await open('implementation', source);
     await session.documentLinks(sourceUri);
     const uri = await open('.codocs/target.yaml', target);
-    const hover = await vi.waitFor(
+    // 발급 직후 수집 세대가 바뀌면 이전 토큰이 거부되므로, Hover를 다시 요청해
+    // 새로 발급된 두 번째 링크가 기대 위치로 확인될 때까지 기다린다.
+    await vi.waitFor(
       async () => {
         const value = await session.hoverDocument({
           textDocument: { uri },
@@ -138,33 +140,30 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
         // 한국어 완료 표시와 실제 개별 링크를 확인해 수집 중 응답을 구분한다.
         expect(markdown).toContain('연결된 코드 · 2곳');
         expect(markdown).not.toContain('수집 중');
-        expect([
+        expect(markdown).toContain('implementation:1:1');
+        expect(markdown).toContain('implementation:1:22');
+        const matches = [
           ...markdown.matchAll(/command:codocs.openSource\?([^)]*)/gu),
-        ]).toHaveLength(2);
-        return value;
+        ];
+        expect(matches).toHaveLength(2);
+        expect(
+          await session.confirmSource(
+            (JSON.parse(decodeURIComponent(matches[1]![1]!)) as unknown[])[0],
+          ),
+        ).toEqual({
+          uri: sourceUri,
+          destination: {
+            kind: 'occurrence',
+            markerText: '@codocs [[대상]]#L6-L7',
+            range: {
+              start: { line: 0, character: 21 },
+              end: { line: 0, character: source.length },
+            },
+          },
+        });
       },
       { timeout: 5000 },
     );
-    const value = (hover!.contents as { value: string }).value;
-    expect(value).toContain('implementation:1:1');
-    expect(value).toContain('implementation:1:22');
-    const matches = [...value.matchAll(/command:codocs.openSource\?([^)]*)/gu)];
-    expect(matches).toHaveLength(2);
-    expect(
-      await session.confirmSource(
-        (JSON.parse(decodeURIComponent(matches[1]![1]!)) as unknown[])[0],
-      ),
-    ).toEqual({
-      uri: sourceUri,
-      destination: {
-        kind: 'occurrence',
-        markerText: '@codocs [[대상]]#L6-L7',
-        range: {
-          start: { line: 0, character: 21 },
-          end: { line: 0, character: source.length },
-        },
-      },
-    });
     await vi.waitFor(
       async () => expect(await session.documentLinks(uri)).toHaveLength(2),
       { timeout: 5000 },
