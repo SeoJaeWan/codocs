@@ -1,4 +1,5 @@
 import chokidar, { type FSWatcher, type ChokidarOptions } from 'chokidar';
+export * from './code-reference-watcher.js';
 import {
   watch as watchDirectory,
   type FSWatcher as DirectoryWatcher,

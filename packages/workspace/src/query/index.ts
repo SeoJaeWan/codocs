@@ -1,5 +1,15 @@
 import { discoveryPath } from './discovery-path.js';
 import {
+  WorkspaceCodeReferenceIndex,
+  codeCollectionStatuses,
+  codeFileReasons,
+  type WorkspaceCodeReferenceSnapshot,
+  type WorkspaceCodeReferenceQuery,
+  type WorkspaceCodeReferenceCaptureInput,
+  type WorkspaceCodeReferenceOccurrence,
+  type WorkspaceCodeBufferInput,
+} from '../code-reference/index.js';
+import {
   catalogConfirmations,
   catalogDiagnosticCodes,
   catalogDiagnosticMessages,
@@ -752,6 +762,10 @@ export class WorkspaceQuerySession {
   #cache = new WorkspaceObservationCache();
   readonly #pending = new Set<string>();
   #closed = false;
+  #codeIndex: WorkspaceCodeReferenceIndex | undefined;
+  readonly #codeListeners = new Set<
+    (snapshot: WorkspaceCodeReferenceSnapshot) => void
+  >();
   readonly #snapshotListeners = new Set<
     (change: WorkspaceSnapshotChange) => void
   >();
@@ -857,6 +871,10 @@ export class WorkspaceQuerySession {
       this.#latestUsableScan = scan;
     }
     this.#scan = scan;
+    this.#codeIndex?.setCatalog(
+      scan.status === scanStatuses.failed ? undefined : this.#catalog,
+      this.#catalogVersion,
+    );
     this.#observe?.('index-published', {
       folder: this.#root?.projectRoot,
       status: scan.status,
@@ -1806,6 +1824,11 @@ export class WorkspaceQuerySession {
   closeDocument(sourcePath: string): void {
     sourcePath = discoveryPath(sourcePath);
     this.#liveDocuments.delete(sourcePath);
+    this.#codeIndex
+      ?.closeBuffer(sourcePath)
+      .catch((error: unknown) =>
+        console.error('Code buffer close failed', error),
+      );
     for (const [token, selection] of this.#selections)
       if (
         'sourcePath' in selection.origin &&
@@ -2187,6 +2210,7 @@ export class WorkspaceQuerySession {
       while (this.#refreshPromise) await this.#refreshPromise;
       const generation = this.#generation;
       const scan = await this.#synchronize();
+      await this.#codeIndex?.refresh();
       if (this.#closed) return superseded();
       const watchFailure = this.#watchFailure();
       if (watchFailure) return this.#watchFailureResult(watchFailure);
@@ -2232,8 +2256,141 @@ export class WorkspaceQuerySession {
     this.#pending.clear();
     this.#snapshotListeners.clear();
     this.#liveDocuments.clear();
+    this.#codeListeners.clear();
     for (const token of this.#selections.keys()) this.releaseCandidate(token);
     await this.#watcher?.close();
+    await this.#codeIndex?.close();
+  }
+
+  /** 문서 준비와 독립적인 코드 index를 필요할 때만 생성한다. */
+  async #codeReferences(): Promise<WorkspaceCodeReferenceIndex | undefined> {
+    await this.#current();
+    if (this.#closed || !this.#root) return undefined;
+    if (!this.#codeIndex) {
+      this.#codeIndex = new WorkspaceCodeReferenceIndex(this.#root.projectRoot);
+      this.#codeIndex.setCatalog(
+        this.#scan?.status === scanStatuses.failed ? undefined : this.#catalog,
+        this.#catalogVersion,
+      );
+      this.#codeIndex.onDidChange(
+        /** 코드 관측 게시를 세션 구독자에 전달한다. */ (snapshot) => {
+          for (const listener of this.#codeListeners) {
+            try {
+              listener(snapshot);
+            } catch (error: unknown) {
+              console.error('Code snapshot listener failed', error);
+            }
+          }
+        },
+      );
+    }
+    return this.#codeIndex;
+  }
+
+  /** root 준비 실패도 complete-empty로 바꾸지 않는 코드 관측이다. */
+  #unavailableCodeSnapshot(): WorkspaceCodeReferenceSnapshot {
+    return {
+      status: codeCollectionStatuses.incomplete,
+      codeGeneration: 0,
+      documentGeneration: this.#catalogVersion,
+      occurrences: [],
+      confirmedCount: 0,
+      failures: [
+        {
+          reason: codeFileReasons.read,
+          message: workspaceDiagnosticMessages.readFailed,
+        },
+      ],
+    };
+  }
+
+  /** 디스크와 적격 IDE buffer를 합친 현재 코드 출현이다. */
+  async codeReferenceSnapshot(): Promise<WorkspaceCodeReferenceSnapshot> {
+    return (
+      (await (await this.#codeReferences())?.snapshot()) ??
+      this.#unavailableCodeSnapshot()
+    );
+  }
+
+  /** 프로젝트 정책상 적격인 source의 최신 IDE 텍스트만 대체한다. */
+  async updateCodeBuffer(input: WorkspaceCodeBufferInput): Promise<boolean> {
+    return (await (await this.#codeReferences())?.updateBuffer(input)) ?? false;
+  }
+
+  /** 문서 링크 source의 현재 버전·소유권을 등록한다. */
+  async setCodeReferenceOwner(
+    sourcePath: string,
+    documentVersion: number,
+  ): Promise<boolean> {
+    return (
+      (await this.#codeReferences())?.setOwner(sourcePath, documentVersion) ??
+      false
+    );
+  }
+
+  /** 편집 관측과 source token을 해제하고 저장 출현으로 돌아간다. */
+  async closeCodeBuffer(sourcePath: string): Promise<void> {
+    await this.#codeIndex?.closeBuffer(sourcePath);
+  }
+
+  /** 겹친 저장 행 구간의 정확한 코드 출현 합집합이다. */
+  async codeReferencesForRows(
+    targetPath: string,
+    startLine: number,
+    endLine = startLine,
+  ): Promise<WorkspaceCodeReferenceQuery> {
+    return (
+      (await (
+        await this.#codeReferences()
+      )?.reverse(targetPath, { startLine, endLine })) ?? {
+        ...this.#unavailableCodeSnapshot(),
+        unique: false,
+        absent: false,
+      }
+    );
+  }
+
+  /** 행 연결을 제외한 문서 전체 코드 출현만 제공한다. */
+  async codeReferencesForDocument(
+    targetPath: string,
+  ): Promise<WorkspaceCodeReferenceQuery> {
+    return (
+      (await (await this.#codeReferences())?.reverse(targetPath)) ?? {
+        ...this.#unavailableCodeSnapshot(),
+        unique: false,
+        absent: false,
+      }
+    );
+  }
+
+  /** forward·reverse 표현이 공유할 source 소유 opaque token이다. */
+  async captureCodeReference(
+    input: WorkspaceCodeReferenceCaptureInput,
+  ): Promise<string | undefined> {
+    return (await this.#codeReferences())?.capture(input);
+  }
+
+  /** 현재 source·owner version·saved target·양쪽 파일 정체를 다시 확인한다. */
+  async confirmCodeReference(
+    token: string,
+    owner: { sourcePath: string; documentVersion: number },
+  ): Promise<WorkspaceCodeReferenceOccurrence | undefined> {
+    return this.#codeIndex?.confirm(token, owner);
+  }
+
+  /** 클릭 source의 선택 근거를 폐기한다. */
+  releaseCodeReference(token: string): void {
+    this.#codeIndex?.release(token);
+  }
+
+  /** code·document 세대와 collecting/incomplete 변화가 있는 출현 게시를 구독한다. */
+  onDidChangeCodeReferences(
+    listener: (snapshot: WorkspaceCodeReferenceSnapshot) => void,
+  ): () => void {
+    if (!this.#closed) this.#codeListeners.add(listener);
+    return /** 해당 코드 구독만 해제한다. */ (): void => {
+      this.#codeListeners.delete(listener);
+    };
   }
 }
 

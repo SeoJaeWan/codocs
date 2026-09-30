@@ -1,0 +1,98 @@
+const vscode = require('vscode');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+
+exports.activate = async function activate(context) {
+  const output = process.env.COD29_PROTOTYPE_OUTPUT;
+  const workspace = vscode.workspace.workspaceFolders[0].uri.fsPath;
+  const targetUri = vscode.Uri.file(path.join(workspace, '.codocs/a.yaml'));
+  const initialDisk = await fs.readFile(targetUri.fsPath, 'utf8');
+  const target = await vscode.workspace.openTextDocument(targetUri);
+  const edit = new vscode.WorkspaceEdit();
+  edit.insert(targetUri, target.positionAt(target.getText().length), '\n# unsaved draft\n');
+  await vscode.workspace.applyEdit(edit);
+  const initialBuffer = target.getText();
+  const initialVersion = target.version;
+  const references = [
+    {relative: 'src/parser.ts', line: 1},
+    {relative: 'tests/parser.test.ts', line: 1},
+  ];
+  const source = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(workspace, references[0].relative)));
+  const sourceEdit = new vscode.WorkspaceEdit();
+  sourceEdit.insert(source.uri, source.positionAt(source.getText().length), '// unsaved source draft\n');
+  await vscode.workspace.applyEdit(sourceEdit);
+  const initialSourceBuffer = source.getText();
+  let count = 2;
+  let generation = 0;
+  let controlGeneration = -1;
+  const opens = [];
+  const emitter = new vscode.EventEmitter();
+  let writes = Promise.resolve();
+  function persist() {
+    const editor = vscode.window.activeTextEditor;
+    const state = {
+      ready: true, vscodeVersion: vscode.version, count, generation,
+      documentText: target.getText(), diskText: initialDisk,
+      documentDirty: target.isDirty, documentVersion: target.version,
+      initialVersion, bufferPreserved: target.getText() === initialBuffer,
+      sourceBufferPreserved: source.getText() === initialSourceBuffer,
+      sourceDirty: source.isDirty,
+      activePath: editor ? vscode.workspace.asRelativePath(editor.document.uri) : null,
+      selection: editor ? {start: editor.selection.start, end: editor.selection.end} : null,
+      opens: [...opens],
+    };
+    writes = writes.then(() => fs.writeFile(path.join(output, 'state.json'), JSON.stringify(state, null, 2)));
+    return writes;
+  }
+  async function openReference(index) {
+    const reference = references[index];
+    const uri = vscode.Uri.file(path.join(workspace, reference.relative));
+    const document = await vscode.workspace.openTextDocument(uri);
+    const line = document.lineAt(reference.line).text;
+    const begin = new vscode.Position(reference.line, line.indexOf('@codocs'));
+    const end = begin.translate(0, '@codocs [[A]]'.length);
+    await vscode.window.showTextDocument(document, {preview: false, selection: new vscode.Range(begin, end)});
+    opens.push({index, path: reference.relative, line: reference.line + 1});
+    await persist();
+  }
+  context.subscriptions.push(vscode.commands.registerCommand('cod29.prototype.open', openReference));
+  context.subscriptions.push(vscode.languages.registerInlayHintsProvider({scheme: 'file', pattern: '**/.codocs/a.yaml'}, {
+    onDidChangeInlayHints: emitter.event,
+    provideInlayHints(document) {
+      if (document.uri.toString() !== targetUri.toString() || count === 0) return [];
+      const part = new vscode.InlayHintLabelPart(`문서 전체에 연결된 코드 · ${count}곳`);
+      if (count === 1) part.command = {title: '연결된 코드 열기', command: 'cod29.prototype.open', arguments: [0]};
+      if (count > 1) {
+        const text = references.slice(0, count).map((ref, index) =>
+          `[${ref.relative}:${ref.line + 1}](command:cod29.prototype.open?${encodeURIComponent(JSON.stringify([index]))})`
+        ).join('\n\n');
+        const markdown = new vscode.MarkdownString(`연결된 코드 · ${count}곳\n\n${text}`);
+        markdown.isTrusted = {enabledCommands: ['cod29.prototype.open']};
+        part.tooltip = markdown;
+      }
+      const hint = new vscode.InlayHint(new vscode.Position(0, 0), [part]);
+      hint.paddingRight = true;
+      return [hint];
+    },
+  }));
+  context.subscriptions.push(emitter);
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => persist()));
+  await vscode.window.showTextDocument(target, {preview: false});
+  const interval = setInterval(async () => {
+    try {
+      const control = JSON.parse(await fs.readFile(path.join(output, 'control.json'), 'utf8'));
+      if (control.generation === controlGeneration) return;
+      controlGeneration = control.generation;
+      count = control.count;
+      generation++;
+      await vscode.workspace.getConfiguration('editor.inlayHints').update('enabled', control.inlayHintsEnabled || 'on', vscode.ConfigurationTarget.Global);
+      emitter.fire();
+      if (control.showDocument) await vscode.window.showTextDocument(target, {preview: false, selection: new vscode.Range(0, 0, 0, 0)});
+      await persist();
+    } catch (error) {
+      if (error.code !== 'ENOENT') await fs.writeFile(path.join(output, 'extension-error.txt'), String(error.stack || error));
+    }
+  }, 100);
+  context.subscriptions.push({dispose() {clearInterval(interval);}});
+  await persist();
+};

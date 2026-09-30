@@ -1,5 +1,6 @@
 export * from './diagnostics/index.js';
 export * from './duplicate-check/index.js';
+export * from './code-reference/index.js';
 export * from './change-plan/index.js';
 export * from './indexing/index.js';
 export * from './lifecycle/index.js';

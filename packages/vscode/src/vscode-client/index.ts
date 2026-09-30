@@ -7,6 +7,7 @@ import {
   TransportKind,
   HoverRequest,
   DocumentLinkRequest,
+  InlayHintRequest,
   type ErrorHandler,
   type LanguageClientOptions,
   type Middleware,
@@ -278,6 +279,39 @@ export class VscodeFolderClient implements FolderClientBoundary {
           },
         },
       ),
+      vscode.languages.registerInlayHintsProvider(
+        { scheme: 'file' },
+        {
+          /** 원문 수정 없이 서버가 확인한 문서 전체 Hint만 표시한다. */
+          provideInlayHints: async (document, range, token) => {
+            if (!owns(document)) return [];
+            const hints = await this.#latestQuery(
+              client,
+              document,
+              token,
+              owns,
+              /** 같은 source와 서버가 제공한 힌트만 변환한다. */ async () =>
+                client.protocol2CodeConverter.asInlayHints(
+                  await client.sendRequest(
+                    InlayHintRequest.type,
+                    { textDocument: { uri: document.uri.toString() }, range },
+                    token,
+                  ),
+                  token,
+                ),
+            );
+            for (const hint of hints ?? []) {
+              if (hint.tooltip)
+                trustGeneratedOpenSourceHoverContents(hint.tooltip);
+              if (Array.isArray(hint.label))
+                for (const part of hint.label)
+                  if (part.tooltip)
+                    trustGeneratedOpenSourceHoverContents(part.tooltip);
+            }
+            return hints ?? [];
+          },
+        },
+      ),
       vscode.languages.registerDocumentLinkProvider(
         { scheme: 'file' },
         {
@@ -512,6 +546,8 @@ export class VscodeFolderClient implements FolderClientBoundary {
       provideHover: () => undefined,
       /** 완료 관측마다 재등록하는 provider가 본문 링크를 담당한다. */
       provideDocumentLinks: () => [],
+      /** source 소유 수동 provider가 Hint를 담당한다. */
+      provideInlayHints: () => [],
       /** 진단도 출처를 소유한 client의 게시만 반영한다. */
       handleDiagnostics: (uri, diagnostics, next) => {
         if (

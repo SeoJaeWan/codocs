@@ -5,7 +5,7 @@
 Codocs connects code to project knowledge stored in local `.codocs` YAML files. Record domain terms, business rules, and development conventions once, then use the same knowledge in VS Code and your AI assistant.
 
 - **MCP:** Let your AI assistant find, read, create, and update project knowledge.
-- **VS Code:** Hover over code identifiers to read definitions and open the source documents.
+- **VS Code:** Hover over code identifiers, follow explicit document links, and navigate back to the code references.
 
 Use either integration on its own, or both. Codocs supports projects on local disks on Windows and macOS. Document names and content can be written in any language.
 
@@ -71,6 +71,8 @@ Open the project folder containing `.codocs` to start using the extension.
 - **Related knowledge:** Follow links to referenced documents, documents that refer to the current one, and other terms matched in the identifier.
 - **Document diagnostics:** Check YAML syntax, required fields, duplicate IDs, and reference errors in `.codocs` documents.
 - **Document links:** Navigate to resolved `[[Document name]]` references in YAML content.
+- **Explicit code links:** Write `@codocs [[Document name]]`, `@codocs [[Document name]]#L11`, or `@codocs [[Domain:Document name]]#L11-L12` in project text to link to a document, line, or inclusive line range.
+- **Reverse code references:** Navigate from a referenced document line to the matching code occurrence. Multiple occurrences have separate hover links. Whole-document references appear in an Inlay Hint before the first row; a single occurrence uses the IDE navigation gesture.
 - **Workspace support:** Use separate project knowledge for each folder in a multi-folder workspace. Document changes are reflected automatically.
 
 If you need to reconnect after resolving a server problem, run **Codocs: Restart Language Servers** from the Command Palette.
