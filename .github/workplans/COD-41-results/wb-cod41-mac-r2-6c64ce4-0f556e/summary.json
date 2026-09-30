@@ -1,0 +1,547 @@
+{
+  "run_id": "wb-cod41-mac-r2-6c64ce4-0f556e",
+  "task_id": "INT-001",
+  "verified_commit": "452b021f45c9d3de5c54c239e1df1d85c5ea285d",
+  "status": "round3_checks_passed_once_by_user_decision",
+  "environment": {
+    "os": "macOS 26.5.1 (Darwin 25.5.0)",
+    "arch": "arm64",
+    "node": "24.21.0",
+    "pnpm": "10.34.5"
+  },
+  "not_executed": ["windows", "vscode-ui-19-scenarios", "required-ci"],
+  "intent_revision": "wb-cod41-mac-r2-6c64ce4-0f556e/intent/5",
+  "round1": {
+    "commit": "452b021f45c9d3de5c54c239e1df1d85c5ea285d",
+    "commands": [
+      {
+        "name": "typecheck",
+        "command": "pnpm typecheck",
+        "exit_code": 0,
+        "duration_s": 11,
+        "started_at_utc": "2026-09-30T04:45:28Z"
+      },
+      {
+        "name": "lint",
+        "command": "pnpm lint",
+        "exit_code": 0,
+        "duration_s": 10,
+        "started_at_utc": "2026-09-30T04:45:39Z"
+      },
+      {
+        "name": "prettier-pre",
+        "command": "pnpm exec prettier . --check",
+        "exit_code": 0,
+        "duration_s": 18,
+        "started_at_utc": "2026-09-30T04:45:49Z"
+      },
+      {
+        "name": "test",
+        "command": "pnpm test",
+        "exit_code": 0,
+        "duration_s": 11,
+        "started_at_utc": "2026-09-30T04:47:51Z"
+      },
+      {
+        "name": "build",
+        "command": "pnpm build",
+        "exit_code": 0,
+        "duration_s": 5,
+        "started_at_utc": "2026-09-30T04:48:02Z"
+      },
+      {
+        "name": "release-pack",
+        "command": "pnpm run release:pack",
+        "exit_code": 0,
+        "duration_s": 6,
+        "started_at_utc": "2026-09-30T04:48:07Z"
+      },
+      {
+        "name": "release-verify",
+        "command": "pnpm run release:verify",
+        "exit_code": 0,
+        "duration_s": 2,
+        "started_at_utc": "2026-09-30T04:48:13Z"
+      }
+    ],
+    "vitest_repetitions": [
+      {
+        "run": "01",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.68s",
+        "started_at_utc": "2026-09-30T04:46:10Z"
+      },
+      {
+        "run": "02",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.89s",
+        "started_at_utc": "2026-09-30T04:46:17Z"
+      },
+      {
+        "run": "03",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "7.17s",
+        "started_at_utc": "2026-09-30T04:46:23Z"
+      },
+      {
+        "run": "04",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "6.50s",
+        "started_at_utc": "2026-09-30T04:46:31Z"
+      },
+      {
+        "run": "05",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "7.63s",
+        "started_at_utc": "2026-09-30T04:46:39Z"
+      },
+      {
+        "run": "06",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "6.09s",
+        "started_at_utc": "2026-09-30T04:46:47Z"
+      },
+      {
+        "run": "07",
+        "exit_code": 1,
+        "files": {
+          "passed": 59,
+          "failed": 1,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1120,
+          "failed": 1,
+          "skipped": 11
+        },
+        "vitest_duration": "5.80s",
+        "started_at_utc": "2026-09-30T04:46:54Z"
+      },
+      {
+        "run": "08",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.95s",
+        "started_at_utc": "2026-09-30T04:47:01Z"
+      },
+      {
+        "run": "09",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.80s",
+        "started_at_utc": "2026-09-30T04:47:07Z"
+      },
+      {
+        "run": "10",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "6.08s",
+        "started_at_utc": "2026-09-30T04:47:14Z"
+      }
+    ],
+    "vitest_summary": {
+      "total": 10,
+      "passed_runs": 9,
+      "failed_runs": ["07"]
+    }
+  },
+  "repair": {
+    "file": "packages/language-server/src/server-session/code-navigation.test.ts",
+    "commit": "a73c043659d639d84e05c9dfc830dd82dcb4db5e",
+    "product_code_changed": false
+  },
+  "round2": {
+    "commit": "a73c043659d639d84e05c9dfc830dd82dcb4db5e",
+    "commands": [
+      {
+        "name": "typecheck-r2",
+        "command": "pnpm typecheck",
+        "exit_code": 0,
+        "duration_s": 10,
+        "started_at_utc": "2026-09-30T05:01:33Z"
+      },
+      {
+        "name": "lint-r2",
+        "command": "pnpm lint",
+        "exit_code": 0,
+        "duration_s": 10,
+        "started_at_utc": "2026-09-30T05:01:43Z"
+      },
+      {
+        "name": "prettier-r2",
+        "command": "pnpm exec prettier . --check",
+        "exit_code": 0,
+        "duration_s": 18,
+        "started_at_utc": "2026-09-30T05:01:53Z"
+      },
+      {
+        "name": "test-r2",
+        "command": "pnpm test",
+        "exit_code": 0,
+        "duration_s": 13,
+        "started_at_utc": "2026-09-30T05:09:18Z"
+      }
+    ],
+    "single_file_code_navigation": {
+      "runs": 20,
+      "failures": 0
+    },
+    "vitest_repetitions": [
+      {
+        "run": "01",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.83s",
+        "started_at_utc": "2026-09-30T05:02:16Z"
+      },
+      {
+        "run": "02",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.70s",
+        "started_at_utc": "2026-09-30T05:02:23Z"
+      },
+      {
+        "run": "03",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.88s",
+        "started_at_utc": "2026-09-30T05:02:29Z"
+      },
+      {
+        "run": "04",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.90s",
+        "started_at_utc": "2026-09-30T05:02:36Z"
+      },
+      {
+        "run": "05",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.74s",
+        "started_at_utc": "2026-09-30T05:02:43Z"
+      },
+      {
+        "run": "06",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.71s",
+        "started_at_utc": "2026-09-30T05:02:49Z"
+      },
+      {
+        "run": "07",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.85s",
+        "started_at_utc": "2026-09-30T05:02:56Z"
+      },
+      {
+        "run": "08",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.83s",
+        "started_at_utc": "2026-09-30T05:03:02Z"
+      },
+      {
+        "run": "09",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "5.91s",
+        "started_at_utc": "2026-09-30T05:03:09Z"
+      },
+      {
+        "run": "10",
+        "exit_code": 0,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1121,
+          "failed": 0,
+          "skipped": 11
+        },
+        "vitest_duration": "6.08s",
+        "started_at_utc": "2026-09-30T05:03:16Z"
+      }
+    ],
+    "vitest_summary": {
+      "total": 10,
+      "passed_runs": 10
+    },
+    "build_release_rerun": false
+  },
+  "diagnostics": {
+    "prefix_778a21d": {
+      "runs": 50,
+      "failures": 2,
+      "failing_tests": [
+        "code-navigation.test.ts > 이전 서버 세션이 발급한 코드 참조 링크를 새 세션에서 확인하면 이동 대상을 반환하지 않는다 (run 10)",
+        "workspace query/query-initialization.test.ts > 첫 폴더 readdir 반환 뒤 폴더 재생성하면 최종 목록을 반영한다 (run 21)"
+      ]
+    },
+    "postfix": {
+      "runs": 50,
+      "failures": 2,
+      "failing_tests": [
+        "code-navigation.test.ts > 이전 서버 세션이 발급한 코드 참조 링크를 새 세션에서 확인하면 이동 대상을 반환하지 않는다 (run 8)",
+        "workspace query/query.test.ts > live 참조와 선택 최신 확인 > undefined 표시 후 발생하면 오래된 파일을 열 후보를 반환하지 않는다 (run 46)"
+      ]
+    }
+  },
+  "delivery": {
+    "performed": false,
+    "reason": "local feature/COD-41 update after the records commit is described in evidence/checkpoint.yaml; no push"
+  },
+  "round3": {
+    "commit": "19c7742aae88be6343e7515ae5ce3720ea569e52",
+    "reason": "click-time confirmation rejected on generation change alone and the language server deleted tokens on generation change; user decided 2026-09-30 to match the existing open-source confirmation",
+    "diagnostic_100_run_supplied_by_user": {
+      "integration_branch_failures": 12,
+      "main_code_failures": 1,
+      "code_navigation_test_failures": 6
+    },
+    "product_code_changed": true,
+    "each_check_run_once_by_user_decision": true,
+    "commands": [
+      {
+        "name": "typecheck",
+        "command": "pnpm typecheck",
+        "exit_code": 0,
+        "duration_s": 10
+      },
+      {
+        "name": "lint",
+        "command": "pnpm lint",
+        "exit_code": 0,
+        "duration_s": 9
+      },
+      {
+        "name": "prettier",
+        "command": "pnpm exec prettier . --check",
+        "exit_code": 0,
+        "duration_s": 18
+      },
+      {
+        "name": "test",
+        "command": "pnpm test",
+        "exit_code": 0,
+        "duration_s": 10,
+        "files": {
+          "passed": 60,
+          "failed": 0,
+          "skipped": 1
+        },
+        "tests": {
+          "passed": 1125,
+          "failed": 0,
+          "skipped": 11
+        },
+        "node_tests": {
+          "passed": 39,
+          "failed": 0
+        }
+      },
+      {
+        "name": "build",
+        "command": "pnpm build",
+        "exit_code": 0,
+        "duration_s": 5
+      },
+      {
+        "name": "release-pack",
+        "command": "pnpm run release:pack",
+        "exit_code": 0,
+        "duration_s": 5
+      },
+      {
+        "name": "release-verify",
+        "command": "pnpm run release:verify",
+        "exit_code": 0,
+        "duration_s": 2,
+        "passed": true
+      }
+    ],
+    "commit_hook": {
+      "exit_code": 0,
+      "vitest_tests_passed": 1125,
+      "node_tests_passed": 39
+    }
+  },
+  "excluded_known_intermittent_tests": [
+    "packages/workspace/src/query/query.test.ts > ...표시 후 발생하면 오래된 파일을 열 후보를 반환하지 않는다",
+    "packages/workspace/src/query/query-initialization.test.ts > 첫 폴더 readdir 반환 뒤 ...하면 최종 목록을 반영한다",
+    "packages/mcp/src/server/write-race.test.ts (any case)",
+    "packages/mcp/src/server/authoring.test.ts > 최신 get revision으로 선택 속성을 unset하면..."
+  ]
+}

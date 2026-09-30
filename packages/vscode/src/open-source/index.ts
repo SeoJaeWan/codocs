@@ -65,6 +65,8 @@ const failureMessages = {
     '확인된 원문 파일에 접근하지 못했습니다.',
   [openSourceFailureReasons.displayFailed]:
     '확인된 원문을 편집기에 표시하지 못했습니다.',
+  [openSourceFailureReasons.destinationUnavailable]:
+    '확인된 행·위치가 현재 편집기 원문에 없습니다.',
 };
 
 /** 출처를 보존한 사용자 클릭 실패이며 토큰은 출력하지 않는다. */
@@ -150,7 +152,7 @@ export function trustGeneratedOpenSourceHoverContents(contents: unknown): void {
   }
 }
 
-/** 최신 선택 확인 후 기존 dirty buffer를 보존하며 (0,0) 빈 선택으로 연다. */
+/** 최신 선택 확인 후 기존 dirty buffer를 보존하며 연다. 전체 문서 대상은 (0,0) 빈 선택을 적용하고, 행·위치 대상은 현재 원문에서 그 범위를 선택한다. 확인된 행·위치가 현재 원문에 없으면 선택하지 않고 destination_unavailable 실패를 기록한다. */
 export async function openSource<Document extends OpenSourceDocument>(
   argument: unknown,
   host: OpenSourceHost<Document>,
@@ -183,15 +185,24 @@ export async function openSource<Document extends OpenSourceDocument>(
     phase = openSourceFailureReasons.fileAccessFailed;
     const document =
       host.findOpenDocument(uri) ?? (await host.openDocument(uri));
+    const destination =
+      'destination' in result ? result.destination : { kind: 'top' };
+    const selection = sourceSelection(document.text, destination);
+    if (!selection) {
+      host.reportError(
+        new OpenSourceFailure(
+          openSourceFailureReasons.destinationUnavailable,
+          argument,
+        ),
+      );
+      return false;
+    }
     const viewColumn = host.findExistingViewColumn(uri);
     phase = openSourceFailureReasons.displayFailed;
     await host.showDocument(document, {
       preview: false,
       ...(viewColumn === undefined ? {} : { viewColumn }),
-      selection: {
-        start: { line: 0, character: 0 },
-        end: { line: 0, character: 0 },
-      },
+      selection,
     });
     return true;
   } catch (error: unknown) {
@@ -204,6 +215,87 @@ export async function openSource<Document extends OpenSourceDocument>(
     return false;
   }
 }
+
+/** 실제 현재 buffer의 두 끝이 존재할 때만 선택하며 범위를 보정하지 않는다. */
+export function sourceSelection(
+  text: string,
+  destination: unknown,
+): OpenSourceRange | undefined {
+  if (
+    typeof destination !== 'object' ||
+    destination === null ||
+    !('kind' in destination)
+  )
+    return undefined;
+  if (destination.kind === 'top')
+    return { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
+  const rows = text.split(/\r\n|\r|\n/u);
+  if (
+    destination.kind === 'rows' &&
+    'startLine' in destination &&
+    'endLine' in destination
+  ) {
+    const start = destination.startLine,
+      end = destination.endLine;
+    if (
+      typeof start !== 'number' ||
+      typeof end !== 'number' ||
+      !Number.isSafeInteger(start) ||
+      !Number.isSafeInteger(end) ||
+      start < 1 ||
+      end < start ||
+      end > rows.length
+    )
+      return undefined;
+    return {
+      start: { line: start - 1, character: 0 },
+      end: { line: end - 1, character: rows[end - 1]!.length },
+    };
+  }
+  if (destination.kind === 'occurrence' && 'range' in destination) {
+    const range = destination.range as Partial<OpenSourceRange> | null;
+    /** 현재 buffer에 존재하는 실제 UTF-16 끝인지 확인한다. */
+    const valid = (
+      position: OpenSourcePosition | undefined,
+    ): position is OpenSourcePosition =>
+      !!position &&
+      Number.isSafeInteger(position.line) &&
+      Number.isSafeInteger(position.character) &&
+      position.line >= 0 &&
+      position.line < rows.length &&
+      position.character >= 0 &&
+      position.character <= rows[position.line]!.length;
+    if (
+      !range ||
+      !valid(range.start) ||
+      !valid(range.end) ||
+      range.end.line < range.start.line ||
+      (range.end.line === range.start.line &&
+        range.end.character < range.start.character)
+    )
+      return undefined;
+    if (
+      !('markerText' in destination) ||
+      typeof destination.markerText !== 'string'
+    )
+      return undefined;
+    const selected =
+      range.start.line === range.end.line
+        ? rows[range.start.line]!.slice(
+            range.start.character,
+            range.end.character,
+          )
+        : [
+            rows[range.start.line]!.slice(range.start.character),
+            ...rows.slice(range.start.line + 1, range.end.line),
+            rows[range.end.line]!.slice(0, range.end.character),
+          ].join('\n');
+    if (selected !== destination.markerText) return undefined;
+    return { start: { ...range.start }, end: { ...range.end } };
+  }
+  return undefined;
+}
+
 /** 알 수 없는 throw 값도 Output에 기록할 문자열로 바꾼다. */
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

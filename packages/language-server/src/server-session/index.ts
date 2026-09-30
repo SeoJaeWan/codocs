@@ -29,8 +29,15 @@ import type {
   DocumentLink,
   Diagnostic,
   WorkspaceFolder,
+  InlayHint,
 } from 'vscode-languageserver/node.js';
 import path from 'node:path';
+import {
+  CodeNavigation,
+  type CodeOwner,
+  type CodeSession,
+  type ConfirmedCodeSource,
+} from '../code-navigation/index.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
 import {
@@ -141,6 +148,16 @@ export interface WorkspaceSessionBoundary extends Partial<
     | 'releaseCandidate'
     | 'closeDocument'
     | 'diagnostics'
+    | 'closeCodeBuffer'
+    | 'setCodeReferenceOwner'
+    | 'updateCodeBuffer'
+    | 'codeReferenceSnapshot'
+    | 'codeReferencesForRows'
+    | 'codeReferencesForDocument'
+    | 'captureCodeReference'
+    | 'confirmCodeReference'
+    | 'releaseCodeReference'
+    | 'onDidChangeCodeReferences'
   >
 > {
   readonly readiness: WorkspaceReadiness;
@@ -175,6 +192,7 @@ export class LanguageServerSession {
   readonly #sessionFactory: WorkspaceSessionFactory;
   readonly #workspaces = new Map<string, WorkspaceBinding>();
   readonly #selections = new SourceSelections();
+  readonly #code = new CodeNavigation();
   readonly #changes = new Set<(uri?: string) => void>();
   readonly #live = new Map<
     string,
@@ -259,8 +277,11 @@ export class LanguageServerSession {
     this.#referenceFailures.delete(uri);
     this.#selections.release(uri);
     const workspace = this.#workspaceForDocument(uri);
-    if (workspace)
+    this.#code.release(uri);
+    if (workspace && !this.documents.get(uri)) {
       workspace.session.closeDocument?.(this.#sourcePath(uri, workspace));
+      this.#code.forget(uri);
+    }
     for (const listener of this.#changes) listener(uri);
   }
 
@@ -369,7 +390,7 @@ export class LanguageServerSession {
   }
 
   /** 단일 확정 YAML 참조에만 본문 링크를 제공한다. */
-  async documentLinks(
+  async #yamlLinks(
     uri: string,
     cancellation?: CancellationToken,
   ): Promise<DocumentLink[]> {
@@ -412,6 +433,89 @@ export class LanguageServerSession {
           : [];
       },
     );
+  }
+
+  /** 공개 코드 API가 있는 실제 세션에 열린 출처를 연결한다. */
+  #codeOwner(uri: string): CodeOwner | undefined {
+    const document = this.documents.get(uri);
+    const workspace = this.#workspaceForDocument(uri);
+    if (!document || !workspace?.session.codeReferenceSnapshot)
+      return undefined;
+    return {
+      uri,
+      path: this.#sourcePath(uri, workspace),
+      rootPath: workspace.rootPath,
+      version: document.version,
+      text: document.getText(),
+      session: workspace.session as CodeSession,
+    };
+  }
+
+  /** 명시 링크를 우선하고 YAML 이름 링크와 단일 역참조를 함께 제공한다. */
+  async documentLinks(
+    uri: string,
+    cancellation?: CancellationToken,
+  ): Promise<DocumentLink[]> {
+    const document = this.documents.get(uri);
+    const workspace = this.#workspaceForDocument(uri);
+    if (!document) return [];
+    const owner = this.#codeOwner(uri);
+    if (owner) await this.#prepareCodeBuffers(owner.session);
+    const forward = owner
+      ? await this.#code.forward(owner)
+      : { links: [], diagnostics: [] };
+    const yaml = (await this.#yamlLinks(uri, cancellation)).filter(
+      /** 명시 표기의 전체 범위를 YAML 이름 링크보다 우선한다. */ (link) =>
+        !forward.links.some((item) => rangesOverlap(item.range, link.range)) &&
+        !(
+          owner &&
+          this.#code.markerAt(owner, document.offsetAt(link.range.start))
+        ),
+    );
+    const reverse =
+      owner && workspace && this.#isKnowledgeDocument(uri, workspace)
+        ? await this.#code.reverseLinks(owner, [...yaml, ...forward.links])
+        : [];
+    if (
+      cancellation?.isCancellationRequested ||
+      (owner && !this.#currentCodeOwner(owner))
+    )
+      return [];
+    return [...forward.links, ...yaml, ...reverse];
+  }
+
+  /** 열린 source들을 같은 프로젝트의 overlay에 먼저 반영한다. */
+  async #prepareCodeBuffers(session: CodeSession): Promise<void> {
+    for (const document of this.documents.all()) {
+      const owner = this.#codeOwner(document.uri);
+      if (owner?.session === session) await this.#code.prepare(owner);
+    }
+  }
+
+  /** 현재 출처와 세션을 비동기 요청 전후 비교한다. */
+  #currentCodeOwner(owner: CodeOwner): boolean {
+    return (
+      this.documents.get(owner.uri)?.version === owner.version &&
+      this.documents.get(owner.uri)?.getText() === owner.text &&
+      this.#workspaceForDocument(owner.uri)?.session === owner.session
+    );
+  }
+
+  /** 문서 전체 코드 출현은 원문 수정 없이 첫 행 Hint로 제공한다. */
+  async inlayHints(
+    uri: string,
+    cancellation?: CancellationToken,
+  ): Promise<InlayHint[]> {
+    const owner = this.#codeOwner(uri);
+    const workspace = this.#workspaceForDocument(uri);
+    if (!owner || !workspace || !this.#isKnowledgeDocument(uri, workspace))
+      return [];
+    await this.#prepareCodeBuffers(owner.session);
+    const hints = await this.#code.hints(owner);
+    return this.#currentCodeOwner(owner) &&
+      !cancellation?.isCancellationRequested
+      ? hints
+      : [];
   }
 
   /** live YAML의 확인된 위치에만 같은 snapshot의 진단을 투영한다. */
@@ -575,6 +679,29 @@ export class LanguageServerSession {
         failures: [...grouped.values()],
       });
     }
+    for (const document of this.documents.all()) {
+      const owner = this.#codeOwner(document.uri);
+      if (!owner) continue;
+      const result = await this.#code.forward(owner);
+      if (
+        !this.#currentCodeOwner(owner) ||
+        epoch !== this.#diagnosticEpoch ||
+        this.#closed
+      )
+        return undefined;
+      const existing = documents.find(
+        (item) =>
+          normalizeWorkspaceUri(item.uri) ===
+          normalizeWorkspaceUri(document.uri),
+      );
+      if (existing) existing.diagnostics.push(...result.diagnostics);
+      else
+        documents.push({
+          uri: document.uri,
+          version: document.version,
+          diagnostics: result.diagnostics,
+        });
+    }
     if (epoch !== this.#diagnosticEpoch || this.#closed) return undefined;
     this.#diagnosticHistory.clear();
     for (const [uri, value] of history)
@@ -589,7 +716,13 @@ export class LanguageServerSession {
   }
 
   /** 최신 출처 소유권·버전·선택 근거를 확인하고 file URI만 반환한다. */
-  async confirmSource(input: unknown): Promise<{ uri: string } | null> {
+  async confirmSource(
+    input: unknown,
+  ): Promise<{ uri: string } | ConfirmedCodeSource | null> {
+    if (this.#code.has(input))
+      return this.#code.confirm(input, (owner) =>
+        this.#currentCodeOwner(owner),
+      );
     return this.#selections.confirm(
       input,
       (uri, version, session) =>
@@ -661,6 +794,21 @@ export class LanguageServerSession {
     const workspace = this.#workspaceForDocument(uri);
     if (!workspace) return null;
     if (cancellation?.isCancellationRequested) return null;
+    const owner = this.#codeOwner(uri);
+    if (owner) await this.#prepareCodeBuffers(owner.session);
+    if (
+      owner &&
+      this.#code.markerAt(owner, snapshot.offsetAt(params.position))
+    ) {
+      const hover = await this.#code.markerHover(
+        owner,
+        snapshot.offsetAt(params.position),
+      );
+      return this.#currentCodeOwner(owner) &&
+        !cancellation?.isCancellationRequested
+        ? hover
+        : null;
+    }
     if (/\.ya?ml$/iu.test(fileURLToPath(uri))) {
       const references = await this.#references(uri);
       const failure = this.#referenceFailures.get(uri);
@@ -701,7 +849,19 @@ export class LanguageServerSession {
         partial: references.scanStatus !== scanStatuses.complete,
         workspaceState: workspace.session.readiness,
       });
-      if (!item) return empty;
+      const reverse =
+        owner && this.#isKnowledgeDocument(uri, workspace)
+          ? await this.#code.reverseHover(owner, params.position.line)
+          : '';
+      if (
+        cancellation?.isCancellationRequested ||
+        (owner && !this.#currentCodeOwner(owner))
+      )
+        return null;
+      if (!item)
+        return reverse
+          ? { contents: { kind: 'markdown', value: reverse } }
+          : empty;
       const targets = references.targets.filter(
         /** 해당 참조 출현에 속하는 디스크 후보만 선택한다. */ (
           target,
@@ -711,7 +871,10 @@ export class LanguageServerSession {
             (candidate) => candidate.path === target.path,
           ),
       );
-      if (!targets.length) return empty;
+      if (!targets.length)
+        return reverse
+          ? { contents: { kind: 'markdown', value: reverse } }
+          : empty;
       const lines = targets.map(
         /** 선택한 이름 후보마다 독립 링크를 표시한다. */ (detail) => {
           const target = this.#target(
@@ -734,6 +897,7 @@ export class LanguageServerSession {
           kind: 'markdown',
           value:
             lines.join('\n') +
+            (reverse ? `\n\n${reverse}` : '') +
             (notice &&
             !Array.isArray(notice) &&
             typeof notice === 'object' &&
@@ -858,7 +1022,7 @@ export class LanguageServerSession {
       );
       return Array.isArray(input) &&
         input.length === 1 &&
-        this.#selections.has(input[0])
+        (this.#selections.has(input[0]) || this.#code.has(input[0]))
         ? link
         : null;
     } catch {
@@ -895,6 +1059,7 @@ export class LanguageServerSession {
     this.#diagnosticEpoch++;
     this.#diagnosticHistory.clear();
     this.#selections.release();
+    this.#code.release();
     this.#live.clear();
     this.#referenceFailures.clear();
     this.#changes.clear();
@@ -927,6 +1092,24 @@ export class LanguageServerSession {
       rootPath,
       session,
     });
+    let codeObservation = '';
+    session.onDidChangeCodeReferences?.(
+      /** 변경된 코드 관측만 갱신하며 동일 catalog 게시의 재조회 순환을 막는다. */ (
+        snapshot,
+      ) => {
+        if (this.#workspaces.get(uri)?.session !== session) return;
+        const generation = `${snapshot.codeGeneration}/${snapshot.documentGeneration}`;
+        const observation = JSON.stringify([
+          generation,
+          snapshot.status,
+          snapshot.confirmedCount,
+          snapshot.failures,
+        ]);
+        if (observation === codeObservation) return;
+        codeObservation = observation;
+        for (const listener of this.#changes) listener();
+      },
+    );
     session.onDidChangeSnapshot?.(
       /** 게시 완료된 관측만 캐시와 진단을 갱신한다. */ () => {
         if (this.#workspaces.get(uri)?.session !== session) return;
@@ -1072,4 +1255,12 @@ function mapMatchResult(
       mapEvidence(document, evidence),
     ),
   };
+}
+
+/** 같은 행의 이름 링크와 명시 표기의 범위 교집합을 확인한다. */
+function rangesOverlap(left: Range, right: Range): boolean {
+  /** 위치가 다른 위치보다 앞서는지 UTF-16 순서로 확인한다. */
+  const before = (a: Range['start'], b: Range['start']): boolean =>
+    a.line < b.line || (a.line === b.line && a.character < b.character);
+  return before(left.start, right.end) && before(right.start, left.end);
 }

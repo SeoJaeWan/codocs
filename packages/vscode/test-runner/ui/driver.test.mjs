@@ -348,3 +348,86 @@ test('native-only tooltip without a loading row waits for the exact provider anc
   assert.equal(state.anchors[1].label, 'Zone');
   assert.ok(calls.every((call) => call.params.type === 'mouseMoved'));
 });
+
+for (const platform of ['win32', 'darwin']) {
+  for (const [name, gesture, text] of [
+    [
+      'Inlay label',
+      /** 렌더링된 Inlay label을 클릭한다. */ (driver) =>
+        driver.inlayLink('문서 전체에 연결된 코드 · 1곳'),
+      '문서 전체에 연결된 코드 · 1곳',
+    ],
+    [
+      'non-link text',
+      /** 링크로 감지되지 않는 문자를 클릭한다. */ (driver) =>
+        driver.modifierClick('@codocs [[Absent]]'),
+      '@codocs [[Absent]]',
+    ],
+  ]) {
+    test(`${platform} ${name} click locates the rendered text, holds the modifier through press/release without waiting for link detection`, /** OS 입력 순서와 수정 키 유지를 검증한다. */ async () => {
+      const calls = [];
+      const lookups = [];
+      const driver = new RendererDriver(
+        /** 실제 전송 순서를 수집한다. */ async (method, params) => {
+          calls.push({ method, params });
+        },
+        platform,
+      );
+      driver.dismiss = /** 이전 화면 상태를 준비한다. */ async () => {};
+      driver.evaluate =
+        /** 표시된 문자 좌표만 공급하며 링크 감지 조회는 없다. */ async (
+          fn,
+          argument,
+        ) => {
+          lookups.push({ name: fn.name, argument });
+          return { x: 40, y: 50 };
+        };
+      await gesture(driver);
+      assert.deepEqual(lookups, [
+        { name: 'textPoint', argument: { text, occurrence: 0 } },
+      ]);
+      assert.deepEqual(
+        calls.map((call) => call.params.type),
+        [
+          'keyDown',
+          'mouseMoved',
+          'mouseMoved',
+          'mousePressed',
+          'mouseReleased',
+          'keyUp',
+        ],
+      );
+      const modifier = linkModifier(platform);
+      assert.equal(calls[0].params.key, modifier.key);
+      assert.ok(
+        calls
+          .slice(0, 5)
+          .every((call) => call.params.modifiers === modifier.modifiers),
+      );
+      assert.ok(
+        calls
+          .slice(1, 5)
+          .every((call) => call.params.x === 40 && call.params.y === 50),
+      );
+      assert.equal(calls.at(-1).params.modifiers, 0);
+    });
+  }
+  test(`${platform} Inlay label click releases its modifier when the press fails`, /** 입력 실패에서도 수정 키를 해제하는지 검증한다. */ async () => {
+    const calls = [];
+    const driver = new RendererDriver(
+      /** 클릭 입력 실패를 재현한다. */ async (method, params) => {
+        calls.push({ method, params });
+        if (params.type === 'mousePressed') throw new Error('input lost');
+      },
+      platform,
+    );
+    driver.dismiss = /** 이전 화면 상태를 준비한다. */ async () => {};
+    driver.evaluate = /** 표시된 문자 좌표를 공급한다. */ async () => ({
+      x: 40,
+      y: 50,
+    });
+    await assert.rejects(driver.inlayLink('label'), /input lost/u);
+    assert.equal(calls.at(-1).params.type, 'keyUp');
+    assert.equal(calls.at(-1).params.modifiers, 0);
+  });
+}

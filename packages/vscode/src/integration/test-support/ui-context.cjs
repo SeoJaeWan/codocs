@@ -13,6 +13,7 @@ exports.uiContext =
   ) {
     // 실제 파일 경계 확인만 정규 경로를 사용하고 VS Code URI는 workspace 표기를 보존한다.
     const physicalWorkspace = realpathSync.native(config.workspace);
+    const workspacePath = path.resolve(config.workspace);
     /** 실제 파일 URI를 만든다. */
     const uri = (relative) =>
       vscode.Uri.file(path.join(config.workspace, relative));
@@ -38,6 +39,76 @@ exports.uiContext =
       );
       assert.equal(await vscode.workspace.applyEdit(edit), true);
       assert.equal(document.getText(), text);
+    }
+    const created = new Set();
+    /** 사례가 만든 임시 파일을 기록하고 복원 대상에 포함한다. */
+    async function create(relative, text) {
+      const file = uri(relative).fsPath;
+      await assertOwnedFixture(file);
+      await fs.mkdir(path.dirname(file), { recursive: true });
+      created.add(relative);
+      await fs.writeFile(file, text);
+    }
+    /** 사례가 만든 임시 파일을 삭제한다. */
+    async function remove(relative) {
+      const file = uri(relative).fsPath;
+      await assertOwnedFixture(file);
+      await fs.rm(file, { force: true });
+      created.delete(relative);
+    }
+    /** 열린 편집기를 모두 닫아 다음 열기가 새 링크 조회를 하게 한다. */
+    async function closeAll() {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+      await until(
+        /** 모든 탭이 실제로 닫혔는지 관측한다. */ () =>
+          vscode.window.tabGroups.all.every((group) => !group.tabs.length),
+        'all editors closed',
+      );
+    }
+    /** 경로와 기존 상위 디렉터리가 workspace 안에 있는지 확인한다. */
+    async function assertOwnedFixture(file) {
+      const absolute = path.resolve(file);
+      const relative = path.relative(workspacePath, absolute);
+      assert.ok(
+        relative &&
+          relative !== '..' &&
+          !relative.startsWith('..' + path.sep) &&
+          !path.isAbsolute(relative),
+        'only owned fixture may be changed',
+      );
+      let parentPath = path.dirname(absolute);
+      let parent;
+      while (true) {
+        try {
+          parent = await fs.realpath(parentPath);
+          break;
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          const nextParent = path.dirname(parentPath);
+          assert.notEqual(nextParent, parentPath, 'workspace parent exists');
+          parentPath = nextParent;
+        }
+      }
+      const physicalRelative = path.relative(physicalWorkspace, parent);
+      assert.ok(
+        physicalRelative !== '..' &&
+          !physicalRelative.startsWith('..' + path.sep) &&
+          !path.isAbsolute(physicalRelative),
+        'only owned fixture may be changed',
+      );
+      try {
+        const physicalFile = await fs.realpath(absolute);
+        const fileRelative = path.relative(physicalWorkspace, physicalFile);
+        assert.ok(
+          fileRelative &&
+            fileRelative !== '..' &&
+            !fileRelative.startsWith('..' + path.sep) &&
+            !path.isAbsolute(fileRelative),
+          'only owned fixture may be changed',
+        );
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
     }
     /** 클릭 결과의 실제 파일·상단 빈 선택을 관측한다. */
     async function atTop(relative) {
@@ -112,27 +183,29 @@ exports.uiContext =
     /** 사례의 dirty editor를 되돌린 뒤 탭과 fixture를 복원한다. */
     async function reset() {
       await driver.dismiss();
+      const dirty = [];
       for (const document of vscode.workspace.textDocuments) {
         if (!document.isDirty || document.uri.scheme !== 'file') continue;
-        const relative = path.relative(
-          physicalWorkspace,
-          await fs.realpath(document.uri.fsPath),
-        );
-        assert.ok(
-          relative &&
-            relative !== '..' &&
-            !relative.startsWith('..' + path.sep) &&
-            !path.isAbsolute(relative),
-          'only owned fixture may be reverted',
-        );
+        await assertOwnedFixture(document.uri.fsPath);
+        dirty.push(document);
+      }
+      const { createFixture, uiFiles } = await import('./ui-fixture.mjs');
+      for (const relative of Object.keys(uiFiles()))
+        await assertOwnedFixture(uri(relative).fsPath);
+      await createFixture(config.workspace);
+      for (const document of dirty) {
         await vscode.window.showTextDocument(document);
         await vscode.commands.executeCommand(
           'workbench.action.revertAndCloseActiveEditor',
         );
       }
       await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-      const { createFixture } = await import('./ui-fixture.mjs');
-      await createFixture(config.workspace);
+      for (const relative of created) {
+        const file = uri(relative).fsPath;
+        await assertOwnedFixture(file);
+        await fs.rm(file, { force: true });
+      }
+      created.clear();
     }
     return {
       assert,
@@ -143,6 +216,9 @@ exports.uiContext =
       driver,
       until,
       uri,
+      create,
+      remove,
+      closeAll,
       open,
       replace,
       atTop,

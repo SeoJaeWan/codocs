@@ -46,3 +46,6 @@ definition: |
   ## 배포 식별자와 내장 서버
 
   공개 확장 ID는 seojaewan.codocs이며 첫 후보 버전은 0.0.1이다. VSIX에 CommonJS 언어 서버와 의존성·라이선스를 포함하고 VS Code 내장 런타임으로 실행한다. 별도 시스템 Node는 확장 사용의 조건이 아니다. 실제 설치한 ID·버전·경로와 기능 및 종료 검사는 [[배포]] 기준에 따라 확인한다.
+
+  코드 관측 변경 알림에도 같은 source-owning Hover·DocumentLink·InlayHint provider를 갱신한다. LSP 기본 provider와 중복 등록하지 않으며 가장 가까운 workspace 소유권을 요청 전후 확인한다.
+  Inlay Hint는 Host의 editor.inlayHints.enabled 설정을 그대로 따르고 command tooltip에는 서버가 생성한 원문 열기 명령만 신뢰한다. 사용자 설정을 수정하여 표시를 강제하지 않는다.

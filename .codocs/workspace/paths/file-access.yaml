@@ -26,3 +26,5 @@ definition: |
 
   접근 범위와 허용 여부는 [담당 구현](../../../packages/workspace/src/paths/index.ts)에서 확인한다.
   관련 계약의 사례는 [인접 테스트](../../../packages/workspace/src/paths/paths.test.ts)에서 확인한다.
+
+  일반 코드의 읽기 적격성은 [별도 구현](../../../packages/workspace/src/paths/code-file-access.ts)과 [인접 테스트](../../../packages/workspace/src/paths/code-file-access.test.ts)에서 확인한다. 이 API는 지식 문서 저장 권한을 부여하지 않는다.

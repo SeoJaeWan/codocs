@@ -103,6 +103,7 @@ export function bindLanguageServer(
           change: TextDocumentSyncKind.Full,
         },
         hoverProvider: true,
+        inlayHintProvider: true,
         documentLinkProvider: { resolveProvider: true },
         workspace: {
           workspaceFolders: {
@@ -148,6 +149,9 @@ export function bindLanguageServer(
   const hover: Parameters<Connection['onHover']>[0] = (params, token) =>
     session.hoverDocument(params, token);
   connection.onHover(hover);
+  connection.languages.inlayHint.on((params, token) =>
+    session.inlayHints(params.textDocument.uri, token),
+  );
   connection.onDocumentLinks((params, token) =>
     session.documentLinks(params.textDocument.uri, token),
   );
