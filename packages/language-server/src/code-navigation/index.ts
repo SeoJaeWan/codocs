@@ -7,7 +7,7 @@ import {
   codeReferenceStatuses,
   extractCodeReferences,
 } from '@codocs/core';
-import { codeCollectionStatuses } from '@codocs/workspace';
+import { codeCollectionStatuses, codeFileReasons } from '@codocs/workspace';
 import type {
   WorkspaceQuerySession,
   WorkspaceCodeReferenceOccurrence,
@@ -26,7 +26,10 @@ import {
   selectionTarget,
   type SourceSelection,
 } from '../navigation/index.js';
-import { codeReferenceMessages } from './domain-values.js';
+import {
+  codeCollectionMessages,
+  codeReferenceMessages,
+} from './domain-values.js';
 
 /** 명시적 참조 표현에 사용하는 공개 workspace 경계다. */
 export type CodeSession = Pick<
@@ -351,7 +354,7 @@ export class CodeNavigation {
       ? `확인된 코드 ${count}곳 · 문서 탐색 미확인`
       : query.status === codeCollectionStatuses.complete
         ? `문서 전체에 연결된 코드 · ${count}곳`
-        : `확인된 코드 ${count}곳 · ${query.status === codeCollectionStatuses.collecting ? '수집 중' : '수집 불완전'}`;
+        : `확인된 코드 ${count}곳 · ${incompleteLabel(query)}`;
     const target =
       query.unique && query.occurrences.length === 1
         ? await this.target(
@@ -416,15 +419,30 @@ export class CodeNavigation {
       );
       lines.push(target ? `- [${label}](${target})` : `- ${label}`);
     }
-    if (query.status !== codeCollectionStatuses.complete)
+    if (query.status !== codeCollectionStatuses.complete) {
       lines.push(
-        `확인된 코드 ${query.occurrences.length}곳 · ${query.status === codeCollectionStatuses.collecting ? '수집 중' : '수집 불완전'}`,
-        ...query.failures.map((item) => escapeMarkdown(item.message)),
+        `확인된 코드 ${query.occurrences.length}곳 · ${incompleteLabel(query)}`,
       );
+      for (const item of query.failures) {
+        if (item.reason === codeFileReasons.watch)
+          console.error('Code watch failed', item.message);
+        else lines.push(escapeMarkdown(item.message));
+      }
+      if (query.failures.some((item) => item.reason === codeFileReasons.watch))
+        lines.push(codeCollectionMessages.reconnectingGuidance);
+    }
     if (!documentComplete)
       lines.push('저장 문서 탐색을 완전히 확인하지 못했습니다.');
     return lines.join('\n');
   }
+}
+/** 미완료 수집의 상태 문구를 정한다. 감시 실패만 있으면 재연결 중이다. */
+function incompleteLabel(query: WorkspaceCodeReferenceQuery): string {
+  if (query.status === codeCollectionStatuses.collecting) return '수집 중';
+  return query.failures.length > 0 &&
+    query.failures.every((item) => item.reason === codeFileReasons.watch)
+    ? codeCollectionMessages.reconnectingLabel
+    : '수집 불완전';
 }
 /** 같은 출처·원문·버전·공개 세션의 준비만 공유한다. */
 function sameOwner(left: CodeOwner, right: CodeOwner): boolean {
