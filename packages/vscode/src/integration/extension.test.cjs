@@ -506,6 +506,28 @@ module.exports.scenarios = [
     },
   },
   {
+    id: 'reverse-folder-recreate',
+    /** 범위 안 폴더를 지웠다 다시 만들어도 연결된 코드 수집이 완료로 돌아오고 이후 편집이 반영된다.
+     * @codocs [[VS Code:원문 열기]]#L40 */
+    async run(c) {
+      const yaml = '.codocs/reverse-recreate.yaml';
+      const folder = 'navigation/recreate';
+      const code = folder + '/reverse-recreate.java';
+      const marker = '@codocs [[Reverse Recreate]]#L3';
+      const text = `class ReverseRecreate {\n  // ${marker}\n}\n`;
+      await c.open(yaml);
+      await c.driver.hover('Reverse recreate row', '연결된 코드 · 1곳');
+      // 폴더를 재귀 삭제하고 곧바로 같은 내용으로 다시 만든다.
+      await c.fs.rm(c.uri(folder).fsPath, { recursive: true, force: true });
+      await c.create(code, text);
+      // 감시가 끊겼다 복구된 뒤에도 완료 표시(N곳)로 돌아온다.
+      await c.driver.hover('Reverse recreate row', '연결된 코드 · 1곳');
+      // 다시 만든 파일의 편집이 이후 Hover에 반영된다.
+      await c.create(code, text.replace('}\n', `  // ${marker}\n}\n`));
+      await c.driver.hover('Reverse recreate row', '연결된 코드 · 2곳');
+    },
+  },
+  {
     id: 'reverse-multiple-hover',
     /** 구현·테스트 두 연결을 Hover의 위치별 앵커로 각각 클릭해 해당 표기를 선택한다.
      * @codocs [[Language Server:IDE 지원]]#L29 */
