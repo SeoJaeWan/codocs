@@ -166,7 +166,7 @@ describe('parseYaml과 extractReferences: YAML 표기별 참조 위치', () => {
       '[[이름]]',
     ]);
   });
-  it('빈 구성과 중첩 및 미완성 참조가 있으면 앞 오류를 유지하고 다음 참조를 복구한다', /** 모든 오류에 실제 원문 범위와 동일한 책임 계층 상수를 반환한다. */ () => {
+  it('빈 구성과 중첩 및 미완성 참조가 있으면 앞 오류를 유지하고 다음 참조를 복구한다', /** 모든 오류에 실제 원문 범위와 동일한 책임 계층 상수를 반환한다. @codocs [[참조 추출]]#L20-L21 */ () => {
     const source =
       'definition: "[[]] [[:이름]] [[도메인:]] [[a:b:c]] [[앞 [[정상]] [[끝"\n';
     const result = extractReferences(parseYaml(source), 'doc.yaml');
@@ -201,7 +201,7 @@ describe('parseYaml과 extractReferences: YAML 표기별 참조 위치', () => {
       '[[끝',
     ]);
   });
-  it('참조를 반복 추출하면 모든 위치와 입력을 변경하지 않는다', /** 같은 표기의 반복은 별도 등장이다. */ () => {
+  it('참조를 반복 추출하면 모든 위치와 입력을 변경하지 않는다', /** 같은 표기의 반복은 별도 등장이다. @codocs [[참조 추출]]#L20-L27 */ () => {
     const source = 'definition: "😀 [[반복]] [[반복]]"\n';
     const parsed = parseYaml(source);
     const before = JSON.stringify(parsed);

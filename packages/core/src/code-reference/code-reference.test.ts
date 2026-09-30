@@ -70,6 +70,7 @@ describe('extractCodeReferences: 일반 텍스트의 명시 참조', () => {
   });
   it('도메인과 escaped 콜론이 있으면 기존 이름 문법으로 해석한다', () => {
     const markers = extractCodeReferences('@codocs [[업무:이름\\:설명]]#L2-L4');
+    // @codocs [[명시적 코드 참조]]#L24-L26
     expect(markers[0]).toMatchObject({
       name: '이름:설명',
       domain: '업무',
@@ -117,6 +118,7 @@ describe('extractCodeReferences: 일반 텍스트의 명시 참조', () => {
     });
   });
   it('범위가 역전되면 전체 표기와 별도 범위 오류를 보존한다', () => {
+    // @codocs [[명시적 코드 참조]]#L34
     expect(extractCodeReferences('@codocs [[대상]]#L4-L2')[0]).toMatchObject({
       text: '@codocs [[대상]]#L4-L2',
       rowError: codeReferenceStatuses.reversedRows,

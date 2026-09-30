@@ -129,7 +129,7 @@ describe('parseYaml: 단일 YAML 매핑의 해석과 오류 처리', () => {
       expect(getValueRange(result, ['name'])).toBeUndefined();
     },
   );
-  it('중복 키가 있으면 두 번째 키 위치를 진단한다', /** CRLF 입력의 두 번째 줄 name은 원문 offset 13부터 17 직전까지다. 줄·문자 번호를 0부터 세므로 좌표는 (1, 0)부터 (1, 4) 직전까지다. */ () => {
+  it('중복 키가 있으면 두 번째 키 위치를 진단한다', /** CRLF 입력의 두 번째 줄 name은 원문 offset 13부터 17 직전까지다. 줄·문자 번호를 0부터 세므로 좌표는 (1, 0)부터 (1, 4) 직전까지다. @codocs [[YAML 파싱]]#L47 */ () => {
     const source = 'name: first\r\nname: second\r\n';
     const result = parseYaml(source);
     expect(result.success).toBe(false);
@@ -144,7 +144,7 @@ describe('parseYaml: 단일 YAML 매핑의 해석과 오류 처리', () => {
   });
   it.each(['a: [1,', 'a: "끝', 'a:\n  b: [x\n'])(
     'YAML %s에 닫는 괄호나 따옴표가 없으면 invalid_yaml을 반환한다',
-    /** YAML 라이브러리가 불완전한 입력에서 일부 구조를 복구하더라도 파싱 성공으로 처리하지 않는다. */ (
+    /** YAML 라이브러리가 불완전한 입력에서 일부 구조를 복구하더라도 파싱 성공으로 처리하지 않는다. @codocs [[YAML 파싱]]#L49-L50 */ (
       source,
     ) => {
       const result = parseYaml(source, 'syntax.yaml');
@@ -378,7 +378,7 @@ describe('키·값·속성의 원문 범위와 UTF-16 좌표', /** 실제로 잘
       slice(result, getPropertyRange(result, ['missing'])),
     ]).toEqual([undefined, undefined, undefined]);
   });
-  it('중첩 배열과 객체를 flow 표기로 쓰면 값을 읽고 각 속성 범위에서 주변 쉼표를 제외한다', /** b와 c의 전체 범위는 각 속성만 포함한다. 배열의 두 번째 항목은 값 2의 범위만 있고 키·속성 전체 범위는 없다. */ () => {
+  it('중첩 배열과 객체를 flow 표기로 쓰면 값을 읽고 각 속성 범위에서 주변 쉼표를 제외한다', /** b와 c의 전체 범위는 각 속성만 포함한다. 배열의 두 번째 항목은 값 2의 범위만 있고 키·속성 전체 범위는 없다. @codocs [[YAML 파싱]]#L29-L31 */ () => {
     const source = 'a: [{b: "값", c: [1, 2]}]\n';
     const result = parseYaml(source);
     expect([
@@ -443,7 +443,7 @@ describe('키·값·속성의 원문 범위와 UTF-16 좌표', /** 실제로 잘
       slice(result, getPropertyRange(result, ['a'])),
     ]).toEqual(['a', '|\r\n  한😀\r\n', 'a: |\r\n  한😀\r\n']);
   });
-  it('문자열 키 a.b와 0을 경로에 그대로 전달하면 중첩 값 x의 범위를 찾는다', /** 경로의 a.b를 a와 b로 나누지 않고, 문자열 0도 배열 인덱스로 바꾸지 않는다. a와 b를 별도 경로로 전달하면 범위가 없다. */ () => {
+  it('문자열 키 a.b와 0을 경로에 그대로 전달하면 중첩 값 x의 범위를 찾는다', /** 경로의 a.b를 a와 b로 나누지 않고, 문자열 0도 배열 인덱스로 바꾸지 않는다. a와 b를 별도 경로로 전달하면 범위가 없다. @codocs [[필드 경로]]#L6-L8 */ () => {
     const source = '"a.b": {"0": x}\n';
     const result = parseYaml(source);
     expect(slice(result, getValueRange(result, ['a.b', '0']))).toBe('x');
