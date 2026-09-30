@@ -1,0 +1,231 @@
+{
+  "run_id": "wb-cod41-mac-r2-6c64ce4-0f556e",
+  "task_id": "INT-001",
+  "verified_commit": "452b021f45c9d3de5c54c239e1df1d85c5ea285d",
+  "status": "provisional_candidate",
+  "environment": {
+    "os": "macOS 26.5.1 (Darwin 25.5.0)",
+    "arch": "arm64",
+    "node": "24.21.0",
+    "pnpm": "10.34.5"
+  },
+  "commands": [
+    {
+      "name": "typecheck",
+      "command": "pnpm typecheck",
+      "exit_code": 0,
+      "duration_s": 11,
+      "started_at_utc": "2026-09-30T04:45:28Z"
+    },
+    {
+      "name": "lint",
+      "command": "pnpm lint",
+      "exit_code": 0,
+      "duration_s": 10,
+      "started_at_utc": "2026-09-30T04:45:39Z"
+    },
+    {
+      "name": "prettier-pre",
+      "command": "pnpm exec prettier . --check",
+      "exit_code": 0,
+      "duration_s": 18,
+      "started_at_utc": "2026-09-30T04:45:49Z"
+    },
+    {
+      "name": "test",
+      "command": "pnpm test",
+      "exit_code": 0,
+      "duration_s": 11,
+      "started_at_utc": "2026-09-30T04:47:51Z"
+    },
+    {
+      "name": "build",
+      "command": "pnpm build",
+      "exit_code": 0,
+      "duration_s": 5,
+      "started_at_utc": "2026-09-30T04:48:02Z"
+    },
+    {
+      "name": "release-pack",
+      "command": "pnpm run release:pack",
+      "exit_code": 0,
+      "duration_s": 6,
+      "started_at_utc": "2026-09-30T04:48:07Z"
+    },
+    {
+      "name": "release-verify",
+      "command": "pnpm run release:verify",
+      "exit_code": 0,
+      "duration_s": 2,
+      "started_at_utc": "2026-09-30T04:48:13Z"
+    }
+  ],
+  "vitest_repetitions": [
+    {
+      "run": "01",
+      "exit_code": 0,
+      "files": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1121,
+        "failed": 0,
+        "skipped": 11
+      },
+      "vitest_duration": "5.68s",
+      "started_at_utc": "2026-09-30T04:46:10Z"
+    },
+    {
+      "run": "02",
+      "exit_code": 0,
+      "files": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1121,
+        "failed": 0,
+        "skipped": 11
+      },
+      "vitest_duration": "5.89s",
+      "started_at_utc": "2026-09-30T04:46:17Z"
+    },
+    {
+      "run": "03",
+      "exit_code": 0,
+      "files": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1121,
+        "failed": 0,
+        "skipped": 11
+      },
+      "vitest_duration": "7.17s",
+      "started_at_utc": "2026-09-30T04:46:23Z"
+    },
+    {
+      "run": "04",
+      "exit_code": 0,
+      "files": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1121,
+        "failed": 0,
+        "skipped": 11
+      },
+      "vitest_duration": "6.50s",
+      "started_at_utc": "2026-09-30T04:46:31Z"
+    },
+    {
+      "run": "05",
+      "exit_code": 0,
+      "files": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1121,
+        "failed": 0,
+        "skipped": 11
+      },
+      "vitest_duration": "7.63s",
+      "started_at_utc": "2026-09-30T04:46:39Z"
+    },
+    {
+      "run": "06",
+      "exit_code": 0,
+      "files": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1121,
+        "failed": 0,
+        "skipped": 11
+      },
+      "vitest_duration": "6.09s",
+      "started_at_utc": "2026-09-30T04:46:47Z"
+    },
+    {
+      "run": "07",
+      "exit_code": 1,
+      "files": {
+        "passed": 59,
+        "failed": 1,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1120,
+        "failed": 1,
+        "skipped": 11
+      },
+      "vitest_duration": "5.80s",
+      "started_at_utc": "2026-09-30T04:46:54Z"
+    },
+    {
+      "run": "08",
+      "exit_code": 0,
+      "files": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1121,
+        "failed": 0,
+        "skipped": 11
+      },
+      "vitest_duration": "5.95s",
+      "started_at_utc": "2026-09-30T04:47:01Z"
+    },
+    {
+      "run": "09",
+      "exit_code": 0,
+      "files": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1121,
+        "failed": 0,
+        "skipped": 11
+      },
+      "vitest_duration": "5.80s",
+      "started_at_utc": "2026-09-30T04:47:07Z"
+    },
+    {
+      "run": "10",
+      "exit_code": 0,
+      "files": {
+        "passed": 60,
+        "failed": 0,
+        "skipped": 1
+      },
+      "tests": {
+        "passed": 1121,
+        "failed": 0,
+        "skipped": 11
+      },
+      "vitest_duration": "6.08s",
+      "started_at_utc": "2026-09-30T04:47:14Z"
+    }
+  ],
+  "vitest_summary": {
+    "total": 10,
+    "passed_runs": 9,
+    "failed_runs": ["07"]
+  },
+  "not_executed": ["windows", "vscode-ui-19-scenarios", "required-ci"]
+}
