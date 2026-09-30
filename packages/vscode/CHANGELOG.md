@@ -1,5 +1,17 @@
 # codocs
 
+## 0.0.3
+
+### Patch Changes
+
+- 5419f69: Add the `codocs_duplicates` MCP tool that reviews repeated passages across the project or in a draft before saving, with paged results and cancellation support.
+
+  저장 전 초안이나 프로젝트 전체의 반복 구절을 검토하는 `codocs_duplicates` MCP 도구를 추가하고, 페이지 결과와 취소를 지원한다.
+
+- 452b021: Add explicit `@codocs [[Document]]`, `#L11`, and `#L11-L12` references to navigate from project text to a document, line, or line range, and reverse navigation with hover links and whole-document Inlay Hints.
+
+  프로젝트 텍스트의 `@codocs [[문서]]`, `#L11`, `#L11-L12` 표기로 문서·행·행 범위로 이동하고, 호버 링크와 문서 전체 Inlay Hint로 코드 위치를 역탐색한다.
+
 ## 0.0.2
 
 ### Patch Changes
