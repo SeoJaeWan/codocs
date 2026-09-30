@@ -479,6 +479,45 @@ export class RendererDriver {
     }
   }
 
+  /** 화면의 문자 범위를 찾아 링크 감지 여부와 무관하게 OS 수정 키 클릭을 전달한다. */
+  async #modifierClickText(text, occurrence, description) {
+    await this.dismiss();
+    const point = await until(
+      () => this.evaluate(textPoint, { text, occurrence }),
+      `visible ${description} ${text}`,
+    );
+    const { modifiers, ...key } = linkModifier(this.platform);
+    await this.command('Input.dispatchKeyEvent', {
+      type: 'keyDown',
+      ...key,
+      modifiers,
+    });
+    try {
+      await this.command('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        ...point,
+        modifiers,
+      });
+      await this.click(point, modifiers);
+    } finally {
+      await this.command('Input.dispatchKeyEvent', {
+        type: 'keyUp',
+        ...key,
+        modifiers: 0,
+      });
+    }
+  }
+
+  /** 링크로 감지되지 않는 표시 문자도 OS 기본 링크 열기 제스처로 클릭한다. */
+  async modifierClick(text, occurrence = 0) {
+    await this.#modifierClickText(text, occurrence, 'text');
+  }
+
+  /** 편집기에 렌더링된 Inlay Hint label을 OS 기본 링크 열기 제스처로 클릭한다. */
+  async inlayLink(label) {
+    await this.#modifierClickText(label, 0, 'Inlay label');
+  }
+
   /** 실패 시 renderer 화면을 그대로 저장한다. */
   async screenshot(file) {
     const result = await this.command('Page.captureScreenshot', {
