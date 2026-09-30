@@ -18,6 +18,8 @@
 
 명시 링크와 잘못된 표기의 이유 Hover, 문서 행에서 코드로 돌아가는 단일 직접 이동·복수 Hover 링크, 문서 전체 Inlay Hint를 구현한다. 기존 YAML 이름 링크와 공존시키고 dirty buffer 및 명시 행의 이동 계약을 지킨다. UI 검증은 기존 A1-A5, B1-B3, C1-C2 등 19개 실제 VS Code 시나리오를 CI에서 실행한다.
 
+결정(2026-09-30): COD-41 링크의 클릭 확인은 기존 코드 식별자 Hover의 "원문 열기" 링크와 같은 방식이다. 코드·문서 세대가 바뀌었다는 사실만으로 클릭을 거부하거나 토큰을 삭제하지 않는다. 클릭은 최신 완료 관측으로 다시 확인하며 진행 중인 수집은 기다리고 최대 3회·2초 안에서 재확인한다. source·표기·대상이 실제로 바뀌었거나 문서가 편집·닫혔거나 서버가 재시작된 경우에만 거부한다. 기존 "원문 열기" 동작은 바꾸지 않는다.
+
 ### 문서와 변경 이력
 
 README·가이드·예시에는 명시 문서 링크와 역방향 코드 탐색, Hover, Inlay Hint만 설명한다. COD-29 계획과 결과, header prototype은 역사 자료로 보존한다. 현재 작업의 변경 요약은 codocs 패키지 patch changeset 하나로 기록한다.
@@ -30,12 +32,12 @@ MCP `codocs_write` 영향 안내, 저장 결과 계약, write-impact/change-impa
 
 작업은 macOS의 독립 Git worktree에서 실행한다. 로컬 작업 부모 디렉터리는 `/Users/seojaewan/Desktop/dev/codocs-worktrees/wb-cod41-mac-r2-6c64ce4-0f556e`이며 TASK-001..005와 INT-001은 각각 별도 worktree를 사용한다. primary checkout은 COD-40에 둔다. 원격 `origin/codex/COD-29--wb-prepare-20260929T141019Z-e3b056d0bd37-972334-INT-001`의 정확한 commit `d09fc4cedcd661cc6b88cb9168d2a8f8ba7ebc68`은 선택적 문서·이력 참고로만 사용한다.
 
-검증은 의존 순서에 따라 진행하며 아래 반복 횟수를 적용한다. 횟수는 테스트가 통과하기 전까지 매 반복 결과를 기록한다.
+검증은 의존 순서에 따라 진행한다. 최종 검증 기준은 2026-09-30에 사용자가 바꾸었다. 전체 Vitest는 10회가 아니라 1회 실행하고, 같은 파일을 반복하는 단일 파일·MCP 반복 세트는 하지 않는다. push 이후 Windows·macOS CI가 최종 확인이다. 각 검사는 1회 실행한 결과를 그대로 기록한다.
 
-1. 각 층의 정적 검사와 전체 테스트를 1회씩 실행한다: `pnpm typecheck`, `pnpm lint`, `pnpm exec prettier . --check`, `pnpm test`.
-2. workspace MCP 검증은 `authoring`과 `write-race`를 함께 골라 10회 실행한다. 이는 MCP 저장 경로를 변경하지 않았고 기존 동작이 유지되는지 확인하기 위한 회귀 검사다.
-3. IDE UI를 실행하기 전에 B1-B3 역참조 UI 사례의 기존 진단·실행 로그를 먼저 확인하고 원인을 기록한다. 진단을 마친 뒤 code-navigation/server-session 관련 회귀 테스트를 20회 실행한다. 실제 UI 시나리오 19개는 이후 Windows·macOS 고정 VS Code 버전 CI에서 실행한다.
-4. 최종 상태에서 전체 Vitest를 10회 실행하고 `pnpm test`, `pnpm build`, `pnpm run release:pack`, `pnpm run release:verify`를 실행한다. 실제 명령과 결과를 구현 결과에 기록한다.
+1. 정적 검사를 1회 실행한다: `pnpm typecheck`, `pnpm lint`, `pnpm exec prettier . --check`.
+2. `pnpm test`를 1회 실행한다. 전체 Vitest를 1회, 이어서 node 테스트를 실행한다.
+3. IDE UI를 실행하기 전에 B1-B3 역참조 UI 사례의 기존 진단·실행 로그를 먼저 확인하고 원인을 기록한다. 실제 UI 시나리오 19개는 이후 Windows·macOS 고정 VS Code 버전 CI에서 실행한다.
+4. 최종 상태에서 `pnpm build`, `pnpm run release:pack`, `pnpm run release:verify`를 1회씩 실행한다. 실제 명령과 결과를 구현 결과에 기록한다.
 5. Windows·macOS CI의 `required-ci`와 19개 실제 UI 시나리오가 통과해야 최종 완료로 본다. macOS 로컬 결과만으로 두 운영체제의 CI 완료를 주장하지 않는다.
 
 기본 formatter 설정을 유지하고 base에서 확인된 단일 Prettier 경고를 수정한다. 커밋 훅은 정상 실행하며 우회하지 않는다. 현재 단계에서 실행되지 않은 검증은 미완료로 남긴다.

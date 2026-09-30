@@ -8,14 +8,15 @@
 - 원인 파악 후 테스트 한 곳(`code-navigation.test.ts`의 B2 사례)만 고쳤다. 제품 코드는 수정하지 않았다.
 - 2라운드(수정 후): 전체 Vitest 10회 모두 통과, 단일 파일 20회 모두 통과, typecheck·lint·prettier·`pnpm test` 통과.
 - 그러나 수락 조건과 별개로 돌린 진단용 50회 반복에서 수정 전후 모두 다른 테스트가 간헐 실패했다(아래 "진단 반복"). 이 때문에 이 결과는 로컬 PR head로 전달하지 않고 보류했다.
+- 3라운드: 제품 코드를 고쳤다. 클릭 확인이 세대 변화만으로 거부하던 설계를 기존 "원문 열기" 링크와 같은 방식으로 바꾸고 테스트의 "토큰이 확인될 때까지 기다리는" 우회를 없앴다. 사용자 결정에 따라 각 검사는 1회만 실행했고 모두 통과했다(아래 "3라운드").
 - 미완료: Windows, 실제 VS Code UI 시나리오 19개, `required-ci` (아래 "미완료").
 
 ## 검증 대상과 환경
 
 - 1라운드 검증 commit: `452b021f45c9d3de5c54c239e1df1d85c5ea285d` (기준 `6c64ce4ef27350c50c1bb72b10e9d9e13c86ba0a` 위에 선형 통합: `c49fe2e`, `a7e9615`, `0c6477c`, `df6334f`, `452b021`)
 - 그 위 commit: `778a21d`(1라운드 기록), 테스트 수정 commit(아래 "수정"), 이 문서를 갱신한 commit. 2라운드는 테스트 수정 commit에서 실행했다.
-- 제품 코드 변경 없음. 수정한 파일은 테스트 1개뿐이다.
-- run `wb-cod41-mac-r2-6c64ce4-0f556e`, task `INT-001`, intent revision 4(revision 3에서 이어짐)
+- 1·2라운드에는 제품 코드 변경이 없었다. 수정한 파일은 테스트 1개뿐이다. 3라운드에서 제품 코드를 바꿨다(아래).
+- run `wb-cod41-mac-r2-6c64ce4-0f556e`, task `INT-001`, intent revision 4(revision 3에서 이어짐). 3라운드는 intent revision 5
 - macOS 26.5.1 (Darwin 25.5.0), arm64, Node v24.21.0, pnpm 10.34.5, Vitest v5.0.0
 - 실행일 2026-09-30 (1라운드 UTC 04:45–04:48, 이후 작업 UTC 04:5x–05:1x)
 - 이전에 남아 있던 `install.log`, `typecheck.log`는 중단된 탐색 실행의 잔여물이라 사용하지 않았다.
@@ -107,6 +108,51 @@
 - 수정한 B2 테스트는 수정 후 50회에서 실패하지 않았다. 다만 수정 전 50회에서도 실패하지 않았으므로 이 관찰만으로 수정의 효과를 입증하지는 못한다.
 - 이 두 테스트도 이번 작업에서 고치지 않았다. 수정 범위는 지정된 B2 테스트 하나로 제한했다.
 
+## 3라운드: 클릭 확인을 "원문 열기"와 같게 바꿈
+
+### 이유
+
+- 링크의 불투명 토큰은 클릭 시 서버가 다시 확인한다. 기존에는 COD-41 링크의 재확인이 토큰 발급 때의 코드·문서 세대와 현재 값이 다르면 거부했고, language server는 세대가 바뀔 때마다 COD-41 토큰을 모두 삭제했다. 세대는 내용이 같은 파일의 감시 이벤트나 저장소 git index 변경에도 오른다. 그래서 방금까지 유효하던 링크가 사용자에게 보이는 이유 없이 거부되었다.
+- 100회 전체 스위트 진단(사용자가 전달한 수치)에서 통합 브랜치는 총 12회 실패했고 main 코드는 1회 실패했다. `code-navigation.test.ts`가 6회 실패했으며 268행에서 같은 토큰이 직전에 확인되었는데도 다음 확인이 `null`을 반환했다. 1·2라운드의 B2·B3 실패도 같은 원인이다.
+- 2026-09-30 사용자 결정: COD-41 링크의 클릭 확인을 기존 코드 식별자 Hover "원문 열기" 링크와 같은 방식으로 만든다. 기존 링크의 동작은 바꾸지 않는다.
+
+### 변경
+
+- `packages/workspace/src/code-reference/index.ts` `confirm()`: 세대·`#epoch` 차이만으로 거부하지 않는다. 진행 중이거나 예약된 수집은 기다린 뒤 최신 관측에서 확인하고, 확인 중 관측이 교체되면 최대 3회·2초 안에서 다시 확인한 뒤 실패하면 `undefined`를 반환한다. source 소유 경로·버전, source 파일 정체·revision(또는 열린 buffer의 revision·문서 버전), 같은 위치·같은 표기의 marker, 해석된 대상 경로, 대상 파일 정체·revision, 닫힘, 토큰의 등록 여부 검사는 그대로다. `capture()`는 바꾸지 않았다.
+- `packages/language-server/src/code-navigation/index.ts`와 `server-session/index.ts`: 코드 세대가 바뀌면 토큰을 삭제하던 `invalidate`와 호출을 제거했다. 토큰은 source 편집·닫기·서버 종료에서만 해제한다.
+- VS Code client(`packages/vscode`, 변경 없음)를 읽어 확인했다: snapshot 알림은 provider 재등록만 하고 `confirmSource`는 알림 세대가 아니라 client 재시작(`#sessionGeneration`)·출처 문서 닫힘·버전 변경만 본다. 세대 알림 때문에 클릭을 거부하는 코드는 없다.
+- 테스트: workspace 4건 추가(관련 없는 파일이 바뀌고 재수집되어도 확인, 수집 중 클릭은 기다린 뒤 확인, 표기 위치 이동 거부, 대상 문서 실변경 거부). 기존 거부 사례는 모두 실제 변경(source 표기 삭제, 대상 변경, 버전, 닫기, catalog 문서 제거, 재시작, 파일 대체, 다른 owner)이라 그대로 두었다. language server 테스트의 "새 토큰이 확인될 때까지 기다리는" 우회 4곳을 없애고 링크·Hover 완료만 기다린 뒤 한 번 확인해 정확한 값을 단정한다. 편집·닫기 뒤 거부와 이전 서버 세션 토큰 거부 단정은 유지했다.
+- `.codocs`: `code-reference-index.yaml`의 "관측과 안전한 확인"의 클릭 선택 문단과 `language-server.yaml` 마지막 줄을 새 동작에 맞췄다.
+
+### 검사 (각 1회, 사용자 결정)
+
+이 라운드의 모든 검사는 한 번만 실행했다. 반복은 하지 않았다. 검사 대상은 commit `19c7742aae88be6343e7515ae5ce3720ea569e52`의 내용과 같은 작업 트리다.
+
+| 명령                           | 종료 코드 | 소요 | 결과                                                                               |
+| ------------------------------ | --------- | ---- | ---------------------------------------------------------------------------------- |
+| `pnpm typecheck`               | 0         | 10초 | 통과                                                                               |
+| `pnpm lint`                    | 0         | 9초  | 통과                                                                               |
+| `pnpm exec prettier . --check` | 0         | 18초 | 통과                                                                               |
+| `pnpm test`                    | 0         | 10초 | Vitest 60 files / 1125 tests 통과(1 file, 11 tests skipped), `node --test` 39 통과 |
+| `pnpm build`                   | 0         | 5초  | 통과                                                                               |
+| `pnpm run release:pack`        | 0         | 5초  | 통과                                                                               |
+| `pnpm run release:verify`      | 0         | 2초  | `result.json`의 `passed: true`                                                     |
+
+- 커밋 훅(lint-staged, typecheck, `pnpm test`)도 통과했다: Vitest 60 files / 1125 tests 통과, `node --test` 39 통과.
+- 이 결과가 없앤 것은 반복 실패의 원인이지 반복 실패가 없다는 통계적 증거가 아니다. 3라운드에서는 반복 진단을 하지 않았다.
+- 로그는 워크트리 밖 `evidence/INT-001/r5-*.log`에 있다.
+
+## 제외한 알려진 간헐 테스트
+
+사용자가 이 작업에서 제외했다. main 코드에서도 가끔 실패하거나 main과 같은 테스트라 조사·수정하지 않았다.
+
+- `packages/workspace/src/query/query.test.ts` > "…표시 후 발생하면 오래된 파일을 열 후보를 반환하지 않는다"
+- `packages/workspace/src/query/query-initialization.test.ts` > "첫 폴더 readdir 반환 뒤 …하면 최종 목록을 반영한다"
+- `packages/mcp/src/server/write-race.test.ts` (모든 사례)
+- `packages/mcp/src/server/authoring.test.ts` > "최신 get revision으로 선택 속성을 unset하면…"
+
+3라운드 검사에서 이 테스트들은 실패하지 않았다.
+
 ## 이전 태스크 단위 증거 (이번 실행이 아님)
 
 - TASK-002 (`a7e9615d7204866e021485ab4bec42b9a2dde915`): `evidence/TASK-002/terminal-result.json` — verification PASS, 커밋 훅 Vitest 58 files / 1096 tests 통과, `node --test` 29 통과, workspace MCP 10회 반복 기록, 보호 경로 diff 없음.
@@ -117,13 +163,13 @@
 
 - 1라운드 7회차 실패와 그 원인은 위와 같다. 테스트 대기 보강으로 처리했다.
 - 전체 Vitest를 반복하면 B3 사례(`code-navigation.test.ts`)와 workspace `query` 테스트 2건이 수정 전후 모두 간헐적으로 실패한다(각 50회 중 2회 안팎). 이번 작업에서 고치지 않았고 원인도 판별하지 않았다.
-- 어떤 세대 증가 뒤에도 탐색 토큰이 거부된다. 내용이 바뀌지 않은 파일의 감시 이벤트도 여기에 포함된다. 이는 기존 제품 동작이며 이번 작업에서 바꾸지 않았고, 열린 제품 질문으로 사용자에게 보고된다.
+- 어떤 세대 증가 뒤에도 탐색 토큰이 거부되던 동작은 열린 제품 질문이었고, 2026-09-30 사용자가 결정했다. COD-41 링크의 클릭 확인을 기존 "원문 열기" 링크와 같은 방식으로 바꾼다(아래 3라운드).
+- `query.test.ts`·`query-initialization.test.ts`의 간헐 실패 2건과 MCP `write-race`·`authoring`의 간헐 실패는 사용자가 이 작업에서 제외했다(아래 "제외한 알려진 간헐 테스트").
 
 ## 미완료
 
 - **Windows**: 실행하지 않았다. macOS 로컬 결과는 Windows 증거가 아니다.
 - **실제 VS Code UI 시나리오 19개**: 실행하지 않았다. `pnpm test:vscode`는 프로젝트 규칙상 CI 전용이다.
 - **`required-ci`** (Windows·macOS): 실행하지 않았다. push 이전이라 아직 존재하지 않는다.
-- 계획 2·3단계의 workspace MCP `authoring`·`write-race` 10회와 server-session 전체 20회 반복은 이번 통합 실행 범위가 아니었다. code-navigation 단독 20회만 이번에 실행했고, 나머지는 이전 태스크 증거만 있다.
-- 위 간헐 실패 3건(B3, `query-initialization`, `query`)의 원인 판별과 처리.
-- 이 결과는 로컬 PR head 브랜치로 전달하지 않았다(진단 반복 실패 때문).
+- 반복 실행(전체 Vitest 10회, 단일 파일 반복, MCP 10회)은 2026-09-30 사용자 결정으로 최종 검증 기준에서 뺐다. 미완료가 아니라 기준 변경이다. push 이후 양 OS CI가 최종 확인이다.
+- 1·2라운드의 위 진단 반복에서 나온 간헐 실패 중 `query`·`query-initialization` 2건은 제외 목록으로 이관했다.
