@@ -71,15 +71,27 @@ describe('명시 링크와 출처 확인', () => {
       const text = '@codocs [[대상]]' + suffix;
       const uri = await open('invalid', text);
       expect(await session.documentLinks(uri)).toEqual([]);
-      expect(
-        await session.hoverDocument({
-          textDocument: { uri },
-          position: { line: 0, character: 11 },
-        }),
-      ).not.toBeNull();
-      const result = await session.diagnostics();
-      const diagnostic = result!.documents.find((item) => item.uri === uri)!
-        .diagnostics[0]!;
+      // 최초 수집이 끝나야 표기 진단과 오류 호버가 나타난다.
+      await vi.waitFor(
+        async () =>
+          expect(
+            await session.hoverDocument({
+              textDocument: { uri },
+              position: { line: 0, character: 11 },
+            }),
+          ).not.toBeNull(),
+        { timeout: 5000 },
+      );
+      const diagnostic = await vi.waitFor(
+        async () => {
+          const result = await session.diagnostics();
+          const found = result!.documents.find((item) => item.uri === uri)!
+            .diagnostics[0]!;
+          expect(found).toBeDefined();
+          return found;
+        },
+        { timeout: 5000 },
+      );
       expect(diagnostic.range).toEqual({
         start: { line: 0, character: 0 },
         end: { line: 0, character: text.length },
@@ -176,19 +188,27 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
         expect(result.some((link) => link.range.start.character === 2)).toBe(
           true,
         );
+        // 공백뿐인 들여쓰기 구간에는 코드 링크를 만들지 않는다.
         expect(result.some((link) => link.range.start.character === 0)).toBe(
-          true,
+          false,
         );
         return result;
       },
       { timeout: 5000 },
     );
-    expect(links).toHaveLength(2);
-    const h = await session.hoverDocument({
-      textDocument: { uri },
-      position: { line: 5, character: 4 },
-    });
-    expect((h!.contents as { value: string }).value).toContain('source:1:1');
+    expect(links).toHaveLength(1);
+    await vi.waitFor(
+      async () => {
+        const h = await session.hoverDocument({
+          textDocument: { uri },
+          position: { line: 5, character: 4 },
+        });
+        expect((h!.contents as { value: string }).value).toContain(
+          'source:1:1',
+        );
+      },
+      { timeout: 5000 },
+    );
   });
   it('문서 전체 출현은 2→1→0으로 갱신하고 행 출현은 Hint에 포함하지 않는다', async () => {
     const source = '@codocs [[대상]] @codocs [[대상]] @codocs [[대상]]#L5';
