@@ -4,7 +4,14 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const { withIoFailures } = await import('../test-support/file-system.js');
   return withIoFailures(actual);
 });
-import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  rename,
+  rm,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
@@ -14,8 +21,19 @@ import {
   scanStatuses,
   codeReferenceStatuses,
 } from '@codocs/core';
+vi.mock('../paths/code-file-access.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../paths/code-file-access.js')>();
+  const { countCodeAccess } = await import('../test-support/code-watch.js');
+  return countCodeAccess(actual);
+});
 import { ioFailures } from '../test-support/file-system.js';
-import { createFakeCodeWatch } from '../test-support/code-watch.js';
+import {
+  codeAccessCounts,
+  createFakeCodeWatch,
+  resetCodeAccessCounts,
+} from '../test-support/code-watch.js';
+import { discoverCodeFiles } from '../paths/code-file-access.js';
 import { CodeReferenceWatcher } from '../watcher/code-reference-watcher.js';
 import {
   WorkspaceCodeReferenceIndex,
@@ -37,6 +55,7 @@ const targetPath = '.codocs/target.yaml';
 const targetText =
   'id: target\nname: 대상\ndomains: [업무]\ndefinition: 본문\n';
 beforeEach(async () => {
+  resetCodeAccessCounts();
   await mkdir('.workbench/fixtures', { recursive: true });
   project = await mkdtemp(path.resolve('.workbench/fixtures/code-index-'));
   vi.stubEnv('GIT_CEILING_DIRECTORIES', path.dirname(project));
@@ -1182,5 +1201,277 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
       codeCollectionStatuses.collecting,
       codeCollectionStatuses.complete,
     ]);
+  });
+});
+
+describe('WorkspaceCodeReferenceIndex: 변경 경로만 증분 수집', () => {
+  /** 가짜 감시로 최초 수집을 마치고 전체 계산 횟수를 0으로 되돌린 색인이다. */
+  async function incrementalIndex(
+    files: Record<string, string> = { source: marker },
+  ): Promise<{
+    index: WorkspaceCodeReferenceIndex;
+    fake: ReturnType<typeof createFakeCodeWatch>;
+    observed: string[];
+    seen: WorkspaceCodeReferenceSnapshot[];
+    signal: (...relatives: string[]) => Promise<void>;
+  }> {
+    for (const [name, text] of Object.entries(files)) {
+      await mkdir(path.dirname(path.join(project, name)), { recursive: true });
+      await writeFile(path.join(project, name), text);
+    }
+    const fake = createFakeCodeWatch();
+    const observed: string[] = [];
+    const index = createIndex({
+      createWatcher: fake.createWatcher,
+      schedule: fake.schedule,
+      observe: (kind) => observed.push(kind),
+    });
+    await index.ready();
+    const seen: WorkspaceCodeReferenceSnapshot[] = [];
+    index.onDidChange((snapshot) => seen.push(snapshot));
+    resetCodeAccessCounts();
+    observed.length = 0;
+    return {
+      index,
+      fake,
+      observed,
+      seen,
+      /** 감시 신호를 보내고 그 신호를 처리한 pass가 끝나기를 기다린다. */
+      signal: async (...relatives) => {
+        const before = observed.length;
+        fake.connections
+          .at(-1)!
+          .changed(relatives.map((item) => path.join(project, item)));
+        await vi.waitFor(() => expect(observed.length).toBeGreaterThan(before));
+      },
+    };
+  }
+  /** 같은 디스크 상태의 새 전체 탐색이 확인한 파일과 실패가 색인과 같은지 확인한다. */
+  async function expectSameAsFullDiscovery(
+    index: WorkspaceCodeReferenceIndex,
+  ): Promise<void> {
+    const discoveries = codeAccessCounts.discovery;
+    const fresh = await discoverCodeFiles(project);
+    codeAccessCounts.discovery = discoveries;
+    const snapshot = await index.snapshot();
+    expect([
+      ...new Set(snapshot.occurrences.map((item) => item.sourcePath)),
+    ]).toEqual(
+      fresh.files
+        .filter((file) => file.text.includes('@codocs'))
+        .map((file) => file.path),
+    );
+    expect(snapshot.failures).toEqual(fresh.failures);
+  }
+  /** @codocs [[작업 공간:코드 참조 색인]]#L35-L37 */
+  it('파일 내용 변경과 같은 내용 저장과 mtime만 바뀐 변경은 정책 계산도 전체 탐색도 하지 않는다', async () => {
+    const { index, signal, seen } = await incrementalIndex();
+    await writeFile(path.join(project, 'source'), marker + '\n' + marker);
+    await signal('source');
+    expect(seen).toHaveLength(1);
+    expect((await index.snapshot()).occurrences).toHaveLength(2);
+    await writeFile(path.join(project, 'source'), marker + '\n' + marker);
+    await signal('source');
+    await utimes(
+      path.join(project, 'source'),
+      new Date(),
+      new Date(2000, 1, 1),
+    );
+    await signal('source');
+    expect(seen).toHaveLength(1);
+    expect(codeAccessCounts).toEqual({ policy: 0, discovery: 0 });
+  });
+  it('파일을 새로 만들고 지우면 그 경로만 반영하며 전체 계산을 하지 않는다', async () => {
+    const { index, signal } = await incrementalIndex();
+    await writeFile(path.join(project, 'added'), marker);
+    await signal('added');
+    expect((await index.snapshot()).occurrences).toHaveLength(2);
+    await rm(path.join(project, 'source'));
+    await signal('source');
+    expect(
+      (await index.snapshot()).occurrences.map((item) => item.sourcePath),
+    ).toEqual(['added']);
+    expect(codeAccessCounts).toEqual({ policy: 0, discovery: 0 });
+  });
+  it('.gitignore 편집과 폴더 생성·삭제와 git add·rm --cached 뒤 결과는 전체 탐색과 같다', async () => {
+    await executeGit('git', ['init', project]);
+    const { index, signal } = await incrementalIndex({
+      source: marker,
+      'ignored/a': marker,
+    });
+    await writeFile(path.join(project, '.gitignore'), 'ignored/\n');
+    await signal('.gitignore');
+    expect((await index.snapshot()).occurrences).toHaveLength(1);
+    await expectSameAsFullDiscovery(index);
+    await mkdir(path.join(project, 'made', 'deep'), { recursive: true });
+    await writeFile(path.join(project, 'made', 'deep', 'b'), marker);
+    await signal('made');
+    expect((await index.snapshot()).occurrences).toHaveLength(2);
+    await expectSameAsFullDiscovery(index);
+    await rm(path.join(project, 'made'), { recursive: true });
+    await signal('made');
+    await expectSameAsFullDiscovery(index);
+    await executeGit('git', ['-C', project, 'add', '-f', 'ignored/a']);
+    await signal('.git/index');
+    expect((await index.snapshot()).occurrences).toHaveLength(2);
+    await expectSameAsFullDiscovery(index);
+    await executeGit('git', [
+      '-C',
+      project,
+      'rm',
+      '--cached',
+      '-q',
+      'ignored/a',
+    ]);
+    await signal('.git/index');
+    expect((await index.snapshot()).occurrences).toHaveLength(1);
+    await expectSameAsFullDiscovery(index);
+    expect(codeAccessCounts.discovery).toBe(0);
+  });
+  it('git status가 index를 다시 써도 이미 적격인 파일의 git add도 아무것도 게시하지 않는다', async () => {
+    await executeGit('git', ['init', project]);
+    const { signal, seen } = await incrementalIndex({ source: marker });
+    await executeGit('git', ['-C', project, 'add', 'source']);
+    await utimes(
+      path.join(project, 'source'),
+      new Date(),
+      new Date(2000, 1, 1),
+    );
+    await executeGit('git', ['-C', project, 'status']);
+    await signal('.git/index');
+    await executeGit('git', ['-C', project, 'status']);
+    await signal('.git/index', '.git/HEAD');
+    expect(seen).toEqual([]);
+    expect(codeAccessCounts.discovery).toBe(0);
+  });
+  it('한 pass 동안 도착한 변경은 누적한 경로만 다음 pass로 처리하고 전체 탐색을 하지 않는다', async () => {
+    const gate: { hold?: Promise<void>; entered?: (() => void) | undefined } =
+      {};
+    const fake = createFakeCodeWatch();
+    const index = createIndex({
+      createWatcher: fake.createWatcher,
+      schedule: fake.schedule,
+      beforeRead: async () => {
+        gate.entered?.();
+        await gate.hold;
+      },
+    });
+    await writeFile(path.join(project, 'source'), marker);
+    await mkdir(path.join(project, 'dir'));
+    await index.ready();
+    resetCodeAccessCounts();
+    let release!: () => void;
+    gate.hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const entered = new Promise<void>((resolve) => {
+      gate.entered = resolve;
+    });
+    const settled = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 3,
+    );
+    await writeFile(path.join(project, 'first'), marker);
+    fake.connections[0]!.changed([path.join(project, 'first')]);
+    await entered;
+    gate.entered = undefined;
+    await writeFile(path.join(project, 'dir', 'second'), marker);
+    fake.connections[0]!.changed([
+      path.join(project, 'dir', 'second'),
+      path.join(project, 'first'),
+    ]);
+    release();
+    await settled;
+    expect(codeAccessCounts).toEqual({ policy: 0, discovery: 0 });
+  });
+});
+
+describe('WorkspaceCodeReferenceIndex: 겹치는 감시 재구성', () => {
+  /** 제외 규칙이 있는 폴더로 최초 수집을 마친 가짜 감시 색인이다. */
+  async function rebuildIndex(): Promise<{
+    index: WorkspaceCodeReferenceIndex;
+    fake: ReturnType<typeof createFakeCodeWatch>;
+  }> {
+    await writeFile(path.join(project, '.gitignore'), 'included/\n');
+    await mkdir(path.join(project, 'included'));
+    await writeFile(path.join(project, 'included', 'source'), marker);
+    const fake = createFakeCodeWatch();
+    const index = createIndex({
+      createWatcher: fake.createWatcher,
+      schedule: fake.schedule,
+    });
+    await index.ready();
+    resetCodeAccessCounts();
+    fake.events.length = 0;
+    return { index, fake };
+  }
+  it('규칙이 바뀌면 새 감시 시작과 ready 뒤에 이전 감시를 닫고 그 사이의 변경도 관측하며 전체 탐색을 하지 않는다', async () => {
+    const { index, fake } = await rebuildIndex();
+    fake.behavior.holdStart = true;
+    await writeFile(path.join(project, '.gitignore'), '');
+    fake.connections[0]!.changed([path.join(project, '.gitignore')]);
+    await vi.waitFor(() => expect(fake.events).toEqual(['start:1']));
+    // 겹치는 동안 두 감시가 같은 경로를 보내도 한 경로로 합쳐진다.
+    await writeFile(path.join(project, 'included', 'during'), marker);
+    const during = path.join(project, 'included', 'during');
+    fake.connections[0]!.changed([during]);
+    fake.connections[1]!.changed([during]);
+    expect(fake.events).toEqual(['start:1']);
+    const settled = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 2,
+    );
+    fake.release(1);
+    expect(
+      (await settled).occurrences.map((item) => item.sourcePath).sort(),
+    ).toEqual(['included/during', 'included/source']);
+    expect(fake.events).toEqual(['start:1', 'ready:1', 'close:0']);
+    expect(fake.connections.map((item) => item.closed)).toEqual([true, false]);
+    expect(codeAccessCounts).toEqual({ policy: 0, discovery: 0 });
+  });
+  it('새 감시가 ready가 된 뒤 새로 포함한 폴더에서 생긴 변경은 새 감시가 전달해 관측한다', async () => {
+    const { index, fake } = await rebuildIndex();
+    await writeFile(path.join(project, '.gitignore'), '');
+    fake.connections[0]!.changed([path.join(project, '.gitignore')]);
+    await vi.waitFor(() => expect(fake.connections).toHaveLength(2));
+    await vi.waitFor(() => expect(fake.connections[0]!.closed).toBe(true));
+    const edited = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 2,
+    );
+    await writeFile(
+      path.join(project, 'included', 'source'),
+      marker + '\n' + marker,
+    );
+    fake.connections[1]!.changed([path.join(project, 'included', 'source')]);
+    await edited;
+    expect(codeAccessCounts.discovery).toBe(0);
+  });
+  it('새 감시 등록이 실패하면 이전 감시를 닫고 감시 오류 복구의 전체 재확인으로 complete를 회복한다', async () => {
+    const { index, fake } = await rebuildIndex();
+    fake.behavior.failRegistrations = 1;
+    const incomplete = published(
+      index,
+      (snapshot) =>
+        snapshot.status === codeCollectionStatuses.incomplete &&
+        snapshot.failures.some((item) => item.reason === codeFileReasons.watch),
+    );
+    const recovered = published(
+      index,
+      (snapshot) => snapshot.status === codeCollectionStatuses.complete,
+    );
+    await writeFile(path.join(project, '.gitignore'), '');
+    fake.connections[0]!.changed([path.join(project, '.gitignore')]);
+    await incomplete;
+    await recovered;
+    expect(fake.events.slice(0, 4)).toEqual([
+      'start:1',
+      'ready:1',
+      'close:1',
+      'close:0',
+    ]);
+    expect(fake.connections[0]!.closed).toBe(true);
+    expect(fake.connections.at(-1)!.closed).toBe(false);
+    expect(codeAccessCounts.discovery).toBeGreaterThan(0);
   });
 });
