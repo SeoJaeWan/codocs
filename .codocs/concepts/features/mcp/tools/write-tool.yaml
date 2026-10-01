@@ -14,7 +14,7 @@ definition: |
 
   ## update
 
-  현재 ID, [[codocs_get]]으로 읽은 revision, 최상위 속성의 set·unset을 받는다. 파일 위치는 그대로 둔다.
+  현재 ID, [[codocs_get]]으로 읽은 revision([[원문 버전]]), 최상위 속성의 set·unset을 받는다. 파일 위치는 그대로 둔다.
   객체·배열 값은 통째로 바꾸며 점이 있는 속성 이름을 중첩 경로로 해석하지 않는다.
   필수 속성의 unset, set과 unset의 같은 속성 지정, 빈 변경은 거부한다.
   set.id로 ID를 바꾸면 직전 ID를 deprecatedAliases에 자동으로 추가한다. deprecatedAliases는 update로 직접 바꿀 수 없다.

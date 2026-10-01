@@ -1,7 +1,7 @@
 id: diagnostics
 name: '진단'
 domains:
-  - 'Core'
+  - '제품 개념'
 definition: |
   문제의 원인과 확인된 위치를 사용자가 조치할 수 있는 정보로 전달하는 영역이다.
   오류 종류와 실제 문서·탐색·저장 상태를 구분한다.
@@ -29,16 +29,14 @@ definition: |
 
   ## 외부 진단 필드
 
-  | 속성 | 필수 여부 | 의미 |
-  | --- | --- | --- |
-  | code | 필수 | 프로그램이 구분할 오류·경고 코드 |
-  | severity | 필수 | error 또는 warning |
-  | message | 필수 | 사람이 이해할 설명 |
-  | path | 해당 시 | 문제가 발생한 파일 경로 |
-  | range | 위치 확인 시 | 원문 시작·끝 위치 |
-  | fieldPath | 해당 시 | [[필드 경로]]로 표현한 문제 위치 |
-  | relatedIds | 해당 시 | 관련 문서 ID |
-  | suggestion | 해결 방법이 있을 때 | 다음 행동 안내 |
+  - code (필수): 프로그램이 구분할 오류·경고 코드
+  - severity (필수): error 또는 warning
+  - message (필수): 사람이 이해할 설명
+  - path (해당 시): 문제가 발생한 파일 경로
+  - range (위치 확인 시): 원문 시작·끝 위치
+  - fieldPath (해당 시): [[필드 경로]]로 표현한 문제 위치
+  - relatedIds (해당 시): 관련 문서 ID
+  - suggestion (해결 방법이 있을 때): 다음 행동 안내
 
   range의 start/end는 각각 line·character를 가지며 character는 화면 너비가 아닌 UTF-16 코드 단위 수다.
   [[YAML 파싱]]의 전체 원문 offset을 외부 range로 변환할 때 앞의 좌표 기준을 적용한다.
@@ -65,29 +63,27 @@ definition: |
 
   오류 코드는 다음 목록을 사용한다. 구체 원인과 해결 방법은 message·suggestion 등 공통 진단 필드로 설명한다.
 
-  | code | 의미 |
-  | --- | --- |
-  | invalid_input | 잘못된 입력·알 수 없는 요청 속성 |
-  | invalid_path | 허용 범위 밖이거나 잘못된 경로 |
-  | not_found | 요청 문서·파일 없음 |
-  | file_access_failed | 파일 읽기·접근 실패. 배포 가이드 원문 접근 실패도 포함 |
-  | invalid_yaml | YAML 문법 오류 |
-  | unsupported_yaml_feature | 앵커·복수 문서 등 금지 구문 |
-  | missing_required_field | 필수 속성 누락 |
-  | invalid_field_type | 속성 자료형 오류 |
-  | invalid_field_value | 빈 값·허용되지 않은 값·ID 형식 오류 |
-  | duplicate_id | 동일 ID 문서 충돌 |
-  | invalid_reference | 참조 작성 문법 오류 |
-  | reference_not_found | 참조 대상 없음 |
-  | reference_ambiguous | 이름·선택 도메인으로 찾은 대상 문서가 여러 개 |
-  | revision_conflict | 조회 이후 파일 변경 |
-  | file_exists | 생성 대상 경로가 이미 존재 |
-  | file_write_failed | 파일 기록·반영 실패 |
-  | index_not_ready | 초기 색인 구성·갱신 진행 중 |
-  | index_build_failed | 전체 색인 구성 실패 |
-  | index_update_failed | 저장 후 색인 반영·복구 실패 |
-  | cursor_expired | 목록 변경 등으로 커서 만료 |
-  | internal_error | 다른 코드로 분류되지 않는 내부 실패 |
+  - invalid_input: 잘못된 입력·알 수 없는 요청 속성
+  - invalid_path: 허용 범위 밖이거나 잘못된 경로
+  - not_found: 요청 문서·파일 없음
+  - file_access_failed: 파일 읽기·접근 실패. 배포 가이드 원문 접근 실패도 포함
+  - invalid_yaml: YAML 문법 오류
+  - unsupported_yaml_feature: 앵커·복수 문서 등 금지 구문
+  - missing_required_field: 필수 속성 누락
+  - invalid_field_type: 속성 자료형 오류
+  - invalid_field_value: 빈 값·허용되지 않은 값·ID 형식 오류
+  - duplicate_id: 동일 ID 문서 충돌
+  - invalid_reference: 참조 작성 문법 오류
+  - reference_not_found: 참조 대상 없음
+  - reference_ambiguous: 이름·선택 도메인으로 찾은 대상 문서가 여러 개
+  - revision_conflict: 조회 이후 파일 변경
+  - file_exists: 생성 대상 경로가 이미 존재
+  - file_write_failed: 파일 기록·반영 실패
+  - index_not_ready: 초기 색인 구성·갱신 진행 중
+  - index_build_failed: 전체 색인 구성 실패
+  - index_update_failed: 저장 후 색인 반영·복구 실패
+  - cursor_expired: 목록 변경 등으로 커서 만료
+  - internal_error: 다른 코드로 분류되지 않는 내부 실패
 
   저장 계층의 revision_conflict·file_exists·file_write_failed·file_access_failed와 저장 후 index_update_failed 고정 코드·문구는 [공통 진단 정의](../../../packages/core/src/diagnostics/index.ts)에서 관리한다.
   file_write_failed는 임시 파일 기록·닫기·반영과 이미 저장된 뒤의 요청 임시 파일 정리 실패에도 사용한다. 저장 여부는 saved와 함께 판단하고 message·suggestion으로 실패 단계를 구분한다.
@@ -98,8 +94,3 @@ definition: |
   공통 요청 성공·실패 분기 타입은 [공통 진단 정의](../../../packages/core/src/diagnostics/index.ts)에 둔다.
   unsupported_yaml_feature의 대상 구문은 [[문서]]의 YAML 저장 형식에서 정의하며 공통 코드는 원인을 메시지와 위치로 구분한다.
   라이브러리의 오류·경고 분류를 그대로 노출하지 않고 제품 진단으로 변환한다.
-
-  ## 코드와 검증 위치
-
-  Diagnostic·좌표 타입과 진단 코드는 [공통 진단 정의](../../../packages/core/src/diagnostics/index.ts)에서 확인한다.
-  원문 위치와 오류·경고 전달은 [파싱 테스트](../../../packages/core/src/parser/parser.test.ts), [문서 검증 테스트](../../../packages/core/src/validator/validator.test.ts), [색인 테스트](../../../packages/core/src/catalog/catalog.test.ts), [조회 투영 테스트](../../../packages/core/src/query/query.test.ts)에서 확인한다.
