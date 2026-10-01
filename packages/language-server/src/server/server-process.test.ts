@@ -570,15 +570,21 @@ describe('language server stdio 프로세스', () => {
           removed: [workspaceFolders[1]],
         },
       });
-      const afterFolderChange = await firstClient.request(
-        5,
-        documentMatchRequestMethod,
-        { textDocument: { uri: missingUri }, version: 1 },
+      // 제거되는 작업 공간은 진행 중인 최초 수집이 끝난 뒤 닫히므로 추가 반영을 기다린다.
+      await vi.waitFor(
+        async () => {
+          const afterFolderChange = await firstClient.request(
+            5,
+            documentMatchRequestMethod,
+            { textDocument: { uri: missingUri }, version: 1 },
+          );
+          expect(afterFolderChange.result).toMatchObject({
+            success: true,
+            candidates: [],
+          });
+        },
+        { timeout: 5000 },
       );
-      expect(afterFolderChange.result).toMatchObject({
-        success: true,
-        candidates: [],
-      });
       await expect(access(path.join(missing, '.codocs'))).rejects.toThrow();
       await mkdir(path.join(missing, '.codocs'));
       await writeFile(

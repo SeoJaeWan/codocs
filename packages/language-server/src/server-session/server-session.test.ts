@@ -7,9 +7,11 @@ import {
   type CodeMatchEvidence,
 } from '@codocs/core';
 import {
+  codeCollectionStatuses,
   workspaceLifecycleStates,
   workspaceDiagnosticCodes,
   workspaceQueryDiagnosticCodes,
+  type WorkspaceCodeReferenceSnapshot as CodeSnapshot,
   type WorkspaceMatchResult,
   type WorkspacePathGetResponse,
 } from '@codocs/workspace';
@@ -554,5 +556,39 @@ describe('LanguageServerSession: 작업 공간별 현재 문서 매칭', () => {
         message: 'watcher failed',
       },
     });
+  });
+});
+
+describe('LanguageServerSession: 같은 코드 관측의 재알림 억제', () => {
+  it('동일한 workspace 코드 관측을 반복 게시하면 변경 알림을 한 번만 보낸다', async () => {
+    const root = await temporaryRoot();
+    let publish: ((snapshot: CodeSnapshot) => void) | undefined;
+    const session = new LanguageServerSession(() => ({
+      ...fakeBoundary(() => Promise.resolve(matchSuccess('unused'))),
+      onDidChangeCodeReferences: (
+        listener: (snapshot: CodeSnapshot) => void,
+      ) => {
+        publish = listener;
+        return () => undefined;
+      },
+    }));
+    await initialize(session, [root]);
+    const changed = vi.fn();
+    session.onDidChange(changed);
+    const snapshot: CodeSnapshot = {
+      status: codeCollectionStatuses.complete,
+      hasCompletedCollection: true,
+      codeGeneration: 3,
+      documentGeneration: 1,
+      occurrences: [],
+      confirmedCount: 0,
+      failures: [],
+    };
+    publish!(snapshot);
+    publish!({ ...snapshot });
+    publish!({ ...snapshot });
+    expect(changed).toHaveBeenCalledTimes(1);
+    publish!({ ...snapshot, codeGeneration: 4 });
+    expect(changed).toHaveBeenCalledTimes(2);
   });
 });
