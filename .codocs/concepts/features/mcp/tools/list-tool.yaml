@@ -2,9 +2,6 @@ id: list-tool
 name: 'codocs_list'
 domains:
   - '제품 개념'
-deprecatedAliases:
-  - id: list-pagination
-  - id: query-cursor
 definition: |
   프로젝트의 문서 목록을 조회하는 [[MCP 도구]]다.
   본문 없이 문서를 고를 수 있는 정보만 돌려주며, 필요한 문서의 내용은 [[codocs_get]]으로 읽는다.

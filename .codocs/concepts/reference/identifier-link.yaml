@@ -2,9 +2,6 @@ id: identifier-link
 name: '식별자 참조'
 domains:
   - '제품 개념'
-deprecatedAliases:
-  - id: match-identifier
-  - id: identifier-matching
 definition: |
   코드에 별도 표기를 쓰지 않아도 코드 식별자와 문서 ID가 일치하면 연결되는 [[참조]]다.
   편집기에서 식별자에 마우스를 올리면 연결된 문서의 설명을 호버로 보여준다. [[코드 참조]] 표기 안에서는 식별자 참조를 표시하지 않는다.

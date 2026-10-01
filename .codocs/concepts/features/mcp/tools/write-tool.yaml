@@ -2,14 +2,6 @@ id: write-tool
 name: 'codocs_write'
 domains:
   - '제품 개념'
-deprecatedAliases:
-  - id: plan-document-change
-  - id: document-change-plan
-  - id: storage
-  - id: write-coordination
-  - id: saved-index-recovery
-  - id: plan-workspace-change
-  - id: workspace-change-plan
 definition: |
   문서를 새로 만들거나 수정하는 [[MCP 도구]]다. 요청 하나는 문서 하나를 다룬다.
   저장 전에 변경 후의 문서 전체를 [[문서 검증]]과 프로젝트의 ID·이름 충돌, 참조 기준으로 검사하며 오류가 남으면 저장하지 않는다.
@@ -23,7 +15,7 @@ definition: |
 
   ## update
 
-  현재 ID, [[codocs_get]]으로 읽은 revision([[원문 버전]]), 최상위 속성의 set·unset을 받는다. 파일 위치는 그대로 둔다.
+  현재 ID, [[codocs_get]]으로 읽은 [[revision]], 최상위 속성의 set·unset을 받는다. 파일 위치는 그대로 둔다.
   객체·배열 값은 통째로 바꾸며 점이 있는 속성 이름을 중첩 경로로 해석하지 않는다.
   필수 속성의 unset, set과 unset의 같은 속성 지정, 빈 변경은 거부한다.
   set.id로 ID를 바꾸면 직전 ID를 deprecatedAliases에 자동으로 추가하고, 새 ID가 이전 ID 목록에 있으면 그 항목을 뺀다. 예를 들어 zone → return-zone → zone으로 바꾸면 현재 ID는 zone, 이전 ID에는 return-zone이 남는다.

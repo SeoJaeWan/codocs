@@ -2,12 +2,6 @@ id: reference
 name: '참조'
 domains:
   - '제품 개념'
-deprecatedAliases:
-  - id: extract-references
-  - id: reference-extraction
-  - id: reference-candidate
-  - id: resolve-reference
-  - id: reference-resolution
 definition: |
   참조는 지식 사이를 잇는 링크다. 문서와 문서, 코드와 문서를 연결해 관련 원문으로 이동하고 되돌아오게 한다.
   쓰는 위치와 연결 조건에 따라 세 가지가 있다.

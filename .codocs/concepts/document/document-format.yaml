@@ -2,11 +2,6 @@ id: document-format
 name: '문서 형식'
 domains:
   - '제품 개념'
-deprecatedAliases:
-  - id: parse-yaml
-  - id: yaml-parsing
-  - id: string-mapping
-  - id: yaml-mapping-style
 definition: |
   [[문서]]를 파일로 작성하는 형식과 저장 위치다.
 
