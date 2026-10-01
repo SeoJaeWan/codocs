@@ -5,7 +5,14 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const { withIoFailures } = await import('../test-support/file-system.js');
   return withIoFailures(actual);
 });
-import { mkdir, mkdtemp, rm, writeFile, symlink } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  rename,
+  rm,
+  writeFile,
+  symlink,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -15,10 +22,14 @@ import {
   codeRepositoryKinds,
 } from '../code-reference/domain-values.js';
 import {
+  applyCodeSignals,
+  codeFileFailures,
   computeCodeFilePolicy,
+  discoverCodeFileState,
   discoverCodeFiles,
   isCodeWatchIgnored,
   readEligibleCodeFile,
+  type CodeFileState,
 } from './code-file-access.js';
 const execute = promisify(execFile);
 let project: string;
@@ -325,4 +336,244 @@ describe('isCodeWatchIgnored: 수집과 같은 감시 대상 판단', () => {
     );
     expect([undecided, decided]).toEqual([false, true]);
   });
+});
+
+/** 비교에 필요한 정책·관측·실패만 순서까지 포함해 값으로 만든다. */
+function summarize(state: CodeFileState): unknown {
+  return {
+    kind: state.policy.repositoryKind,
+    tracked: [...state.policy.tracked].sort(),
+    trackedDirectories: [...state.policy.trackedDirectories].sort(),
+    layers: state.policy.layers.map((layer) => [layer.directory, layer.text]),
+    unknown: [...state.policy.unknownIgnoreDirectories].sort(),
+    files: [...state.files].map(([key, file]) => [key, file.revision]),
+    failures: codeFileFailures(state),
+  };
+}
+/** 증분 결과가 같은 디스크 상태의 새 전체 탐색과 같은지 확인한다. */
+async function expectSameAsFullDiscovery(
+  state: CodeFileState,
+  label: string,
+): Promise<void> {
+  expect(summarize(state), label).toEqual(
+    summarize(await discoverCodeFileState(project)),
+  );
+}
+const indexPath = (): string => path.join(project, '.git', 'index');
+const gitIn = (...args: string[]): Promise<unknown> =>
+  execute('git', ['-C', project, ...args]);
+
+describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같다', () => {
+  /** @codocs [[작업 공간:코드 참조 색인]]#L14-L18 */
+  it('.gitignore를 편집하면 그 폴더 이하의 적격성만 다시 확인해 전체 탐색과 같다', async () => {
+    await mkdir(path.join(project, 'child', 'deep'), { recursive: true });
+    await writeFile(path.join(project, 'child', 'a.txt'), 'a');
+    await writeFile(path.join(project, 'child', 'deep', 'b.txt'), 'b');
+    await writeFile(path.join(project, 'top.txt'), 't');
+    const state = await discoverCodeFileState(project);
+    await writeFile(
+      path.join(project, 'child', '.gitignore'),
+      'deep/\n*.txt\n',
+    );
+    const edited = await applyCodeSignals(state, [
+      path.join(project, 'child', '.gitignore'),
+    ]);
+    expect([...edited.files.keys()]).toEqual(['child/.gitignore', 'top.txt']);
+    await expectSameAsFullDiscovery(edited, '규칙 추가');
+    await writeFile(path.join(project, 'child', '.gitignore'), '');
+    const restored = await applyCodeSignals(edited, [
+      path.join(project, 'child', '.gitignore'),
+    ]);
+    expect(restored.files.has('child/deep/b.txt')).toBe(true);
+    await expectSameAsFullDiscovery(restored, '규칙 제거');
+    await rm(path.join(project, 'child', '.gitignore'));
+    await expectSameAsFullDiscovery(
+      await applyCodeSignals(restored, [
+        path.join(project, 'child', '.gitignore'),
+      ]),
+      '.gitignore 삭제',
+    );
+  });
+  it('폴더를 만들면 그 하위만 탐색하고 삭제하면 그 경로 아래 관측을 제거한다', async () => {
+    await writeFile(path.join(project, 'top.txt'), 't');
+    const state = await discoverCodeFileState(project);
+    await mkdir(path.join(project, 'made', 'inner'), { recursive: true });
+    await writeFile(path.join(project, 'made', '.gitignore'), 'skip\n');
+    await writeFile(path.join(project, 'made', 'skip'), 's');
+    await writeFile(path.join(project, 'made', 'inner', 'c.txt'), 'c');
+    const created = await applyCodeSignals(state, [path.join(project, 'made')]);
+    expect([...created.files.keys()]).toEqual([
+      'made/.gitignore',
+      'made/inner/c.txt',
+      'top.txt',
+    ]);
+    await expectSameAsFullDiscovery(created, '폴더 생성');
+    await rm(path.join(project, 'made'), { recursive: true });
+    const removed = await applyCodeSignals(created, [
+      path.join(project, 'made'),
+    ]);
+    expect([...removed.files.keys()]).toEqual(['top.txt']);
+    expect(removed.policy.layers).toEqual([]);
+    await expectSameAsFullDiscovery(removed, '폴더 삭제');
+  });
+  it('git add와 git rm --cached 뒤 index 신호는 추적 차이만 반영해 전체 탐색과 같다', async () => {
+    await execute('git', ['init', project]);
+    await mkdir(path.join(project, 'dist'));
+    await writeFile(path.join(project, '.gitignore'), 'dist/\n*.log\n');
+    await writeFile(path.join(project, 'dist', 'out.js'), 'o');
+    await writeFile(path.join(project, 'dist', 'junk.js'), 'j');
+    await writeFile(path.join(project, 'run.log'), 'l');
+    let state = await discoverCodeFileState(project);
+    expect([...state.files.keys()]).toEqual(['.gitignore']);
+    await gitIn('add', '-f', 'dist/out.js', 'run.log');
+    state = await applyCodeSignals(state, [indexPath()]);
+    expect([...state.files.keys()]).toEqual([
+      '.gitignore',
+      'dist/out.js',
+      'run.log',
+    ]);
+    await expectSameAsFullDiscovery(state, 'git add -f');
+    await gitIn('rm', '--cached', '-q', 'dist/out.js');
+    state = await applyCodeSignals(state, [indexPath()]);
+    expect([...state.files.keys()]).toEqual(['.gitignore', 'run.log']);
+    await expectSameAsFullDiscovery(state, 'git rm --cached');
+  });
+  it('추적 집합이 같은 index 신호는 같은 상태 객체를 돌려주고 이미 적격인 파일의 git add도 관측을 바꾸지 않는다', async () => {
+    await execute('git', ['init', project]);
+    await writeFile(path.join(project, 'plain'), 'p');
+    const state = await discoverCodeFileState(project);
+    expect(await applyCodeSignals(state, [indexPath()])).toBe(state);
+    await gitIn('add', 'plain');
+    const added = await applyCodeSignals(state, [indexPath()]);
+    expect(added.files.get('plain')).toBe(state.files.get('plain'));
+    expect(added.policy.tracked.has('plain')).toBe(true);
+    await expectSameAsFullDiscovery(added, '적격 파일의 git add');
+  });
+  it('ignore 규칙을 읽지 못한 범위에 파일이 생겨도 미추적 출현을 수집하지 않고 실패로 남긴다', async () => {
+    await mkdir(path.join(project, 'scope'));
+    await writeFile(path.join(project, 'scope', '.gitignore'), 'x\n');
+    ioFailures.set(path.join(project, 'scope', '.gitignore'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const state = await discoverCodeFileState(project);
+    await writeFile(path.join(project, 'scope', 'late'), 'late');
+    const next = await applyCodeSignals(state, [
+      path.join(project, 'scope', 'late'),
+    ]);
+    expect(next.files.has('scope/late')).toBe(false);
+    expect(codeFileFailures(next).map((failure) => failure.path)).toContain(
+      'scope/late',
+    );
+    await expectSameAsFullDiscovery(next, '미확인 ignore 범위');
+  });
+  it('파일 변경·삭제·같은 내용 저장은 그 경로만 갱신하고 같은 내용이면 관측 결과가 같다', async () => {
+    await writeFile(path.join(project, 'a'), 'one');
+    await writeFile(path.join(project, 'b'), 'two');
+    const state = await discoverCodeFileState(project);
+    await writeFile(path.join(project, 'a'), 'one');
+    const same = await applyCodeSignals(state, [path.join(project, 'a')]);
+    expect(same.files.get('a')?.revision).toBe(state.files.get('a')?.revision);
+    expect(same.files.get('b')).toBe(state.files.get('b'));
+    await writeFile(path.join(project, 'a'), 'changed');
+    await rm(path.join(project, 'b'));
+    const changed = await applyCodeSignals(same, [
+      path.join(project, 'a'),
+      path.join(project, 'b'),
+    ]);
+    expect([...changed.files.keys()]).toEqual(['a']);
+    await expectSameAsFullDiscovery(changed, '변경과 삭제');
+  });
+  it.each([20261001, 7, 1234567])(
+    '무작위 변경 순서를 반복해도 매 단계의 증분 결과가 전체 탐색과 같다 (seed %i)',
+    async (initialSeed) => {
+      await execute('git', ['init', project]);
+      /** 재현 가능한 의사 난수다. */
+      let seed = initialSeed;
+      const random = (limit: number): number => {
+        seed = (seed + 0x6d2b79f5) | 0;
+        let value = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        value ^= value + Math.imul(value ^ (value >>> 7), 61 | value);
+        return Math.floor(
+          (((value ^ (value >>> 14)) >>> 0) / 4294967296) * limit,
+        );
+      };
+      const pick = <T>(items: readonly T[]): T => items[random(items.length)]!;
+      const directories = ['', 'a', 'b', 'a/c', 'b/c'];
+      const names = ['f1', 'f2', 'x.log', 'keep.log', '.gitignore'];
+      const contents = ['', 'y', '@codocs [[x]]', '@codocs [[x]]\nz'];
+      const patterns = ['a/', '*.log', '!keep.log', 'b', 'f1', 'c/', ''];
+      const exists = new Set<string>();
+      let state = await discoverCodeFileState(project);
+      const trail: string[] = [];
+      let compared = 0;
+      for (let step = 0; step < 40; step++) {
+        const signals: string[] = [];
+        const operation = random(7);
+        const directory = pick(directories);
+        const file = path.posix.join(directory, pick(names));
+        const absolute = path.join(project, ...file.split('/'));
+        if (operation <= 1) {
+          await mkdir(path.dirname(absolute), { recursive: true });
+          const text =
+            path.posix.basename(file) === '.gitignore'
+              ? pick(patterns) + '\n' + pick(patterns) + '\n'
+              : pick(contents);
+          await writeFile(absolute, text);
+          exists.add(file);
+          trail.push(`write ${file}`);
+          signals.push(path.dirname(absolute), absolute);
+        } else if (operation === 2 && exists.size) {
+          const target = pick([...exists]);
+          await rm(path.join(project, ...target.split('/')), { force: true });
+          exists.delete(target);
+          trail.push(`rm ${target}`);
+          signals.push(path.join(project, ...target.split('/')));
+        } else if (operation === 3 && directory) {
+          await rm(path.join(project, ...directory.split('/')), {
+            recursive: true,
+            force: true,
+          });
+          for (const item of [...exists])
+            if (item.startsWith(directory + '/')) exists.delete(item);
+          trail.push(`rmdir ${directory}`);
+          signals.push(path.join(project, ...directory.split('/')));
+        } else if (operation === 4 && exists.size) {
+          const target = pick([...exists]);
+          await gitIn('add', '-f', '--', target).catch(() => undefined);
+          trail.push(`add ${target}`);
+          signals.push(indexPath());
+        } else if (operation === 5) {
+          const target = pick([...exists, 'none']);
+          await gitIn('rm', '--cached', '-q', '--', target).catch(
+            () => undefined,
+          );
+          trail.push(`rm-cached ${target}`);
+          signals.push(indexPath());
+        } else if (
+          directory.includes('/') ||
+          directory === 'a' ||
+          directory === 'b'
+        ) {
+          const to = path.join(project, 'moved-' + step);
+          const from = path.join(project, ...directory.split('/'));
+          try {
+            await rename(from, to);
+            for (const item of [...exists])
+              if (item.startsWith(directory + '/')) exists.delete(item);
+            trail.push(`move ${directory}`);
+            signals.push(from, to);
+          } catch {
+            // 존재하지 않는 폴더의 이동은 건너뛴다.
+          }
+        }
+        if (!signals.length) continue;
+        compared++;
+        state = await applyCodeSignals(state, signals);
+        await expectSameAsFullDiscovery(state, trail.join(' | '));
+      }
+      expect(compared).toBeGreaterThan(15);
+    },
+    120_000,
+  );
 });

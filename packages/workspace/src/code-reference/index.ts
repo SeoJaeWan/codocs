@@ -13,18 +13,23 @@ import {
   type CodeReferenceResolution,
 } from '@codocs/core';
 import {
+  applyCodeSignals,
+  codeFileFailures,
+  codeFileStatus,
   codeWatchRuleKey,
   computeCodeFilePolicy,
+  diffCodeWatchRules,
   discoverCodeFiles,
   hasTrackedDescendant,
   isCodeFileIgnored,
   isCodeWatchIgnored,
   readEligibleCodeFile,
+  recheckCodeDirectories,
   codeFileRelativePath,
   type CodeCollectionFailure,
-  type CodeFileDiscovery,
   type CodeFileObservation,
   type CodeFilePolicy,
+  type CodeFileState,
 } from '../paths/code-file-access.js';
 import {
   CodeReferenceWatcher,
@@ -131,8 +136,6 @@ function scheduleTimer(callback: () => void, delay: number): () => void {
   const timer = setTimeout(callback, delay);
   return /** 예약한 타이머를 해제한다. */ () => clearTimeout(timer);
 }
-/** 한 번의 수집 중 규칙 변화로 감시를 다시 구성하는 최대 횟수다. */
-const maximumWatchRebuilds = 3;
 /** 등록 실패를 값으로 전달해 falsy 오류도 구분한다. */
 interface WatchRegistrationFailure {
   error: unknown;
@@ -145,7 +148,7 @@ export class WorkspaceCodeReferenceIndex {
   #catalog: Catalog | undefined;
   #documentGeneration = 0;
   #codeGeneration = 0;
-  #discovery: CodeFileDiscovery | undefined;
+  #state: CodeFileState | undefined;
   #disk = new Map<string, CodeFileObservation>();
   #markers = new Map<string, readonly CodeReferenceMarker[]>();
   #buffers = new Map<string, BufferObservation>();
@@ -154,7 +157,11 @@ export class WorkspaceCodeReferenceIndex {
   #selections = new Map<string, Selection>();
   #listeners = new Set<(snapshot: WorkspaceCodeReferenceSnapshot) => void>();
   #watcher: CodeWatchConnection | undefined;
-  #registeredRules: string | undefined;
+  #registered: { policy: CodeFilePolicy; rules: string } | undefined;
+  #overlapping = false;
+  #rebuilding = false;
+  #overlapErrors: unknown[] = [];
+  #fullPending = false;
   #recovering: Promise<void> | undefined;
   #cancelRetry: (() => void) | undefined;
   #failedAttempts = 0;
@@ -222,13 +229,10 @@ export class WorkspaceCodeReferenceIndex {
       this.#closed ||
       this.#pendingBuffers.get(relative) !== pending ||
       this.#owners.get(relative) !== input.documentVersion ||
-      !this.#discovery
+      !this.#state
     )
       return false;
-    const observed = await readEligibleCodeFile(
-      this.#discovery.policy,
-      relative,
-    );
+    const observed = await readEligibleCodeFile(this.#state.policy, relative);
     if (
       this.#closed ||
       this.#pendingBuffers.get(relative) !== pending ||
@@ -272,12 +276,12 @@ export class WorkspaceCodeReferenceIndex {
   }
   /** 최초 수집이 끝날 때까지 기다린 뒤 snapshot을 돌려준다. 이후에는 재확인을 기다리지 않는다. */
   async ready(): Promise<WorkspaceCodeReferenceSnapshot> {
-    if (!this.#discovery && !this.#closed) await this.refresh();
+    if (!this.#state && !this.#closed) await this.refresh();
     return this.#snapshot();
   }
   /** 최초 수집을 기다리지 않고 시작하며 예외는 수집 상태로 게시된다. */
   #startInitial(): void {
-    if (this.#discovery || this.#closed || this.#operation) return;
+    if (this.#state || this.#closed || this.#operation) return;
     this.#collect().catch(
       /** 수집 예외는 작업 안에서 incomplete로 게시되므로 감시 손상만 알린다. */ (
         error: unknown,
@@ -326,7 +330,7 @@ export class WorkspaceCodeReferenceIndex {
     }
     return {
       status: this.#visibleStatus(),
-      hasCompletedCollection: this.#discovery !== undefined,
+      hasCompletedCollection: this.#state !== undefined,
       codeGeneration: this.#codeGeneration,
       documentGeneration: this.#documentGeneration,
       occurrences,
@@ -385,10 +389,10 @@ export class WorkspaceCodeReferenceIndex {
         item.occurrenceId === input.occurrenceId &&
         item.status === codeReferenceStatuses.resolved,
     );
-    if (!occurrence?.target || !this.#discovery) return undefined;
+    if (!occurrence?.target || !this.#state) return undefined;
     const target = await readEligibleCodeFile(
       {
-        ...this.#discovery.policy,
+        ...this.#state.policy,
         tracked: new Set([
           codeFileRelativePath(this.projectRoot, occurrence.target.path)!,
         ]),
@@ -440,7 +444,7 @@ export class WorkspaceCodeReferenceIndex {
     const selection = this.#selections.get(token);
     if (
       !selection ||
-      !this.#discovery ||
+      !this.#state ||
       !this.#catalog ||
       this.#closed ||
       codeFileRelativePath(this.projectRoot, owner.sourcePath) !==
@@ -449,7 +453,7 @@ export class WorkspaceCodeReferenceIndex {
       this.#owners.get(selection.ownerPath) !== selection.ownerVersion
     )
       return undefined;
-    const { policy } = this.#discovery;
+    const { policy } = this.#state;
     const source = await readEligibleCodeFile(
       policy,
       selection.occurrence.sourcePath,
@@ -523,7 +527,7 @@ export class WorkspaceCodeReferenceIndex {
       ]);
     return JSON.stringify([
       this.#visibleStatus(),
-      this.#discovery !== undefined,
+      this.#state !== undefined,
       this.#failures,
       this.#watchFailure,
       files,
@@ -549,7 +553,7 @@ export class WorkspaceCodeReferenceIndex {
   #beginCheck(): void {
     if (this.#closed || this.#checking) return;
     this.#checking = true;
-    if (!this.#discovery) return;
+    if (!this.#state) return;
     this.#collectingTimer = setTimeout(
       /** 지연을 넘긴 재확인만 collecting으로 알린다. */ () => {
         this.#collectingTimer = undefined;
@@ -580,7 +584,7 @@ export class WorkspaceCodeReferenceIndex {
       }
     }
   }
-  /** 변경 경로의 cached bytes만 버리고 Git·ignore 변경은 적격 집합을 재확인한다. */
+  /** 변경 경로를 누적하고 제외 경로의 신호는 버린다. 분류와 읽기는 처리 시점에 한다. */
   #changed(paths: readonly string[]): void {
     if (this.#closed) return;
     const affected = paths.filter(
@@ -588,13 +592,14 @@ export class WorkspaceCodeReferenceIndex {
         const relative = codeFileRelativePath(this.projectRoot, input);
         if (
           !relative ||
-          !this.#discovery ||
+          !this.#state ||
+          this.#rebuilding ||
           path.basename(input) === '.gitignore'
         )
           return true;
         return (
-          !isCodeFileIgnored(this.#discovery.policy, relative) ||
-          hasTrackedDescendant(this.#discovery.policy, relative)
+          !isCodeFileIgnored(this.#state.policy, relative) ||
+          hasTrackedDescendant(this.#state.policy, relative)
         );
       },
     );
@@ -639,10 +644,12 @@ export class WorkspaceCodeReferenceIndex {
   }
   /**
    * 정책을 먼저 계산해 수집할 수 있는 경로만 감시하고, 모든 연결의 ready·error 뒤에 반환한다.
-   * 등록 중 도착한 오류는 등록 실패로 반환하며 이전 연결은 새 연결이 대체한다.
+   * 등록 중 도착한 오류는 등록 실패로 반환한다. overlap이면 이전 연결을 유지한 채 새 연결을 시작해
+   * ready 뒤에 교체하며, 등록에 실패하면 이전 연결도 닫는다.
    */
   async #register(
     known?: CodeFilePolicy,
+    overlap = false,
   ): Promise<WatchRegistrationFailure | undefined> {
     let policy: CodeFilePolicy;
     try {
@@ -653,49 +660,77 @@ export class WorkspaceCodeReferenceIndex {
     if (this.#closed) return undefined;
     let registering = true;
     let failure: WatchRegistrationFailure | undefined;
+    const registered = { policy, rules: codeWatchRuleKey(policy) };
     const watcher: CodeWatchConnection = (
       this.options.createWatcher ?? createChokidarWatcher
     )(
       this.projectRoot,
-      /** 등록 중 신호도 버리지 않고 병합한다. */ (paths) =>
-        this.#changed(paths),
-      /** 현재 연결의 오류만 등록 실패 또는 연결 손상으로 다룬다. */ (
+      /** 겹치는 동안의 신호도 경로 단위로 하나의 대기 집합에 합친다. */ (
+        paths,
+      ) => this.#changed(paths),
+      /** 등록 중 오류는 등록 실패로, 이후에는 현재 연결의 오류만 연결 손상으로 다룬다. */ (
         error,
       ) => {
-        if (this.#closed || watcher !== this.#watcher) return;
+        if (this.#closed) return;
         if (registering) failure ??= { error };
-        else this.#watchBroken(error);
+        else if (watcher === this.#watcher) {
+          if (this.#overlapping) this.#overlapErrors.push(error);
+          else this.#watchBroken(error);
+        }
       },
       /** 수집과 같은 정책으로 감시 제외를 판단한다. */ (input, stats) =>
         isCodeWatchIgnored(policy, input, stats),
     );
-    const replaced = this.#watcher;
-    this.#watcher = watcher;
-    this.#registeredRules = codeWatchRuleKey(policy);
-    await replaced?.close();
+    const replaced = overlap ? this.#watcher : undefined;
+    if (overlap) {
+      this.#overlapping = true;
+      this.#overlapErrors = [];
+    } else {
+      this.#watcher = watcher;
+      this.#registered = registered;
+    }
     try {
       await watcher.start();
     } catch (error: unknown) {
       failure ??= { error };
     }
     registering = false;
-    if (failure && watcher === this.#watcher) {
-      this.#watcher = undefined;
-      this.#registeredRules = undefined;
-      await watcher.close();
+    if (!overlap) {
+      if (failure && watcher === this.#watcher) {
+        this.#watcher = undefined;
+        this.#registered = undefined;
+        await watcher.close();
+      }
+      return failure;
     }
-    return failure;
+    this.#overlapping = false;
+    if (this.#closed) {
+      await watcher.close();
+      return undefined;
+    }
+    if (failure) {
+      this.#watcher = undefined;
+      this.#registered = undefined;
+      await watcher.close();
+      await replaced?.close();
+      return failure;
+    }
+    this.#watcher = watcher;
+    this.#registered = registered;
+    await replaced?.close();
+    const [overlapError] = this.#overlapErrors;
+    if (this.#overlapErrors.length) this.#watchBroken(overlapError);
+    this.#overlapErrors = [];
+    return undefined;
   }
   /** 기존 연결을 종료하고 다시 등록한다. */
-  async #reregister(
-    known?: CodeFilePolicy,
-  ): Promise<WatchRegistrationFailure | undefined> {
+  async #reregister(): Promise<WatchRegistrationFailure | undefined> {
     const previous = this.#watcher;
     this.#watcher = undefined;
-    this.#registeredRules = undefined;
+    this.#registered = undefined;
     await previous?.close();
     if (this.#closed) return undefined;
-    return this.#register(known);
+    return this.#register();
   }
   /** 최초 등록을 공유하며 실패는 복구로 넘긴다. */
   async #start(): Promise<void> {
@@ -770,72 +805,66 @@ export class WorkspaceCodeReferenceIndex {
       return this.#recover().then(() => this.#snapshot());
     return this.#collect(paths);
   }
-  /** Full reconciliation은 메타데이터가 같은 cached 원문을 다시 읽지 않는다. */
+  /**
+   * 경로 없는 수집(최초·명시 refresh·감시 오류 복구)만 전체 탐색을 하고,
+   * 경로가 있는 수집은 누적한 경로만 증분으로 반영한다.
+   */
   #collect(paths?: readonly string[]): Promise<WorkspaceCodeReferenceSnapshot> {
     if (paths) for (const input of paths) this.#pending.add(input);
+    else this.#fullPending = true;
     if (this.#operation) return this.#operation;
     this.#beginCheck();
-    /** 수집 중 신호는 새 pass로 처리하며 완료 전에 draining한다. */
+    /** 수집 중 신호는 누적해 다음 pass로 처리하며 완료 전에 draining한다. */
     const reconcile = async (): Promise<WorkspaceCodeReferenceSnapshot> => {
       await this.#start();
-      let rebuilds = 0;
-      let rerun: boolean;
       do {
-        rerun = false;
+        const full = this.#fullPending || !this.#state;
+        this.#fullPending = false;
         const affected = [...this.#pending];
         this.#pending.clear();
         const epoch = this.#epoch;
-        const cache = new Map(this.#disk);
-        for (const input of affected) {
-          const relative = codeFileRelativePath(this.projectRoot, input);
-          if (relative)
-            for (const key of cache.keys())
-              if (key === relative || key.startsWith(relative + '/'))
-                cache.delete(key);
-        }
         await this.options.beforeRead?.(paths);
-        const discovery = await discoverCodeFiles(this.projectRoot, cache);
-        if (this.#closed) return this.#snapshot();
-        if (epoch !== this.#epoch) continue;
-        const rules = codeWatchRuleKey(discovery.policy);
-        if (
-          this.#watcher &&
-          this.#registeredRules !== undefined &&
-          this.#registeredRules !== rules &&
-          rebuilds < maximumWatchRebuilds
-        ) {
-          // 감시 규칙이 달라졌다면 새 정책으로 전체 감시를 다시 구성하고 재확인한다.
-          rebuilds++;
-          const failure = await this.#reregister(discovery.policy);
-          if (failure) this.#watchBroken(failure.error);
-          rerun = true;
-          continue;
+        let state: CodeFileState;
+        let policyChanged = true;
+        if (full) {
+          const cache = new Map(this.#disk);
+          for (const input of affected) {
+            const relative = codeFileRelativePath(this.projectRoot, input);
+            if (relative)
+              for (const key of cache.keys())
+                if (key === relative || key.startsWith(relative + '/'))
+                  cache.delete(key);
+          }
+          state = (await discoverCodeFiles(this.projectRoot, cache)).state;
+          if (this.#closed) return this.#snapshot();
+          if (epoch !== this.#epoch) {
+            // 전체 탐색 중 신호가 도착했다면 중간 결과를 게시하지 않고 다시 읽는다.
+            for (const input of affected) this.#pending.add(input);
+            this.#fullPending = true;
+            continue;
+          }
+        } else {
+          const previous = this.#state!;
+          state = await applyCodeSignals(previous, affected);
+          if (this.#closed) return this.#snapshot();
+          policyChanged = state.policy !== previous.policy;
         }
-        this.#discovery = discovery;
-        const disk = new Map(discovery.files.map((file) => [file.path, file]));
-        for (const file of discovery.files)
-          if (this.#disk.get(file.path) !== file)
-            this.#markers.set(file.path, extractCodeReferences(file.text));
-        for (const key of this.#markers.keys())
-          if (!disk.has(key)) this.#markers.delete(key);
-        for (const [key, buffer] of this.#buffers)
-          if (disk.get(key)?.identity !== buffer.identity)
-            this.#buffers.delete(key);
-        this.#disk = disk;
-        this.#failures = discovery.failures;
-        this.#status = this.#watchFailure
-          ? codeCollectionStatuses.incomplete
-          : discovery.status;
+        state = await this.#syncWatch(state, policyChanged);
+        if (this.#closed) return this.#snapshot();
+        this.#apply(state);
         // collecting을 이미 알렸다면 마지막 pass의 최종 결과만 게시해 중간 결과로 다시 알리지 않는다.
-        const following = this.#pending.size > 0 || this.#timer !== undefined;
+        const following =
+          this.#pending.size > 0 ||
+          this.#fullPending ||
+          this.#timer !== undefined;
         if (!this.#collectingShown) this.#commit();
         else if (!following) this.#endCheck();
         this.options.observe?.('code-index-published', {
           codeGeneration: this.#codeGeneration,
-          files: disk.size,
+          files: this.#disk.size,
           affected,
         });
-      } while ((rerun || this.#pending.size) && !this.#closed);
+      } while ((this.#pending.size || this.#fullPending) && !this.#closed);
       return this.#snapshot();
     };
     const operation = reconcile().catch(
@@ -852,8 +881,8 @@ export class WorkspaceCodeReferenceIndex {
     /** 후속 변경이 공유 작업 완료 경계에서 사라지지 않게 한다. */
     const clear = (): void => {
       if (this.#operation === operation) this.#operation = undefined;
-      if (this.#pending.size && !this.#closed)
-        this.refresh([...this.#pending]).catch(
+      if ((this.#pending.size || this.#fullPending) && !this.#closed)
+        this.#collect(this.#fullPending ? undefined : [...this.#pending]).catch(
           /** 감시 실패를 수집 상태로 게시한다. */ (error) =>
             this.#watchBroken(error),
         );
@@ -866,6 +895,57 @@ export class WorkspaceCodeReferenceIndex {
           this.#watchBroken(error),
       );
     return operation;
+  }
+  /**
+   * 감시 규칙이 달라졌을 때만 새 감시를 시작해 ready가 된 뒤 이전 감시를 닫는다.
+   * 재구성 뒤에는 규칙이 달라진 폴더만 다시 확인하며, 등록 실패는 감시 오류 복구로 넘긴다.
+   */
+  async #syncWatch(
+    state: CodeFileState,
+    policyChanged: boolean,
+  ): Promise<CodeFileState> {
+    if (
+      !policyChanged ||
+      !this.#watcher ||
+      !this.#registered ||
+      this.#recovering ||
+      codeWatchRuleKey(state.policy) === this.#registered.rules
+    )
+      return state;
+    const previous = this.#registered.policy;
+    // 재구성 중에는 아직 반영하지 않은 새 정책의 신호를 이전 정책으로 버리지 않는다.
+    this.#rebuilding = true;
+    try {
+      const failure = await this.#register(state.policy, true);
+      if (this.#closed) return state;
+      if (failure) {
+        this.#watchBroken(failure.error);
+        return state;
+      }
+      const changed = diffCodeWatchRules(previous, state.policy);
+      return changed.length
+        ? await recheckCodeDirectories(state, changed)
+        : state;
+    } finally {
+      this.#rebuilding = false;
+    }
+  }
+  /** 새 상태를 보유 관측·marker·buffer에 반영하며 바뀐 파일의 marker만 다시 추출한다. */
+  #apply(state: CodeFileState): void {
+    this.#state = state;
+    for (const [key, file] of state.files)
+      if (this.#disk.get(key) !== file)
+        this.#markers.set(key, extractCodeReferences(file.text));
+    for (const key of this.#markers.keys())
+      if (!state.files.has(key)) this.#markers.delete(key);
+    for (const [key, buffer] of this.#buffers)
+      if (state.files.get(key)?.identity !== buffer.identity)
+        this.#buffers.delete(key);
+    this.#disk = new Map(state.files);
+    this.#failures = codeFileFailures(state);
+    this.#status = this.#watchFailure
+      ? codeCollectionStatuses.incomplete
+      : codeFileStatus(state);
   }
   /** 비동기 완료·버퍼·토큰을 무효화하고 연결을 종료한다. */
   async close(): Promise<void> {
