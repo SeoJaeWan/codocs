@@ -175,7 +175,6 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       documents: [],
     });
   });
-  /** @codocs [[작업 공간:문서 탐색]]#L16-L17 @codocs [[작업 공간:탐색 상태]]#L16 @codocs [[작업 공간:작업 공간 진단]]#L15-L16 */
   it('하위 정션은 경고 후 제외하고 일반 문서는 계속 읽는다', async () => {
     await document('ordinary.yaml', raw);
     await writeFile(path.join(outside, 'external.yaml'), raw);

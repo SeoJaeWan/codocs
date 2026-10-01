@@ -144,7 +144,7 @@ describe('parseYaml: 단일 YAML 매핑의 해석과 오류 처리', () => {
   });
   it.each(['a: [1,', 'a: "끝', 'a:\n  b: [x\n'])(
     'YAML %s에 닫는 괄호나 따옴표가 없으면 invalid_yaml을 반환한다',
-    /** YAML 라이브러리가 불완전한 입력에서 일부 구조를 복구하더라도 파싱 성공으로 처리하지 않는다. @codocs [[YAML 파싱]]#L49-L50 */ (
+    /** YAML 라이브러리가 불완전한 입력에서 일부 구조를 복구하더라도 파싱 성공으로 처리하지 않는다. */ (
       source,
     ) => {
       const result = parseYaml(source, 'syntax.yaml');

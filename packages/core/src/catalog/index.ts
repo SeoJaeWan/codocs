@@ -72,7 +72,7 @@ export interface CatalogIdentity {
   domains: readonly string[];
   confirmation: CatalogConfirmation;
 }
-/** 후보마다 오류와 확인 상태를 함께 제공한다. @codocs [[참조 후보]] */
+/** 후보마다 오류와 확인 상태를 함께 제공한다. */
 export interface ReferenceCandidate extends CatalogIdentity {
   errors: readonly Diagnostic[];
 }
@@ -102,7 +102,7 @@ export interface CatalogDocument extends CatalogIdentity {
   references: readonly CatalogIdentity[];
   referencedBy: readonly CatalogIdentity[];
 }
-/** 경로를 유일 키로 사용하는 IO 없는 계산 결과다. 반환 컬렉션은 읽기 전용 계약이다. @codocs [[문서 색인]] */
+/** 경로를 유일 키로 사용하는 IO 없는 계산 결과다. 반환 컬렉션은 읽기 전용 계약이다. */
 export interface Catalog {
   status: CatalogScan['status'];
   failures: readonly CatalogFailure[];
@@ -254,7 +254,7 @@ function linkIdentity(document: CatalogIdentity): CatalogIdentity {
     confirmation: document.confirmation,
   };
 }
-/** 전체 또는 지정 도메인에서 정확 비교한다. 출처 도메인을 우선하지 않는다. @codocs [[참조 후보를 문서 연결로 확정하는 절차]] */
+/** 전체 또는 지정 도메인에서 정확 비교한다. 출처 도메인을 우선하지 않는다. */
 export function resolveReference(
   catalog: Catalog,
   reference: { name: string; domain?: string },
@@ -327,7 +327,7 @@ function calculate(
     namePaths,
     domainNamePaths,
   };
-  /** 충돌의 모든 경로를 개별 진단한다. @codocs [[문서 색인]]#L23-L24 */
+  /** 충돌의 모든 경로를 개별 진단한다. */
   function conflicts(
     paths: Set<string>,
     code:
@@ -456,7 +456,7 @@ function resolveDocumentReferences(
   };
 }
 
-/** live 출처 하나만 해석하며 대상 색인과 역참조를 변경하지 않는다. @codocs [[문서 색인]]#L31-L34 */
+/** live 출처 하나만 해석하며 대상 색인과 역참조를 변경하지 않는다. */
 export function resolveLiveDocument(
   catalog: Catalog,
   observation: CatalogObservation,
@@ -647,7 +647,7 @@ function sameResolution(
     before.candidates.every((c, i) => c.path === after.candidates[i]?.path)
   );
 }
-/** 대상 경로·필드·실제 위치·후보와 미해결 영향을 계산한다. 파일·입력·원문은 변경하지 않는다. @codocs [[이름 변경 시 기존 참조의 의미 보존]] */
+/** 대상 경로·필드·실제 위치·후보와 미해결 영향을 계산한다. 파일·입력·원문은 변경하지 않는다. */
 export function planRename(
   catalog: Catalog,
   request: RenameRequest,

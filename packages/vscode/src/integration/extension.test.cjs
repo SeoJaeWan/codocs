@@ -48,12 +48,11 @@ function codeAnchors(hover, name = '') {
   );
 }
 
-// @codocs [[VS Code:VS Code]]
 module.exports.scenarios = [
   {
     id: 'hover-content-and-relations',
     /** 실제 코드 Hover의 본문·관계 앵커를 관측하고 각각 클릭한다.
-     * @codocs [[VS Code:원문 열기]]#L11 */
+     * */
     async run(c) {
       for (const [label, target] of [
         ['원문 열기', zone],
@@ -80,7 +79,7 @@ module.exports.scenarios = [
   {
     id: 'yaml-single-special-path',
     /** 특수 출처·대상 경로의 YAML 링크를 OS 수정 키 클릭으로 연다.
-     * @codocs [[VS Code:원문 열기]]#L18 */
+     * */
     async run(c) {
       await c.open(source);
       const hover = await c.driver.hover('[[Zone]]', 'Zone', 0, {
@@ -102,7 +101,7 @@ module.exports.scenarios = [
   {
     id: 'yaml-multiple-candidates',
     /** 복수 후보를 모두 표시하고 선택한 앵커의 파일만 연다.
-     * @codocs [[VS Code:원문 열기]]#L20 */
+     * */
     async run(c) {
       for (const candidate of ['a', 'b']) {
         await c.open('.codocs/ambiguous.yaml');
@@ -117,8 +116,7 @@ module.exports.scenarios = [
   {
     id: 'dirty-target-tab',
     /** 기존 미저장 대상의 내용·탭을 보존하며 상단으로 이동한다.
-     * @codocs [[VS Code:원문 열기]]#L25-L26
-     * @codocs [[VS Code:원문 열기]]#L29-L30 */
+     * */
     async run(c) {
       const document = await c.open(zone);
       const disk = await c.fs.readFile(document.uri.fsPath, 'utf8');
@@ -284,7 +282,7 @@ module.exports.scenarios = [
   {
     id: 'nested-workspace-owner',
     /** 같은 ID라도 가장 가까운 workspace의 표시 내용·링크만 사용한다.
-     * @codocs [[VS Code:언어 서버 연결]]#L20 */
+     * */
     async run(c) {
       await c.open('nested/source.java');
       const hover = await c.driver.hover('zone', 'Nested workspace body');
@@ -297,7 +295,7 @@ module.exports.scenarios = [
   {
     id: 'explicit-link-open',
     /** 코드의 명시 링크 셋을 OS 수정 키 클릭으로 열어 상단·행·범위 선택을 관측한다.
-     * @codocs [[VS Code:원문 열기]]#L25-L27 */
+     * */
     async run(c) {
       const text = await c.fs.readFile(c.uri(navigation).fsPath, 'utf8');
       await c.open('navigation/explicit-whole.java');
@@ -325,7 +323,7 @@ module.exports.scenarios = [
   {
     id: 'explicit-link-dirty-target',
     /** 미저장 행이 삽입된 대상에서 저장 행 번호가 아닌 현재 원문의 11·12행을 선택한다.
-     * @codocs [[VS Code:원문 열기]]#L35-L38 */
+     * */
     async run(c) {
       const document = await c.open(dirtyNavigation);
       const disk = await c.fs.readFile(document.uri.fsPath, 'utf8');
@@ -440,8 +438,7 @@ module.exports.scenarios = [
   {
     id: 'explicit-link-rejected',
     /** 미저장 대상에서 끝 행을 지운 뒤 클릭하면 Output에 실패만 남고 편집기·탭이 유지된다.
-     * @codocs [[VS Code:원문 열기]]#L37
-     * @codocs [[VS Code:원문 열기]]#L21 */
+     * */
     async run(c) {
       const document = await c.open(rejectedNavigation);
       const disk = await c.fs.readFile(document.uri.fsPath, 'utf8');
@@ -485,7 +482,7 @@ module.exports.scenarios = [
   {
     id: 'reverse-single-direct',
     /** 코드 하나가 연결한 YAML 행을 수정 키로 클릭하면 코드의 @codocs 표기가 선택된다.
-     * @codocs [[VS Code:원문 열기]]#L40 */
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-single.yaml';
       const code = 'navigation/reverse-single.java';
@@ -508,7 +505,7 @@ module.exports.scenarios = [
   {
     id: 'reverse-folder-recreate',
     /** 범위 안 폴더를 지웠다 다시 만들어도 연결된 코드 수집이 완료로 돌아오고 이후 편집이 반영된다.
-     * @codocs [[VS Code:원문 열기]]#L40 */
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-recreate.yaml';
       const folder = 'navigation/recreate';
@@ -530,7 +527,7 @@ module.exports.scenarios = [
   {
     id: 'reverse-multiple-hover',
     /** 구현·테스트 두 연결을 Hover의 위치별 앵커로 각각 클릭해 해당 표기를 선택한다.
-     * @codocs [[Language Server:IDE 지원]]#L29 */
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-multiple.yaml';
       for (const [label, code] of [
@@ -558,7 +555,7 @@ module.exports.scenarios = [
   {
     id: 'reverse-overlap-yaml-link',
     /** 이름 링크와 겹친 행은 YAML 링크가 문서를 열고 코드 연결은 Hover 앵커로만 연다.
-     * @codocs [[Language Server:IDE 지원]]#L35 */
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-overlap.yaml';
       const code = 'navigation/reverse-overlap.java';
@@ -585,8 +582,7 @@ module.exports.scenarios = [
   {
     id: 'whole-single-gesture',
     /** 문서 전체 코드 하나는 상단 Inlay label을 수정 키로 클릭해 표기를 선택한다.
-     * @codocs [[Language Server:IDE 지원]]#L43
-     * @codocs [[Language Server:IDE 지원]]#L46 */
+     * */
     async run(c) {
       const code = 'navigation/whole-single.java';
       await c.open('.codocs/whole-single.yaml');
@@ -602,7 +598,7 @@ module.exports.scenarios = [
   {
     id: 'whole-multiple-hover',
     /** 문서 전체 코드 둘은 Inlay label Hover의 앵커로 고른 표기를 선택한다.
-     * @codocs [[Language Server:IDE 지원]]#L43 */
+     * */
     async run(c) {
       const code = 'navigation/whole-multiple-test.java';
       await c.open('.codocs/whole-multiple.yaml');

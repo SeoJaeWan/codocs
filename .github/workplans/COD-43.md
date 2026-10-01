@@ -10,7 +10,9 @@ COD-42에서 코드에 `@codocs [[문서]]#Lx-Ly` 링크 311개를 추가하면�
 
 - `.codocs` 문서 79개: core 18, workspace 25, mcp 9, language-server 5, vscode 3, development 12, writing-guide 6, index 1
 - 문서의 표현, 중복과 구조, 정책이 모호한 부분 정리
-- 코드의 `@codocs` 링크 추가, 수정, 삭제. 링크 대상 문서의 이름과 행 범위가 바뀌면 함께 갱신한다.
+- 사용자와 개발자가 함께 알아야 하는 제품 개념을 `.codocs/concepts`(도메인 '제품 개념')에 정의하고, core·workspace·mcp·language-server·vscode 문서의 개념 수준 내용을 이곳으로 옮긴다. 구현에만 해당하는 내용은 옮기지 않는다.
+- 문서 작성 방법은 「문서 컨벤션」에 모은다.
+- 코드 주석의 기존 `@codocs` 링크는 모두 제거하고, 문서 정리가 끝나면 정리된 문서를 기준으로 다시 구성한다. 테스트 입력값으로 쓰인 `@codocs` 문자열은 유지한다.
 
 ## 범위 밖
 
@@ -19,11 +21,10 @@ COD-42에서 코드에 `@codocs [[문서]]#Lx-Ly` 링크 311개를 추가하면�
 
 ## 진행 방식
 
-문서 하나마다 다음 순서로 진행한다.
-
-1. 문서를 함께 읽고 표현, 중복, 정책을 정리한다. 문구와 정책은 사용자가 결정한다.
-2. 조항별 링크가 실제 담당 구현과 테스트를 가리키는지 확인하고 정리한다.
-3. 불일치를 발견하면 아래 셋 중 하나로 판정해 「후속 항목」에 기록한다.
+1. development와 concepts 문서를 함께 읽고 표현, 중복, 정책을 정리한다. 문구와 정책은 사용자가 결정한다.
+2. 합의한 기준으로 패키지 문서를 core → workspace → mcp → language-server → vscode 순으로 concepts에 옮긴다. 옮길지 판단하기 어려운 문서는 보류하고 마지막에 함께 결정한다.
+3. 문서 정리가 끝나면 코드 링크를 조항별 담당 구현과 테스트에 다시 연결한다.
+4. 불일치를 발견하면 아래 셋 중 하나로 판정해 「후속 항목」에 기록한다.
    - 문서 수정: 문서가 틀렸거나 모호하면 이 PR에서 고친다.
    - 코드 수정 필요: 기획과 구현이 다르면 별도 PR로 넘긴다.
    - 테스트 보완 필요: 계약을 검증하는 테스트가 없거나 약하면 별도 PR로 넘긴다.
@@ -54,13 +55,13 @@ COD-42에서 확인한 상황을 공유하기 위한 목록이다. 해당 문서
 | #   | 문서 위치                                                                                                                                                                         | 코드 위치                                           | 내용                                                                                                                                                                                                                                                                                                                                                  | 판정           | 처리                         |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------------------- |
 | 1   | `concepts/document/document-attributes.yaml`                                                                                                                                      | core validator·query, workspace 조회 커서, mcp 조회 | 문서 속성을 필수 5개로 정리: `kind`·`status`·`examples` 제거, `deprecatedAliases` 필수화(create 생략 시 `[]`)                                                                                                                                                                                                                                         | 코드 수정 필요 | COD-46 (PR #60)              |
-| 2   | `concepts/document/yaml-mapping-style.yaml`                                                                                                                                       | `core/src/parser/index.ts:141`                      | 「YAML 매핑 표기」를 「문서 형식」에 합치고 '원문을 다룰 때의 의미' 절은 「YAML 파싱」으로 옮긴다                                                                                                                                                                                                                                                     | 문서 수정      | core 검토 때 이 PR           |
+| 2   | `concepts/document/yaml-mapping-style.yaml`                                                                                                                                       | -                                                   | 「YAML 매핑 표기」를 「문서 형식」에 합치고 '원문을 다룰 때의 의미' 절은 「YAML 파싱」으로 옮긴다                                                                                                                                                                                                                                                     | 문서 수정      | core 검토 때 이 PR           |
 | 3   | `core/code-reference.yaml:22`, `core/duplicate-detection.yaml:9`, `mcp/duplicate-review-request.yaml:46`, `mcp/guide/authoring-guide.yaml:28,33`, `workspace/project-root.yaml:7` | -                                                   | 삭제·통합한 문서(기본 작성 지침·설명 분리·지식을 선택해서 읽고 변경하는 흐름·도메인·문서 작성 가이드 도메인)를 가리키는 참조                                                                                                                                                                                                                          | 문서 수정      | 각 패키지 검토 때 이 PR      |
 | 4   | `core/core.yaml`, `mcp/mcp.yaml`, `workspace/workspace.yaml`                                                                                                                      | -                                                   | concepts로 옮긴 「YAML 매핑 표기」·「문서 검증」·「검증 오류가 있는 문서를 조회하고 수정하는 절차」·「진단」·「도구 결과」·「탐색 상태」·「원문 버전」이 목차에 남아 있다                                                                                                                                                                             | 문서 수정      | 각 패키지 검토 때 이 PR      |
 | 5   | `docs/guide`, `mcp/guide/authoring-guide.yaml`, `development/documentation-convention.yaml` '사용자 가이드' 절                                                                    | `packages/mcp/src/guide/index.ts`                   | 사용자 가이드는 제품 개념만 안내하도록 정리한다                                                                                                                                                                                                                                                                                                       | 문서 수정      | 문서 정리 후 별도 PR         |
 | 6   | `concepts/reference/document-link.yaml`                                                                                                                                           | core 참조 추출                                      | `[[ ]]`를 모든 속성의 문자열에서 참조로 인식                                                                                                                                                                                                                                                                                                          | 코드 수정 필요 | COD-47 (PR #61)              |
 | 7   | `concepts/document/document-attributes.yaml`                                                                                                                                      | core validator                                      | 사용자 속성의 `unknown_field` 경고 제거                                                                                                                                                                                                                                                                                                               | 코드 수정 필요 | COD-48 (PR #62)              |
-| 8   | `core/matcher/previous-id.yaml`                                                                                                                                                   | `core/src` 이전 ID 링크 1개                         | 「이전 ID」 내용을 「문서 속성」 deprecatedAliases 절로 옮겼으므로 core 문서를 삭제하고 참조·코드 링크를 정리                                                                                                                                                                                                                                         | 문서 수정      | core 검토 때 이 PR           |
+| 8   | `core/matcher/previous-id.yaml`                                                                                                                                                   | -                                                   | 「이전 ID」 내용을 「문서 속성」 deprecatedAliases 절로 옮겼으므로 core 문서를 삭제하고 참조를 정리                                                                                                                                                                                                                                                   | 문서 수정      | core 검토 때 이 PR           |
 | 9   | `core/change-plan/document-change-plan.yaml`, `workspace/storage/storage.yaml`                                                                                                    | -                                                   | 요청·결과 계약을 「codocs_write」로 모으고 core·workspace에는 구현 경계만 남김                                                                                                                                                                                                                                                                        | 문서 수정      | core·workspace 검토 때 이 PR |
 | 10  | `mcp/*`, `vscode/*`, `language-server/*`                                                                                                                                          | -                                                   | 「MCP 서버」·도구별 문서·「VS Code 확장」·참조 3종과 겹치는 패키지 문서(조회, 문서 검증 요청, 본문 중복 검토 요청, 사용 가이드, 색인 갱신, 언어 서버 연결, 명시적 코드 참조, 코드 식별자 매칭 등) 정리. 「참조 추출」·「참조 후보를 문서 연결로 확정하는 절차」에서 개념 수준의 절차가 남으면 `concepts/reference`로 옮기고 core에는 구현 경계만 남김 | 문서 수정      | 각 패키지 검토 때 이 PR      |
 | 11  | `core/code-reference/code-reference.yaml`                                                                                                                                         | -                                                   | 본문의 Markdown 표를 목록으로 바꾼다(「문서 컨벤션」 '문단과 간격')                                                                                                                                                                                                                                                                                   | 문서 수정      | core 검토 때 이 PR           |
@@ -68,14 +69,14 @@ COD-42에서 확인한 상황을 공유하기 위한 목록이다. 해당 문서
 ## 검증
 
 - `codocs_validate`로 문서 진단이 새로 생기지 않았는지 확인한다.
-- 모든 `@codocs` 링크가 참조 해석기로 해석되는지 확인한다.
+- 코드 링크를 다시 구성한 뒤 모든 `@codocs` 링크(도메인을 지정한 형식 포함)가 참조 해석기로 해석되는지 확인한다.
 - 링크 주석 외에 소스가 바뀌지 않았는지 주석을 제외한 AST로 확인한다.
 - 커밋 훅의 타입 검사, lint, 테스트, 포맷 검사를 통과한다.
 
 ## 완료 기준
 
-- 79개 문서를 모두 함께 검토했다.
-- 검토한 문서의 링크가 실제 담당 구현과 테스트를 가리킨다.
+- 모든 문서를 검토해 개념은 concepts에, 작성 방법은 「문서 컨벤션」에 정리했다.
+- 다시 구성한 코드 링크가 정리된 문서의 조항과 실제 담당 구현·테스트를 가리킨다.
 - 문서 정비 중 새로 발견한 코드 수정·테스트 보완 필요 항목은 모두 판정과 함께 「후속 항목」에 기록되어 있다.
 
 ## Jira

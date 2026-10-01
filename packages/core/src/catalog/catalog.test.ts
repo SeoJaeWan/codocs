@@ -1470,7 +1470,6 @@ describe('planRename: 이름 변경 계획', () => {
       expect(
         plan.changes.find((change) => change.path === sourceRefersToOrder.path),
       ).toMatchObject({
-        // @codocs [[이름 변경 시 기존 참조의 의미 보존]]#L26-L27
         oldText: '[[주문]]',
         newText: '[[새주문]]',
         targetPath: orderDocument.path,

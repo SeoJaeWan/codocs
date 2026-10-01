@@ -234,9 +234,9 @@ export interface SourceRange {
   start: SourcePosition;
   end: SourcePosition;
 }
-/** 매핑 키와 배열 인덱스로 구성한 경로다. @codocs [[필드 경로]] */
+/** 매핑 키와 배열 인덱스로 구성한 경로다. */
 export type FieldPath = readonly (string | number)[];
-/** 각 계층이 코드 타입을 지정하는 공통 진단이다. 기본 코드는 core 진단이며 미확인 메타데이터는 생략한다. @codocs [[진단]]#L14-L25 */
+/** 각 계층이 코드 타입을 지정하는 공통 진단이다. 기본 코드는 core 진단이며 미확인 메타데이터는 생략한다. */
 export interface Diagnostic<Code extends string = DiagnosticCode> {
   code: Code;
   severity: DiagnosticSeverity;

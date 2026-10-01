@@ -251,7 +251,7 @@ export type DocumentValidationResult =
       warnings: readonly SchemaDiagnostic[];
     };
 
-/** 확인된 경로의 범위만 선택하며 누락은 직접 부모의 값 범위를 사용한다. @codocs [[진단]]#L24-L25 */
+/** 확인된 경로의 범위만 선택하며 누락은 직접 부모의 값 범위를 사용한다. */
 function diagnosticRange(
   input: ValidateDocumentInput,
   fieldPath: FieldPath,
@@ -298,7 +298,7 @@ function diagnostic(
   };
 }
 
-/** 현재 ID와 같은 이전 ID만 경고하며 사용자가 작성한 항목은 제거하지 않는다. @codocs [[문서 검증]]#L35-L40 */
+/** 현재 ID와 같은 이전 ID만 경고하며 사용자가 작성한 항목은 제거하지 않는다. */
 function deprecatedAliasWarnings(
   input: ValidateDocumentInput,
 ): SchemaDiagnostic[] {
@@ -380,7 +380,7 @@ function issueCode(
   return schemaDiagnosticCodes.invalidFieldValue;
 }
 
-/** IO 없이 전체 문서를 검증한다. 입력 데이터와 원문·범위를 변경하지 않는다. @codocs [[문서 검증]]
+/** IO 없이 전체 문서를 검증한다. 입력 데이터와 원문·범위를 변경하지 않는다.
  * @param input 호출자가 읽거나 병합한 전체 데이터와 선택적인 위치다.
  * @returns 성공 문서 또는 오류와 별도의 사용자 속성 경고다. 저장 허용은 판단하지 않는다.
  */

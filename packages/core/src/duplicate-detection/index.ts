@@ -214,7 +214,7 @@ export function duplicatePreparationKey(
 
 /**
  * 문서 한 건의 definition·examples를 비교 구간으로 준비한다. 다른 문서와 무관하므로 결과를 캐시해 재사용할 수 있다.
- * 파싱에 실패한 입력에서는 본문을 추측하지 않고 skipReason만 남긴다. 입력은 변경하지 않는다. @codocs [[본문 중복 탐지]]#L13-L15
+ * 파싱에 실패한 입력에서는 본문을 추측하지 않고 skipReason만 남긴다. 입력은 변경하지 않는다.
  * @param input 이미 파싱한 문서다.
  * @returns 정규화한 구간을 가진 준비 결과다.
  */
@@ -656,7 +656,7 @@ export function createDuplicateComparison(
 }
 
 /**
- * 문서 준비와 전체 비교를 한 번에 끝까지 실행한다. 대형 입력에서는 예산을 나눠 진행하는 createDuplicateComparison을 쓴다. @codocs [[본문 중복 탐지]]
+ * 문서 준비와 전체 비교를 한 번에 끝까지 실행한다. 대형 입력에서는 예산을 나눠 진행하는 createDuplicateComparison을 쓴다.
  * @param inputs 이미 파싱한 문서 목록이다.
  * @returns 완료된 결과다.
  */

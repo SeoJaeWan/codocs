@@ -109,7 +109,6 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
         (item) => item.uri === uri,
       );
       expect(failure?.reason).toContain(code);
-      // @codocs [[IDE 지원]]#L62-L65
       expect(failure?.previousDiagnostics).toContainEqual(
         expect.stringContaining('ID'),
       );
@@ -167,7 +166,6 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
   });
   it('파일을 열지 않아도 전체 저장 색인의 중복 위치를 반환한다', async () => {
     const result = await session.diagnostics();
-    // @codocs [[IDE 지원]]#L58-L59
     expect(result?.documents).toHaveLength(2);
     expect(
       result?.documents.find((document) => document.uri === uri)?.diagnostics,
@@ -200,7 +198,6 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
     const restored = (await session.diagnostics())?.documents.find(
       (document) => document.uri === uri,
     );
-    // @codocs [[문서 동기화]]#L58
     expect(restored).not.toHaveProperty('version');
     expect(restored?.diagnostics).toContainEqual(
       expect.objectContaining({ code: catalogDiagnosticCodes.duplicateId }),

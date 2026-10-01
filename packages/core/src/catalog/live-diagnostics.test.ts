@@ -39,7 +39,6 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
       }),
     );
     expect(catalog.idPaths.get('target')).toEqual(new Set([saved.path]));
-    // @codocs [[문서 색인]]#L31-L34
     expect(catalog.documents.has(live.path)).toBe(false);
   });
 

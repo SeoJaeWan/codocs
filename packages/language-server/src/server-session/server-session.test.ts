@@ -306,7 +306,6 @@ describe('LanguageServerSession: 작업 공간별 현재 문서 매칭', () => {
       requestedVersion: 3,
       currentVersion: 4,
     });
-    // @codocs [[문서 동기화]]#L14
     expect(match).not.toHaveBeenCalled();
   });
 
@@ -366,7 +365,6 @@ describe('LanguageServerSession: 작업 공간별 현재 문서 매칭', () => {
     });
     finish?.(pathDetails('zone', 1));
 
-    // @codocs [[코드 호버]]#L42
     await expect(pending).resolves.toBeNull();
   });
 

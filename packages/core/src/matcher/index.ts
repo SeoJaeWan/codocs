@@ -151,7 +151,7 @@ function splitRun(source: string, start: number, end: number): InternalToken[] {
   return tokens;
 }
 
-/** 하나의 원문을 순회하며 연속 토큰과 UTF-16 범위를 만든다. @codocs [[코드 식별자 매칭]]#L21-L29 */
+/** 하나의 원문을 순회하며 연속 토큰과 UTF-16 범위를 만든다. */
 export function tokenizeCode(source: string): readonly CodeTokenGroup[] {
   const groups: InternalGroup[] = [];
   let index = 0;
@@ -251,7 +251,7 @@ function fieldHasBlockingError(
   );
 }
 
-/** 문서에서 형식이 확인된 현재·이전 ID를 순서와 메시지와 함께 추출한다. @codocs [[이전 ID]]#L6-L13 @codocs [[코드 식별자 매칭]]#L55-L58 */
+/** 문서에서 형식이 확인된 현재·이전 ID를 순서와 메시지와 함께 추출한다. */
 function indexedIds(document: CatalogDocument): readonly IndexedId[] {
   const parsed = document.observation.parsed;
   if (!parsed.success) return [];
@@ -382,7 +382,7 @@ function compareEvidence(
   );
 }
 
-/** 현재·이전, 연속 토큰 수, 표기 일치만 매칭의 의미 우선순위로 비교한다. 동률이면 0을 반환한다. @codocs [[코드 식별자 매칭]]#L42-L50 */
+/** 현재·이전, 연속 토큰 수, 표기 일치만 매칭의 의미 우선순위로 비교한다. 동률이면 0을 반환한다. */
 export function compareEvidencePriority(
   left: CodeMatchEvidence,
   right: CodeMatchEvidence,
@@ -484,7 +484,7 @@ function diagnosticsFor(
   return [...unique.values()];
 }
 
-/** 현재·이전 ID 색인으로 코드 원문을 순수하게 매칭한다. 입력 카탈로그와 원문은 변경하지 않는다. @codocs [[코드 식별자 매칭]] */
+/** 현재·이전 ID 색인으로 코드 원문을 순수하게 매칭한다. 입력 카탈로그와 원문은 변경하지 않는다. */
 export function matchCode(catalog: Catalog, code: string): CodeMatchResult;
 /** 카탈로그와 코드 원문 선택 입력을 분리해 받는 오버로드다. */
 export function matchCode(
