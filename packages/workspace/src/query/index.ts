@@ -58,6 +58,7 @@ import {
   fstatSync,
   lstatSync,
   readFileSync,
+  statSync,
   type Stats,
 } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -75,6 +76,7 @@ import {
   loadWorkspacePath,
   WorkspaceObservationCache,
   containsWorkspacePath,
+  type WorkspacePathScanResult,
   type WorkspaceScanDiagnostic,
   type WorkspaceScanResult,
 } from '../loader/index.js';
@@ -773,6 +775,7 @@ export class WorkspaceQuerySession {
   #root: ProjectRoot | undefined;
   #cache = new WorkspaceObservationCache();
   readonly #pending = new Set<string>();
+  readonly #stamps = new Map<string, string>();
   #closed = false;
   #codeIndex: WorkspaceCodeReferenceIndex | undefined;
   readonly #codeListeners = new Set<
@@ -799,11 +802,30 @@ export class WorkspaceQuerySession {
     );
   }
 
-  /** .codocs 감시 신호로 진행 중 읽기의 세대를 무효화한다. */
-  #collect(paths: readonly string[], start = true): void {
+  /** 문서 파일의 identity·크기·mtime·ctime으로 같은 상태 판별용 stamp를 만든다. 파일이 아니거나 읽을 수 없으면 undefined다. */
+  #fileStamp(logicalPath: string): string | undefined {
+    try {
+      const result = statSync(logicalPath, { bigint: true });
+      if (!result.isFile()) return undefined;
+      return `${result.dev}:${result.ino}:${result.size}:${result.mtimeNs}:${result.ctimeNs}`;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * .codocs 감시 신호로 진행 중 읽기의 세대를 무효화한다.
+   * trustStamp가 true이면 마지막으로 읽은 상태와 stamp가 같은 파일의 중복 신호는 버린다.
+   */
+  #collect(paths: readonly string[], start = true, trustStamp = true): void {
     if (this.#closed || !this.#root) return;
     for (const changed of paths) {
       if (/^\.codocs-write-[^.]+\.tmp$/u.test(path.basename(changed))) continue;
+      const known = this.#stamps.get(changed);
+      if (known !== undefined) {
+        if (trustStamp && this.#fileStamp(changed) === known) continue;
+        this.#stamps.delete(changed);
+      }
       const scopes: string[] = [];
       if (containsWorkspacePath(this.#root.codocsPath, changed))
         scopes.push(changed);
@@ -928,6 +950,7 @@ export class WorkspaceQuerySession {
     if (full || !basis || !this.#root) {
       this.#watcher?.drain();
       this.#pending.clear();
+      this.#stamps.clear();
       if (this.#root) this.#cache.invalidate(this.#root.codocsPath);
       const loaded = await loadWorkspace(this.#input, options);
       if (this.#closed) return this.#closedScan();
@@ -965,9 +988,20 @@ export class WorkspaceQuerySession {
       if (!scopes.length) break;
       for (const scope of scopes) {
         if (this.#closed) return this.#closedScan();
-        const result = await loadWorkspacePath(this.#root!, scope, options);
+        // 읽기 전 stamp를 기록해 읽는 중 도착한 같은 상태의 중복 신호는 버리고 실제 변경은 다른 stamp로 다시 감지한다.
+        const stamp = this.#fileStamp(scope);
+        if (stamp !== undefined) this.#stamps.set(scope, stamp);
+        let result: WorkspacePathScanResult;
+        try {
+          result = await loadWorkspacePath(this.#root!, scope, options);
+        } catch (error: unknown) {
+          this.#stamps.delete(scope);
+          throw error;
+        }
         this.#watcher?.drain();
         working.apply(result, this.#cache);
+        if (result.outcome === scanStatuses.failed || result.failures.length)
+          this.#stamps.delete(scope);
       }
     }
     if (this.#closed) return this.#closedScan();
@@ -1073,7 +1107,7 @@ export class WorkspaceQuerySession {
     if (this.#closed || !this.#root) return false;
     pathName = discoveryPath(pathName);
     const logicalPath = path.resolve(this.#root.projectRoot, pathName);
-    this.#collect([logicalPath], false);
+    this.#collect([logicalPath], false, false);
     while (!this.#closed) {
       const operation =
         this.#refreshPromise ??

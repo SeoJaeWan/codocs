@@ -404,9 +404,6 @@ export class VscodeFolderClient implements FolderClientBoundary {
     const directoryWatcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(this.#folder, '.codocs'),
     );
-    const contentsWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(this.#folder, '.codocs/**'),
-    );
     const serverOptions: ServerOptions = {
       module: this.#serverPath,
       transport: TransportKind.ipc,
@@ -442,7 +439,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
         this.#registerProviders(client),
       ),
     );
-    /** knowledge 파일 변경 뒤 해당 작업 공간의 catalog를 갱신한다. */
+    /** .codocs 폴더 생성·삭제 뒤에만 해당 작업 공간의 catalog 갱신을 요청한다. */
     const refresh = () => this.#refresh();
     /** 실행 상태가 되면 연결 사실을 output channel에 기록한다. */
     const reportRunning = (event: { newState: State }): void => {
@@ -457,13 +454,8 @@ export class VscodeFolderClient implements FolderClientBoundary {
     };
     this.#disposables.push(
       directoryWatcher,
-      contentsWatcher,
       directoryWatcher.onDidCreate(refresh),
-      directoryWatcher.onDidChange(refresh),
       directoryWatcher.onDidDelete(refresh),
-      contentsWatcher.onDidCreate(refresh),
-      contentsWatcher.onDidChange(refresh),
-      contentsWatcher.onDidDelete(refresh),
       client.onDidChangeState(reportRunning),
     );
     await client.start();
