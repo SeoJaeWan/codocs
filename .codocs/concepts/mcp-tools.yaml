@@ -1,0 +1,20 @@
+id: mcp-tools
+name: 'MCP 도구'
+domains:
+  - '제품 개념'
+definition: |
+  MCP 도구는 AI가 프로젝트의 .codocs 문서를 찾고 읽고 수정할 때 호출하는 기능이다.
+  Codocs MCP 서버를 AI 클라이언트에 연결하면 아래 도구를 사용할 수 있다.
+
+  | 도구 | 하는 일 |
+  | --- | --- |
+  | codocs_list | 문서 목록을 도메인·kind·status로 걸러 조회한다. |
+  | codocs_get | 현재 ID로 문서의 내용·참조·revision을 읽는다. |
+  | codocs_write | 문서를 새로 만들거나(create), 읽은 revision을 기준으로 바꿀 속성을 set·unset으로 지정해 수정한다(update). |
+  | codocs_validate | 프로젝트 전체나 YAML 파일 하나의 오류·경고를 확인한다. |
+  | codocs_duplicates | 문서 본문에서 같은 설명이 반복되는 곳을 찾는다. 검토 정보이며 저장을 막지 않는다. |
+  | codocs_refresh | 문서 색인 전체를 다시 구성한다. |
+  | codocs_guide | 문서 형식과 작성·수정 방법 안내를 읽는다. |
+
+  AI는 전체 문서를 한 번에 읽지 않고 목록에서 필요한 문서를 골라 읽은 뒤 판단한다.
+  문서를 수정할 때는 get으로 읽은 revision을 사용하므로, 그 사이 다른 곳에서 문서가 바뀌면 다시 읽고 수정안을 확인한다.
