@@ -1,7 +1,7 @@
 id: error-document-access
 name: '검증 오류가 있는 문서를 조회하고 수정하는 절차'
 domains:
-  - 'MCP'
+  - '제품 개념'
 kind: procedure
 status: confirmed
 definition: |

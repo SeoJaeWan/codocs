@@ -1,7 +1,7 @@
 id: yaml-mapping-style
 name: 'YAML 매핑 표기'
 domains:
-  - 'Core'
+  - '제품 개념'
 definition: |
   YAML 매핑은 속성 이름과 값을 짝지은 구조이며 block과 flow 표기로 작성할 수 있다.
   두 표기가 같은 데이터로 해석되어도 원문에서 항목을 구분하는 방식이 달라, Codocs가 원문 위치를 찾거나 일부를 수정할 때 구분해야 한다.
