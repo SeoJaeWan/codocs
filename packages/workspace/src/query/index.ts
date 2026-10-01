@@ -58,6 +58,7 @@ import {
   fstatSync,
   lstatSync,
   readFileSync,
+  statSync,
   type Stats,
 } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -75,6 +76,7 @@ import {
   loadWorkspacePath,
   WorkspaceObservationCache,
   containsWorkspacePath,
+  type WorkspacePathScanResult,
   type WorkspaceScanDiagnostic,
   type WorkspaceScanResult,
 } from '../loader/index.js';
@@ -508,7 +510,10 @@ function fingerprint(items: readonly CatalogListItem[]): string {
     .digest('hex');
 }
 
-/** HMAC 입력과 payload를 분리할 수 있는 URL-safe 토큰으로 만든다. */
+/**
+ * HMAC 입력과 payload를 분리할 수 있는 URL-safe 토큰으로 만든다.
+ * @codocs [[작업 공간:조회 커서]]#L11-L12
+ */
 function encodeCursor(payload: CursorPayload): string {
   return encodeSignedCursor(payload);
 }
@@ -553,7 +558,10 @@ function decodeCursor(token: string): CursorPayload | undefined {
   return cursorPayload(decodeSignedCursor(token));
 }
 
-/** 커서가 만료되었음을 첫 페이지 대체 없이 반환한다. */
+/**
+ * 커서가 만료되었음을 첫 페이지 대체 없이 반환한다.
+ * @codocs [[작업 공간:목록 페이지 조회]]#L23-L24
+ */
 function cursorExpired(
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>,
 ): WorkspaceQueryFailure {
@@ -651,7 +659,10 @@ function scanRevisions(scan: WorkspaceScanResult): Map<string, string> {
   );
 }
 
-/** 미확인 문서에 최신성 비보장 진단을 추가한다. */
+/**
+ * 미확인 문서에 최신성 비보장 진단을 추가한다.
+ * @codocs [[작업 공간:미확인 문서]]#L12-L13
+ */
 function withConfirmationDiagnostic(
   result: CatalogGetResult,
 ): WorkspaceGetResult {
@@ -740,7 +751,10 @@ export interface WorkspaceDiagnosticsSnapshot {
   failures: readonly { path?: string; message: string }[];
 }
 
-/** 실제 scan과 이전 Catalog를 직렬로 연결하는 process 범위 조회 세션이다. */
+/**
+ * 실제 scan과 이전 Catalog를 직렬로 연결하는 process 범위 조회 세션이다.
+ * @codocs [[작업 공간:작업 공간 조회 세션]]
+ */
 export class WorkspaceQuerySession {
   readonly #input: unknown;
   readonly #options: WorkspaceQuerySessionOptions;
@@ -761,6 +775,7 @@ export class WorkspaceQuerySession {
   #root: ProjectRoot | undefined;
   #cache = new WorkspaceObservationCache();
   readonly #pending = new Set<string>();
+  readonly #stamps = new Map<string, string>();
   #closed = false;
   #codeIndex: WorkspaceCodeReferenceIndex | undefined;
   readonly #codeListeners = new Set<
@@ -787,11 +802,30 @@ export class WorkspaceQuerySession {
     );
   }
 
-  /** .codocs 감시 신호로 진행 중 읽기의 세대를 무효화한다. */
-  #collect(paths: readonly string[], start = true): void {
+  /** 문서 파일의 identity·크기·mtime·ctime으로 같은 상태 판별용 stamp를 만든다. 파일이 아니거나 읽을 수 없으면 undefined다. */
+  #fileStamp(logicalPath: string): string | undefined {
+    try {
+      const result = statSync(logicalPath, { bigint: true });
+      if (!result.isFile()) return undefined;
+      return `${result.dev}:${result.ino}:${result.size}:${result.mtimeNs}:${result.ctimeNs}`;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * .codocs 감시 신호로 진행 중 읽기의 세대를 무효화한다.
+   * trustStamp가 true이면 마지막으로 읽은 상태와 stamp가 같은 파일의 중복 신호는 버린다.
+   */
+  #collect(paths: readonly string[], start = true, trustStamp = true): void {
     if (this.#closed || !this.#root) return;
     for (const changed of paths) {
       if (/^\.codocs-write-[^.]+\.tmp$/u.test(path.basename(changed))) continue;
+      const known = this.#stamps.get(changed);
+      if (known !== undefined) {
+        if (trustStamp && this.#fileStamp(changed) === known) continue;
+        this.#stamps.delete(changed);
+      }
       const scopes: string[] = [];
       if (containsWorkspacePath(this.#root.codocsPath, changed))
         scopes.push(changed);
@@ -814,7 +848,10 @@ export class WorkspaceQuerySession {
       void this.#synchronize(false).catch(() => undefined);
   }
 
-  /** 프로젝트 선택 후 첫 문서 IO 전에 구독과 감시 준비를 완료한다. */
+  /**
+   * 프로젝트 선택 후 첫 문서 IO 전에 구독과 감시 준비를 완료한다.
+   * @codocs [[작업 공간:색인 갱신]]#L39-L41
+   */
   async #prepare(): Promise<WorkspaceScanResult | undefined> {
     if (this.#watcher || this.#closed) return;
     const selected = await resolveProjectRoot(this.#input);
@@ -913,6 +950,7 @@ export class WorkspaceQuerySession {
     if (full || !basis || !this.#root) {
       this.#watcher?.drain();
       this.#pending.clear();
+      this.#stamps.clear();
       if (this.#root) this.#cache.invalidate(this.#root.codocsPath);
       const loaded = await loadWorkspace(this.#input, options);
       if (this.#closed) return this.#closedScan();
@@ -950,9 +988,20 @@ export class WorkspaceQuerySession {
       if (!scopes.length) break;
       for (const scope of scopes) {
         if (this.#closed) return this.#closedScan();
-        const result = await loadWorkspacePath(this.#root!, scope, options);
+        // 읽기 전 stamp를 기록해 읽는 중 도착한 같은 상태의 중복 신호는 버리고 실제 변경은 다른 stamp로 다시 감지한다.
+        const stamp = this.#fileStamp(scope);
+        if (stamp !== undefined) this.#stamps.set(scope, stamp);
+        let result: WorkspacePathScanResult;
+        try {
+          result = await loadWorkspacePath(this.#root!, scope, options);
+        } catch (error: unknown) {
+          this.#stamps.delete(scope);
+          throw error;
+        }
         this.#watcher?.drain();
         working.apply(result, this.#cache);
+        if (result.outcome === scanStatuses.failed || result.failures.length)
+          this.#stamps.delete(scope);
       }
     }
     if (this.#closed) return this.#closedScan();
@@ -1058,7 +1107,7 @@ export class WorkspaceQuerySession {
     if (this.#closed || !this.#root) return false;
     pathName = discoveryPath(pathName);
     const logicalPath = path.resolve(this.#root.projectRoot, pathName);
-    this.#collect([logicalPath], false);
+    this.#collect([logicalPath], false, false);
     while (!this.#closed) {
       const operation =
         this.#refreshPromise ??
@@ -1076,7 +1125,10 @@ export class WorkspaceQuerySession {
     return false;
   }
 
-  /** 저장은 한 번만 수행하고 색인 관측 실패에만 범위 재읽기를 추가 한 번 시도한다. */
+  /**
+   * 저장은 한 번만 수행하고 색인 관측 실패에만 범위 재읽기를 추가 한 번 시도한다.
+   * @codocs [[작업 공간:저장 후 색인 갱신 실패를 복구하는 절차]]
+   */
   async write(input: unknown): Promise<WorkspaceWriteResult> {
     if (this.#closed || this.#explicitRefreshPromise)
       return this.#writeFailure([workspaceIndexNotReady().error]);
@@ -1218,7 +1270,10 @@ export class WorkspaceQuerySession {
     };
   }
 
-  /** 최신 실제 scan에서 필터 snapshot을 50개씩 반환한다. */
+  /**
+   * 최신 실제 scan에서 필터 snapshot을 50개씩 반환한다.
+   * @codocs [[작업 공간:목록 페이지 조회]]
+   */
   async list(input: WorkspaceListInput = {}): Promise<WorkspaceListResult> {
     if (this.#scan && this.#explicitRefreshPromise)
       return workspaceIndexNotReady();
@@ -2198,7 +2253,10 @@ export class WorkspaceQuerySession {
       : undefined;
   }
 
-  /** 명시 refresh는 결과 변화와 무관하게 기존 커서 generation을 만료한다. */
+  /**
+   * 명시 refresh는 결과 변화와 무관하게 기존 커서 generation을 만료한다.
+   * @codocs [[작업 공간:색인 갱신]]#L33-L35
+   */
   refresh(): Promise<WorkspaceRefreshResult> {
     if (this.#closed) return Promise.resolve(superseded());
     if (this.#explicitRefreshPromise) return this.#explicitRefreshPromise;
@@ -2291,6 +2349,7 @@ export class WorkspaceQuerySession {
   #unavailableCodeSnapshot(): WorkspaceCodeReferenceSnapshot {
     return {
       status: codeCollectionStatuses.incomplete,
+      hasCompletedCollection: false,
       codeGeneration: 0,
       documentGeneration: this.#catalogVersion,
       occurrences: [],
@@ -2304,7 +2363,7 @@ export class WorkspaceQuerySession {
     };
   }
 
-  /** 디스크와 적격 IDE buffer를 합친 현재 코드 출현이다. */
+  /** 디스크와 적격 IDE buffer를 합친 현재 코드 출현이며 최초 수집을 기다리지 않는다. */
   async codeReferenceSnapshot(): Promise<WorkspaceCodeReferenceSnapshot> {
     return (
       (await (await this.#codeReferences())?.snapshot()) ??
@@ -2328,7 +2387,7 @@ export class WorkspaceQuerySession {
     );
   }
 
-  /** 편집 관측과 source token을 해제하고 저장 출현으로 돌아간다. */
+  /** 편집 관측과 source token을 해제하고 저장 출현으로 돌아간다. 저장 원문은 다시 수집하지 않는다. */
   async closeCodeBuffer(sourcePath: string): Promise<void> {
     await this.#codeIndex?.closeBuffer(sourcePath);
   }
@@ -2370,7 +2429,7 @@ export class WorkspaceQuerySession {
     return (await this.#codeReferences())?.capture(input);
   }
 
-  /** 현재 source·owner version·saved target·양쪽 파일 정체를 다시 확인한다. */
+  /** 수집을 기다리지 않고 source·owner version·saved target·양쪽 파일 정체를 직접 다시 확인한다. */
   async confirmCodeReference(
     token: string,
     owner: { sourcePath: string; documentVersion: number },

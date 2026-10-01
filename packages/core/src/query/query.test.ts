@@ -513,6 +513,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           expect.objectContaining({ code: catalogDiagnosticCodes.duplicateId }),
         ],
       });
+      // @codocs [[조회 투영]]#L31
       expect(result.results[0]).not.toHaveProperty('document');
       expect(result.results[0]).not.toHaveProperty('rawYaml');
       expect(result.results[0]).not.toHaveProperty('revision');

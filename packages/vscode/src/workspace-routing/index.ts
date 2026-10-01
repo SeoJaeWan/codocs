@@ -6,7 +6,8 @@ export interface WorkspaceRoot {
   uri: string;
 }
 
-/** 포함하는 루트 중 가장 가까운 workspace folder를 선택한다. */
+/** 포함하는 루트 중 가장 가까운 workspace folder를 선택한다.
+ * @codocs [[VS Code:언어 서버 연결]]#L20-L21 */
 export function nearestWorkspaceRoot(
   documentPath: string,
   roots: readonly WorkspaceRoot[],

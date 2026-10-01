@@ -301,7 +301,7 @@ function matchesFilters(
   );
 }
 
-/** Catalog를 ID 오름차순의 전체 목록 snapshot으로 투영한다.
+/** Catalog를 ID 오름차순의 전체 목록 snapshot으로 투영한다. @codocs [[조회 투영]]#L13-L23
  * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
  * @param filters 한 파일이 모두 만족해야 하는 선택 조건이다.
  */
@@ -656,7 +656,7 @@ function cloneJson(
   return { success: true, value: result };
 }
 
-/** 연결 경로에서 유효하고 전역 유일한 ID만 중복 제거해 정렬한다. */
+/** 연결 경로에서 유효하고 전역 유일한 ID만 중복 제거해 정렬한다. @codocs [[조회 투영]]#L50-L56 */
 function externalIds(
   catalog: Catalog,
   identities: readonly CatalogIdentity[],
@@ -751,7 +751,7 @@ function documentResult(
   };
 }
 
-/** 첫 등장 순서로 중복 제거한 1~20개 ID를 독립 결과로 투영한다.
+/** 첫 등장 순서로 중복 제거한 1~20개 ID를 독립 결과로 투영한다. @codocs [[조회 투영]]#L25-L32
  * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
  * @param ids 조회할 ID 목록이다.
  * @param options 같은 원문 시점의 선택적인 경로별 revision이다.
@@ -826,7 +826,7 @@ export function projectCatalogGet(
   return { success: true, results };
 }
 
-/** 발견 경로를 같은 Catalog 관측의 내용·진단·직접/역참조로 투영한다.
+/** 발견 경로를 같은 Catalog 관측의 내용·진단·직접/역참조로 투영한다. @codocs [[조회 투영]]#L34-L38 @codocs [[조회 투영]]#L57-L58
  * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
  * @param paths 코드 매칭이 반환한 발견 경로 목록이다.
  * @param options 같은 원문 시점의 선택적인 경로별 revision이다.
@@ -926,7 +926,7 @@ export interface CatalogLiveReferenceResult {
   targets: readonly CatalogPathResult[];
 }
 
-/** 열린 YAML 하나만 파싱하고 기존 디스크 색인으로 이름 참조를 투영한다. */
+/** 열린 YAML 하나만 파싱하고 기존 디스크 색인으로 이름 참조를 투영한다. @codocs [[조회 투영]]#L40-L46 */
 export function projectLiveReferences(
   catalog: Catalog,
   sourcePath: string,

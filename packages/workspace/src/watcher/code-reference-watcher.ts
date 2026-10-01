@@ -1,18 +1,32 @@
 import chokidar, { type FSWatcher } from 'chokidar';
 import { execFile } from 'node:child_process';
+import type { Stats } from 'node:fs';
 import { promisify } from 'node:util';
 import path from 'node:path';
 const execute = promisify(execFile);
-/** 코드와 프로젝트 Git 메타데이터의 변경을 문서 감시와 분리한다. */
+/** 감시하지 않을 경로인지 판단하며 종류를 알 수 없는 첫 호출은 stats가 없다. */
+export type CodeWatchExclusion = (
+  input: string,
+  stats?: { isDirectory(): boolean },
+) => boolean;
+/**
+ * 코드와 프로젝트 Git 메타데이터의 변경을 문서 감시와 분리한다.
+ * @codocs [[작업 공간:작업 공간 파일 감시]]#L66-L69
+ */
 export class CodeReferenceWatcher {
   #watchers: FSWatcher[] = [];
   #closed = false;
   #cancel = new Set<() => void>();
-  /** 시작 전 구독을 고정하며 실패는 수집 계층에 전달한다. */
+  /**
+   * 시작 전 구독을 고정하며 실패는 수집 계층에 전달한다.
+   * excluded는 수집 정책과 같은 판단으로 감시하지 않을 경로를 알려 준다.
+   */
   constructor(
     readonly projectRoot: string,
     readonly changed: (paths: readonly string[]) => void,
     readonly failed: (error: unknown) => void,
+    readonly excluded: CodeWatchExclusion = /** 기본값은 제외하지 않는다. */ () =>
+      false,
   ) {}
   /** 모든 watch를 먼저 등록한 뒤 최초 reconciliation을 허용한다. */
   async start(): Promise<void> {
@@ -40,13 +54,11 @@ export class CodeReferenceWatcher {
       followSymlinks: false,
       ignoreInitial: true,
       /** Git 내부는 별도 index·HEAD 감시만 허용한다. */
-      ignored: (input: string): boolean =>
-        path
-          .relative(this.projectRoot, input)
-          .split(path.sep)
-          .indexOf('.git') >= 0 &&
-        path.relative(this.projectRoot, input).split(path.sep).at(-1) !==
-          '.git',
+      ignored: (input: string, stats?: Stats): boolean => {
+        const parts = path.relative(this.projectRoot, input).split(path.sep);
+        if (parts.indexOf('.git') >= 0) return parts.at(-1) !== '.git';
+        return this.excluded(input, stats);
+      },
     });
     const metadataPaths = new Set([
       path.join(this.projectRoot, '.git', 'index'),

@@ -322,7 +322,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
         (item) => item.code === 'deprecated_reference',
       ),
     ).toBe(false);
-    // 본문은 이동하지 않고 각 Hover 후보는 선택한 발견 경로로 확인한다.
+    // 본문은 이동하지 않고 각 Hover 후보는 선택한 발견 경로로 확인한다. @codocs [[IDE 지원]]#L74-L76
     const value = (hover!.contents as { value: string }).value;
     const queries = [...value.matchAll(/command:codocs.openSource\?([^)]*)/gu)];
     const targets = await Promise.all(

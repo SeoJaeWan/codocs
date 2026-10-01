@@ -7,7 +7,7 @@ import {
   codeReferenceStatuses,
   extractCodeReferences,
 } from '@codocs/core';
-import { codeCollectionStatuses } from '@codocs/workspace';
+import { codeCollectionStatuses, codeFileReasons } from '@codocs/workspace';
 import type {
   WorkspaceQuerySession,
   WorkspaceCodeReferenceOccurrence,
@@ -26,7 +26,10 @@ import {
   selectionTarget,
   type SourceSelection,
 } from '../navigation/index.js';
-import { codeReferenceMessages } from './domain-values.js';
+import {
+  codeCollectionMessages,
+  codeReferenceMessages,
+} from './domain-values.js';
 
 /** 명시적 참조 표현에 사용하는 공개 workspace 경계다. */
 export type CodeSession = Pick<
@@ -66,17 +69,19 @@ interface Selected {
   key: string;
 }
 
-/** source-owned 토큰으로 명시 링크·역참조·힌트를 표현한다. */
+/** source-owned 토큰으로 명시 링크·역참조·힌트를 표현한다. @codocs [[IDE 지원]]#L16-L54 */
 export class CodeNavigation {
   readonly #selected = new Map<string, Selected>();
   readonly #ready = new Map<
     string,
     { owner: CodeOwner; promise: Promise<void> }
   >();
-  /** 최신 열린 원문을 한 번만 동기화하고 같은 버전의 요청은 공유한다. */
-  prepare(owner: CodeOwner): Promise<void> {
+  /** 최신 열린 원문을 한 번만 동기화하고 같은 버전의 요청은 공유한다. @codocs [[문서 동기화]]#L37 @codocs [[문서 동기화]]#L61 */
+  async prepare(owner: CodeOwner): Promise<void> {
     const previous = this.#ready.get(owner.uri);
-    if (previous && sameOwner(previous.owner, owner)) return previous.promise;
+    // 최초 수집 중에는 등록을 뒤에서 이어 가고 요청 경로는 수집을 기다리지 않는다.
+    if (previous && sameOwner(previous.owner, owner))
+      return (await initialPending(owner)) ? undefined : previous.promise;
     const promise = (previous?.promise ?? Promise.resolve()).then(
       /** 최신 출처 버전과 적격 열린 원문을 같은 API 관측에 등록한다. */ async () => {
         await owner.session.setCodeReferenceOwner(owner.path, owner.version);
@@ -91,6 +96,14 @@ export class CodeNavigation {
       },
     );
     this.#ready.set(owner.uri, { owner, promise });
+    if (await initialPending(owner)) {
+      promise.catch(
+        /** 뒤에서 이어지는 등록 실패는 요청을 막지 않고 기록한다. */ (
+          error: unknown,
+        ) => console.error('Code buffer registration failed', error),
+      );
+      return;
+    }
     return promise;
   }
   /** 편집·닫기에서 표시 토큰을 즉시 폐기한다. */
@@ -154,7 +167,7 @@ export class CodeNavigation {
     this.#selected.set(key, { owner, token, reverse, key: identity });
     return selectionTarget({ sourceUri: owner.uri, token: key });
   }
-  /** 클릭 전후 현재 출처 버전·서버와 양쪽 파일 정체를 재확인한다. */
+  /** 클릭 전후 현재 출처 버전·서버와 양쪽 파일 정체를 재확인한다. @codocs [[IDE 지원]]#L94-L96 */
   async confirm(
     input: unknown,
     current: (owner: CodeOwner) => boolean,
@@ -200,14 +213,14 @@ export class CodeNavigation {
           : { kind: 'top' },
     };
   }
-  /** 유효·무효 전체 span을 ID Hover보다 먼저 확인한다. */
+  /** 유효·무효 전체 span을 ID Hover보다 먼저 확인한다. @codocs [[코드 호버]]#L8 */
   markerAt(owner: CodeOwner, offset: number): boolean {
     return extractCodeReferences(owner.text).some(
       (item) =>
         item.offsetRange.start <= offset && offset < item.offsetRange.end,
     );
   }
-  /** 무효 명시 표기에는 ID 설명 대신 구별 가능한 오류 이유만 제공한다. */
+  /** 무효 명시 표기에는 ID 설명 대신 구별 가능한 오류 이유만 제공한다. @codocs [[IDE 지원]]#L19-L22 */
   async markerHover(owner: CodeOwner, offset: number): Promise<Hover | null> {
     await this.prepare(owner);
     const snapshot = await owner.session.codeReferenceSnapshot();
@@ -226,12 +239,14 @@ export class CodeNavigation {
       range: item.marker.range,
     };
   }
-  /** 적격 source의 확인한 출현만 직접 링크로 만든다. */
+  /** 적격 source의 확인한 출현만 직접 링크로 만든다. @codocs [[IDE 지원]]#L100-L101 */
   async forward(
     owner: CodeOwner,
   ): Promise<{ links: DocumentLink[]; diagnostics: Diagnostic[] }> {
     await this.prepare(owner);
     const snapshot = await owner.session.codeReferenceSnapshot();
+    if (snapshot.hasCompletedCollection === false)
+      return { links: [], diagnostics: [] };
     const links: DocumentLink[] = [];
     const diagnostics: Diagnostic[] = [];
     for (const item of snapshot.occurrences.filter(
@@ -265,13 +280,14 @@ export class CodeNavigation {
     );
     return this.render(owner, query);
   }
-  /** 완료 단일 구간만 직접 연결하며 문서 이름 링크와 겹친 구간은 양보한다. */
+  /** 완료 단일 구간만 직접 연결하며 문서 이름 링크와 겹친 구간은 양보한다. @codocs [[IDE 지원]]#L29-L36 */
   async reverseLinks(
     owner: CodeOwner,
     yamlLinks: readonly DocumentLink[],
   ): Promise<DocumentLink[]> {
     await this.prepare(owner);
     const snapshot = await owner.session.codeReferenceSnapshot();
+    if (snapshot.hasCompletedCollection === false) return [];
     const rows = owner.text.split(/\r\n|\r|\n/u);
     const boundaries = new Set<number>();
     for (const item of snapshot.occurrences)
@@ -293,7 +309,7 @@ export class CodeNavigation {
         first,
         last,
       );
-      if (!query.unique || query.occurrences.length !== 1) continue;
+      if (query.occurrences.length !== 1) continue;
       for (let line = first - 1; line < last; line++) {
         const length = rows[line]!.length;
         const blocked = yamlLinks
@@ -321,6 +337,24 @@ export class CodeNavigation {
           start = Math.max(start, block.end);
         }
         if (start < length) segments.push({ start, end: length });
+        const text = rows[line]!;
+        const body = segments.flatMap(
+          /** 앞뒤 공백을 덜어낸 본문 구간만 남기고 공백뿐인 구간은 버린다. */ (
+            segment,
+          ) => {
+            const raw = text.slice(segment.start, segment.end);
+            const lead = raw.length - raw.trimStart().length;
+            const trimmed = raw.trim();
+            return trimmed
+              ? [
+                  {
+                    start: segment.start + lead,
+                    end: segment.start + lead + trimmed.length,
+                  },
+                ]
+              : [];
+          },
+        );
         const target = await this.target(
           owner,
           query.occurrences[0]!,
@@ -328,7 +362,7 @@ export class CodeNavigation {
           `${query.codeGeneration}/${query.documentGeneration}`,
         );
         if (target)
-          for (const segment of segments)
+          for (const segment of body)
             links.push({
               range: {
                 start: { line, character: segment.start },
@@ -340,10 +374,22 @@ export class CodeNavigation {
     }
     return links;
   }
-  /** 문서 전체 출현만 실제 첫 행 앞에 표시한다. */
+  /** 문서 전체 출현만 실제 첫 행 앞에 표시한다. @codocs [[IDE 지원]]#L40-L45 */
   async hints(owner: CodeOwner): Promise<InlayHint[]> {
     await this.prepare(owner);
     const query = await owner.session.codeReferencesForDocument(owner.path);
+    if (isInitialCollection(query))
+      return [
+        {
+          position: { line: 0, character: 0 },
+          label: [{ value: codeCollectionMessages.initialLabel }],
+          tooltip: {
+            kind: 'markdown',
+            value: codeCollectionMessages.initialLabel,
+          },
+          paddingRight: true,
+        },
+      ];
     if (query.absent) return [];
     const count = query.occurrences.length;
     const documentComplete = await this.documentComplete(owner, query);
@@ -351,9 +397,9 @@ export class CodeNavigation {
       ? `확인된 코드 ${count}곳 · 문서 탐색 미확인`
       : query.status === codeCollectionStatuses.complete
         ? `문서 전체에 연결된 코드 · ${count}곳`
-        : `확인된 코드 ${count}곳 · ${query.status === codeCollectionStatuses.collecting ? '수집 중' : '수집 불완전'}`;
+        : `확인된 코드 ${count}곳 · ${incompleteLabel(query)}`;
     const target =
-      query.unique && query.occurrences.length === 1
+      count === 1
         ? await this.target(
             owner,
             query.occurrences[0]!,
@@ -392,11 +438,12 @@ export class CodeNavigation {
     );
     return result.success && result.scanStatus === scanStatuses.complete;
   }
-  /** 개별 위치와 수집 상태를 Markdown에 안전하게 표시한다. */
+  /** 개별 위치와 수집 상태를 Markdown에 안전하게 표시한다. @codocs [[IDE 지원]]#L51-L54 */
   async render(
     owner: CodeOwner,
     query: WorkspaceCodeReferenceQuery,
   ): Promise<string> {
+    if (isInitialCollection(query)) return codeCollectionMessages.initialLabel;
     const documentComplete = await this.documentComplete(owner, query);
     const lines: string[] =
       query.occurrences.length &&
@@ -416,15 +463,41 @@ export class CodeNavigation {
       );
       lines.push(target ? `- [${label}](${target})` : `- ${label}`);
     }
-    if (query.status !== codeCollectionStatuses.complete)
+    if (query.status !== codeCollectionStatuses.complete) {
       lines.push(
-        `확인된 코드 ${query.occurrences.length}곳 · ${query.status === codeCollectionStatuses.collecting ? '수집 중' : '수집 불완전'}`,
-        ...query.failures.map((item) => escapeMarkdown(item.message)),
+        `확인된 코드 ${query.occurrences.length}곳 · ${incompleteLabel(query)}`,
       );
+      for (const item of query.failures) {
+        if (item.reason === codeFileReasons.watch)
+          console.error('Code watch failed', item.message);
+        else lines.push(escapeMarkdown(item.message));
+      }
+      if (query.failures.some((item) => item.reason === codeFileReasons.watch))
+        lines.push(codeCollectionMessages.reconnectingGuidance);
+    }
     if (!documentComplete)
       lines.push('저장 문서 탐색을 완전히 확인하지 못했습니다.');
     return lines.join('\n');
   }
+}
+/** 미완료 수집의 상태 문구를 정한다. 감시 실패만 있으면 재연결 중이다. */
+function incompleteLabel(query: WorkspaceCodeReferenceQuery): string {
+  if (query.status === codeCollectionStatuses.collecting)
+    return codeCollectionMessages.collectingLabel;
+  return query.failures.length > 0 &&
+    query.failures.every((item) => item.reason === codeFileReasons.watch)
+    ? codeCollectionMessages.reconnectingLabel
+    : codeCollectionMessages.incompleteLabel;
+}
+/** 최초 수집이 아직 끝나지 않아 유일·부재를 말할 수 없는 상태인지 확인한다. */
+function isInitialCollection(query: {
+  hasCompletedCollection?: boolean;
+}): boolean {
+  return query.hasCompletedCollection === false;
+}
+/** 최초 수집이 끝나지 않았는지 기다리지 않고 확인한다. */
+async function initialPending(owner: CodeOwner): Promise<boolean> {
+  return isInitialCollection(await owner.session.codeReferenceSnapshot());
 }
 /** 같은 출처·원문·버전·공개 세션의 준비만 공유한다. */
 function sameOwner(left: CodeOwner, right: CodeOwner): boolean {

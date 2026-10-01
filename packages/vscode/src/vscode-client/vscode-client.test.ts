@@ -37,6 +37,10 @@ const boundary = vi.hoisted(() => {
     showError: vi.fn(),
     showDocument: vi.fn(),
     openDocument: vi.fn(),
+    watchers: [] as {
+      pattern: string;
+      handlers: { create: unknown[]; change: unknown[]; delete: unknown[] };
+    }[],
     options: undefined as LanguageClientOptions | undefined,
     state: undefined as ((event: { newState: number }) => void) | undefined,
     hints: undefined as
@@ -82,12 +86,29 @@ vi.mock('vscode', () => ({
     getWorkspaceFolder: () => boundary.owner,
     onDidChangeWorkspaceFolders: () => boundary.disposable,
     openTextDocument: boundary.openDocument,
-    createFileSystemWatcher: () => ({
-      ...boundary.disposable,
-      onDidCreate: () => boundary.disposable,
-      onDidChange: () => boundary.disposable,
-      onDidDelete: () => boundary.disposable,
-    }),
+    createFileSystemWatcher: (pattern: { pattern?: string }) => {
+      const handlers = {
+        create: [] as unknown[],
+        change: [] as unknown[],
+        delete: [] as unknown[],
+      };
+      boundary.watchers.push({ pattern: String(pattern.pattern), handlers });
+      return {
+        ...boundary.disposable,
+        onDidCreate: (handler: unknown) => {
+          handlers.create.push(handler);
+          return boundary.disposable;
+        },
+        onDidChange: (handler: unknown) => {
+          handlers.change.push(handler);
+          return boundary.disposable;
+        },
+        onDidDelete: (handler: unknown) => {
+          handlers.delete.push(handler);
+          return boundary.disposable;
+        },
+      };
+    },
   },
   languages: {
     registerDocumentLinkProvider: (
@@ -122,7 +143,13 @@ vi.mock('vscode', () => ({
     },
   },
   ['Uri']: { parse: (value: string) => ({ toString: () => value }) },
-  ['RelativePattern']: class {},
+  ['RelativePattern']: class {
+    pattern: string;
+    /** 감시 대상 패턴을 테스트에서 확인할 수 있게 보관한다. */
+    constructor(_base: unknown, pattern: string) {
+      this.pattern = pattern;
+    }
+  },
 }));
 vi.mock('vscode-languageclient/node.js', () => ({
   ['CloseAction']: {},
@@ -198,6 +225,7 @@ beforeEach(() => {
   boundary.showDocument.mockReset();
   boundary.openDocument.mockReset();
   boundary.commands.clear();
+  boundary.watchers.length = 0;
 });
 
 describe('VscodeExtensionRuntime 원문 이동 실패 출력', () => {
@@ -245,6 +273,30 @@ describe('VscodeExtensionRuntime 원문 이동 실패 출력', () => {
       await runtime.deactivate();
     },
   );
+});
+
+// @codocs [[VS Code:언어 서버 연결]]
+describe('VscodeFolderClient 갱신 요청 신호', () => {
+  it('.codocs 폴더 생성·삭제에만 refresh를 요청하고 내용 파일 변경과 폴더 변경에는 요청하지 않는다', async () => {
+    boundary.send.mockResolvedValue(undefined);
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    expect(boundary.watchers.map((watcher) => watcher.pattern)).toEqual([
+      '.codocs',
+    ]);
+    const { create, change, delete: remove } = boundary.watchers[0]!.handlers;
+    expect(change).toEqual([]);
+    for (const handler of [...create, ...remove] as (() => void)[]) handler();
+    expect(boundary.send).toHaveBeenCalledTimes(2);
+    expect(boundary.send).toHaveBeenCalledWith(expect.anything(), {
+      workspaceUri: 'file:///fixture',
+    });
+    await client.stop();
+  });
 });
 
 describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
@@ -324,6 +376,7 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
     await client.stop();
   });
 
+  // @codocs [[VS Code:언어 서버 연결]]#L43
   it('이전 client 세션의 늦은 실패 알림은 새 상태 항목에 게시하지 않는다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,
@@ -444,6 +497,7 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
       await client.stop();
     },
   );
+  // @codocs [[VS Code:원문 열기]]#L16
   it('확인 응답 사이에 snapshot 알림이 와도 같은 출처와 서버의 성공을 유지한다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,
@@ -540,6 +594,7 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
 });
 
 describe('source-owning Inlay Hint provider', () => {
+  // @codocs [[VS Code:언어 서버 연결]]#L50-L51
   it('소유한 source의 힌트만 요청하고 서버가 생성한 tooltip command만 신뢰한다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,

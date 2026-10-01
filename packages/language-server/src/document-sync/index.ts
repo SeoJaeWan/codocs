@@ -31,7 +31,7 @@ export type DocumentUpdateResult =
       reason: DocumentUpdateRejection;
     };
 
-/** SDK TextDocument로 전체 원문과 단조 증가 버전을 관리한다. */
+/** SDK TextDocument로 전체 원문과 단조 증가 버전을 관리한다. @codocs [[문서 동기화]] */
 export class SynchronizedDocuments {
   readonly #documents = new Map<string, TextDocument>();
 
@@ -51,7 +51,7 @@ export class SynchronizedDocuments {
     return { accepted: true, document };
   }
 
-  /** didChange의 단일 전체 원문만 받고 버전이 증가할 때 교체한다. */
+  /** didChange의 단일 전체 원문만 받고 버전이 증가할 때 교체한다. @codocs [[문서 동기화]]#L11-L14 */
   change(params: DidChangeTextDocumentParams): DocumentUpdateResult {
     const current = this.#documents.get(params.textDocument.uri);
     if (!current)
@@ -75,7 +75,7 @@ export class SynchronizedDocuments {
     return { accepted: true, document };
   }
 
-  /** 닫힌 URI의 편집 중 원문을 제거한다. */
+  /** 닫힌 URI의 편집 중 원문을 제거한다. @codocs [[문서 동기화]]#L38 */
   close(uri: string): boolean {
     return this.#documents.delete(uri);
   }
@@ -117,7 +117,7 @@ export function utf16OffsetToPosition(
   return document.positionAt(offset);
 }
 
-/** UTF-16 [start,end) 범위를 LSP 반개방 Range로 바꾼다. */
+/** UTF-16 [start,end) 범위를 LSP 반개방 Range로 바꾼다. @codocs [[문서 동기화]]#L12-L13 */
 export function utf16OffsetsToRange(
   document: TextDocument,
   offsets: Utf16OffsetRange,

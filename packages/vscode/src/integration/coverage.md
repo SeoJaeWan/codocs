@@ -1,6 +1,6 @@
 # 실제 VS Code UI 검사와 이전 assertion 소유권
 
-`extension.test.cjs`의 19개 대표 사례는 설치된 VSIX의 실제 renderer에서 포인터 Hover, 표시된 앵커 press/release, Windows Ctrl-click 또는 macOS Cmd-click을 사용한다. API는 활성화, 게시된 진단, fixture 편집 준비, 실제 editor/선택/탭 관측에만 사용한다. provider 응답이나 제품 command를 직접 호출하지 않는다. 설치 smoke는 활성화와 서버가 게시한 진단 응답만 확인한다.
+`extension.test.cjs`의 20개 대표 사례는 설치된 VSIX의 실제 renderer에서 포인터 Hover, 표시된 앵커 press/release, Windows Ctrl-click 또는 macOS Cmd-click을 사용한다. API는 활성화, 게시된 진단, fixture 편집 준비, 실제 editor/선택/탭 관측에만 사용한다. provider 응답이나 제품 command를 직접 호출하지 않는다. 설치 smoke는 활성화와 서버가 게시한 진단 응답만 확인한다.
 
 | UI 사례                      | 고유한 화면/Host 관측                                                                       |
 | ---------------------------- | ------------------------------------------------------------------------------------------- |
@@ -19,6 +19,7 @@
 | explicit-link-recover        | 대상 생성·저장 뒤 진단 제거와 새 링크 클릭으로 대상 열기                                    |
 | explicit-link-rejected       | 미저장 대상의 끝 행 삭제 뒤 클릭 거부: Output의 destination_unavailable, 선택·탭 보존       |
 | reverse-single-direct        | 단일 코드 연결 YAML 행의 수정 키 클릭이 코드의 @codocs 표기를 선택                          |
+| reverse-folder-recreate      | 폴더 삭제·재생성 뒤 `연결된 코드 · 1곳` Hover 복귀와 재생성 파일 편집(2곳)의 반영           |
 | reverse-multiple-hover       | 구현·테스트 두 연결의 `연결된 코드 · 2곳` Hover와 앵커별 표기 선택                          |
 | reverse-overlap-yaml-link    | 이름 링크와 겹친 행: YAML 링크는 문서 상단, Hover의 코드 앵커는 표기 선택                   |
 | whole-single-gesture         | 문서 전체 단일 연결의 Inlay label 수정 키 클릭이 표기를 선택                                |
