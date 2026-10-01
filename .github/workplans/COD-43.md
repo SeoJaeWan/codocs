@@ -45,7 +45,7 @@ COD-42에서 확인한 상황을 공유하기 위한 목록이다. 해당 문서
 | 9   | core            | 예시 `[[이름]]`이 대상 없는 참조로 진단됨 (`reference-extraction.yaml:19`)                                            | COD-45 `98193f3`에서 처리됨 |
 | 10  | -               | `.github/workplans/COD-42.md` 포맷 검사 실패                                                                          | 작업 계획 자동화            |
 
-항목별 재현 근거는 이 PR 본문의 이전 버전과 [COD-43](https://seojaewan.atlassian.net/browse/COD-43)에 남아 있다.
+항목별 재현 근거는 [이전 계획서](https://github.com/SeoJaeWan/codocs/blob/ed1c8ab/.github/workplans/COD-43.md)에 남아 있다.
 
 ## 후속 항목
 
