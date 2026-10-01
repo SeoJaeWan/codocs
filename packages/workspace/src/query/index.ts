@@ -2315,6 +2315,7 @@ export class WorkspaceQuerySession {
   #unavailableCodeSnapshot(): WorkspaceCodeReferenceSnapshot {
     return {
       status: codeCollectionStatuses.incomplete,
+      hasCompletedCollection: false,
       codeGeneration: 0,
       documentGeneration: this.#catalogVersion,
       occurrences: [],
@@ -2328,7 +2329,7 @@ export class WorkspaceQuerySession {
     };
   }
 
-  /** 디스크와 적격 IDE buffer를 합친 현재 코드 출현이다. */
+  /** 디스크와 적격 IDE buffer를 합친 현재 코드 출현이며 최초 수집을 기다리지 않는다. */
   async codeReferenceSnapshot(): Promise<WorkspaceCodeReferenceSnapshot> {
     return (
       (await (await this.#codeReferences())?.snapshot()) ??
@@ -2352,7 +2353,7 @@ export class WorkspaceQuerySession {
     );
   }
 
-  /** 편집 관측과 source token을 해제하고 저장 출현으로 돌아간다. */
+  /** 편집 관측과 source token을 해제하고 저장 출현으로 돌아간다. 저장 원문은 다시 수집하지 않는다. */
   async closeCodeBuffer(sourcePath: string): Promise<void> {
     await this.#codeIndex?.closeBuffer(sourcePath);
   }
@@ -2394,7 +2395,7 @@ export class WorkspaceQuerySession {
     return (await this.#codeReferences())?.capture(input);
   }
 
-  /** 현재 source·owner version·saved target·양쪽 파일 정체를 다시 확인한다. */
+  /** 수집을 기다리지 않고 source·owner version·saved target·양쪽 파일 정체를 직접 다시 확인한다. */
   async confirmCodeReference(
     token: string,
     owner: { sourcePath: string; documentVersion: number },
