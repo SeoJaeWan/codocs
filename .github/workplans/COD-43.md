@@ -69,6 +69,7 @@ COD-42에서 확인한 상황을 공유하기 위한 목록이다. 해당 문서
 | 11  | `development/*`                                                                  | -                                                                       | 패키지 폴더를 전제로 한 「폴더 컨벤션」·「문서 컨벤션」·「실행 구조」 등의 서술 정리                                                                        | 문서 수정      | development 논의 후 이 PR |
 | 12  | `concepts/document/validation/diagnostics.yaml`                                  | `packages/workspace/src/query/index.ts` `withConfirmationDiagnostic` 등 | 미확인 **문서**의 get·list 결과에도 참조 진단 코드 `unconfirmed_reference`를 붙인다. 「진단」 검토 때 함께 판정                                             | 판정 보류      | 「진단」 링크 작업 때     |
 | 13  | `concepts/reference/reference.yaml`                                              | `packages/core/src/catalog/index.ts` `resolveReference`                 | 후보 중 미확인 문서가 있으면 미확인으로 두는 분기는 미확인 문서가 완료되지 않은 탐색에서만 생겨 실행될 수 없었다. 함수 분리 때 제거                         | 코드 정리      | 이 PR에서 처리            |
+| 14  | `concepts/reference/code-link.yaml` 「문서에서 코드로 돌아가기」                 | `packages/language-server/src/code-navigation/index.ts`                 | 연결이 1곳일 때만 본문 밑줄이 생기고 2곳 이상은 호버로만 이동한다. 밑줄이 상시 보여 가독성도 떨어진다. 줄 끝 `*` 표시와 호버 배경 강조로 바꾼다             | 코드 수정 필요 | COD-56 (PR #70)           |
 
 ## 검증
 
