@@ -137,23 +137,21 @@ describe('extractReferences: 본문 문자열에서 참조 추출', () => {
   });
 });
 
-/** 정의 문자열의 참조를 이름·도메인 쌍으로 바꾼다. 문법 오류는 null이다. */
-function parts(definition: string): ([string, string | undefined] | null)[] {
-  return extractReferences(
-    parseYaml(`definition: ${definition}\n`),
-  ).occurrences.map((item) =>
-    item.syntax === referenceSyntaxStatuses.valid
-      ? [item.name, item.domain]
-      : null,
-  );
-}
-
 describe('표기: 참조 이름과 도메인', () => {
   /**
    * @codocs [[참조]]#L18
    */
   it('이름 앞에 도메인과 콜론을 적으면 도메인과 이름으로 나눈다', () => {
-    expect(parts("'[[도메인:이름]] [[이름]]'")).toEqual([
+    const result = extractReferences(
+      parseYaml("definition: '[[도메인:이름]] [[이름]]'\n"),
+    );
+    expect(
+      result.occurrences.map((item) =>
+        item.syntax === referenceSyntaxStatuses.valid
+          ? [item.name, item.domain]
+          : null,
+      ),
+    ).toEqual([
       ['이름', '도메인'],
       ['이름', undefined],
     ]);
@@ -162,7 +160,16 @@ describe('표기: 참조 이름과 도메인', () => {
    * @codocs [[참조]]#L19
    */
   it('이름과 도메인에 `\\:`로 쓴 콜론은 콜론 글자로 읽는다', () => {
-    expect(parts(String.raw`'[[a\:b]] [[도\:메인:이\:름]]'`)).toEqual([
+    const result = extractReferences(
+      parseYaml(String.raw`definition: '[[a\:b]] [[도\:메인:이\:름]]'` + '\n'),
+    );
+    expect(
+      result.occurrences.map((item) =>
+        item.syntax === referenceSyntaxStatuses.valid
+          ? [item.name, item.domain]
+          : null,
+      ),
+    ).toEqual([
       ['a:b', undefined],
       ['이:름', '도:메인'],
     ]);
@@ -179,7 +186,16 @@ describe('표기: 참조 이름과 도메인', () => {
   ])(
     '백슬래시가 %s이면 홀수 개는 글자로, 짝수 개는 원래 표기로 읽는다',
     (_count, definition, expected) => {
-      expect(parts(definition)).toEqual(expected);
+      const result = extractReferences(
+        parseYaml(`definition: ${definition}\n`),
+      );
+      expect(
+        result.occurrences.map((item) =>
+          item.syntax === referenceSyntaxStatuses.valid
+            ? [item.name, item.domain]
+            : null,
+        ),
+      ).toEqual(expected);
     },
   );
   /**
@@ -187,9 +203,10 @@ describe('표기: 참조 이름과 도메인', () => {
    * @codocs [[참조]]#L21
    */
   it('YAML 큰따옴표 문자열은 YAML이 바꾼 뒤의 백슬래시 개수로 판단한다', () => {
-    expect(parts(String.raw`"\\[[제외]] \\\\[[포함]]"`)).toEqual([
-      ['포함', undefined],
-    ]);
+    const result = extractReferences(
+      parseYaml(String.raw`definition: "\\[[제외]] \\\\[[포함]]"` + '\n'),
+    );
+    expect(result.occurrences.map((item) => item.text)).toEqual(['[[포함]]']);
   });
 });
 
