@@ -186,7 +186,11 @@ export class WorkspaceCodeReferenceIndex {
   ) {
     this.#published = this.#signature();
   }
-  /** 저장 document snapshot만 교체하고 원문 코드 관측을 재사용한다. 바뀐 경우에만 알린다. @codocs [[참조]]#L51 */
+  /**
+   * 대상 문서를 저장해 색인이 바뀌면 코드 참조를 다시 판단하도록 알린다.
+   * 코드 쪽 관측은 다시 읽지 않고 재사용한다.
+   * @codocs [[참조]]#L51
+   */
   setCatalog(catalog: Catalog | undefined, documentGeneration: number): void {
     if (this.#closed) return;
     const changed =
@@ -210,7 +214,11 @@ export class WorkspaceCodeReferenceIndex {
     this.#owners.set(relative, documentVersion);
     return true;
   }
-  /** 동일 버전의 원문까지 확인한 후 적격 저장 파일만 편집 관측으로 대체한다. @codocs [[참조]]#L53 */
+  /**
+   * 코드의 저장하지 않은 편집 내용으로 코드 참조를 다시 찾는다.
+   * 같은 버전의 저장 파일이 수집 대상일 때만 편집 내용으로 대체한다.
+   * @codocs [[참조]]#L53
+   */
   async updateBuffer(input: WorkspaceCodeBufferInput): Promise<boolean> {
     const relative = codeFileRelativePath(this.projectRoot, input.sourcePath);
     if (!relative || !this.setOwner(relative, input.documentVersion))

@@ -46,7 +46,10 @@ export interface ReferenceExtraction {
   occurrences: readonly ReferenceOccurrence[];
   diagnostics: readonly ReferenceDiagnostic[];
 }
-/** 바로 앞 연속 백슬래시 개수가 홀수인지 검사한다. @codocs [[참조]]#L20 */
+/**
+ * 바로 앞의 연속 백슬래시가 홀수라 글자로 쓰였는지 확인한다.
+ * @codocs [[참조]]#L20
+ */
 function escaped(value: string, index: number): boolean {
   let count = 0;
   while (index > 0 && value[--index] === '\\') count++;
@@ -59,7 +62,10 @@ function unescapedColons(value: string): number[] {
     if (value[index] === ':' && !escaped(value, index)) colons.push(index);
   return colons;
 }
-/** 첫 번째 escape되지 않은 콜론을 기준으로 도메인과 이름 원문을 나눈다. @codocs [[참조]]#L18 */
+/**
+ * 참조 표기에서 첫 번째 escape되지 않은 콜론 앞을 도메인, 뒤를 이름으로 나눈다.
+ * @codocs [[참조]]#L18
+ */
 function splitDomain(
   value: string,
   separator: number | undefined,
@@ -70,11 +76,17 @@ function splitDomain(
     domain: value.slice(0, separator),
   };
 }
-/** 이름과 도메인에 escape해 넣은 콜론을 콜론 글자로 되돌린다. @codocs [[참조]]#L19 */
+/**
+ * 이름과 도메인에 `\:`로 쓴 콜론을 콜론 글자로 되돌린다.
+ * @codocs [[참조]]#L19
+ */
 function unescapeColon(text: string): string {
   return text.replace(/\\:/gu, ':');
 }
-/** 대괄호 안의 구성이 문법 오류인지 판정한다. @codocs [[참조]]#L22 */
+/**
+ * 대괄호 안의 구성이 빈 이름·도메인, 남은 대괄호, 두 번째 콜론 중 하나면 문법 오류로 판정한다.
+ * @codocs [[참조]]#L22
+ */
 function invalidComponents(
   value: string,
   colons: readonly number[],
@@ -105,7 +117,10 @@ interface ReferenceSpan {
   end: number;
   closed: boolean;
 }
-/** 참조 표기 구간을 찾는다. 닫히지 않은 참조는 다음 `[[` 앞이나 본문 끝에서 끝낸다. @codocs [[참조]]#L26 */
+/**
+ * 본문에서 참조 표기 구간을 찾는다. 닫히지 않은 참조는 다음 `[[` 앞이나 본문 끝에서 끝낸다.
+ * @codocs [[참조]]#L26
+ */
 function scanReferenceSpans(value: string): ReferenceSpan[] {
   const spans: ReferenceSpan[] = [];
   let start: number | undefined;
@@ -135,7 +150,10 @@ function bodyPaths(data: Record<string, unknown>): FieldPath[] {
         paths.push([documentFields.examples, index]);
   return paths;
 }
-/** YAML 성공 결과의 정해진 본문만 추출한다. 스키마 검증·ID·파일 IO에 의존하지 않고 입력을 변경하지 않는다. @codocs [[참조]]#L15 */
+/**
+ * 문서 본문에서 참조 표기를 찾아 이름과 도메인으로 해석하고, 문법 오류인 표기는 그 위치에 진단한다.
+ * @codocs [[참조]]#L15
+ */
 export function extractReferences(
   parsed: YamlParseResult,
   path?: string,

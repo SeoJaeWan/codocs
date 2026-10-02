@@ -138,7 +138,11 @@ describe('extractReferences: 본문 문자열에서 참조 추출', () => {
 });
 
 describe('parseYaml과 extractReferences: YAML 표기별 참조 위치', () => {
-  it('백슬래시 홀짝과 콜론 이스케이프를 쓰면 리터럴을 제외하고 정확한 이름을 유지한다', /** @codocs [[참조]]#L19 @codocs [[참조]]#L20 */ () => {
+  /**
+   * @codocs [[참조]]#L19
+   * @codocs [[참조]]#L20
+   */
+  it('백슬래시 홀짝과 콜론 이스케이프를 쓰면 리터럴을 제외하고 정확한 이름을 유지한다', () => {
     const source = String.raw`definition: '\[[리터럴]] \\[[이름]] \\\[[리터럴]] \\\\[[도메인:이름\:콜론]] [[ 이름 😀 ]] [[이름]]'
 `;
     const result = extractReferences(parseYaml(source));
@@ -166,7 +170,12 @@ describe('parseYaml과 extractReferences: YAML 표기별 참조 위치', () => {
       '[[이름]]',
     ]);
   });
-  it('빈 구성과 중첩 및 미완성 참조가 있으면 앞 오류를 유지하고 다음 참조를 복구한다', /** 모든 오류에 실제 원문 범위와 동일한 책임 계층 상수를 반환한다. @codocs [[참조]]#L23 @codocs [[참조]]#L25 @codocs [[참조]]#L26 */ () => {
+  /**
+   * @codocs [[참조]]#L23
+   * @codocs [[참조]]#L25
+   * @codocs [[참조]]#L26
+   */
+  it('빈 구성과 중첩 및 미완성 참조가 있으면 앞 오류를 유지하고 다음 참조를 복구한다', () => {
     const source =
       'definition: "[[]] [[:이름]] [[도메인:]] [[a:b:c]] [[앞 [[정상]] [[끝"\n';
     const result = extractReferences(parseYaml(source), 'doc.yaml');
@@ -201,7 +210,10 @@ describe('parseYaml과 extractReferences: YAML 표기별 참조 위치', () => {
       '[[끝',
     ]);
   });
-  it('참조를 반복 추출하면 모든 위치와 입력을 변경하지 않는다', /** 같은 표기의 반복은 별도 등장이다. @codocs [[참조]]#L27 */ () => {
+  /**
+   * @codocs [[참조]]#L27
+   */
+  it('참조를 반복 추출하면 모든 위치와 입력을 변경하지 않는다', () => {
     const source = 'definition: "😀 [[반복]] [[반복]]"\n';
     const parsed = parseYaml(source);
     const before = JSON.stringify(parsed);
@@ -240,13 +252,21 @@ describe('parseYaml과 extractReferences: YAML 표기별 참조 위치', () => {
     ]);
     expect(result.diagnostics[0]?.path).toBe('');
   });
-  it('해석 문자열의 백슬래시 escape 개수가 홀짝이면 YAML 원문 개수로 판정하지 않는다', /** double quote의 두 원문 백슬래시는 해석값에서 하나의 리터럴 escape가 된다. @codocs [[참조]]#L21 */ () => {
+  /**
+   * double quote의 두 원문 백슬래시는 해석값에서 하나의 리터럴 escape가 된다.
+   * @codocs [[참조]]#L21
+   */
+  it('해석 문자열의 백슬래시 escape 개수가 홀짝이면 YAML 원문 개수로 판정하지 않는다', () => {
     const source = String.raw`definition: "\\[[제외]] \\\\[[포함]]"` + '\n';
     expect(
       extractReferences(parseYaml(source)).occurrences.map((item) => item.text),
     ).toEqual(['[[포함]]']);
   });
-  it('대괄호 구성 오류와 연속 참조가 있으면 오류와 다음 정상 참조를 모두 유지한다', /** 이름의 단일 대괄호를 정상으로 추측하지 않는다. @codocs [[참조]]#L24 @codocs [[참조]]#L26 */ () => {
+  /**
+   * @codocs [[참조]]#L24
+   * @codocs [[참조]]#L26
+   */
+  it('대괄호 구성 오류와 연속 참조가 있으면 오류와 다음 정상 참조를 모두 유지한다', () => {
     const source =
       'definition: "[[a[b]][[정상]][[a]b]][[다음]][[앞 [[중간 [[끝]]"\n';
     expect(
@@ -264,7 +284,12 @@ describe('parseYaml과 extractReferences: YAML 표기별 참조 위치', () => {
       ['valid', '[[끝]]'],
     ]);
   });
-  it('콜론 앞 백슬래시가 홀짝이면 첫 실제 구분자와 escape 콜론을 구별한다', /** escape 제거는 콜론에 붙은 백슬래시 하나만 제거하며 나머지는 유지한다. @codocs [[참조]]#L18 @codocs [[참조]]#L19 */ () => {
+  /**
+   * escape 제거는 콜론에 붙은 백슬래시 하나만 제거하며 나머지는 유지한다.
+   * @codocs [[참조]]#L18
+   * @codocs [[참조]]#L19
+   */
+  it('콜론 앞 백슬래시가 홀짝이면 첫 실제 구분자와 escape 콜론을 구별한다', () => {
     const source = String.raw`definition: '[[a\:b]] [[a\\:b]] [[a\\\:b]] [[도\:메인:이\:름]]'
 `;
     expect(

@@ -255,7 +255,10 @@ describe('buildCatalog: 문서 색인', () => {
       ).toEqual([]);
     });
 
-    it('여러 도메인에 속한 문서는 후보로 한 번만 센다', /** @codocs [[참조]]#L34 */ () => {
+    /**
+     * @codocs [[참조]]#L34
+     */
+    it('여러 도메인에 속한 문서는 후보로 한 번만 센다', () => {
       const observation = {
         path: 'a.yaml',
         parsed: {
@@ -416,7 +419,10 @@ describe('buildCatalog: 문서 색인', () => {
   });
 
   describe('반복 참조의 원문 순서 보존과 문서 연결 중복 제거', () => {
-    it('참조가 여러 번 나오면 추출기가 제공한 순서와 위치를 그대로 보존한다', /** @codocs [[참조]]#L27 */ () => {
+    /**
+     * @codocs [[참조]]#L27
+     */
+    it('참조가 여러 번 나오면 추출기가 제공한 순서와 위치를 그대로 보존한다', () => {
       const definition = '[[Z]] [[A]] [[Z]]';
       const source = JSON.stringify({
         name: '출처',
@@ -557,7 +563,10 @@ describe('buildCatalog: 문서 색인', () => {
   });
 
   describe('연결할 수 없는 참조의 후보와 진단 반환', () => {
-    it('같은 이름의 후보가 여러 도메인에 있으면 모든 후보를 반환하고 대상을 확정하지 않는다', /** @codocs [[참조]]#L35 */ () => {
+    /**
+     * @codocs [[참조]]#L35
+     */
+    it('같은 이름의 후보가 여러 도메인에 있으면 모든 후보를 반환하고 대상을 확정하지 않는다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
@@ -575,7 +584,11 @@ describe('buildCatalog: 문서 색인', () => {
       expect(source?.references).toEqual([]);
     });
 
-    it('참조 이름에 맞는 후보가 없으면 연결을 만들지 않는다', /** @codocs [[참조]]#L41 @codocs [[참조]]#L44 */ () => {
+    /**
+     * @codocs [[참조]]#L41
+     * @codocs [[참조]]#L44
+     */
+    it('참조 이름에 맞는 후보가 없으면 연결을 만들지 않는다', () => {
       const observation = {
         path: 's.yaml',
         parsed: {
@@ -612,7 +625,10 @@ describe('buildCatalog: 문서 색인', () => {
       expect(catalog.documents.get(observation.path)?.references).toEqual([]);
     });
 
-    it('유효하지 않은 참조가 전달되면 후보를 조회하지 않고 연결하지 않는다', /** @codocs [[참조]]#L43 */ () => {
+    /**
+     * @codocs [[참조]]#L43
+     */
+    it('유효하지 않은 참조가 전달되면 후보를 조회하지 않고 연결하지 않는다', () => {
       const observation = {
         path: 's.yaml',
         parsed: {
@@ -691,7 +707,10 @@ describe('buildCatalog: 문서 색인', () => {
       ).toContain(catalogDiagnosticCodes.selfReference);
     });
 
-    it('같은 부재 참조가 여러 번 나오면 나온 위치마다 진단한다', /** @codocs [[참조]]#L27 */ () => {
+    /**
+     * @codocs [[참조]]#L27
+     */
+    it('같은 부재 참조가 여러 번 나오면 나온 위치마다 진단한다', () => {
       const source =
         'id: s\nname: 출처\ndomains: [판매]\ndefinition: "[[없음]] [[없음]]"\n';
       const observation = { path: 's.yaml', parsed: parseYaml(source) };
@@ -718,7 +737,10 @@ describe('buildCatalog: 문서 색인', () => {
       ]);
     });
 
-    it('확정되지 않은 참조는 후보 문서에 역참조를 만들지 않는다', /** @codocs [[참조]]#L44 */ () => {
+    /**
+     * @codocs [[참조]]#L44
+     */
+    it('확정되지 않은 참조는 후보 문서에 역참조를 만들지 않는다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
@@ -734,7 +756,10 @@ describe('buildCatalog: 문서 색인', () => {
   });
 
   describe('문서 오류가 있을 때 이름·참조 정보 보존', () => {
-    it('ID가 없는 문서를 색인해도 확인된 이름으로 다른 문서가 참조할 수 있다', /** @codocs [[참조]]#L45 */ () => {
+    /**
+     * @codocs [[참조]]#L45
+     */
+    it('ID가 없는 문서를 색인해도 확인된 이름으로 다른 문서가 참조할 수 있다', () => {
       const observationA = {
         path: 'a.yaml',
         parsed: {
@@ -756,7 +781,10 @@ describe('buildCatalog: 문서 색인', () => {
       ).toEqual([observationA.path]);
     });
 
-    it('다른 필드에 오류가 있어도 확인된 이름으로 다른 문서가 참조할 수 있다', /** @codocs [[참조]]#L45 */ () => {
+    /**
+     * @codocs [[참조]]#L45
+     */
+    it('다른 필드에 오류가 있어도 확인된 이름으로 다른 문서가 참조할 수 있다', () => {
       const observationA = {
         path: 'a.yaml',
         parsed: {
@@ -785,7 +813,10 @@ describe('buildCatalog: 문서 색인', () => {
       ).toEqual([observationA.path]);
     });
 
-    it('오류가 있는 문서를 참조하면 참조 대상 오류를 경고한다', /** @codocs [[참조]]#L46 */ () => {
+    /**
+     * @codocs [[참조]]#L46
+     */
+    it('오류가 있는 문서를 참조하면 참조 대상 오류를 경고한다', () => {
       const observationA = {
         path: 'a.yaml',
         parsed: {
@@ -816,7 +847,10 @@ describe('buildCatalog: 문서 색인', () => {
       );
     });
 
-    it('ID가 중복돼도 참조 이름에 일치하는 문서가 하나면 그 문서에 연결한다', /** @codocs [[참조]]#L45 */ () => {
+    /**
+     * @codocs [[참조]]#L45
+     */
+    it('ID가 중복돼도 참조 이름에 일치하는 문서가 하나면 그 문서에 연결한다', () => {
       const observationA = {
         path: 'a.yaml',
         parsed: {
@@ -1122,6 +1156,9 @@ describe('buildCatalog: 관측 갱신', () => {
   });
 
   describe('탐색·읽기 실패와 회복에 따른 문서 확인 상태 갱신', () => {
+    /**
+     * @codocs [[참조]]#L59
+     */
     it.each([
       {
         label: '파일',
@@ -1137,7 +1174,7 @@ describe('buildCatalog: 관측 갱신', () => {
       },
     ])(
       '$label 탐색에 실패한 부분 스캔이면 이전 문서를 미확인으로 보존한다',
-      /** @codocs [[참조]]#L59 */ ({ failure }) => {
+      ({ failure }) => {
         const previousScan = {
           status: scanStatuses.complete,
           observations: [documentA],
@@ -1156,7 +1193,10 @@ describe('buildCatalog: 관측 갱신', () => {
       },
     );
 
-    it('전체 스캔에 실패하면 새 관측을 채택하지 않고 이전 이름을 미확인으로 보존한다', /** @codocs [[참조]]#L59 */ () => {
+    /**
+     * @codocs [[참조]]#L59
+     */
+    it('전체 스캔에 실패하면 새 관측을 채택하지 않고 이전 이름을 미확인으로 보존한다', () => {
       const previousScan = {
         status: scanStatuses.complete,
         observations: [documentA],
@@ -1294,7 +1334,10 @@ describe('buildCatalog: 관측 갱신', () => {
 
 describe('resolveReference: 참조 대상 조회', () => {
   describe('이름과 도메인으로 참조 대상 조회', () => {
-    it('이름과 도메인이 일치하는 문서가 하나면 그 문서를 대상으로 반환한다', /** @codocs [[참조]]#L40 */ () => {
+    /**
+     * @codocs [[참조]]#L40
+     */
+    it('이름과 도메인이 일치하는 문서가 하나면 그 문서를 대상으로 반환한다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [orderDocument],
@@ -1310,7 +1353,10 @@ describe('resolveReference: 참조 대상 조회', () => {
       });
     });
 
-    it('도메인을 지정하면 같은 이름을 가진 다른 도메인의 문서를 제외한다', /** @codocs [[참조]]#L32 */ () => {
+    /**
+     * @codocs [[참조]]#L32
+     */
+    it('도메인을 지정하면 같은 이름을 가진 다른 도메인의 문서를 제외한다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [orderDocument, purchaseOrder],
@@ -1327,7 +1373,10 @@ describe('resolveReference: 참조 대상 조회', () => {
       ).toEqual([purchaseOrder.path]);
     });
 
-    it('대괄호 안의 이름과 name이 같은 문서를 후보로 찾는다', /** @codocs [[참조]]#L17 */ () => {
+    /**
+     * @codocs [[참조]]#L17
+     */
+    it('대괄호 안의 이름과 name이 같은 문서를 후보로 찾는다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [orderDocument],
@@ -1340,7 +1389,10 @@ describe('resolveReference: 참조 대상 조회', () => {
       ).toEqual([orderDocument.path]);
     });
 
-    it('도메인을 생략하면 참조한 문서의 도메인과 관계없이 모든 도메인에서 후보를 찾는다', /** @codocs [[참조]]#L33 */ () => {
+    /**
+     * @codocs [[참조]]#L33
+     */
+    it('도메인을 생략하면 참조한 문서의 도메인과 관계없이 모든 도메인에서 후보를 찾는다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
@@ -1357,7 +1409,10 @@ describe('resolveReference: 참조 대상 조회', () => {
   });
 
   describe('공백·대소문자·콜론을 포함한 참조 이름 비교', () => {
-    it('저장된 이름의 앞뒤 공백을 제거해 조회하면 후보를 찾지 않는다', /** @codocs [[참조]]#L31 */ () => {
+    /**
+     * @codocs [[참조]]#L31
+     */
+    it('저장된 이름의 앞뒤 공백을 제거해 조회하면 후보를 찾지 않는다', () => {
       const observation = {
         path: 'a.yaml',
         parsed: {
@@ -1384,7 +1439,10 @@ describe('resolveReference: 참조 대상 조회', () => {
       });
     });
 
-    it('저장된 이름과 대소문자가 다르면 후보를 찾지 않는다', /** @codocs [[참조]]#L31 */ () => {
+    /**
+     * @codocs [[참조]]#L31
+     */
+    it('저장된 이름과 대소문자가 다르면 후보를 찾지 않는다', () => {
       const observation = {
         path: 'a.yaml',
         parsed: {
@@ -1469,7 +1527,10 @@ describe('resolveReference: 참조 대상 조회', () => {
   });
 
   describe('복수 후보와 불완전한 탐색에서 참조 대상 확정 제한', () => {
-    it('같은 이름을 가진 문서가 둘이면 경로순 후보를 모두 반환하고 대상을 선택하지 않는다', /** @codocs [[참조]]#L42 */ () => {
+    /**
+     * @codocs [[참조]]#L42
+     */
+    it('같은 이름을 가진 문서가 둘이면 경로순 후보를 모두 반환하고 대상을 선택하지 않는다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [purchaseOrder, orderDocument],
@@ -1485,7 +1546,10 @@ describe('resolveReference: 참조 대상 조회', () => {
       expect(result.target).toBeUndefined();
     });
 
-    it('부분 스캔에서 확인한 후보가 하나여도 전체 탐색을 마치지 못했으면 대상을 확정하지 않는다', /** @codocs [[참조]]#L57 */ () => {
+    /**
+     * @codocs [[참조]]#L57
+     */
+    it('부분 스캔에서 확인한 후보가 하나여도 전체 탐색을 마치지 못했으면 대상을 확정하지 않는다', () => {
       const scan = {
         status: scanStatuses.partial,
         observations: [orderDocument],
@@ -1499,7 +1563,10 @@ describe('resolveReference: 참조 대상 조회', () => {
       });
     });
 
-    it('탐색을 마치지 못했으면 후보가 없어도 부재로 확정하지 않는다', /** @codocs [[참조]]#L57 */ () => {
+    /**
+     * @codocs [[참조]]#L57
+     */
+    it('탐색을 마치지 못했으면 후보가 없어도 부재로 확정하지 않는다', () => {
       const scan = {
         status: scanStatuses.partial,
         observations: [],

@@ -84,7 +84,10 @@ describe('live YAML과 디스크 대상의 연결', () => {
       capture.mockRestore();
     }
   });
-  it('열린 대상 문서의 저장하지 않은 이름은 출처 참조의 대상 판단에 쓰지 않는다', /** @codocs [[참조]]#L50 */ async () => {
+  /**
+   * @codocs [[참조]]#L50
+   */
+  it('열린 대상 문서의 저장하지 않은 이름은 출처 참조의 대상 판단에 쓰지 않는다', async () => {
     const source =
       'id: source\nname: Source\ndefinition: "[[대상]]"\ndomains: [업무]\n';
     await writeFile(path.join(root, '.codocs/source.yaml'), source);

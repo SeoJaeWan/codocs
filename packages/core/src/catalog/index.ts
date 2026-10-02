@@ -254,7 +254,10 @@ function linkIdentity(document: CatalogIdentity): CatalogIdentity {
     confirmation: document.confirmation,
   };
 }
-/** 지정한 도메인에 속한 문서에서만 이름 후보 경로를 찾는다. @codocs [[참조]]#L32 */
+/**
+ * 도메인을 적은 참조의 후보를 그 도메인에 속한 문서에서만 찾는다.
+ * @codocs [[참조]]#L32
+ */
 function findInDomain(
   catalog: Catalog,
   domain: string,
@@ -262,14 +265,20 @@ function findInDomain(
 ): ReadonlySet<string> | undefined {
   return catalog.domainNamePaths.get(domain)?.get(name);
 }
-/** 모든 도메인에서 이름 후보 경로를 찾는다. 출처 도메인을 우선하지 않는다. @codocs [[참조]]#L33 */
+/**
+ * 도메인을 생략한 참조의 후보를 모든 도메인에서 찾는다.
+ * @codocs [[참조]]#L33
+ */
 function findInAllDomains(
   catalog: Catalog,
   name: string,
 ): ReadonlySet<string> | undefined {
   return catalog.namePaths.get(name);
 }
-/** 이름과 도메인으로 후보 문서를 경로순으로 찾는다. @codocs [[참조]]#L29 */
+/**
+ * 참조의 name과 도메인으로 후보 문서를 찾아 경로순으로 돌려준다.
+ * @codocs [[참조]]#L29
+ */
 function findCandidates(
   catalog: Catalog,
   reference: { name: string; domain?: string },
@@ -283,11 +292,17 @@ function findCandidates(
     return doc ? [candidate(doc)] : [];
   });
 }
-/** 완전한 탐색으로 만든 색인인지 확인한다. 아니면 후보 수와 관계없이 미확인이다. @codocs [[참조]]#L57 */
+/**
+ * 탐색이 끝난 색인인지 확인한다. 끝나지 않았으면 참조를 후보 수와 관계없이 미확인으로 둔다.
+ * @codocs [[참조]]#L57
+ */
 function isScanComplete(catalog: Catalog): boolean {
   return catalog.status === scanStatuses.complete;
 }
-/** 후보 수에 따라 확정·부재·모호함을 정한다. @codocs [[참조]]#L39 */
+/**
+ * 후보 수에 따라 참조 대상을 확정·부재·모호함 중 하나로 판단한다.
+ * @codocs [[참조]]#L39
+ */
 function statusByCandidateCount(
   candidates: readonly ReferenceCandidate[],
 ): ReferenceResolutionStatus {
@@ -295,7 +310,10 @@ function statusByCandidateCount(
   if (candidates.length > 1) return referenceResolutionStatuses.ambiguous;
   return referenceResolutionStatuses.resolved;
 }
-/** 참조 하나의 대상을 판단한다. @codocs [[참조]]#L37 */
+/**
+ * 참조 하나가 가리키는 대상을 후보를 찾아 판단한다.
+ * @codocs [[참조]]#L37
+ */
 export function resolveReference(
   catalog: Catalog,
   reference: { name: string; domain?: string },
@@ -409,7 +427,10 @@ function calculate(
     });
   return catalog;
 }
-/** 등장 하나를 해석한다. 문법 오류인 참조는 후보를 찾지 않는다. @codocs [[참조]]#L43 */
+/**
+ * 본문에 나온 참조 하나를 해석한다. 문법 오류인 참조는 후보를 찾지 않는다.
+ * @codocs [[참조]]#L43
+ */
 function resolveOccurrence(
   catalog: Catalog,
   occurrence: ReferenceOccurrence,
@@ -419,7 +440,11 @@ function resolveOccurrence(
     ? { status: referenceResolutionStatuses.invalid, candidates: [] }
     : resolveReference(catalog, occurrence, sourcePath);
 }
-/** 확정된 참조만 연결과 역참조를 만든다. 출처 문서도 이번 탐색에서 확인한 문서여야 한다. @codocs [[참조]]#L44 */
+/**
+ * 확정된 참조인지 확인해 연결과 역참조를 만들지 정한다.
+ * 참조를 쓴 문서도 이번 탐색에서 확인한 문서여야 한다.
+ * @codocs [[참조]]#L44
+ */
 function isLinkable(
   resolution: ReferenceResolution,
   source: CatalogDocument,
@@ -430,7 +455,10 @@ function isLinkable(
     source.confirmation === catalogConfirmations.confirmed
   );
 }
-/** 확정한 대상에 문서 오류가 있으면 참조 위치에 경고를 만든다. @codocs [[참조]]#L46 */
+/**
+ * 확정한 대상 문서에 오류가 있으면 참조 위치에 경고를 만든다.
+ * @codocs [[참조]]#L46
+ */
 function targetErrorWarning(
   doc: CatalogDocument,
   occurrence: ReferenceOccurrence,
@@ -445,7 +473,11 @@ function targetErrorWarning(
       )
     : undefined;
 }
-/** 디스크 색인 또는 임시 출처의 등장·진단·연결을 같은 규칙으로 계산한다. @codocs [[참조]] */
+/**
+ * 문서 하나의 본문에서 참조를 찾아 대상을 판단하고 진단과 연결을 만든다.
+ * 저장된 문서와 편집 중인 문서에 같은 규칙을 쓴다.
+ * @codocs [[참조]]
+ */
 function resolveDocumentReferences(
   catalog: Catalog,
   doc: CatalogDocument,
@@ -508,7 +540,11 @@ function resolveDocumentReferences(
   };
 }
 
-/** live 출처 하나만 해석하며 대상 색인과 역참조를 변경하지 않는다. @codocs [[참조]]#L52 */
+/**
+ * 편집 중인 문서의 저장하지 않은 내용으로 참조를 해석한다.
+ * 대상은 저장된 색인으로 판단하며 색인과 역참조는 바꾸지 않는다.
+ * @codocs [[참조]]#L52
+ */
 export function resolveLiveDocument(
   catalog: Catalog,
   observation: CatalogObservation,
@@ -575,7 +611,11 @@ export function resolveLiveDocument(
   return resolveDocumentReferences(catalog, document);
 }
 
-/** 다시 탐색하는 동안 이전에 확인한 문서를 미확인 후보로 보존한다. 완전한 탐색이면 보존하지 않는다. @codocs [[참조]]#L59 */
+/**
+ * 다시 탐색하는 동안 이전에 확인한 문서를 미확인 후보로 보존한다.
+ * 완전한 탐색이면 보존하지 않는다.
+ * @codocs [[참조]]#L59
+ */
 function preserveUnconfirmed(
   scan: CatalogScan,
   previous?: Catalog,

@@ -205,7 +205,10 @@ describe('저장 이름·도메인 색인과 현재 편집 진단', () => {
 });
 
 describe('편집 중인 출처의 참조 해석', () => {
-  it('저장 원문과 다른 참조로 편집하면 현재 편집 내용의 참조로 대상을 판단한다', /** @codocs [[참조]]#L52 */ () => {
+  /**
+   * @codocs [[참조]]#L52
+   */
+  it('저장 원문과 다른 참조로 편집하면 현재 편집 내용의 참조로 대상을 판단한다', () => {
     const observation = (id: string, name: string, definition: string) => ({
       path: `${id}.yaml`,
       parsed: parseYaml(
