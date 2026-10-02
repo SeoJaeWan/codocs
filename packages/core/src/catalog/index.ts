@@ -254,29 +254,59 @@ function linkIdentity(document: CatalogIdentity): CatalogIdentity {
     confirmation: document.confirmation,
   };
 }
-/** 전체 또는 지정 도메인에서 정확 비교한다. 출처 도메인을 우선하지 않는다. */
+/** 지정한 도메인에 속한 문서에서만 이름 후보 경로를 찾는다. @codocs [[참조]]#L32 */
+function findInDomain(
+  catalog: Catalog,
+  domain: string,
+  name: string,
+): ReadonlySet<string> | undefined {
+  return catalog.domainNamePaths.get(domain)?.get(name);
+}
+/** 모든 도메인에서 이름 후보 경로를 찾는다. 출처 도메인을 우선하지 않는다. @codocs [[참조]]#L33 */
+function findInAllDomains(
+  catalog: Catalog,
+  name: string,
+): ReadonlySet<string> | undefined {
+  return catalog.namePaths.get(name);
+}
+/** 이름과 도메인으로 후보 문서를 경로순으로 찾는다. @codocs [[참조]]#L29 */
+function findCandidates(
+  catalog: Catalog,
+  reference: { name: string; domain?: string },
+): ReferenceCandidate[] {
+  const paths =
+    reference.domain === undefined
+      ? findInAllDomains(catalog, reference.name)
+      : findInDomain(catalog, reference.domain, reference.name);
+  return [...(paths ?? [])].sort().flatMap((path) => {
+    const doc = catalog.documents.get(path);
+    return doc ? [candidate(doc)] : [];
+  });
+}
+/** 완전한 탐색으로 만든 색인인지 확인한다. 아니면 후보 수와 관계없이 미확인이다. @codocs [[참조]]#L57 */
+function isScanComplete(catalog: Catalog): boolean {
+  return catalog.status === scanStatuses.complete;
+}
+/** 후보 수에 따라 확정·부재·모호함을 정한다. @codocs [[참조]]#L39 */
+function statusByCandidateCount(
+  candidates: readonly ReferenceCandidate[],
+): ReferenceResolutionStatus {
+  if (!candidates.length) return referenceResolutionStatuses.missing;
+  if (candidates.length > 1) return referenceResolutionStatuses.ambiguous;
+  return referenceResolutionStatuses.resolved;
+}
+/** 참조 하나의 대상을 판단한다. @codocs [[참조]]#L37 */
 export function resolveReference(
   catalog: Catalog,
   reference: { name: string; domain?: string },
   sourcePath?: string,
 ): ReferenceResolution {
-  const paths =
-    reference.domain === undefined
-      ? catalog.namePaths.get(reference.name)
-      : catalog.domainNamePaths.get(reference.domain)?.get(reference.name);
-  const candidates = [...(paths ?? [])].sort().flatMap((path) => {
-    const doc = catalog.documents.get(path);
-    return doc ? [candidate(doc)] : [];
-  });
-  if (
-    catalog.status !== scanStatuses.complete ||
-    candidates.some((c) => c.confirmation === catalogConfirmations.unconfirmed)
-  )
+  const candidates = findCandidates(catalog, reference);
+  if (!isScanComplete(catalog))
     return { status: referenceResolutionStatuses.unconfirmed, candidates };
-  if (!candidates.length)
-    return { status: referenceResolutionStatuses.missing, candidates };
-  if (candidates.length > 1)
-    return { status: referenceResolutionStatuses.ambiguous, candidates };
+  const status = statusByCandidateCount(candidates);
+  if (status !== referenceResolutionStatuses.resolved)
+    return { status, candidates };
   const target = candidates[0];
   if (!target)
     return { status: referenceResolutionStatuses.missing, candidates };
@@ -379,7 +409,43 @@ function calculate(
     });
   return catalog;
 }
-/** 디스크 색인 또는 임시 출처의 등장·진단·연결을 같은 규칙으로 계산한다. */
+/** 등장 하나를 해석한다. 문법 오류인 참조는 후보를 찾지 않는다. @codocs [[참조]]#L43 */
+function resolveOccurrence(
+  catalog: Catalog,
+  occurrence: ReferenceOccurrence,
+  sourcePath: string,
+): ReferenceResolution {
+  return occurrence.syntax === referenceSyntaxStatuses.invalid
+    ? { status: referenceResolutionStatuses.invalid, candidates: [] }
+    : resolveReference(catalog, occurrence, sourcePath);
+}
+/** 확정된 참조만 연결과 역참조를 만든다. 출처 문서도 이번 탐색에서 확인한 문서여야 한다. @codocs [[참조]]#L44 */
+function isLinkable(
+  resolution: ReferenceResolution,
+  source: CatalogDocument,
+): resolution is ReferenceResolution & { target: ReferenceCandidate } {
+  return (
+    resolution.status === referenceResolutionStatuses.resolved &&
+    resolution.target !== undefined &&
+    source.confirmation === catalogConfirmations.confirmed
+  );
+}
+/** 확정한 대상에 문서 오류가 있으면 참조 위치에 경고를 만든다. @codocs [[참조]]#L46 */
+function targetErrorWarning(
+  doc: CatalogDocument,
+  occurrence: ReferenceOccurrence,
+  target: ReferenceCandidate,
+): CatalogDiagnostic | undefined {
+  return target.errors.length
+    ? catalogDiagnostic(
+        doc,
+        catalogDiagnosticCodes.referenceTargetError,
+        occurrence.fieldPath,
+        occurrence,
+      )
+    : undefined;
+}
+/** 디스크 색인 또는 임시 출처의 등장·진단·연결을 같은 규칙으로 계산한다. @codocs [[참조]] */
 function resolveDocumentReferences(
   catalog: Catalog,
   doc: CatalogDocument,
@@ -395,10 +461,7 @@ function resolveDocumentReferences(
     /** 원문 등장을 해석하며 확정 연결만 별도 집계한다. */ (
       occurrence,
     ): CatalogOccurrence => {
-      const resolution: ReferenceResolution =
-        occurrence.syntax === referenceSyntaxStatuses.invalid
-          ? { status: referenceResolutionStatuses.invalid, candidates: [] }
-          : resolveReference(catalog, occurrence, path);
+      const resolution = resolveOccurrence(catalog, occurrence, path);
       const key =
         resolution.status === referenceResolutionStatuses.missing
           ? catalogDiagnosticCodes.missingReference
@@ -413,11 +476,7 @@ function resolveDocumentReferences(
         diagnostics.push(
           catalogDiagnostic(doc, key, occurrence.fieldPath, occurrence),
         );
-      if (
-        resolution.status === referenceResolutionStatuses.resolved &&
-        resolution.target &&
-        doc.confirmation === catalogConfirmations.confirmed
-      ) {
+      if (isLinkable(resolution, doc)) {
         links.add(resolution.target.path);
         const target = catalog.documents.get(resolution.target.path);
         if (
@@ -432,15 +491,8 @@ function resolveDocumentReferences(
               occurrence,
             ),
           );
-        if (resolution.target.errors.length)
-          diagnostics.push(
-            catalogDiagnostic(
-              doc,
-              catalogDiagnosticCodes.referenceTargetError,
-              occurrence.fieldPath,
-              occurrence,
-            ),
-          );
+        const warning = targetErrorWarning(doc, occurrence, resolution.target);
+        if (warning) diagnostics.push(warning);
       }
       return { occurrence, resolution };
     },
@@ -456,7 +508,7 @@ function resolveDocumentReferences(
   };
 }
 
-/** live 출처 하나만 해석하며 대상 색인과 역참조를 변경하지 않는다. */
+/** live 출처 하나만 해석하며 대상 색인과 역참조를 변경하지 않는다. @codocs [[참조]]#L52 */
 export function resolveLiveDocument(
   catalog: Catalog,
   observation: CatalogObservation,
@@ -523,15 +575,23 @@ export function resolveLiveDocument(
   return resolveDocumentReferences(catalog, document);
 }
 
+/** 다시 탐색하는 동안 이전에 확인한 문서를 미확인 후보로 보존한다. 완전한 탐색이면 보존하지 않는다. @codocs [[참조]]#L59 */
+function preserveUnconfirmed(
+  scan: CatalogScan,
+  previous?: Catalog,
+): Map<string, CatalogDocument> {
+  const records = new Map<string, CatalogDocument>();
+  if (scan.status === scanStatuses.complete) return records;
+  for (const [path, doc] of previous?.documents ?? [])
+    records.set(path, {
+      ...doc,
+      confirmation: catalogConfirmations.unconfirmed,
+    });
+  return records;
+}
 /** complete만 삭제 근거로 삼아 구축·갱신한다. partial/failed의 미관측 이전 기록은 미확인으로 보존한다. */
 export function buildCatalog(scan: CatalogScan, previous?: Catalog): Catalog {
-  const records = new Map<string, CatalogDocument>();
-  if (scan.status !== scanStatuses.complete)
-    for (const [path, doc] of previous?.documents ?? [])
-      records.set(path, {
-        ...doc,
-        confirmation: catalogConfirmations.unconfirmed,
-      });
+  const records = preserveUnconfirmed(scan, previous);
   if (scan.status !== scanStatuses.failed)
     for (const observation of scan.observations) {
       const parsed = observation.parsed;

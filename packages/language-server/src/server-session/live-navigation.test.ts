@@ -84,6 +84,33 @@ describe('live YAML과 디스크 대상의 연결', () => {
       capture.mockRestore();
     }
   });
+  it('열린 대상 문서의 저장하지 않은 이름은 출처 참조의 대상 판단에 쓰지 않는다', /** @codocs [[참조]]#L50 */ async () => {
+    const source =
+      'id: source\nname: Source\ndefinition: "[[대상]]"\ndomains: [업무]\n';
+    await writeFile(path.join(root, '.codocs/source.yaml'), source);
+    await session.refreshWorkspaces();
+    session.openDocument({
+      textDocument: {
+        uri: pathToFileURL(path.join(root, '.codocs/대상 문서.yaml')).href,
+        version: 1,
+        languageId: 'yaml',
+        text: targetText.replace('name: 대상', 'name: 다른 이름'),
+      },
+    });
+    session.openDocument({
+      textDocument: {
+        uri: sourceUri,
+        version: 1,
+        languageId: 'yaml',
+        text: source,
+      },
+    });
+    const links = await session.documentLinks(sourceUri);
+    expect(links).toHaveLength(1);
+    expect(links[0]!.tooltip).toBe(
+      '원문 열기: 대상 \\(\\.codocs/대상 문서\\.yaml\\)',
+    );
+  });
   it.each(['코드 Hover', 'YAML 본문'])(
     '%s의 특수 경로 링크는 resolve와 Host 해석 뒤 같은 출처·토큰으로 대상을 확인한다',
     async (kind) => {
