@@ -256,7 +256,7 @@ function linkIdentity(document: CatalogIdentity): CatalogIdentity {
 }
 /**
  * 도메인을 적은 참조의 후보를 그 도메인에 속한 문서에서만 찾는다.
- * @codocs [[참조]]#L32
+ * @codocs [[참조]]#L33
  */
 function findInDomain(
   catalog: Catalog,
@@ -267,7 +267,7 @@ function findInDomain(
 }
 /**
  * 도메인을 생략한 참조의 후보를 모든 도메인에서 찾는다.
- * @codocs [[참조]]#L33
+ * @codocs [[참조]]#L34
  */
 function findInAllDomains(
   catalog: Catalog,
@@ -277,7 +277,7 @@ function findInAllDomains(
 }
 /**
  * 참조의 name과 도메인으로 후보 문서를 찾아 경로순으로 돌려준다.
- * @codocs [[참조]]#L29
+ * @codocs [[참조]]#L30
  */
 function findCandidates(
   catalog: Catalog,
@@ -294,14 +294,14 @@ function findCandidates(
 }
 /**
  * 탐색이 끝난 색인인지 확인한다. 끝나지 않았으면 참조를 후보 수와 관계없이 미확인으로 둔다.
- * @codocs [[참조]]#L57
+ * @codocs [[참조]]#L65
  */
 function isScanComplete(catalog: Catalog): boolean {
   return catalog.status === scanStatuses.complete;
 }
 /**
  * 후보 수에 따라 참조 대상을 확정·부재·모호함 중 하나로 판단한다.
- * @codocs [[참조]]#L39
+ * @codocs [[참조]]#L40
  */
 function statusByCandidateCount(
   candidates: readonly ReferenceCandidate[],
@@ -312,7 +312,7 @@ function statusByCandidateCount(
 }
 /**
  * 참조 하나가 가리키는 대상을 후보를 찾아 판단한다.
- * @codocs [[참조]]#L37
+ * @codocs [[참조]]#L38
  */
 export function resolveReference(
   catalog: Catalog,
@@ -429,7 +429,7 @@ function calculate(
 }
 /**
  * 본문에 나온 참조 하나를 해석한다. 문법 오류인 참조는 후보를 찾지 않는다.
- * @codocs [[참조]]#L43
+ * @codocs [[참조]]#L44
  */
 function resolveOccurrence(
   catalog: Catalog,
@@ -443,7 +443,7 @@ function resolveOccurrence(
 /**
  * 확정된 참조인지 확인해 연결과 역참조를 만들지 정한다.
  * 참조를 쓴 문서도 이번 탐색에서 확인한 문서여야 한다.
- * @codocs [[참조]]#L44
+ * @codocs [[참조]]#L45
  */
 function isLinkable(
   resolution: ReferenceResolution,
@@ -457,7 +457,7 @@ function isLinkable(
 }
 /**
  * 확정한 대상 문서에 오류가 있으면 참조 위치에 경고를 만든다.
- * @codocs [[참조]]#L46
+ * @codocs [[참조]]#L47
  */
 function targetErrorWarning(
   doc: CatalogDocument,
@@ -543,7 +543,7 @@ function resolveDocumentReferences(
 /**
  * 편집 중인 문서의 저장하지 않은 내용으로 참조를 해석한다.
  * 대상은 저장된 색인으로 판단하며 색인과 역참조는 바꾸지 않는다.
- * @codocs [[참조]]#L52
+ * @codocs [[참조]]#L56
  */
 export function resolveLiveDocument(
   catalog: Catalog,
@@ -614,7 +614,7 @@ export function resolveLiveDocument(
 /**
  * 다시 탐색하는 동안 이전에 확인한 문서를 미확인 후보로 보존한다.
  * 완전한 탐색이면 보존하지 않는다.
- * @codocs [[참조]]#L59
+ * @codocs [[참조]]#L67
  */
 function preserveUnconfirmed(
   scan: CatalogScan,

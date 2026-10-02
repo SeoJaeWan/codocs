@@ -85,7 +85,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
     }
   });
   /**
-   * @codocs [[참조]]#L50
+   * @codocs [[참조]]#L54
    */
   it('열린 대상 문서의 저장하지 않은 이름은 출처 참조의 대상 판단에 쓰지 않는다', async () => {
     const source =
@@ -211,6 +211,32 @@ describe('live YAML과 디스크 대상의 연결', () => {
     await writeFile(betaPath, 'id: beta\nname: 베타\ndefinition: 관계 제거\n');
     await session.refreshWorkspaces();
     expect(await session.confirmSource(selection)).toBeNull();
+  });
+  /**
+   * @codocs [[참조]]#L55
+   */
+  it('대상 문서의 이름을 저장해 색인이 갱신되면 열린 문서의 참조를 다시 판단한다', async () => {
+    const source =
+      'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n';
+    session.openDocument({
+      textDocument: {
+        uri: sourceUri,
+        version: 1,
+        languageId: 'yaml',
+        text: source,
+      },
+    });
+    expect(await session.documentLinks(sourceUri)).toHaveLength(1);
+    await writeFile(
+      path.join(root, '.codocs/대상 문서.yaml'),
+      targetText.replace('name: 대상', 'name: 새 이름'),
+    );
+    await vi.waitFor(
+      async () => {
+        expect(await session.documentLinks(sourceUri)).toHaveLength(0);
+      },
+      { timeout: 3000 },
+    );
   });
   it('감시가 상태 변경을 게시하면 수동 refresh 없이 폐기 경고를 갱신한다', async () => {
     session.openDocument({

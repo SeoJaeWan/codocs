@@ -256,7 +256,7 @@ describe('buildCatalog: 문서 색인', () => {
     });
 
     /**
-     * @codocs [[참조]]#L34
+     * @codocs [[참조]]#L35
      */
     it('여러 도메인에 속한 문서는 후보로 한 번만 센다', () => {
       const observation = {
@@ -419,9 +419,6 @@ describe('buildCatalog: 문서 색인', () => {
   });
 
   describe('반복 참조의 원문 순서 보존과 문서 연결 중복 제거', () => {
-    /**
-     * @codocs [[참조]]#L27
-     */
     it('참조가 여러 번 나오면 추출기가 제공한 순서와 위치를 그대로 보존한다', () => {
       const definition = '[[Z]] [[A]] [[Z]]';
       const source = JSON.stringify({
@@ -564,7 +561,7 @@ describe('buildCatalog: 문서 색인', () => {
 
   describe('연결할 수 없는 참조의 후보와 진단 반환', () => {
     /**
-     * @codocs [[참조]]#L35
+     * @codocs [[참조]]#L36
      */
     it('같은 이름의 후보가 여러 도메인에 있으면 모든 후보를 반환하고 대상을 확정하지 않는다', () => {
       const scan = {
@@ -585,48 +582,7 @@ describe('buildCatalog: 문서 색인', () => {
     });
 
     /**
-     * @codocs [[참조]]#L41
      * @codocs [[참조]]#L44
-     */
-    it('참조 이름에 맞는 후보가 없으면 연결을 만들지 않는다', () => {
-      const observation = {
-        path: 's.yaml',
-        parsed: {
-          ...parsedBase,
-          source:
-            '{"name":"출처","domains":["판매"],"definition":"[[없음]]","id":"s"}',
-          data: {
-            name: '출처',
-            domains: ['판매'],
-            definition: '[[없음]]',
-            id: 's',
-          },
-          strings: [
-            {
-              fieldPath: ['definition'],
-              value: '[[없음]]',
-              sourceRanges: Array.from({ length: 6 }, (_, index) => ({
-                start: 44 + index,
-                end: 45 + index,
-              })),
-            },
-          ],
-        },
-      } satisfies CatalogObservation;
-      const scan = {
-        status: scanStatuses.complete,
-        observations: [observation],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      expect(
-        catalog.documents.get(observation.path)?.occurrences[0]?.resolution
-          .status,
-      ).toBe(referenceResolutionStatuses.missing);
-      expect(catalog.documents.get(observation.path)?.references).toEqual([]);
-    });
-
-    /**
-     * @codocs [[참조]]#L43
      */
     it('유효하지 않은 참조가 전달되면 후보를 조회하지 않고 연결하지 않는다', () => {
       const observation = {
@@ -708,7 +664,7 @@ describe('buildCatalog: 문서 색인', () => {
     });
 
     /**
-     * @codocs [[참조]]#L27
+     * @codocs [[참조]]#L28
      */
     it('같은 부재 참조가 여러 번 나오면 나온 위치마다 진단한다', () => {
       const source =
@@ -738,83 +694,69 @@ describe('buildCatalog: 문서 색인', () => {
     });
 
     /**
-     * @codocs [[참조]]#L44
+     * @codocs [[참조]]#L45
      */
-    it('확정되지 않은 참조는 후보 문서에 역참조를 만들지 않는다', () => {
-      const scan = {
+    it.each<[string, CatalogObservation[]]>([
+      ['대상이 없는', []],
+      ['대상이 모호한', [orderDocument, purchaseOrder]],
+    ])('%s 참조는 연결도 역참조도 만들지 않는다', (_case, candidates) => {
+      const catalog = buildCatalog({
         status: scanStatuses.complete,
-        observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      expect(catalog.documents.get(orderDocument.path)?.referencedBy).toEqual(
-        [],
-      );
-      expect(catalog.documents.get(purchaseOrder.path)?.referencedBy).toEqual(
-        [],
-      );
+        observations: [...candidates, sourceRefersToOrder],
+      });
+      expect(
+        catalog.documents.get(sourceRefersToOrder.path)?.references,
+      ).toEqual([]);
+      for (const candidate of candidates)
+        expect(catalog.documents.get(candidate.path)?.referencedBy).toEqual([]);
     });
   });
 
   describe('문서 오류가 있을 때 이름·참조 정보 보존', () => {
     /**
-     * @codocs [[참조]]#L45
-     */
-    it('ID가 없는 문서를 색인해도 확인된 이름으로 다른 문서가 참조할 수 있다', () => {
-      const observationA = {
-        path: 'a.yaml',
-        parsed: {
-          ...parsedBase,
-          source: '{"name":"주문","domains":["판매"],"definition":"설명"}',
-          data: { name: '주문', domains: ['판매'], definition: '설명' },
-        },
-      } satisfies CatalogObservation;
-      const scan = {
-        status: scanStatuses.complete,
-        observations: [observationA, sourceRefersToOrder],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      expect(catalog.documents.get(observationA.path)?.id).toBeUndefined();
-      expect(
-        catalog.documents
-          .get(sourceRefersToOrder.path)
-          ?.references.map((reference) => reference.path),
-      ).toEqual([observationA.path]);
-    });
-
-    /**
-     * @codocs [[참조]]#L45
-     */
-    it('다른 필드에 오류가 있어도 확인된 이름으로 다른 문서가 참조할 수 있다', () => {
-      const observationA = {
-        path: 'a.yaml',
-        parsed: {
-          ...parsedBase,
-          source:
-            '{"name":"주문","domains":["판매"],"definition":"설명","id":"a","examples":42}',
-          data: {
-            name: '주문',
-            domains: ['판매'],
-            definition: '설명',
-            id: 'a',
-            examples: 42,
-          },
-        },
-      } satisfies CatalogObservation;
-      const scan = {
-        status: scanStatuses.complete,
-        observations: [observationA, sourceRefersToOrder],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      expect(catalog.documents.get(observationA.path)?.id).toBe('a');
-      expect(
-        catalog.documents
-          .get(sourceRefersToOrder.path)
-          ?.references.map((reference) => reference.path),
-      ).toEqual([observationA.path]);
-    });
-
-    /**
      * @codocs [[참조]]#L46
+     */
+    it.each<[string, string, CatalogObservation[]]>([
+      ['ID가 없어도', 'name: 주문\ndomains: [판매]\ndefinition: 설명\n', []],
+      [
+        '다른 속성에 오류가 있어도',
+        'id: a\nname: 주문\ndomains: [판매]\ndefinition: 42\n',
+        [],
+      ],
+      [
+        'ID가 다른 문서와 중복돼도',
+        'id: shared\nname: 주문\ndomains: [판매]\ndefinition: 설명\n',
+        [
+          {
+            path: 'other.yaml',
+            parsed: parseYaml(
+              'id: shared\nname: 다른 문서\ndomains: [판매]\ndefinition: 설명\n',
+            ),
+          },
+        ],
+      ],
+    ])('대상 문서에 %s 이름으로 확정되면 연결한다', (_case, target, others) => {
+      const observation = { path: 'a.yaml', parsed: parseYaml(target) };
+      const catalog = buildCatalog({
+        status: scanStatuses.complete,
+        observations: [observation, ...others, sourceRefersToOrder],
+      });
+      expect(
+        catalog.documents
+          .get(observation.path)
+          ?.documentDiagnostics.some(
+            (diagnostic) => diagnostic.severity === diagnosticSeverities.error,
+          ),
+      ).toBe(true);
+      expect(
+        catalog.documents
+          .get(sourceRefersToOrder.path)
+          ?.references.map((reference) => reference.path),
+      ).toEqual([observation.path]);
+    });
+
+    /**
+     * @codocs [[참조]]#L47
      */
     it('오류가 있는 문서를 참조하면 참조 대상 오류를 경고한다', () => {
       const observationA = {
@@ -845,79 +787,6 @@ describe('buildCatalog: 문서 색인', () => {
           severity: 'warning',
         }),
       );
-    });
-
-    /**
-     * @codocs [[참조]]#L45
-     */
-    it('ID가 중복돼도 참조 이름에 일치하는 문서가 하나면 그 문서에 연결한다', () => {
-      const observationA = {
-        path: 'a.yaml',
-        parsed: {
-          ...parsedBase,
-          source:
-            '{"name":"A","domains":["판매"],"definition":"설명","id":"shared"}',
-          data: {
-            name: 'A',
-            domains: ['판매'],
-            definition: '설명',
-            id: 'shared',
-          },
-        },
-      } satisfies CatalogObservation;
-      const observationB = {
-        path: 'b.yaml',
-        parsed: {
-          ...parsedBase,
-          source:
-            '{"name":"B","domains":["판매"],"definition":"설명","id":"shared"}',
-          data: {
-            name: 'B',
-            domains: ['판매'],
-            definition: '설명',
-            id: 'shared',
-          },
-        },
-      } satisfies CatalogObservation;
-      const observationC = {
-        path: 's.yaml',
-        parsed: {
-          ...parsedBase,
-          source:
-            '{"name":"출처","domains":["판매"],"definition":"[[A]]","id":"s"}',
-          data: {
-            name: '출처',
-            domains: ['판매'],
-            definition: '[[A]]',
-            id: 's',
-          },
-          strings: [
-            {
-              fieldPath: ['definition'],
-              value: '[[A]]',
-              sourceRanges: Array.from({ length: 5 }, (_, index) => ({
-                start: 44 + index,
-                end: 45 + index,
-              })),
-            },
-          ],
-        },
-      } satisfies CatalogObservation;
-      const scan = {
-        status: scanStatuses.complete,
-        observations: [observationA, observationB, observationC],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      expect(
-        catalog.documents
-          .get(observationA.path)
-          ?.documentDiagnostics.map((diagnostic) => diagnostic.code),
-      ).toContain(catalogDiagnosticCodes.duplicateId);
-      expect(
-        catalog.documents
-          .get(observationC.path)
-          ?.references.map((reference) => reference.path),
-      ).toEqual([observationA.path]);
     });
 
     it('파싱 실패 결과를 색인하면 이름과 참조를 추측하지 않는다', () => {
@@ -1157,45 +1026,59 @@ describe('buildCatalog: 관측 갱신', () => {
 
   describe('탐색·읽기 실패와 회복에 따른 문서 확인 상태 갱신', () => {
     /**
-     * @codocs [[참조]]#L59
+     * @codocs [[참조]]#L67
      */
-    it.each([
-      {
-        label: '파일',
-        failure: { kind: catalogFailureKinds.file, path: 'a.yaml' },
-      },
-      {
-        label: '폴더',
-        failure: { kind: catalogFailureKinds.folder, path: 'sub' },
-      },
-      {
-        label: '범위를 모르는',
-        failure: { kind: catalogFailureKinds.unknown },
-      },
-    ])(
-      '$label 탐색에 실패한 부분 스캔이면 이전 문서를 미확인으로 보존한다',
-      ({ failure }) => {
-        const previousScan = {
-          status: scanStatuses.complete,
-          observations: [documentA],
-        } satisfies CatalogScan;
-        const previous = buildCatalog(previousScan);
-        const nextScan = {
+    it.each<[string, CatalogScan]>([
+      [
+        '파일을 읽지 못한 부분 탐색',
+        {
           status: scanStatuses.partial,
           observations: [],
-          failures: [failure],
-        } satisfies CatalogScan;
-        const next = buildCatalog(nextScan, previous);
+          failures: [{ kind: catalogFailureKinds.file, path: 'a.yaml' }],
+        },
+      ],
+      [
+        '폴더를 읽지 못한 부분 탐색',
+        {
+          status: scanStatuses.partial,
+          observations: [],
+          failures: [{ kind: catalogFailureKinds.folder, path: 'sub' }],
+        },
+      ],
+      [
+        '범위를 모르는 부분 탐색',
+        {
+          status: scanStatuses.partial,
+          observations: [],
+          failures: [{ kind: catalogFailureKinds.unknown }],
+        },
+      ],
+      [
+        '전체 탐색 실패',
+        {
+          status: scanStatuses.failed,
+          observations: [],
+          failures: [{ kind: catalogFailureKinds.unknown }],
+        },
+      ],
+    ])(
+      '다시 탐색이 %s이면 이전에 확인한 문서를 미확인 후보로 보존한다',
+      (_case, scan) => {
+        const previous = buildCatalog({
+          status: scanStatuses.complete,
+          observations: [documentA],
+        });
+        const next = buildCatalog(scan, previous);
         expect(next.documents.get(documentA.path)?.confirmation).toBe(
           catalogConfirmations.unconfirmed,
         );
-        expect(next.failures).toEqual([failure]);
+        expect(
+          resolveReference(next, { name: 'A' }).candidates.map(
+            (candidate) => candidate.path,
+          ),
+        ).toEqual([documentA.path]);
       },
     );
-
-    /**
-     * @codocs [[참조]]#L59
-     */
     it('전체 스캔에 실패하면 새 관측을 채택하지 않고 이전 이름을 미확인으로 보존한다', () => {
       const previousScan = {
         status: scanStatuses.complete,
@@ -1337,24 +1220,45 @@ describe('resolveReference: 참조 대상 조회', () => {
     /**
      * @codocs [[참조]]#L40
      */
-    it('이름과 도메인이 일치하는 문서가 하나면 그 문서를 대상으로 반환한다', () => {
-      const scan = {
+    it.each<
+      [string, CatalogObservation[], string, string[], string | undefined]
+    >([
+      [
+        '하나면 확정한다',
+        [orderDocument],
+        referenceResolutionStatuses.resolved,
+        [orderDocument.path],
+        orderDocument.path,
+      ],
+      [
+        '없으면 부재로 안내한다',
+        [],
+        referenceResolutionStatuses.missing,
+        [],
+        undefined,
+      ],
+      [
+        '여러 개면 모호함으로 안내하고 대표를 고르지 않는다',
+        [purchaseOrder, orderDocument],
+        referenceResolutionStatuses.ambiguous,
+        [orderDocument.path, purchaseOrder.path],
+        undefined,
+      ],
+    ])('후보가 %s', (_case, observations, status, paths, target) => {
+      const catalog = buildCatalog({
         status: scanStatuses.complete,
-        observations: [orderDocument],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      const reference = {
-        name: orderDocument.parsed.data.name,
-        domain: '판매',
-      };
-      expect(resolveReference(catalog, reference)).toMatchObject({
-        status: referenceResolutionStatuses.resolved,
-        target: { path: orderDocument.path },
+        observations,
       });
+      const result = resolveReference(catalog, { name: '주문' });
+      expect(result.status).toBe(status);
+      expect(result.candidates.map((candidate) => candidate.path)).toEqual(
+        paths,
+      );
+      expect(result.target?.path).toBe(target);
     });
 
     /**
-     * @codocs [[참조]]#L32
+     * @codocs [[참조]]#L33
      */
     it('도메인을 지정하면 같은 이름을 가진 다른 도메인의 문서를 제외한다', () => {
       const scan = {
@@ -1390,7 +1294,7 @@ describe('resolveReference: 참조 대상 조회', () => {
     });
 
     /**
-     * @codocs [[참조]]#L33
+     * @codocs [[참조]]#L34
      */
     it('도메인을 생략하면 참조한 문서의 도메인과 관계없이 모든 도메인에서 후보를 찾는다', () => {
       const scan = {
@@ -1410,60 +1314,24 @@ describe('resolveReference: 참조 대상 조회', () => {
 
   describe('공백·대소문자·콜론을 포함한 참조 이름 비교', () => {
     /**
-     * @codocs [[참조]]#L31
+     * @codocs [[참조]]#L32
      */
-    it('저장된 이름의 앞뒤 공백을 제거해 조회하면 후보를 찾지 않는다', () => {
-      const observation = {
-        path: 'a.yaml',
-        parsed: {
-          ...parsedBase,
-          source:
-            '{"name":" 주문A! ","domains":["판매"],"definition":"설명","id":"a"}',
-          data: {
-            name: ' 주문A! ',
-            domains: ['판매'],
-            definition: '설명',
-            id: 'a',
-          },
-        },
-      } satisfies CatalogObservation;
-      const scan = {
+    it.each([
+      ['앞뒤 공백', ' 주문A! ', '주문A!'],
+      ['대소문자', '주문A!', '주문a!'],
+    ])('name과 %s만 달라도 후보로 찾지 않는다', (_case, name, reference) => {
+      const catalog = buildCatalog({
         status: scanStatuses.complete,
-        observations: [observation],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      const reference = { name: '주문A!', domain: '판매' };
-      expect(resolveReference(catalog, reference)).toMatchObject({
-        status: referenceResolutionStatuses.missing,
-        candidates: [],
+        observations: [
+          {
+            path: 'a.yaml',
+            parsed: parseYaml(
+              `id: a\nname: "${name}"\ndomains: [판매]\ndefinition: 설명\n`,
+            ),
+          },
+        ],
       });
-    });
-
-    /**
-     * @codocs [[참조]]#L31
-     */
-    it('저장된 이름과 대소문자가 다르면 후보를 찾지 않는다', () => {
-      const observation = {
-        path: 'a.yaml',
-        parsed: {
-          ...parsedBase,
-          source:
-            '{"name":"주문A!","domains":["판매"],"definition":"설명","id":"a"}',
-          data: {
-            name: '주문A!',
-            domains: ['판매'],
-            definition: '설명',
-            id: 'a',
-          },
-        },
-      } satisfies CatalogObservation;
-      const scan = {
-        status: scanStatuses.complete,
-        observations: [observation],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      const reference = { name: '주문a!', domain: '판매' };
-      expect(resolveReference(catalog, reference)).toMatchObject({
+      expect(resolveReference(catalog, { name: reference })).toMatchObject({
         status: referenceResolutionStatuses.missing,
         candidates: [],
       });
@@ -1528,56 +1396,26 @@ describe('resolveReference: 참조 대상 조회', () => {
 
   describe('복수 후보와 불완전한 탐색에서 참조 대상 확정 제한', () => {
     /**
-     * @codocs [[참조]]#L42
+     * @codocs [[참조]]#L65
      */
-    it('같은 이름을 가진 문서가 둘이면 경로순 후보를 모두 반환하고 대상을 선택하지 않는다', () => {
-      const scan = {
-        status: scanStatuses.complete,
-        observations: [purchaseOrder, orderDocument],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      const reference = { name: orderDocument.parsed.data.name };
-      const result = resolveReference(catalog, reference);
-      expect(result.status).toBe(referenceResolutionStatuses.ambiguous);
-      expect(result.candidates.map((candidate) => candidate.path)).toEqual([
-        orderDocument.path,
-        purchaseOrder.path,
-      ]);
-      expect(result.target).toBeUndefined();
-    });
-
-    /**
-     * @codocs [[참조]]#L57
-     */
-    it('부분 스캔에서 확인한 후보가 하나여도 전체 탐색을 마치지 못했으면 대상을 확정하지 않는다', () => {
-      const scan = {
-        status: scanStatuses.partial,
-        observations: [orderDocument],
-        failures: [{ kind: catalogFailureKinds.folder, path: 'sub' }],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      const reference = { name: orderDocument.parsed.data.name };
-      expect(resolveReference(catalog, reference)).toMatchObject({
-        status: referenceResolutionStatuses.unconfirmed,
-        candidates: [{ path: orderDocument.path }],
-      });
-    });
-
-    /**
-     * @codocs [[참조]]#L57
-     */
-    it('탐색을 마치지 못했으면 후보가 없어도 부재로 확정하지 않는다', () => {
-      const scan = {
-        status: scanStatuses.partial,
-        observations: [],
-        failures: [{ kind: catalogFailureKinds.folder, path: 'sub' }],
-      } satisfies CatalogScan;
-      const catalog = buildCatalog(scan);
-      expect(resolveReference(catalog, { name: '주문' })).toMatchObject({
-        status: referenceResolutionStatuses.unconfirmed,
-        candidates: [],
-      });
-    });
+    it.each<[string, CatalogObservation[], string[]]>([
+      ['하나', [orderDocument], [orderDocument.path]],
+      ['없음', [], []],
+    ])(
+      '탐색을 마치지 못했으면 후보가 %s이어도 미확인으로 둔다',
+      (_count, observations, paths) => {
+        const catalog = buildCatalog({
+          status: scanStatuses.partial,
+          observations,
+          failures: [{ kind: catalogFailureKinds.folder, path: 'sub' }],
+        });
+        const result = resolveReference(catalog, { name: '주문' });
+        expect(result.status).toBe(referenceResolutionStatuses.unconfirmed);
+        expect(result.candidates.map((candidate) => candidate.path)).toEqual(
+          paths,
+        );
+      },
+    );
   });
 });
 
