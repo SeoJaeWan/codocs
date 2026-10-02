@@ -254,9 +254,6 @@ describe('buildCatalog: 문서 색인', () => {
       ).toEqual([]);
     });
 
-    /**
-     * @codocs [[참조]]#L35
-     */
     it('여러 도메인에 속한 문서는 후보로 한 번만 센다', () => {
       const observation = {
         path: 'a.yaml',
@@ -559,9 +556,6 @@ describe('buildCatalog: 문서 색인', () => {
   });
 
   describe('연결할 수 없는 참조의 후보와 진단 반환', () => {
-    /**
-     * @codocs [[참조]]#L36
-     */
     it('같은 이름의 후보가 여러 도메인에 있으면 모든 후보를 반환하고 대상을 확정하지 않는다', () => {
       const scan = {
         status: scanStatuses.complete,
@@ -580,9 +574,6 @@ describe('buildCatalog: 문서 색인', () => {
       expect(source?.references).toEqual([]);
     });
 
-    /**
-     * @codocs [[참조]]#L44
-     */
     it('유효하지 않은 참조가 전달되면 후보를 조회하지 않고 연결하지 않는다', () => {
       const observation = {
         path: 's.yaml',
@@ -662,9 +653,6 @@ describe('buildCatalog: 문서 색인', () => {
       ).toContain(catalogDiagnosticCodes.selfReference);
     });
 
-    /**
-     * @codocs [[참조]]#L28
-     */
     it('같은 참조가 여러 번 나오면 나온 위치마다 따로 진단한다', () => {
       const observation = {
         path: 's.yaml',
@@ -713,9 +701,6 @@ describe('buildCatalog: 문서 색인', () => {
       ]);
     });
 
-    /**
-     * @codocs [[참조]]#L45
-     */
     it.each<[string, CatalogObservation[]]>([
       ['대상이 없는', []],
       ['대상이 모호한', [orderDocument, purchaseOrder]],
@@ -733,9 +718,6 @@ describe('buildCatalog: 문서 색인', () => {
   });
 
   describe('문서 오류가 있을 때 이름·참조 정보 보존', () => {
-    /**
-     * @codocs [[참조]]#L46
-     */
     it.each<[string, Record<string, unknown>, CatalogObservation[]]>([
       [
         'ID가 없어도',
@@ -790,9 +772,6 @@ describe('buildCatalog: 문서 색인', () => {
       ).toEqual([observation.path]);
     });
 
-    /**
-     * @codocs [[참조]]#L47
-     */
     it('오류가 있는 문서를 참조하면 참조 대상 오류를 경고한다', () => {
       const observationA = {
         path: 'a.yaml',
@@ -1060,9 +1039,6 @@ describe('buildCatalog: 관측 갱신', () => {
   });
 
   describe('탐색·읽기 실패와 회복에 따른 문서 확인 상태 갱신', () => {
-    /**
-     * @codocs [[참조]]#L67
-     */
     it.each<[string, CatalogScan]>([
       [
         '파일을 읽지 못한 부분 탐색',
@@ -1252,9 +1228,6 @@ describe('buildCatalog: 관측 갱신', () => {
 
 describe('resolveReference: 참조 대상 조회', () => {
   describe('이름과 도메인으로 참조 대상 조회', () => {
-    /**
-     * @codocs [[참조]]#L40
-     */
     it.each<
       [string, CatalogObservation[], string, string[], string | undefined]
     >([
@@ -1292,9 +1265,6 @@ describe('resolveReference: 참조 대상 조회', () => {
       expect(result.target?.path).toBe(target);
     });
 
-    /**
-     * @codocs [[참조]]#L33
-     */
     it('도메인을 지정하면 같은 이름을 가진 다른 도메인의 문서를 제외한다', () => {
       const scan = {
         status: scanStatuses.complete,
@@ -1312,9 +1282,6 @@ describe('resolveReference: 참조 대상 조회', () => {
       ).toEqual([purchaseOrder.path]);
     });
 
-    /**
-     * @codocs [[참조]]#L17
-     */
     it('대괄호 안의 이름과 name이 같은 문서를 후보로 찾는다', () => {
       const scan = {
         status: scanStatuses.complete,
@@ -1328,9 +1295,6 @@ describe('resolveReference: 참조 대상 조회', () => {
       ).toEqual([orderDocument.path]);
     });
 
-    /**
-     * @codocs [[참조]]#L34
-     */
     it('도메인을 생략하면 참조한 문서의 도메인과 관계없이 모든 도메인에서 후보를 찾는다', () => {
       const scan = {
         status: scanStatuses.complete,
@@ -1348,9 +1312,6 @@ describe('resolveReference: 참조 대상 조회', () => {
   });
 
   describe('공백·대소문자·콜론을 포함한 참조 이름 비교', () => {
-    /**
-     * @codocs [[참조]]#L32
-     */
     it.each([
       ['앞뒤 공백', ' 주문A! ', '주문A!'],
       ['대소문자', '주문A!', '주문a!'],

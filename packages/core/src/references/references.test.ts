@@ -138,9 +138,6 @@ describe('extractReferences: 본문 문자열에서 참조 추출', () => {
 });
 
 describe('표기: 참조 이름과 도메인', () => {
-  /**
-   * @codocs [[참조]]#L18
-   */
   it('이름 앞에 도메인과 콜론을 적으면 도메인과 이름으로 나눈다', () => {
     const result = extractReferences(
       parseYaml("definition: '[[도메인:이름]] [[이름]]'\n"),
@@ -156,9 +153,6 @@ describe('표기: 참조 이름과 도메인', () => {
       ['이름', undefined],
     ]);
   });
-  /**
-   * @codocs [[참조]]#L19
-   */
   it('이름과 도메인에 `\\:`로 쓴 콜론은 콜론 글자로 읽는다', () => {
     const result = extractReferences(
       parseYaml(String.raw`definition: '[[a\:b]] [[도\:메인:이\:름]]'` + '\n'),
@@ -174,9 +168,6 @@ describe('표기: 참조 이름과 도메인', () => {
       ['이:름', '도:메인'],
     ]);
   });
-  /**
-   * @codocs [[참조]]#L20
-   */
   it.each([
     ['대괄호 앞 1개', String.raw`'\[[글자]]'`, []],
     ['대괄호 앞 2개', String.raw`'\\[[이름]]'`, [['이름', undefined]]],
@@ -200,7 +191,6 @@ describe('표기: 참조 이름과 도메인', () => {
   );
   /**
    * double quote의 두 원문 백슬래시는 해석값에서 하나의 리터럴 escape가 된다.
-   * @codocs [[참조]]#L21
    */
   it('YAML 큰따옴표 문자열은 YAML이 바꾼 뒤의 백슬래시 개수로 판단한다', () => {
     const result = extractReferences(
@@ -211,9 +201,6 @@ describe('표기: 참조 이름과 도메인', () => {
 });
 
 describe('표기: 문법 오류', () => {
-  /**
-   * @codocs [[참조]]#L22
-   */
   it.each([
     ['빈 이름', '[[]]'],
     ['도메인 뒤 빈 이름', '[[도메인:]]'],
@@ -239,9 +226,6 @@ describe('표기: 문법 오류', () => {
       }),
     ]);
   });
-  /**
-   * @codocs [[참조]]#L26
-   */
   it('닫지 않은 참조는 다음 `[[` 앞에서 문법 오류로 끝내고 다음 참조를 새로 읽는다', () => {
     const source = 'definition: "[[앞 [[중간 [[정상]] [[끝"\n';
     expect(
@@ -256,9 +240,6 @@ describe('표기: 문법 오류', () => {
       [referenceSyntaxStatuses.invalid, '[[끝'],
     ]);
   });
-  /**
-   * @codocs [[참조]]#L27
-   */
   it('같은 참조가 여러 번 나오면 나온 위치마다 따로 해석한다', () => {
     const source = 'definition: "😀 [[반복]] [[반복]]"\n';
     const result = extractReferences(parseYaml(source));

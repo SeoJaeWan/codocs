@@ -189,7 +189,6 @@ export class WorkspaceCodeReferenceIndex {
   /**
    * 대상 문서를 저장해 색인이 바뀌면 코드 참조를 다시 판단하도록 알린다.
    * 코드 쪽 관측은 다시 읽지 않고 재사용한다.
-   * @codocs [[참조]]#L60
    */
   setCatalog(catalog: Catalog | undefined, documentGeneration: number): void {
     if (this.#closed) return;
@@ -217,7 +216,6 @@ export class WorkspaceCodeReferenceIndex {
   /**
    * 코드의 저장하지 않은 편집 내용으로 코드 참조를 다시 찾는다.
    * 같은 버전의 저장 파일이 수집 대상일 때만 편집 내용으로 대체한다.
-   * @codocs [[참조]]#L61
    */
   async updateBuffer(input: WorkspaceCodeBufferInput): Promise<boolean> {
     const relative = codeFileRelativePath(this.projectRoot, input.sourcePath);

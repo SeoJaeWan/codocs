@@ -104,9 +104,6 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
       ],
     });
   });
-  /**
-   * @codocs [[참조]]#L61
-   */
   it('적격 buffer를 편집하면 disk 출현을 대체하고 중복 집계하지 않는다', async () => {
     await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
     const index = createIndex();
@@ -164,9 +161,6 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     ).toBe(false);
     expect((await index.ready()).occurrences[0]?.documentVersion).toBe(2);
   });
-  /**
-   * @codocs [[참조]]#L59
-   */
   it('대상 YAML의 미저장 buffer만 수정하면 저장 이름 해석은 바뀌지 않는다', async () => {
     await writeFile(path.join(project, 'source'), '@codocs [[대상]]');
     const session = createWorkspaceQuerySession({ project });
@@ -604,9 +598,6 @@ describe('WorkspaceCodeReferenceIndex: 실제 감시 갱신', () => {
       absent: true,
     });
   });
-  /**
-   * @codocs [[참조]]#L60
-   */
   it('대상 이름을 저장하면 query session이 현재 코드 관측을 다시 해석한다', async () => {
     await writeFile(path.join(project, 'source'), '@codocs [[대상]]');
     const session = createWorkspaceQuerySession({ project });
