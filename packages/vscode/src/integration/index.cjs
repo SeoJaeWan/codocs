@@ -43,7 +43,7 @@ exports.run = /** 현재 UI 입력·응답 관측을 연결한다. */ async func
           .some(
             (item) =>
               (typeof item.code === 'object' ? item.code.value : item.code) ===
-              'reference_ambiguous',
+              'ambiguous_reference',
           ),
       'installed server diagnostic response',
     );
