@@ -3,8 +3,6 @@ name: 가상 주문 처리
 domains:
   - sample-sales
   - sample-delivery
-kind: procedure
-status: confirmed
 deprecatedAliases: []
 definition: |
   [[가상 주문]]의 요청 정보를 받아 [[sample-sales:가상 배송\:정책]]으로 접수 가능 여부를 판단한다.

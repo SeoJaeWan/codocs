@@ -14,8 +14,6 @@ import {
   catalogDiagnosticCodes,
   catalogDiagnosticMessages,
   diagnosticSeverities,
-  isDocumentKind,
-  isDocumentStatus,
   matchCode,
   parseYaml,
   changePlanStatuses,
@@ -493,14 +491,12 @@ function sessionInput(input: unknown): unknown {
 function normalizeFilters(input: CatalogListFilters): CatalogListFilters {
   return {
     ...(input.domain === undefined ? {} : { domain: input.domain }),
-    ...(input.kind === undefined ? {} : { kind: input.kind }),
-    ...(input.status === undefined ? {} : { status: input.status }),
   };
 }
 
 /** 커서와 함께 필터가 하나라도 명시되었는지 판별한다. */
 function hasSuppliedFilters(input: WorkspaceListInput): boolean {
-  return ['domain', 'kind', 'status'].some((key) => hasOwnData(input, key));
+  return ['domain'].some((key) => hasOwnData(input, key));
 }
 
 /** 목록에 보이는 모든 값만 canonical snapshot으로 해시한다. */
@@ -525,8 +521,6 @@ function cursorPayload(value: unknown): CursorPayload | undefined {
   const listFingerprint = ownValue(value, 'fingerprint');
   const generation = ownValue(value, 'generation');
   const domain = ownValue(filters, 'domain');
-  const kind = ownValue(filters, 'kind');
-  const status = ownValue(filters, 'status');
   if (
     version !== cursorVersion ||
     !Number.isSafeInteger(position) ||
@@ -534,17 +528,13 @@ function cursorPayload(value: unknown): CursorPayload | undefined {
     typeof listFingerprint !== 'string' ||
     !Number.isSafeInteger(generation) ||
     (generation as number) < 0 ||
-    (domain !== undefined && typeof domain !== 'string') ||
-    (kind !== undefined && !isDocumentKind(kind)) ||
-    (status !== undefined && !isDocumentStatus(status))
+    (domain !== undefined && typeof domain !== 'string')
   )
     return undefined;
   return {
     version,
     filters: normalizeFilters({
       ...(typeof domain === 'string' ? { domain } : {}),
-      ...(isDocumentKind(kind) ? { kind } : {}),
-      ...(isDocumentStatus(status) ? { status } : {}),
     }),
     position: position as number,
     fingerprint: listFingerprint,

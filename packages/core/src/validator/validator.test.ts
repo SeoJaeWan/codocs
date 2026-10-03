@@ -96,14 +96,11 @@ describe('validateDocument: 문서 스키마 검증', () => {
     if (result.success) expect(result.data.deprecatedAliases).toEqual([]);
   });
 
-  it('복수 도메인과 모든 선택 속성을 함께 검사하면 종류 구분 없이 원문을 보존한다', /** 단일 문서에 예문·이전 명칭·정책 상태를 함께 허용한다. */ () => {
+  it('복수 도메인과 이전 ID를 함께 검사하면 종류 구분 없이 원문을 보존한다', /** 단일 문서에 복수 도메인과 이전 명칭을 함께 허용한다. */ () => {
     const data = {
       ...term,
       domains: ['판매', '배송'],
-      examples: ['[[주문 처리]]'],
       deprecatedAliases: [{ id: 'previous-order' }],
-      kind: 'policy',
-      status: 'confirmed',
     };
     const result = validateDocument({ data });
     expect(result.success).toBe(true);
@@ -112,6 +109,28 @@ describe('validateDocument: 문서 스키마 검증', () => {
       expect(result.data).toEqual(data);
       expect(result.data).not.toHaveProperty('type');
     }
+  });
+
+  it('kind, status, examples를 가진 문서를 검증하면 값을 그대로 보존하고 각 속성에 unknown_field 경고만 반환한다', /** 세 속성은 더 이상 제품 속성이 아니므로 값 형식도 검사하지 않는다. */ () => {
+    const data = {
+      ...term,
+      kind: 'Policy',
+      status: null,
+      examples: [false, '[[주문 처리]]'],
+    };
+
+    const result = validateDocument({ data });
+
+    expect(result.success).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(
+      result.warnings.map((issue) => [issue.code, issue.fieldPath]),
+    ).toEqual([
+      [schemaDiagnosticCodes.unknownField, ['kind']],
+      [schemaDiagnosticCodes.unknownField, ['status']],
+      [schemaDiagnosticCodes.unknownField, ['examples']],
+    ]);
+    if (result.success) expect(result.data).toEqual(data);
   });
 
   it('이전 형식을 검사하면 새 필수 필드를 대신 채우지 않고 이전 속성을 경고한다', /** 호환 변환 없이 사용자 속성으로 보존하며 필수 속성 누락을 진단한다. */ () => {
@@ -144,20 +163,14 @@ describe('validateDocument: 문서 스키마 검증', () => {
 
   it.each([
     term,
-    { ...term, examples: [], deprecatedAliases: [] },
     {
       ...term,
-      examples: [' 예시 '],
       deprecatedAliases: [
         { id: 'previous-name' },
         { id: 'previous-title', message: ' 안내 ' },
       ],
     },
     knowledge,
-    { ...knowledge, kind: 'policy', status: 'proposed' },
-    { ...knowledge, kind: 'procedure', status: 'confirmed' },
-    { ...knowledge, kind: 'decision', status: 'deprecated' },
-    { ...knowledge, kind: 'discussion' },
   ])(
     '정상 문서와 선택 속성을 검사하면 원래 값으로 성공한다: %j',
     /** 선택 누락과 빈 선택 배열에 기본값을 넣지 않는다. */ (data) => {
@@ -166,8 +179,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
       expect(result.errors).toEqual([]);
       expect(result.warnings).toEqual([]);
       if (result.success) expect(result.data).toEqual(data);
-      if (!Object.hasOwn(data, 'status') && result.success)
-        expect(result.data).not.toHaveProperty('status');
     },
   );
 
@@ -237,7 +248,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
       schemaDiagnosticMessages.invalidId,
     ],
     ['id', 7, schemaDiagnosticCodes.invalidFieldType, undefined],
-    ['examples', null, schemaDiagnosticCodes.invalidFieldType, undefined],
     [
       'deprecatedAliases',
       null,
@@ -276,21 +286,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
     [
       { ...knowledge, domains: [null] },
       ['domains', 0],
-      schemaDiagnosticCodes.invalidFieldType,
-    ],
-    [
-      { ...knowledge, kind: 'Policy' },
-      ['kind'],
-      schemaDiagnosticCodes.invalidFieldValue,
-    ],
-    [
-      { ...knowledge, status: null },
-      ['status'],
-      schemaDiagnosticCodes.invalidFieldType,
-    ],
-    [
-      { ...term, examples: [false] },
-      ['examples', 0],
       schemaDiagnosticCodes.invalidFieldType,
     ],
     [
@@ -545,11 +540,10 @@ describe('validateDocument: 문서 스키마 검증', () => {
       expect(calls).toBe(0);
     });
 
-    it.each([
-      { name: 'examples', data: { ...term, examples: undefined } },
-      { name: 'status', data: { ...knowledge, status: undefined } },
-    ])('$name에 명시적 undefined를 전달하면 검증에 실패한다', ({ data }) => {
-      const result = validateDocument({ data });
+    it('필수 속성에 명시적 undefined를 전달하면 검증에 실패한다', () => {
+      const result = validateDocument({
+        data: { ...knowledge, definition: undefined },
+      });
       expect(result.success).toBe(false);
     });
   });
@@ -597,7 +591,7 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
             newlineName,
             newline,
             name: '배열 원소',
-            fieldPath: ['examples', 1],
+            fieldPath: ['domains', 1],
             section: 'errors',
             expected: 'false',
           },
@@ -628,8 +622,7 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
         'id: Bad-ID # 값 뒤 주석',
         'name: 이름',
         'definition: 정의',
-        'domains: [영역]',
-        'examples: ["😀", false]',
+        'domains: ["😀", false]',
         'deprecatedAliases: [{message: "안내"}]',
         'aliases: [old]',
         '# 뒤 주석',
@@ -653,10 +646,10 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
       if (!issue) return;
       expect(issueSlice(source, issue)).toBe(expected);
       expect(issue.path).toBe('terms.yaml');
-      if (fieldPath[0] === 'examples')
+      if (fieldPath[0] === 'domains')
         expect(issue.range).toEqual({
-          start: { line: 6, character: 17 },
-          end: { line: 6, character: 22 },
+          start: { line: 5, character: 16 },
+          end: { line: 5, character: 21 },
         });
     },
   );

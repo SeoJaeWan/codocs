@@ -154,8 +154,7 @@ describe('language server stdio 프로세스', () => {
         path.resolve('.workbench/fixtures/protocol-links-'),
       );
       await mkdir(path.join(root, '.codocs'));
-      const target =
-        'id: target\nname: 대상\ndefinition: 설명\nstatus: deprecated\n';
+      const target = 'id: target\nname: 대상\ndefinition: 설명\n';
       await writeFile(path.join(root, '.codocs/target.yaml'), target);
       if (ambiguous)
         await writeFile(
@@ -242,7 +241,7 @@ describe('language server stdio 프로세스', () => {
               expect.objectContaining({
                 code: ambiguous
                   ? 'reference_ambiguous'
-                  : 'deprecated_reference',
+                  : 'reference_target_error',
                 severity: ambiguous ? 1 : 2,
               }),
             ]) as unknown,

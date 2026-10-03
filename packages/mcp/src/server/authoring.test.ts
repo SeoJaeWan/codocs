@@ -135,7 +135,6 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
           name: '가상 B',
           definition: '[[가상 A]]를 사용하는 절차',
           domains: ['연습'],
-          kind: 'procedure',
         },
       },
     });

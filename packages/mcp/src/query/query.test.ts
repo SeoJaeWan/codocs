@@ -242,11 +242,11 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
   describe('요청 입력 검증과 backend 호출 방지', () => {
     it.each([
       { name: '알 수 없는 목록 속성', method: 'list', input: { limit: 10 } },
-      { name: '잘못된 종류 값', method: 'list', input: { kind: 'knowledge' } },
+      { name: 'kind 필터', method: 'list', input: { kind: 'policy' } },
       {
-        name: '명시적 undefined 상태',
+        name: 'status 필터',
         method: 'list',
-        input: { status: undefined },
+        input: { status: 'confirmed' },
       },
       { name: '빈 ID 목록', method: 'get', input: { ids: [] } },
       { name: '희소 ID 배열', method: 'get', input: { ids: Array(1) } },
@@ -347,7 +347,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { domain: '업무', kind: 'policy', status: 'confirmed' };
+      const input = { domain: '업무' };
 
       const result = await handlers.codocsList(input);
 

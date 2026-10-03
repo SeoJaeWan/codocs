@@ -129,7 +129,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
       });
     });
 
-    it('ID가 없는 문서가 다른 문서를 참조하면 이름과 참조 위치를 연결한다', async () => {
+    it('ID가 없는 문서가 다른 문서를 참조하면 definition의 이름과 참조 위치만 연결하고 examples는 제외한다', async () => {
       await file(
         'valid.yaml',
         "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
@@ -144,7 +144,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
 
       expect(document?.name).toBe('오류');
       expect(document?.id).toBeUndefined();
-      expect(document?.occurrences).toHaveLength(3);
+      expect(document?.occurrences).toHaveLength(1);
       expect(document?.references.map((item) => item.path)).toEqual([
         discovered('valid.yaml'),
       ]);
@@ -155,7 +155,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
             item.occurrence.offsetRange.end,
           ),
         ),
-      ).toEqual(['[[정상]]', '[[정상]]', '[[정상]]']);
+      ).toEqual(['[[정상]]']);
     });
 
     it('파싱에 실패한 문서를 색인하면 참조 위치를 만들지 않는다', async () => {
@@ -169,7 +169,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
       ).toEqual([]);
     });
   });
-  it('잘못된 본문 자료형과 사용자 필드는 제외하고 정상 examples 원소만 추출한다', /** 타입을 추측하거나 문자열로 변환하지 않는다. */ async () => {
+  it('잘못된 본문 자료형과 사용자 필드, examples는 제외하고 참조를 추출하지 않는다', /** 타입을 추측하거나 문자열로 변환하지 않는다. */ async () => {
     await file(
       'a.yaml',
       'name: A\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: ["[[B]]"]\nexamples: [5, "[[B]]", { text: "[[B]]" }]\n',
@@ -184,9 +184,9 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
       'name: 지식\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: ["[[B]]"]\n',
     );
     const catalog = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
-    expect(
-      catalog.documents.get(discovered('a.yaml'))?.occurrences,
-    ).toHaveLength(1);
+    expect(catalog.documents.get(discovered('a.yaml'))?.occurrences).toEqual(
+      [],
+    );
     expect(
       catalog.documents.get(discovered('unknown.yaml'))?.occurrences,
     ).toEqual([]);

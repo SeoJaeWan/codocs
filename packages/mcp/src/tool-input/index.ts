@@ -1,4 +1,3 @@
-import { documentKinds, documentStatuses } from '@codocs/core';
 import type { WorkspaceListInput } from '@codocs/workspace';
 import { z } from 'zod';
 import { guideTopics } from '../guide/domain-values.js';
@@ -56,8 +55,6 @@ export type CodocsToolName =
 const listSchema = z.strictObject({
   cursor: z.string().optional(),
   domain: z.string().optional(),
-  kind: z.enum(documentKinds).optional(),
-  status: z.enum(documentStatuses).optional(),
 });
 const getSchema = z.strictObject({ ids: z.array(z.string().min(1)) });
 const validateSchema = z.strictObject({ path: z.string().optional() });
@@ -125,12 +122,10 @@ export function parseListInput(input: unknown): WorkspaceListInput | undefined {
   if (!dataOnly(input)) return undefined;
   const result = listSchema.safeParse(input);
   if (!result.success) return undefined;
-  const { cursor, domain, kind, status } = result.data;
+  const { cursor, domain } = result.data;
   return {
     ...(cursor === undefined ? {} : { cursor }),
     ...(domain === undefined ? {} : { domain }),
-    ...(kind === undefined ? {} : { kind }),
-    ...(status === undefined ? {} : { status }),
   };
 }
 

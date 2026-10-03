@@ -102,8 +102,6 @@ export const catalogDiagnosticCodes = {
   unconfirmedReference: 'unconfirmed_reference',
   /** 확정 경로 대상에 문서 오류가 있을 때 연결을 유지하며 경고한다. */
   referenceTargetError: 'reference_target_error',
-  /** 확정 대상의 문서 상태가 폐기일 때 등장마다 경고한다. */
-  deprecatedReference: 'deprecated_reference',
 } as const;
 /** 색인 계층이 소유하는 고정 문구다. */
 export const catalogDiagnosticMessages = {
@@ -114,7 +112,6 @@ export const catalogDiagnosticMessages = {
   selfReference: '같은 발견 문서를 자기 참조할 수 없습니다.',
   unconfirmedReference: '스캔이 불완전하여 참조 대상을 확정할 수 없습니다.',
   referenceTargetError: '확정 참조 대상에 문서 오류가 있습니다.',
-  deprecatedReference: '폐기 상태의 문서를 참조하고 있습니다.',
 } as const;
 /** 상수에서 도출한 색인 진단 코드다. */
 export type CatalogDiagnosticCode =

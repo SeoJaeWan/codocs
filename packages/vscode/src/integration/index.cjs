@@ -34,7 +34,7 @@ exports.run = /** 현재 UI 입력·응답 관측을 연결한다. */ async func
     environment.extensionPath = extension.extensionPath;
     environment.extensionVersion = extension.packageJSON.version;
     const uri = vscode.Uri.file(
-      path.join(config.workspace, '.codocs/old-source.yaml'),
+      path.join(config.workspace, '.codocs/ambiguous.yaml'),
     );
     await until(
       /** 현재 UI 입력·응답 관측을 연결한다. */ () =>
@@ -43,7 +43,7 @@ exports.run = /** 현재 UI 입력·응답 관측을 연결한다. */ async func
           .some(
             (item) =>
               (typeof item.code === 'object' ? item.code.value : item.code) ===
-              'deprecated_reference',
+              'reference_ambiguous',
           ),
       'installed server diagnostic response',
     );

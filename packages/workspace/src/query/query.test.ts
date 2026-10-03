@@ -8,8 +8,6 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 import {
   catalogDiagnosticCodes,
   diagnosticSeverities,
-  documentKinds,
-  documentStatuses,
   queryDiagnosticCodes,
   scanStatuses,
   yamlDiagnosticCodes,
@@ -711,7 +709,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   describe('부분 스캔 후 이전 조회 결과 보존', () => {
     it('문서 경로의 확인이 실패하면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
       const raw =
-        "id: alpha\nname: 알파\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: '이전 본문'\n";
+        "id: alpha\nname: 알파\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: '이전 본문'\n";
       const target = await file('alpha.yaml', raw);
       const session = createWorkspaceQuerySession({ cwd: project });
       const initial = await session.get(['alpha']);
@@ -745,7 +743,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('부분 스캔에서 색인 밖 ID를 조회하면 부재로 확정하지 않는다', async () => {
       const target = await file(
         'alpha.yaml',
-        'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+        'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.get(['alpha']);
@@ -768,11 +766,11 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('부분 스캔에서 목록을 조회하면 이전 항목을 포함한 개수를 반환한다', async () => {
       const target = await file(
         'alpha.yaml',
-        'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+        'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
       );
       await file(
         'beta.yaml',
-        'id: beta\nname: beta\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+        'id: beta\nname: beta\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.list();
@@ -792,7 +790,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   it('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 미지원 .codocs 정션으로 failed 전환을 만든다. */ async () => {
     await file(
       'alpha.yaml',
-      'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     expect(await session.get(['alpha'])).toMatchObject({ success: true });
@@ -814,26 +812,14 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     for (let index = 59; index >= 0; index--)
       await file(
         `doc-${index}.yaml`,
-        `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+        `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n`,
       );
     await file(
       'other.yaml',
-      'id: other\nname: other\ndomains: [기타]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
-    );
-    await file(
-      'other-kind.yaml',
-      'id: other-kind\nname: other-kind\ndomains: [업무]\ndeprecatedAliases: []\nkind: decision\nstatus: confirmed\ndefinition: 본문\n',
-    );
-    await file(
-      'other-status.yaml',
-      'id: other-status\nname: other-status\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: proposed\ndefinition: 본문\n',
+      'id: other\nname: other\ndomains: [기타]\ndeprecatedAliases: []\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const first = await session.list({
-      domain: '업무',
-      kind: documentKinds.policy,
-      status: documentStatuses.confirmed,
-    });
+    const first = await session.list({ domain: '업무' });
     expect(first).toMatchObject({
       success: true,
       totalCount: 60,
@@ -867,7 +853,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -875,7 +861,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         throw new Error('다음 cursor 없음');
       await file(
         'doc-50.yaml',
-        'id: doc-50\nname: doc-50\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 새 본문\n',
+        'id: doc-50\nname: doc-50\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 새 본문\n',
       );
 
       await vi.waitFor(
@@ -903,7 +889,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list({ domain: '업무' });
@@ -925,7 +911,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -933,7 +919,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         throw new Error('다음 cursor 없음');
       await file(
         'doc-50.yaml',
-        'id: doc-50\nname: 표시 이름 변경\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+        'id: doc-50\nname: 표시 이름 변경\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
       );
 
       await vi.waitFor(
@@ -972,7 +958,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         for (let index = 0; index < 51; index++)
           await file(
             `doc-${index}.yaml`,
-            `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+            `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n`,
           );
         const session = createWorkspaceQuerySession({ cwd: project });
         const first = await session.list();
@@ -981,17 +967,17 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         if (changed === 'new')
           await file(
             'new.yaml',
-            'id: new\nname: new\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+            'id: new\nname: new\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
           );
         if (changed === 'error')
           await file(
             'doc-50.yaml',
-            "id: doc-50\nname: doc-50\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: '[[Missing]]'\n",
+            "id: doc-50\nname: doc-50\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: '[[Missing]]'\n",
           );
         if (changed === 'conflict')
           await file(
             'duplicate.yaml',
-            'id: doc-50\nname: duplicate\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+            'id: doc-50\nname: duplicate\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
           );
 
         await vi.waitFor(
@@ -1086,73 +1072,47 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
-    it.each([
-      {
-        label: '도메인',
-        domains: '기타',
-        kind: documentKinds.policy,
-        status: documentStatuses.confirmed,
-      },
-      {
-        label: '종류',
-        domains: '업무',
-        kind: documentKinds.decision,
-        status: documentStatuses.confirmed,
-      },
-      {
-        label: '상태',
-        domains: '업무',
-        kind: documentKinds.policy,
-        status: documentStatuses.proposed,
-      },
-    ])(
-      '문서의 $label을 변경해 기존 필터에서 제외하면 기존 cursor를 만료한다',
-      async ({ domains, kind, status }) => {
-        for (let index = 0; index < 51; index++) {
-          const id = `doc-${String(index).padStart(2, '0')}`;
-          await file(
-            `${id}.yaml`,
-            `id: ${id}\nname: ${id}\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
-          );
-        }
-        const filters = {
-          domain: '업무',
-          kind: documentKinds.policy,
-          status: documentStatuses.confirmed,
-        };
-        const session = createWorkspaceQuerySession({ cwd: project });
-        const first = await session.list(filters);
-        if (!first.success || !first.nextCursor)
-          throw new Error('다음 cursor 없음');
-        const input = { cursor: first.nextCursor };
+    it('문서의 도메인을 변경해 기존 필터에서 제외하면 기존 cursor를 만료한다', async () => {
+      for (let index = 0; index < 51; index++) {
+        const id = `doc-${String(index).padStart(2, '0')}`;
         await file(
-          'doc-50.yaml',
-          `id: doc-50\nname: doc-50\ndomains: [${domains}]\ndeprecatedAliases: []\nkind: ${kind}\nstatus: ${status}\ndefinition: 본문\n`,
+          `${id}.yaml`,
+          `id: ${id}\nname: ${id}\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n`,
         );
+      }
+      const filters = { domain: '업무' };
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const first = await session.list(filters);
+      if (!first.success || !first.nextCursor)
+        throw new Error('다음 cursor 없음');
+      const input = { cursor: first.nextCursor };
+      await file(
+        'doc-50.yaml',
+        `id: doc-50\nname: doc-50\ndomains: [기타]\ndeprecatedAliases: []\ndefinition: 본문\n`,
+      );
 
-        await vi.waitFor(
-          async () => {
-            const synchronized = await session.list(filters);
-            expect(synchronized).toMatchObject({
-              success: true,
-              totalCount: 50,
-            });
-          },
-          { timeout: 5_000, interval: 25 },
-        );
-        const result = await session.list(input);
+      await vi.waitFor(
+        async () => {
+          const synchronized = await session.list(filters);
+          expect(synchronized).toMatchObject({
+            success: true,
+            totalCount: 50,
+          });
+        },
+        { timeout: 5_000, interval: 25 },
+      );
+      const result = await session.list(input);
 
-        expect(result).toEqual({
-          success: false,
-          scanStatus: scanStatuses.complete,
-          error: {
-            code: workspaceQueryDiagnosticCodes.cursorExpired,
-            severity: diagnosticSeverities.error,
-            message: workspaceQueryDiagnosticMessages.cursorExpired,
-          },
-        });
-      },
-    );
+      expect(result).toEqual({
+        success: false,
+        scanStatus: scanStatuses.complete,
+        error: {
+          code: workspaceQueryDiagnosticCodes.cursorExpired,
+          severity: diagnosticSeverities.error,
+          message: workspaceQueryDiagnosticMessages.cursorExpired,
+        },
+      });
+    });
   });
 
   describe('cursor 서명과 세션 수명', () => {
@@ -1160,7 +1120,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -1191,7 +1151,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -1211,7 +1171,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -1456,11 +1416,9 @@ describe('live 참조와 선택 최신 확인', () => {
       ],
     });
     if (!result.success) throw new Error('참조 조회 실패');
-    expect(
-      result.diagnostics.filter(
-        (item) => item.code === catalogDiagnosticCodes.deprecatedReference,
-      ),
-    ).toHaveLength(2);
+    expect(result.diagnostics.map((item) => item.code)).not.toContain(
+      'deprecated_reference',
+    );
     expect(result.targets[0]).toMatchObject({
       source: {
         uri: pathToFileURL(path.join(project, '.codocs/target.yaml')).href,

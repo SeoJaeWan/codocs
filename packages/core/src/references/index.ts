@@ -139,10 +139,6 @@ function bodyPaths(data: Record<string, unknown>): FieldPath[] {
   const paths: FieldPath[] = [];
   if (typeof data.definition === 'string')
     paths.push([documentFields.definition]);
-  if (Array.isArray(data.examples))
-    for (let index = 0; index < data.examples.length; index++)
-      if (typeof data.examples[index] === 'string')
-        paths.push([documentFields.examples, index]);
   return paths;
 }
 /**

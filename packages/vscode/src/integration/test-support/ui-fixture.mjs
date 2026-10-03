@@ -42,7 +42,7 @@ export function uiFiles() {
     '.codocs/twin-b.yaml':
       'id: twin-b\nname: Twin\ndefinition: Twin B body\ndomains: [beta]\ndeprecatedAliases: []\n',
     '.codocs/old.yaml':
-      'id: old\nname: Old\ndefinition: Old body\nstatus: deprecated\ndomains: [test]\ndeprecatedAliases: []\n',
+      'id: old\nname: Old\ndefinition: Old body\ndomains: [test]\ndeprecatedAliases: []\n',
     '.codocs/old-source.yaml':
       'id: old-source\nname: Old Source\ndefinition: Body [[Old]]\ndomains: [test]\ndeprecatedAliases: []\n',
     'nested/source.java': 'zone();\n',
