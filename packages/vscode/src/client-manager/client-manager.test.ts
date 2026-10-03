@@ -63,9 +63,7 @@ function fakeClient(): FolderClientBoundary & {
   };
 }
 
-// @codocs [[VS Code:언어 서버 연결]]
 describe('WorkspaceClientManager: 폴더별 client 생명주기', () => {
-  // @codocs [[VS Code:언어 서버 연결]]#L19
   it('활성화 시 workspace folder마다 독립 client를 하나씩 시작한다', async () => {
     const host = new FakeHost([first, second]);
     const clients = new Map<string, ReturnType<typeof fakeClient>>();
@@ -150,7 +148,6 @@ describe('WorkspaceClientManager: 폴더별 client 생명주기', () => {
 });
 
 describe('RollingRestartBudget: 반복 종료 제한', () => {
-  // @codocs [[VS Code:언어 서버 연결]]#L33
   it('관찰 구간의 허용 횟수 뒤에는 자동 재시작을 중단한다', () => {
     const budget = new RollingRestartBudget(3, 1_000);
 

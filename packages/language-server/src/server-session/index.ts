@@ -186,7 +186,7 @@ interface WorkspaceBinding {
 const defaultSessionFactory: WorkspaceSessionFactory = (rootPath) =>
   createWorkspaceQuerySession({ cwd: rootPath });
 
-/** LSP 연결과 분리해 문서·작업 공간·비동기 최신성을 관리한다. @codocs [[문서 동기화]] */
+/** LSP 연결과 분리해 문서·작업 공간·비동기 최신성을 관리한다. */
 export class LanguageServerSession {
   readonly documents = new SynchronizedDocuments();
   readonly #sessionFactory: WorkspaceSessionFactory;
@@ -237,7 +237,7 @@ export class LanguageServerSession {
     return this.#workspaces.size;
   }
 
-  /** didOpen 원문을 언어·확장자와 무관하게 저장한다. @codocs [[문서 동기화]]#L18-L21 */
+  /** didOpen 원문을 언어·확장자와 무관하게 저장한다. */
   openDocument(
     params: DidOpenTextDocumentParams,
   ): ReturnType<SynchronizedDocuments['open']> {
@@ -270,7 +270,7 @@ export class LanguageServerSession {
     };
   }
 
-  /** 편집 출처에 묶인 조회·선택을 무효화한다. @codocs [[문서 동기화]]#L36-L38 */
+  /** 편집 출처에 묶인 조회·선택을 무효화한다. */
   #documentChanged(uri: string): void {
     this.#diagnosticEpoch++;
     this.#live.delete(uri);
@@ -293,7 +293,7 @@ export class LanguageServerSession {
       .join('/');
   }
 
-  /** 같은 문서·완료 관측의 참조 요청을 공유하며 늦은 결과를 폐기한다. @codocs [[문서 동기화]]#L44-L47 */
+  /** 같은 문서·완료 관측의 참조 요청을 공유하며 늦은 결과를 폐기한다. */
   async #references(
     uri: string,
   ): Promise<WorkspaceLiveReferenceSuccess | undefined> {
@@ -389,7 +389,7 @@ export class LanguageServerSession {
     return selection ? selectionTarget(selection) : undefined;
   }
 
-  /** 단일 확정 YAML 참조에만 본문 링크를 제공한다. @codocs [[IDE 지원]]#L71-L77 */
+  /** 단일 확정 YAML 참조에만 본문 링크를 제공한다. */
   async #yamlLinks(
     uri: string,
     cancellation?: CancellationToken,
@@ -451,7 +451,7 @@ export class LanguageServerSession {
     };
   }
 
-  /** 명시 링크를 우선하고 YAML 이름 링크와 단일 역참조를 함께 제공한다. @codocs [[IDE 지원]]#L98-L101 */
+  /** 명시 링크를 우선하고 YAML 이름 링크와 단일 역참조를 함께 제공한다. */
   async documentLinks(
     uri: string,
     cancellation?: CancellationToken,
@@ -484,7 +484,7 @@ export class LanguageServerSession {
     return [...forward.links, ...yaml, ...reverse];
   }
 
-  /** 열린 source들을 같은 프로젝트의 overlay에 먼저 반영한다. @codocs [[문서 동기화]]#L61-L62 */
+  /** 열린 source들을 같은 프로젝트의 overlay에 먼저 반영한다. */
   async #prepareCodeBuffers(session: CodeSession): Promise<void> {
     for (const document of this.documents.all()) {
       const owner = this.#codeOwner(document.uri);
@@ -501,7 +501,7 @@ export class LanguageServerSession {
     );
   }
 
-  /** 문서 전체 코드 출현은 원문 수정 없이 첫 행 Hint로 제공한다. @codocs [[IDE 지원]]#L40-L47 */
+  /** 문서 전체 코드 출현은 원문 수정 없이 첫 행 Hint로 제공한다. */
   async inlayHints(
     uri: string,
     cancellation?: CancellationToken,
@@ -536,7 +536,7 @@ export class LanguageServerSession {
     };
   }
 
-  /** 열린 원문을 우선하여 모든 저장 지식 문서를 진단하고 실패 관측을 분리한다. @codocs [[IDE 지원]]#L58-L66 */
+  /** 열린 원문을 우선하여 모든 저장 지식 문서를 진단하고 실패 관측을 분리한다. */
   async diagnostics(): Promise<
     | {
         documents: {
@@ -731,7 +731,7 @@ export class LanguageServerSession {
     );
   }
 
-  /** 요청 시점의 원문을 매칭하고 완료 시점에도 같은 버전인지 확인한다. @codocs [[문서 동기화]]#L27-L29 */
+  /** 요청 시점의 원문을 매칭하고 완료 시점에도 같은 버전인지 확인한다. */
   async matchDocument(
     request: DocumentMatchRequest,
   ): Promise<DocumentMatchResponse> {
@@ -781,7 +781,7 @@ export class LanguageServerSession {
     return mapMatchResult(current, workspace, result);
   }
 
-  /** 같은 코드·catalog 관측의 커서 후보와 경로 상세로 표준 Hover를 만든다. @codocs [[문서 동기화]]#L32 @codocs [[코드 호버]]#L42 */
+  /** 같은 코드·catalog 관측의 커서 후보와 경로 상세로 표준 Hover를 만든다. */
   async hoverDocument(
     params: HoverParams,
     cancellation?: CancellationToken,

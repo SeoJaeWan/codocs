@@ -49,7 +49,6 @@ describe('명시 링크와 출처 확인', () => {
       },
       { timeout: 5000 },
     );
-    // @codocs [[IDE 지원]]#L18-L20
     expect(links[0]!.range).toEqual({
       start: { line: 0, character: 3 },
       end: { line: 0, character: text.length },
@@ -118,7 +117,6 @@ describe('명시 링크와 출처 확인', () => {
       textDocument: { uri, version: 2 },
       contentChanges: [{ text: '표기 제거' }],
     });
-    // @codocs [[문서 동기화]]#L36-L40
     expect(await session.confirmSource(selected)).toBeNull();
     session.closeDocument(uri);
     expect(await session.confirmSource(selected)).toBeNull();

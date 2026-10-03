@@ -70,7 +70,6 @@ describe('planDocumentChange', () => {
       expect(result.status).toBe(changePlanStatuses.candidate);
       if (result.status !== changePlanStatuses.candidate) return;
       expect(result.path).toBe(baseContext.source.path);
-      // @codocs [[문서 변경 계획]]#L90
       expect(result.baseRevision).toBe(baseContext.source.revision);
       expect(result.raw).toBe(
         'id: zone\nname: 구역\ndomains: [운영]\ndefinition: 새 설명\n',
@@ -127,7 +126,6 @@ describe('planDocumentChange', () => {
 
       expect(result.status).toBe(changePlanStatuses.candidate);
       if (result.status === changePlanStatuses.candidate)
-        // @codocs [[문서 변경 계획]]#L55
         expect(result.data.deprecatedAliases).toEqual([{ id: 'zone' }]);
     });
 

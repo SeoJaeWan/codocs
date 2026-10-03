@@ -275,7 +275,6 @@ describe('VscodeExtensionRuntime 원문 이동 실패 출력', () => {
   );
 });
 
-// @codocs [[VS Code:언어 서버 연결]]
 describe('VscodeFolderClient 갱신 요청 신호', () => {
   it('.codocs 폴더 생성·삭제에만 refresh를 요청하고 내용 파일 변경과 폴더 변경에는 요청하지 않는다', async () => {
     boundary.send.mockResolvedValue(undefined);
@@ -376,7 +375,6 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
     await client.stop();
   });
 
-  // @codocs [[VS Code:언어 서버 연결]]#L43
   it('이전 client 세션의 늦은 실패 알림은 새 상태 항목에 게시하지 않는다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,
@@ -497,7 +495,6 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
       await client.stop();
     },
   );
-  // @codocs [[VS Code:원문 열기]]#L16
   it('확인 응답 사이에 snapshot 알림이 와도 같은 출처와 서버의 성공을 유지한다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,
@@ -594,7 +591,6 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
 });
 
 describe('source-owning Inlay Hint provider', () => {
-  // @codocs [[VS Code:언어 서버 연결]]#L50-L51
   it('소유한 source의 힌트만 요청하고 서버가 생성한 tooltip command만 신뢰한다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,

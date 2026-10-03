@@ -104,7 +104,6 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
       ],
     });
   });
-  /** @codocs [[작업 공간:코드 참조 색인]]#L35-L37 */
   it('적격 buffer를 편집하면 disk 출현을 대체하고 중복 집계하지 않는다', async () => {
     await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
     const index = createIndex();
@@ -222,7 +221,6 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     ).toEqual([0, 21]);
     expect((await index.reverse(targetPath)).confirmedCount).toBe(1);
   });
-  /** @codocs [[작업 공간:코드 참조 색인]]#L54-L55 */
   it('개별 파일 읽기가 실패하면 확인한 다른 출현과 실패 사유를 유지하고 incomplete로 표시한다', async () => {
     await writeFile(path.join(project, 'source'), '@codocs [[대상]]');
     await writeFile(path.join(project, 'unreadable'), '@codocs [[대상]]');
@@ -761,7 +759,6 @@ function countingWatchers(): {
 const marker = '@codocs [[대상]]';
 
 describe('WorkspaceCodeReferenceIndex: 수집 범위만 감시', () => {
-  /** @codocs [[작업 공간:작업 공간 파일 감시]]#L67 */
   it('제외한 dist 폴더를 삭제하고 다시 만들어도 감시 오류 없이 complete를 유지한다', async () => {
     await writeFile(path.join(project, '.gitignore'), 'dist/\n');
     await mkdir(path.join(project, 'dist'));
@@ -1263,7 +1260,6 @@ describe('WorkspaceCodeReferenceIndex: 변경 경로만 증분 수집', () => {
     );
     expect(snapshot.failures).toEqual(fresh.failures);
   }
-  /** @codocs [[작업 공간:코드 참조 색인]]#L35-L37 */
   it('파일 내용 변경과 같은 내용 저장과 mtime만 바뀐 변경은 정책 계산도 전체 탐색도 하지 않는다', async () => {
     const { index, signal, seen } = await incrementalIndex();
     await writeFile(path.join(project, 'source'), marker + '\n' + marker);

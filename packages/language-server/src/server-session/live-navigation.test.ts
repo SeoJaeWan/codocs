@@ -84,6 +84,33 @@ describe('live YAML과 디스크 대상의 연결', () => {
       capture.mockRestore();
     }
   });
+  it('열린 대상 문서의 저장하지 않은 이름은 출처 참조의 대상 판단에 쓰지 않는다', async () => {
+    const source =
+      'id: source\nname: Source\ndefinition: "[[대상]]"\ndomains: [업무]\n';
+    await writeFile(path.join(root, '.codocs/source.yaml'), source);
+    await session.refreshWorkspaces();
+    session.openDocument({
+      textDocument: {
+        uri: pathToFileURL(path.join(root, '.codocs/대상 문서.yaml')).href,
+        version: 1,
+        languageId: 'yaml',
+        text: targetText.replace('name: 대상', 'name: 다른 이름'),
+      },
+    });
+    session.openDocument({
+      textDocument: {
+        uri: sourceUri,
+        version: 1,
+        languageId: 'yaml',
+        text: source,
+      },
+    });
+    const links = await session.documentLinks(sourceUri);
+    expect(links).toHaveLength(1);
+    expect(links[0]!.tooltip).toBe(
+      '원문 열기: 대상 \\(\\.codocs/대상 문서\\.yaml\\)',
+    );
+  });
   it.each(['코드 Hover', 'YAML 본문'])(
     '%s의 특수 경로 링크는 resolve와 Host 해석 뒤 같은 출처·토큰으로 대상을 확인한다',
     async (kind) => {
@@ -181,6 +208,29 @@ describe('live YAML과 디스크 대상의 연결', () => {
     await writeFile(betaPath, 'id: beta\nname: 베타\ndefinition: 관계 제거\n');
     await session.refreshWorkspaces();
     expect(await session.confirmSource(selection)).toBeNull();
+  });
+  it('대상 문서의 이름을 저장해 색인이 갱신되면 열린 문서의 참조를 다시 판단한다', async () => {
+    const source =
+      'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n';
+    session.openDocument({
+      textDocument: {
+        uri: sourceUri,
+        version: 1,
+        languageId: 'yaml',
+        text: source,
+      },
+    });
+    expect(await session.documentLinks(sourceUri)).toHaveLength(1);
+    await writeFile(
+      path.join(root, '.codocs/대상 문서.yaml'),
+      targetText.replace('name: 대상', 'name: 새 이름'),
+    );
+    await vi.waitFor(
+      async () => {
+        expect(await session.documentLinks(sourceUri)).toHaveLength(0);
+      },
+      { timeout: 3000 },
+    );
   });
   it('감시가 상태 변경을 게시하면 수동 refresh 없이 폐기 경고를 갱신한다', async () => {
     session.openDocument({
@@ -322,7 +372,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
         (item) => item.code === 'deprecated_reference',
       ),
     ).toBe(false);
-    // 본문은 이동하지 않고 각 Hover 후보는 선택한 발견 경로로 확인한다. @codocs [[IDE 지원]]#L74-L76
+    // 본문은 이동하지 않고 각 Hover 후보는 선택한 발견 경로로 확인한다.
     const value = (hover!.contents as { value: string }).value;
     const queries = [...value.matchAll(/command:codocs.openSource\?([^)]*)/gu)];
     const targets = await Promise.all(

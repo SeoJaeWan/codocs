@@ -72,7 +72,6 @@ export function getIoErrorCode(error: unknown): string | undefined {
 
 /**
  * 이름 있는 workspace 코드·문구와 확인된 경로·IO 코드로 진단을 구성한다.
- * @codocs [[작업 공간:작업 공간 진단]]#L11-L12
  */
 export function createWorkspaceDiagnostic(
   code: WorkspaceDiagnosticCode,

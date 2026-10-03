@@ -99,7 +99,6 @@ describe('compareEvidencePriority: 코드 매칭 근거 의미 우선순위', ()
   it('현재 ID 근거를 이전 ID 근거보다 먼저 비교한다', () => {
     const current = { ...baseEvidence, kind: matcherEvidenceKinds.current };
 
-    // @codocs [[코드 식별자 매칭]]#L44
     expect(compareEvidencePriority(current, baseEvidence)).toBeLessThan(0);
     expect(compareEvidencePriority(baseEvidence, current)).toBeGreaterThan(0);
   });
@@ -125,7 +124,6 @@ describe('compareEvidencePriority: 코드 매칭 근거 의미 우선순위', ()
       sourceId: 'other-zone',
     };
 
-    // @codocs [[코드 식별자 매칭]]#L48
     expect(compareEvidencePriority(baseEvidence, otherLocation)).toBe(0);
   });
 });

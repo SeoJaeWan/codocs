@@ -147,7 +147,6 @@ function barrier(): { promise: Promise<void>; release: () => void } {
 }
 
 describe('최초 전체 순회 중 변경 범위 보정', () => {
-  /** @codocs [[작업 공간:색인 갱신]]#L31 @codocs [[작업 공간:작업 공간 조회 세션]]#L61 */
   it('변경이 없으면 각 원문을 한 번 읽고 파싱해 같은 초기화를 공유한다', async () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
     const raw = 'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n';

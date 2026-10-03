@@ -175,7 +175,6 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       documents: [],
     });
   });
-  /** @codocs [[작업 공간:문서 탐색]]#L16-L17 @codocs [[작업 공간:탐색 상태]]#L16 @codocs [[작업 공간:작업 공간 진단]]#L15-L16 */
   it('하위 정션은 경고 후 제외하고 일반 문서는 계속 읽는다', async () => {
     await document('ordinary.yaml', raw);
     await writeFile(path.join(outside, 'external.yaml'), raw);
@@ -353,7 +352,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       ioFailures.clear();
     }
   });
-  it('하위 폴더 열거가 실패하면 누락 범위와 정상 파일을 함께 반환한다', /** 폴더 열거의 EACCES 응답을 주입한다.  @codocs [[작업 공간:탐색 상태]]#L12 @codocs [[작업 공간:불완전한 탐색]]#L11-L13 */ async () => {
+  it('하위 폴더 열거가 실패하면 누락 범위와 정상 파일을 함께 반환한다', /** 폴더 열거의 EACCES 응답을 주입한다. */ async () => {
     await document('restricted/hidden.yaml', raw);
     await document('ok.yaml', raw);
     const folder = path.join(codocs, 'restricted');
