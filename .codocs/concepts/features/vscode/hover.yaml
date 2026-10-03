@@ -2,6 +2,7 @@ id: hover
 name: '코드 호버'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   코드 호버는 코드의 식별자에 마우스를 올렸을 때 [[식별자 참조]]로 연결된 문서의 설명과 관련 링크를 보여주는 [[편집기 기능]]이다.
 

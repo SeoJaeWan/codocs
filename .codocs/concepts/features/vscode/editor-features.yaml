@@ -2,6 +2,7 @@ id: editor-features
 name: '편집기 기능'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   편집기 기능은 VS Code에서 코드를 읽는 중에 관련 문서를 확인하고 문서와 코드 사이를 오가게 하는 기능이다.
   [[VS Code 확장]]이 실행한 언어 서버가 .codocs 문서와 코드를 함께 읽어 제공한다.

@@ -2,6 +2,7 @@ id: tool-result
 name: '도구 결과'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   도구 결과는 모든 [[MCP 도구]]가 돌려주는 응답의 공통 형식이다.
   최상위 success는 요청을 처리했는지를 나타내며, 문서가 유효한지·있는지·파일에 저장됐는지를 대신하지 않는다.

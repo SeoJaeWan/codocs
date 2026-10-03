@@ -14,7 +14,7 @@ beforeAll(async () => {
   await mkdir(path.join(fixture, '.codocs'));
   await writeFile(
     path.join(fixture, '.codocs', 'one.yaml'),
-    'id: one\nname: 하나\ndomains: [test]\ndefinition: 본문\n',
+    'id: one\nname: 하나\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 본문\n',
   );
 });
 

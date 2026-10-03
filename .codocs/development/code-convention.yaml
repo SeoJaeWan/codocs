@@ -2,6 +2,7 @@ id: code-convention
 name: '코드 컨벤션'
 domains:
   - '개발'
+deprecatedAliases: []
 definition: |
   TypeScript와 ESM JavaScript 코드의 이름·타입·함수 설명·상수와 모듈 경계를 통일하는 규칙이다.
   아래 '자동 검사' 절의 규칙은 lint가 확인하고, 나머지는 리뷰에서 확인한다.

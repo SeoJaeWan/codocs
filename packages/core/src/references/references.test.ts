@@ -9,7 +9,8 @@ import { extractReferences } from './index.js';
 
 describe('extractReferences: 본문 문자열에서 참조 추출', () => {
   it('정의에 참조가 하나 있으면 이름과 실제 원문 위치를 반환한다', () => {
-    const source = 'definition: "[[대상]]"\nname: 출처\ndomains: [업무]\n';
+    const source =
+      'definition: "[[대상]]"\nname: 출처\ndomains: [업무]\ndeprecatedAliases: []\n';
     const parsed = {
       success: true as const,
       source,
@@ -61,7 +62,7 @@ describe('extractReferences: 본문 문자열에서 참조 추출', () => {
     expect(result.occurrences.map((item) => item.text)).toEqual(['[[대상]]']);
   });
 
-  it('정의와 예문에 참조가 있으면 다른 필드는 제외하고 본문 순서로 반환한다', () => {
+  it('definition과 examples에 참조가 있으면 definition의 참조만 반환한다', () => {
     const parsed = {
       success: true as const,
       source:
@@ -96,10 +97,7 @@ describe('extractReferences: 본문 문자열에서 참조 추출', () => {
     const result = extractReferences(parsed);
     expect(
       result.occurrences.map((item) => [item.fieldPath, item.text]),
-    ).toEqual([
-      [['definition'], '[[정의]]'],
-      [['examples', 1], '[[예시]]'],
-    ]);
+    ).toEqual([[['definition'], '[[정의]]']]);
   });
 
   it.each([

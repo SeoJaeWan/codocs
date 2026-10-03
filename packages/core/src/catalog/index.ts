@@ -20,7 +20,6 @@ import {
 import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import type { ReferenceOccurrence } from '../references/index.js';
 import { extractReferences } from '../references/index.js';
-import { documentStatuses } from '../validator/domain-values.js';
 import { documentFields, validateDocument } from '../validator/index.js';
 import {
   catalogConfirmations,
@@ -174,10 +173,6 @@ const catalogDiagnosticDefinitions = {
   },
   [catalogDiagnosticCodes.unconfirmedReference]: {
     message: catalogDiagnosticMessages.unconfirmedReference,
-    severity: diagnosticSeverities.warning,
-  },
-  [catalogDiagnosticCodes.deprecatedReference]: {
-    message: catalogDiagnosticMessages.deprecatedReference,
     severity: diagnosticSeverities.warning,
   },
   [catalogDiagnosticCodes.referenceTargetError]: {
@@ -500,19 +495,6 @@ function resolveDocumentReferences(
         );
       if (isLinkable(resolution, doc)) {
         links.add(resolution.target.path);
-        const target = catalog.documents.get(resolution.target.path);
-        if (
-          target?.observation.parsed.success &&
-          target.observation.parsed.data.status === documentStatuses.deprecated
-        )
-          diagnostics.push(
-            catalogDiagnostic(
-              doc,
-              catalogDiagnosticCodes.deprecatedReference,
-              occurrence.fieldPath,
-              occurrence,
-            ),
-          );
         const warning = targetErrorWarning(doc, occurrence, resolution.target);
         if (warning) diagnostics.push(warning);
       }

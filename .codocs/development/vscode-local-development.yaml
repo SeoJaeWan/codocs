@@ -2,7 +2,7 @@ id: vscode-local-development
 name: 'VS Code에서 직접 실행하기'
 domains:
   - '개발'
-kind: procedure
+deprecatedAliases: []
 definition: |
   로컬 저장소에서 빌드한 Codocs를 개발용 VS Code 창에 불러와 직접 사용하는 절차다.
   VSIX를 일반 확장으로 설치하지 않고 저장소의 .codocs 문서와 코드를 실제 편집기에서 직접 확인한다.

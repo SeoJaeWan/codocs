@@ -14,13 +14,6 @@ import {
 } from '../diagnostics/index.js';
 import type { FieldRanges } from '../parser/index.js';
 import { offsetToPosition } from '../parser/index.js';
-import {
-  documentKinds,
-  documentStatuses,
-  type DocumentKind,
-  type DocumentStatus,
-} from './domain-values.js';
-export * from './domain-values.js';
 
 /** 사용자 속성이 보존할 수 있는 재귀 JSON 값이다. 숫자는 유한해야 한다. */
 export type JsonValue =
@@ -152,10 +145,7 @@ const documentStructure = z
     name: nonblank,
     definition: nonblank,
     domains: z.array(nonblank).min(1),
-    examples: z.array(nonblank).optional(),
-    deprecatedAliases: z.array(deprecatedAlias).optional(),
-    kind: z.enum(documentKinds).optional(),
-    status: z.enum(documentStatuses).optional(),
+    deprecatedAliases: z.array(deprecatedAlias),
   })
   .catchall(userValue);
 
@@ -169,14 +159,8 @@ export const documentFields = {
   definition: documentStructure.keyof().enum.definition,
   /** 문서가 속하는 도메인 이름 목록이다. */
   domains: documentStructure.keyof().enum.domains,
-  /** 참조를 추출하는 예시 문자열 목록이다. */
-  examples: documentStructure.keyof().enum.examples,
   /** 이전 ID와 전환 안내다. */
   deprecatedAliases: documentStructure.keyof().enum.deprecatedAliases,
-  /** 문서 내용의 종류다. */
-  kind: documentStructure.keyof().enum.kind,
-  /** 문서 내용의 합의 상태다. */
-  status: documentStructure.keyof().enum.status,
 } satisfies Record<keyof typeof documentStructure.shape, string>;
 /** 스키마에서 도출한 문서 필드 이름이다. */
 export type DocumentField =
@@ -407,19 +391,4 @@ export function validateDocument(
       ),
   );
   return { success: false, errors, warnings };
-}
-
-/** 문서 종류 원본 정의로 외부 값을 확인한다. */
-export function isDocumentKind(value: unknown): value is DocumentKind {
-  return (
-    typeof value === 'string' &&
-    Object.values(documentKinds).some((item) => item === value)
-  );
-}
-/** 문서 상태 원본 정의로 외부 값을 확인한다. */
-export function isDocumentStatus(value: unknown): value is DocumentStatus {
-  return (
-    typeof value === 'string' &&
-    Object.values(documentStatuses).some((item) => item === value)
-  );
 }

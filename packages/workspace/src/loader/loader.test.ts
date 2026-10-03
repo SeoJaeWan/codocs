@@ -31,7 +31,7 @@ let project: string;
 let codocs: string;
 let outside: string;
 const raw =
-  'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\n';
+  'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\ndeprecatedAliases: []\r\n';
 beforeEach(
   /** 고유한 실제 프로젝트와 외부 폴더를 준비한다. */ async () => {
     fixture = await mkdtemp(path.join(tmpdir(), 'codocs-loader-'));
@@ -302,7 +302,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
         {
           code: 'unknown_field',
           severity: 'warning',
-          range: { start: { line: 4, character: 0 } },
+          range: { start: { line: 5, character: 0 } },
         },
       ],
     });

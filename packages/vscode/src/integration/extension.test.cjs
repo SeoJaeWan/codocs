@@ -145,12 +145,6 @@ module.exports.scenarios = [
     /** 참조 편집과 저장 뒤 새 Hover·링크·진단을 관측한다. */
     async run(c) {
       const document = await c.open('.codocs/old-source.yaml');
-      await c.until(
-        () =>
-          c.diagnostics('.codocs/old-source.yaml', 'deprecated_reference')
-            .length === 1,
-        'deprecated warning',
-      );
       await c.driver.hover('[[Old]]', 'Old', 0, {
         providerLabel: 'Old',
         nativeLabel: '원문 열기: Old (.codocs/old.yaml)',
@@ -158,12 +152,6 @@ module.exports.scenarios = [
       await c.replace(
         document,
         document.getText().replace('[[Old]]', '[[Direct]]'),
-      );
-      await c.until(
-        () =>
-          c.diagnostics('.codocs/old-source.yaml', 'deprecated_reference')
-            .length === 0,
-        'changed-reference warning cleared',
       );
       await c.driver.hover('[[Direct]]', 'Direct', 0, {
         providerLabel: 'Direct',
@@ -205,7 +193,7 @@ module.exports.scenarios = [
       await c.until(() => c.tabs(zone).length === 0, 'saved target tab closed');
       await c.fs.writeFile(
         document.uri.fsPath,
-        'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\n',
+        'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       await c.driver.hover('zone', 'External body');
       await c.driver.clickAnchor('원문 열기');
@@ -229,12 +217,12 @@ module.exports.scenarios = [
       ).href;
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: zone\nname: Zone\ndefinition: Changed after display [[Old]]\ndomains: [test]\n',
+        'id: zone\nname: Zone\ndefinition: Changed after display [[Unknown Target]]\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       // 새 저장 원문의 실제 진단 게시로 완료 snapshot을 관측한다.
       // 기존 Hover와 href는 유지하며 제품 조회·명시 refresh는 호출하지 않는다.
       await c.until(
-        () => c.diagnostics(zone, 'deprecated_reference').length === 1,
+        () => c.diagnostics(zone, 'reference_not_found').length === 1,
         'changed target completed snapshot',
       );
       await c.driver.clickAnchor('원문 열기', href);
@@ -256,7 +244,7 @@ module.exports.scenarios = [
       const beforeOutput = await c.output();
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\n',
+        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       await c.driver.clickAnchor('원문 열기', href);
       await c.until(
@@ -412,7 +400,7 @@ module.exports.scenarios = [
       );
       await c.create(
         recoveredNavigation,
-        'id: recovered-nav-target\nname: Recovered Nav Target\ndefinition: Recovered body\ndomains: [test]\n',
+        'id: recovered-nav-target\nname: Recovered Nav Target\ndefinition: Recovered body\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       await c.until(
         () =>

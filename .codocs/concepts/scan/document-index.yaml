@@ -2,6 +2,7 @@ id: catalog
 name: '문서 색인'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   문서 색인은 [[탐색]]으로 읽은 문서를 모아 ID·이름으로 찾고 문서 사이의 연결을 계산해 둔 결과다.
   조회·검증·저장·편집기 기능은 요청마다 모든 YAML을 다시 읽지 않고 이 색인을 사용한다.

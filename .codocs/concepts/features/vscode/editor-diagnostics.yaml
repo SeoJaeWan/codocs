@@ -2,6 +2,7 @@ id: editor-diagnostics
 name: '편집기 진단'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   편집기 진단은 .codocs 문서의 [[진단]]을 편집기의 문제 목록과 밑줄로 보여주는 [[편집기 기능]]이다.
   열린 파일뿐 아니라 색인에 있는 모든 문서의 진단을 보여준다.

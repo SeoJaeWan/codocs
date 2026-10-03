@@ -2,6 +2,7 @@ id: workspace-scan
 name: '탐색'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   탐색은 .codocs의 문서 파일을 찾아 읽고, 바뀐 파일을 감시해 다시 읽으며 [[문서 색인]]을 최신으로 유지하는 과정이다.
   VS Code 언어 서버와 [[MCP 서버]]는 각자 탐색하며 결과를 서로 공유하지 않는다. 진행 상태는 [[탐색 상태]]에서 설명한다.

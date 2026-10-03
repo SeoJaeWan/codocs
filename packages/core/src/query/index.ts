@@ -23,12 +23,6 @@ import {
   queryDiagnosticMessages,
   referenceDiagnosticCodes,
 } from '../diagnostics/index.js';
-import {
-  documentKinds,
-  documentStatuses,
-  type DocumentKind,
-  type DocumentStatus,
-} from '../validator/domain-values.js';
 import type { JsonValue } from '../validator/index.js';
 import { documentFields, type DocumentField } from '../validator/index.js';
 import { offsetToPosition, parseYaml } from '../parser/index.js';
@@ -40,14 +34,10 @@ import {
 export * from './domain-values.js';
 
 const validId = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
-const kinds = Object.values(documentKinds);
-const statuses = Object.values(documentStatuses);
 
 /** 목록에서 한 문서가 만족해야 하는 AND 조건이다. */
 export interface CatalogListFilters {
   domain?: string;
-  kind?: DocumentKind;
-  status?: DocumentStatus;
 }
 
 /** 목록에 표시할 수 있는 유일 ID 문서다. */
@@ -57,8 +47,6 @@ export interface CatalogListDocumentItem {
   source: { path: string };
   confirmation: CatalogIdentity['confirmation'];
   domains?: readonly string[];
-  kind?: DocumentKind;
-  status?: DocumentStatus;
   hasErrors: boolean;
   conflict: false;
 }
@@ -271,33 +259,14 @@ function documentDomains(
   return [...new Set(value as string[])];
 }
 
-/** 작성된 선택 열거 속성이 유효할 때만 반환한다. */
-function documentEnum<const Values extends readonly string[]>(
-  document: CatalogDocument,
-  key: typeof documentFields.kind | typeof documentFields.status,
-  values: Values,
-): Values[number] | undefined {
-  if (!validField(document, key) || !document.observation.parsed.success)
-    return undefined;
-  const value = ownValue(document.observation.parsed.data, key);
-  return typeof value === 'string' && values.includes(value)
-    ? value
-    : undefined;
-}
-
 /** 한 파일이 생략하지 않은 모든 목록 조건을 동시에 만족하는지 판별한다. */
 function matchesFilters(
   document: CatalogDocument,
   filters: CatalogListFilters,
 ): boolean {
   const domains = documentDomains(document);
-  const kind = documentEnum(document, documentFields.kind, kinds);
-  const status = documentEnum(document, documentFields.status, statuses);
   return (
-    (filters.domain === undefined ||
-      domains?.includes(filters.domain) === true) &&
-    (filters.kind === undefined || kind === filters.kind) &&
-    (filters.status === undefined || status === filters.status)
+    filters.domain === undefined || domains?.includes(filters.domain) === true
   );
 }
 
@@ -330,16 +299,12 @@ export function projectCatalogList(
     const document = matching[0];
     if (!document?.name) continue;
     const domains = documentDomains(document);
-    const kind = documentEnum(document, documentFields.kind, kinds);
-    const status = documentEnum(document, documentFields.status, statuses);
     items.push({
       id,
       name: document.name,
       source: { path: document.path },
       confirmation: document.confirmation,
       ...(domains ? { domains } : {}),
-      ...(kind ? { kind } : {}),
-      ...(status ? { status } : {}),
       hasErrors: document.diagnostics.some(
         (diagnostic) => diagnostic.severity === diagnosticSeverities.error,
       ),

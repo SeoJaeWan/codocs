@@ -10,7 +10,7 @@ let root: string;
 let session: LanguageServerSession;
 let sourceUri: string;
 const targetText =
-  'id: target\nname: 대상\ndomains: [업무]\ndefinition: 원래 본문\nstatus: deprecated\n';
+  'id: target\nname: 대상\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 원래 본문\n';
 
 beforeEach(async () => {
   await mkdir('.workbench/fixtures', { recursive: true });
@@ -34,7 +34,7 @@ afterEach(async () => {
 describe('live YAML과 디스크 대상의 연결', () => {
   it('편집 뒤 native 대상 이름·경로를 바꾸고 이전 선택을 거부하며 새 본문 선택만 확인한다', async () => {
     const source =
-      'id: source\nname: Source\ndefinition: "[[Old]]"\ndomains: [업무]\n';
+      'id: source\nname: Source\ndefinition: "[[Old]]"\ndomains: [업무]\ndeprecatedAliases: []\n';
     await writeFile(path.join(root, '.codocs/source.yaml'), source);
     await writeFile(
       path.join(root, '.codocs/대상 문서.yaml'),
@@ -42,7 +42,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
     );
     await writeFile(
       path.join(root, '.codocs/direct [이름] %.yaml'),
-      'id: direct\nname: "Direct <name>"\ndefinition: Direct body\ndomains: [업무]\n',
+      'id: direct\nname: "Direct <name>"\ndefinition: Direct body\ndomains: [업무]\ndeprecatedAliases: []\n',
     );
     await session.refreshWorkspaces();
     const capture = vi.spyOn(SourceSelections.prototype, 'capture');
@@ -86,7 +86,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
   it('열린 대상 문서의 저장하지 않은 이름은 출처 참조의 대상 판단에 쓰지 않는다', async () => {
     const source =
-      'id: source\nname: Source\ndefinition: "[[대상]]"\ndomains: [업무]\n';
+      'id: source\nname: Source\ndefinition: "[[대상]]"\ndomains: [업무]\ndeprecatedAliases: []\n';
     await writeFile(path.join(root, '.codocs/source.yaml'), source);
     await session.refreshWorkspaces();
     session.openDocument({
@@ -211,7 +211,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
   it('대상 문서의 이름을 저장해 색인이 갱신되면 열린 문서의 참조를 다시 판단한다', async () => {
     const source =
-      'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n';
+      'id: source\nname: 출처\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: "[[대상]]"\n';
     session.openDocument({
       textDocument: {
         uri: sourceUri,
@@ -232,13 +232,13 @@ describe('live YAML과 디스크 대상의 연결', () => {
       { timeout: 3000 },
     );
   });
-  it('감시가 상태 변경을 게시하면 수동 refresh 없이 폐기 경고를 갱신한다', async () => {
+  it('감시가 대상 이름 변경을 게시하면 수동 refresh 없이 참조 진단을 갱신한다', async () => {
     session.openDocument({
       textDocument: {
         uri: sourceUri,
         version: 1,
         languageId: 'yaml',
-        text: 'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n',
+        text: 'id: source\nname: 출처\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: "[[대상]]"\n',
       },
     });
     await session.documentDiagnostics(sourceUri);
@@ -246,7 +246,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
     const unsubscribe = session.onDidChange(changed);
     await writeFile(
       path.join(root, '.codocs/대상 문서.yaml'),
-      targetText.replace('status: deprecated', 'status: confirmed'),
+      targetText.replace('name: 대상', 'name: 새 이름'),
     );
     await vi.waitFor(() => expect(changed).toHaveBeenCalled(), {
       timeout: 3000,
@@ -257,13 +257,13 @@ describe('live YAML과 디스크 대상의 연결', () => {
         expect(diagnostics).toBeDefined();
         expect(
           diagnostics!.diagnostics.some(
-            (item) => item.code === 'deprecated_reference',
+            (item) => item.code === 'reference_not_found',
           ),
-        ).toBe(false);
+        ).toBe(true);
       },
       { timeout: 3000 },
     );
-    expect(await session.documentLinks(sourceUri)).toHaveLength(1);
+    expect(await session.documentLinks(sourceUri)).toHaveLength(0);
     unsubscribe();
   });
 
@@ -272,9 +272,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
     await mkdir(path.join(nested, '.codocs'), { recursive: true });
     await writeFile(
       path.join(nested, '.codocs/nested.yaml'),
-      targetText
-        .replace('id: target', 'id: nested')
-        .replace('status: deprecated', 'status: confirmed'),
+      targetText.replace('id: target', 'id: nested'),
     );
     await session.changeWorkspaceFolders(
       [{ uri: pathToFileURL(nested).href, name: 'nested' }],
@@ -287,7 +285,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
         uri,
         version: 1,
         languageId: 'yaml',
-        text: 'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n',
+        text: 'id: source\nname: 출처\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: "[[대상]]"\n',
       },
     });
     const links = await session.documentLinks(uri);
@@ -304,7 +302,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
 
   it.each(['\n', '\r\n'])(
-    '줄바꿈 %j에서 미저장 참조의 UTF-16 범위와 폐기 경고를 보존한다',
+    '줄바꿈 %j에서 미저장 definition 참조의 UTF-16 범위를 보존하고 examples 참조는 링크로 만들지 않는다',
     async (newline) => {
       const text = [
         'id: source',
@@ -319,20 +317,16 @@ describe('live YAML과 디스크 대상의 연결', () => {
       });
       const links = await session.documentLinks(sourceUri);
       const diagnostics = await session.documentDiagnostics(sourceUri);
-      expect(links).toHaveLength(3);
+      expect(links).toHaveLength(2);
       expect(links[0]?.range).toEqual({
         start: { line: 2, character: 16 },
         end: { line: 2, character: 22 },
       });
-      const warnings = diagnostics!.diagnostics.filter(
-        (item) => item.code === 'deprecated_reference',
-      );
-      expect(warnings).toHaveLength(links.length);
-      for (const [index, warning] of warnings.entries()) {
-        expect(warning.severity).toBe(2);
-        expect(warning.range).toEqual(links[index]!.range);
-        expect(warning.message).toContain('폐기');
-      }
+      expect(
+        diagnostics!.diagnostics.some(
+          (item) => item.code === 'deprecated_reference',
+        ),
+      ).toBe(false);
       const selected = JSON.parse(
         decodeURIComponent(links[0]!.target!.split('?')[1]!),
       ) as unknown[];

@@ -474,7 +474,15 @@ function planDocumentChangeInternal(
     )
       return failure('invalidRequest');
     if (context.catalog.documents.has(path)) return failure('pathExists', path);
-    const validation = validateDocument({ data: input.document, path });
+    const validation = validateDocument({
+      data:
+        typeof input.document === 'object' &&
+        input.document !== null &&
+        !Array.isArray(input.document)
+          ? { ...input.document, [documentFields.deprecatedAliases]: [] }
+          : input.document,
+      path,
+    });
     if (!validation.success)
       return {
         status: changePlanStatuses.failed,

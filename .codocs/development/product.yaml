@@ -2,6 +2,7 @@ id: product
 name: '제품'
 domains:
   - '개발'
+deprecatedAliases: []
 definition: |
   Codocs가 해결할 문제와 제공할 기능의 범위를 정의하는 영역이다.
   지식 관리의 목적과 구현 범위를 판단하는 기준을 제공한다.

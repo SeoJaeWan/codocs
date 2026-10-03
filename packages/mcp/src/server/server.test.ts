@@ -33,7 +33,7 @@ beforeAll(async () => {
     await mkdir(path.join(project, '.codocs'), { recursive: true });
     await writeFile(
       path.join(project, '.codocs', `${id}.yaml`),
-      `id: ${id}\nname: ${id}\ndomains: [test]\ndefinition: 본문\n`,
+      `id: ${id}\nname: ${id}\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 본문\n`,
     );
   }
 });
@@ -150,24 +150,24 @@ describe('소스 MCP stdio 서버', () => {
       (_, index) => `target-${String(index).padStart(2, '0')}`,
     );
     const definition = `${targets.map((_, index) => `[[Target ${String(index).padStart(2, '0')}]]`).join(' ')} ${'x'.repeat(500_000)}`;
-    const rawYaml = `id: invalid\nname: Invalid\ndomains: [test]\ndefinition: ${'y'.repeat(500_000)}\nvalue: .inf\n`;
+    const rawYaml = `id: invalid\nname: Invalid\ndomains: [test]\ndeprecatedAliases: []\ndefinition: ${'y'.repeat(500_000)}\nvalue: .inf\n`;
     await writeFile(
       path.join(folder, 'normal.yaml'),
-      `id: normal\nname: Normal\ndomains: [test]\ndefinition: ${JSON.stringify(definition)}\n`,
+      `id: normal\nname: Normal\ndomains: [test]\ndeprecatedAliases: []\ndefinition: ${JSON.stringify(definition)}\n`,
     );
     for (const [index, id] of targets.entries())
       await writeFile(
         path.join(folder, `${id}.yaml`),
-        `id: ${id}\nname: Target ${String(index).padStart(2, '0')}\ndomains: [test]\ndefinition: 대상\n`,
+        `id: ${id}\nname: Target ${String(index).padStart(2, '0')}\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 대상\n`,
       );
     await writeFile(path.join(folder, 'invalid.yaml'), rawYaml);
     await writeFile(
       path.join(folder, 'conflict-a.yaml'),
-      'id: shared\nname: Conflict A\ndomains: [test]\ndefinition: 본문\n',
+      'id: shared\nname: Conflict A\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 본문\n',
     );
     await writeFile(
       path.join(folder, 'conflict-b.yaml'),
-      'id: shared\nname: Conflict B\ndomains: [test]\ndefinition: 본문\n',
+      'id: shared\nname: Conflict B\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 본문\n',
     );
     const { client } = await clientFor(selected);
     try {

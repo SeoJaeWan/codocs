@@ -2,8 +2,7 @@ id: development-conventions
 name: '개발'
 domains:
   - '개발'
-kind: procedure
-status: confirmed
+deprecatedAliases: []
 definition: |
   개발은 제품 범위를 정하고 구현·검증·지식 갱신을 거쳐 배포 가능한 상태로 만드는 영역이다.
   아래 문서는 이 도메인의 전체 구성이다. 작업 순서에 따라 필요한 기준을 선택한다.

@@ -12,15 +12,14 @@ name: 가상 주문
 definition: 가상 고객의 구매 요청이다.
 domains:
   - sample-sales
-examples:
-  - 가상 주문 SAMPLE-001을 생성한다.
 deprecatedAliases:
   - id: previous-order
     message: sample-order로 변경되었습니다.
 ```
 
-필수 필드는 `id`, `name`, `definition`, `domains`다. `domains`에는 문자열이 하나 이상 있어야 한다.
-`examples`는 문자열 배열, `deprecatedAliases`는 필수 `id`와 선택 `message`를 가진 객체 배열이다. 두 선택 배열은 비어 있어도 된다.
+필수 필드는 `id`, `name`, `definition`, `domains`, `deprecatedAliases` 다섯 개다. `domains`에는 문자열이 하나 이상 있어야 한다.
+`deprecatedAliases`는 필수 `id`와 선택 `message`를 가진 객체 배열이다. 이전 ID가 없으면 `deprecatedAliases: []`로 쓴다. 필드를 빼면 `missing_required_field` 오류다.
+MCP로 새 문서를 만들면 `deprecatedAliases`는 호출자가 넘기지 않아도 `[]`로 저장된다.
 이전 ID는 현재 ID와 같은 형식을 사용하며 이전 코드 식별자의 매칭을 유지한다. 문서 간 참조와 ID 기반 조회·수정은 각각 현재 `name`과 현재 `id`를 사용한다.
 
 여러 도메인에 걸친 흐름도 같은 형식을 사용한다.
@@ -34,24 +33,10 @@ definition: |
 domains:
   - sample-sales
   - sample-delivery
-kind: procedure
-status: confirmed
+deprecatedAliases: []
 ```
 
-`kind`는 `policy`, `procedure`, `decision`, `discussion` 중 하나이고 `status`는 `proposed`, `confirmed`, `deprecated` 중 하나다.
-모든 문서에서 선택 속성을 함께 사용할 수 있으며 생략한 값은 자동으로 추가하지 않는다.
-
-`kind`는 내용의 성격을 나타낸다. `policy`는 규칙, `procedure`는 절차, `decision`은 선택과 판단 근거, `discussion`은 논의할 쟁점과 대안이다.
-
-`status`는 내용의 합의·적용 상태를 나타낸다.
-
-| 값           | 의미                                     |
-| ------------ | ---------------------------------------- |
-| `proposed`   | 제안되어 검토 중인 내용                  |
-| `confirmed`  | 합의된 내용                              |
-| `deprecated` | 적용이 종료되어 참고용으로 보존하는 내용 |
-
-개발 작업의 대기·진행·완료를 나타내지 않는다. `confirmed`도 구현 완료를 뜻하지 않는다. 생략하면 상태를 명시하지 않은 것이며 자동으로 확정하지 않는다.
+`kind`, `status`, `examples`는 제품 속성이 아니다. 이 이름의 필드를 쓰면 다른 알려지지 않은 필드처럼 사용자 속성으로 보존되고 `unknown_field` 경고가 생긴다. 쓰지 않으면 삭제한다.
 
 ## 공통 값 규칙
 

@@ -2,8 +2,7 @@ id: index
 name: '프로젝트 지식 읽기 안내'
 domains:
   - '개발'
-kind: procedure
-status: confirmed
+deprecatedAliases: []
 definition: |
   Codocs 프로젝트의 지식을 찾는 출발점이다. .codocs는 제품 개념과 개발 규칙 두 영역으로 구성한다.
 
