@@ -2,6 +2,7 @@ id: documentation-convention
 name: '문서 컨벤션'
 domains:
   - '개발'
+deprecatedAliases: []
 definition: |
   이 저장소의 .codocs 문서를 작성하고 고치는 규칙이다.
   문서·속성·참조가 무엇인지는 [[문서]]와 [[참조]]에서 정의하며, 이 문서는 그 개념을 이 프로젝트에서 어떻게 쓸지만 정한다.

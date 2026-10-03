@@ -2,6 +2,7 @@ id: validate-document
 name: '문서 검증'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   문서 검증은 문서 하나가 [[문서 속성]]의 필수 속성·자료형·허용 값에 맞는지 검사하는 것이다.
   예를 들어 definition이 빠졌거나 id가 허용된 형식이 아니면 그 속성의 오류를 [[진단]]으로 알린다.

@@ -2,6 +2,7 @@ id: mcp-server
 name: 'MCP 서버'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   MCP 서버는 AI 클라이언트가 프로젝트의 .codocs 문서를 찾고 읽고 수정하게 하는 진입점이다.
   AI 클라이언트가 서버를 실행해 stdio로 연결하면 [[MCP 도구]]를 호출할 수 있다.

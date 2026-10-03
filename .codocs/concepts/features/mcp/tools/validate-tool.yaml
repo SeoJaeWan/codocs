@@ -2,6 +2,7 @@ id: validate-tool
 name: 'codocs_validate'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   프로젝트 전체나 YAML 파일 하나의 문서 문제를 확인하는 [[MCP 도구]]다.
   문서 하나의 형식 검사인 [[문서 검증]]과 프로젝트의 ID·이름 충돌, 참조 검사를 함께 적용한다.

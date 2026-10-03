@@ -2,6 +2,7 @@ id: folder-convention
 name: '폴더 컨벤션'
 domains:
   - '개발'
+deprecatedAliases: []
 definition: |
   이 저장소에서 파일과 폴더를 만들 때 따르는 이름과 배치 규칙이다.
   이 규칙은 우리 프로젝트의 관례이며 제품이 다른 사용자의 프로젝트나 .codocs에 강제하는 것은 아니다.

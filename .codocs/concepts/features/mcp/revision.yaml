@@ -2,6 +2,7 @@ id: revision
 name: 'revision'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   revision은 [[MCP 도구]]로 문서를 읽은 뒤 고칠 때, 그사이 다른 사람이나 도구가 같은 파일을 바꿨는지 확인하는 값이다.
   이 확인이 없으면 AI가 처음 읽은 내용을 기준으로 저장하면서 그사이 사람이 고친 내용을 모르고 덮어쓸 수 있다.

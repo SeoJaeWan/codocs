@@ -2,6 +2,7 @@ id: scan-status
 name: '탐색 상태'
 domains:
   - '제품 개념'
+deprecatedAliases: []
 definition: |
   탐색 상태는 [[탐색]]이 대상 파일을 얼마나 확인했는지 나타낸다.
   일부만 확인했거나 실패한 결과를 "없음"이나 "완료"로 보여주지 않는다.
