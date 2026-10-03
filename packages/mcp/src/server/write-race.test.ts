@@ -77,7 +77,7 @@ beforeEach(async () => {
   await mkdir(path.join(project, '.codocs'));
   await writeFile(
     path.join(project, '.codocs/a.yaml'),
-    'id: a\nname: A\ndefinition: original\ndomains: [test]\n',
+    'id: a\nname: A\ndefinition: original\ndomains: [test]\ndeprecatedAliases: []\n',
   );
   clients = [];
   evidence = [

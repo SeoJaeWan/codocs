@@ -23,7 +23,7 @@ beforeEach(async () => {
   await writeFile(source, original);
   await writeFile(
     path.join(root, '.codocs', 'second.yaml'),
-    'id: second\nname: 둘째 문서\ndomains: [업무]\ndefinition: 본문\n',
+    'id: second\nname: 둘째 문서\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
   );
   sessions = [];
 });

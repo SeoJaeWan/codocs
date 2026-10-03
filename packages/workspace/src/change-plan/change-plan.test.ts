@@ -21,11 +21,11 @@ beforeEach(async () => {
   await writeFile(file, original);
   await writeFile(
     path.join(folder, 'taken.yaml'),
-    'id: taken\nname: 다른 문서\ndefinition: 설명\ndomains: [운영]\n',
+    'id: taken\nname: 다른 문서\ndefinition: 설명\ndomains: [운영]\ndeprecatedAliases: []\n',
   );
   await writeFile(
     path.join(folder, 'unrelated.yaml'),
-    'id: unrelated\nname: 오류 문서\ndomains: [운영]\n',
+    'id: unrelated\nname: 오류 문서\ndomains: [운영]\ndeprecatedAliases: []\n',
   );
 });
 

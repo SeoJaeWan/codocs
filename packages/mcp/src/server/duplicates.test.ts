@@ -25,7 +25,7 @@ beforeAll(async () => {
   for (const id of ['alpha', 'bravo'])
     await writeFile(
       path.join(fixture, '.codocs', `${id}.yaml`),
-      `id: ${id}\nname: ${id}\ndomains: [test]\ndefinition: ${repeated}\n`,
+      `id: ${id}\nname: ${id}\ndomains: [test]\ndeprecatedAliases: []\ndefinition: ${repeated}\n`,
     );
 });
 

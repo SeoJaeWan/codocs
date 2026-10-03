@@ -1148,7 +1148,8 @@ describe('matchCode: 코드와 문서 ID 매칭', () => {
           ...validDocument.observation,
           parsed: {
             ...validDocument.observation.parsed,
-            source: 'id: bad\nname: bad\ndomains: [test]\ndefinition: 42\n',
+            source:
+              'id: bad\nname: bad\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 42\n',
             data: { ...validDocument.observation.parsed.data, definition: 42 },
           },
         },

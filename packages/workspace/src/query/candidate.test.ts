@@ -23,7 +23,7 @@ beforeEach(async () => {
   await mkdir(path.join(project, '.codocs'));
   await writeFile(
     path.join(project, '.codocs/target.yaml'),
-    'id: target\nname: 대상\ndomains: [업무]\ndefinition: 내용\n',
+    'id: target\nname: 대상\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 내용\n',
   );
   session = new WorkspaceQuerySession({ cwd: project });
 });
@@ -95,7 +95,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
   it('선택 당시 ID가 중복이면 선택한 경로가 삭제된 뒤 남은 문서로 이동하지 않는다', async () => {
     await writeFile(
       path.join(project, '.codocs/other.yaml'),
-      'id: target\nname: 대상\ndomains: [업무]\ndefinition: 내용\n',
+      'id: target\nname: 대상\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 내용\n',
     );
     await session.refresh();
     const token = session.captureCandidate(
@@ -134,7 +134,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
   it('같은 이름이 여러 경로에 있어도 명시적으로 선택한 확인 후보를 연다', async () => {
     await writeFile(
       path.join(project, '.codocs/other.yaml'),
-      'id: other\nname: 대상\ndomains: [다른업무]\ndefinition: 내용\n',
+      'id: other\nname: 대상\ndomains: [다른업무]\ndeprecatedAliases: []\ndefinition: 내용\n',
     );
     await session.refresh();
     const token = session.captureCandidate(
@@ -486,7 +486,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
     await rm(path.join(project, '.codocs/target.yaml'));
     await writeFile(
       path.join(project, '.codocs/target.yaml'),
-      'id: target\nname: 대상\ndomains: [업무]\ndefinition: 다른 문서\n',
+      'id: target\nname: 대상\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 다른 문서\n',
     );
     await session.refresh();
     expect(await session.confirmCandidate(token)).toBeUndefined();
@@ -502,7 +502,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
       if (!reverse)
         await writeFile(
           path.join(project, '.codocs/target.yaml'),
-          'id: target\nname: 대상\ndomains: [업무]\ndefinition: "[[관계]]"\n',
+          'id: target\nname: 대상\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: "[[관계]]"\n',
         );
       await session.refresh();
       const token = session.captureCandidate(
@@ -523,7 +523,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
         ),
         reverse
           ? 'id: related\nname: 관계\ndefinition: 관계 삭제\n'
-          : 'id: target\nname: 대상\ndomains: [업무]\ndefinition: 관계 삭제\n',
+          : 'id: target\nname: 대상\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 관계 삭제\n',
       );
       await session.refresh();
       expect(await session.confirmCandidate(token)).toBeUndefined();

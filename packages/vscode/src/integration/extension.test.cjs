@@ -205,7 +205,7 @@ module.exports.scenarios = [
       await c.until(() => c.tabs(zone).length === 0, 'saved target tab closed');
       await c.fs.writeFile(
         document.uri.fsPath,
-        'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\n',
+        'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       await c.driver.hover('zone', 'External body');
       await c.driver.clickAnchor('원문 열기');
@@ -229,7 +229,7 @@ module.exports.scenarios = [
       ).href;
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: zone\nname: Zone\ndefinition: Changed after display [[Old]]\ndomains: [test]\n',
+        'id: zone\nname: Zone\ndefinition: Changed after display [[Old]]\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       // 새 저장 원문의 실제 진단 게시로 완료 snapshot을 관측한다.
       // 기존 Hover와 href는 유지하며 제품 조회·명시 refresh는 호출하지 않는다.
@@ -256,7 +256,7 @@ module.exports.scenarios = [
       const beforeOutput = await c.output();
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\n',
+        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       await c.driver.clickAnchor('원문 열기', href);
       await c.until(
@@ -412,7 +412,7 @@ module.exports.scenarios = [
       );
       await c.create(
         recoveredNavigation,
-        'id: recovered-nav-target\nname: Recovered Nav Target\ndefinition: Recovered body\ndomains: [test]\n',
+        'id: recovered-nav-target\nname: Recovered Nav Target\ndefinition: Recovered body\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       await c.until(
         () =>

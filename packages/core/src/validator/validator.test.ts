@@ -13,12 +13,14 @@ const term = {
   name: ' 가상 주문 😀 ',
   definition: '정의 [[sample-fulfillment]]',
   domains: ['Sample Sales'],
+  deprecatedAliases: [],
 };
 const knowledge = {
   id: 'sample-fulfillment',
   name: '제목',
   definition: '본문 [[sample-order]]',
   domains: [' Sample Sales '],
+  deprecatedAliases: [],
 };
 
 /** JSON 직렬화가 잃는 undefined·비유한 수도 유지하는 검사 전 스냅샷이다. */
@@ -60,6 +62,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
       name: '주문',
       definition: '설명',
       domains: ['판매'],
+      deprecatedAliases: [],
     };
 
     const result = validateDocument({ data });
@@ -68,6 +71,29 @@ describe('validateDocument: 문서 스키마 검증', () => {
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
     if (result.success) expect(result.data).toEqual(data);
+  });
+
+  it('deprecatedAliases가 없는 문서를 검증하면 해당 위치의 필수 필드 누락 오류를 반환한다', () => {
+    const { deprecatedAliases: omitted, ...data } = term;
+    expect(omitted).toEqual([]);
+
+    const result = validateDocument({ data });
+
+    expect(result.success).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        fieldPath: ['deprecatedAliases'],
+        code: schemaDiagnosticCodes.missingRequiredField,
+      }),
+    );
+  });
+
+  it('deprecatedAliases가 빈 배열인 문서를 검증하면 오류 없이 성공한다', () => {
+    const result = validateDocument({ data: term });
+
+    expect(result.success).toBe(true);
+    expect(result.errors).toEqual([]);
+    if (result.success) expect(result.data.deprecatedAliases).toEqual([]);
   });
 
   it('복수 도메인과 모든 선택 속성을 함께 검사하면 종류 구분 없이 원문을 보존한다', /** 단일 문서에 예문·이전 명칭·정책 상태를 함께 허용한다. */ () => {
@@ -102,6 +128,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
       ['name'],
       ['definition'],
       ['domains'],
+      ['deprecatedAliases'],
     ]);
     expect(result.warnings.map((issue) => issue.fieldPath)).toEqual([
       ['type'],
@@ -409,7 +436,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
   it.each(['.nan', '.inf', '-.inf'])(
     '실제 YAML %s를 파싱해 검사하면 비유한 수의 원문을 지목한다',
     /** 파서 성공은 스키마 성공을 보장하지 않는다. */ (value) => {
-      const source = `id: order\nname: 이름\ndefinition: 정의\ndomains: [영역]\ncustom:\n  nested: [${value}]\n`;
+      const source = `id: order\nname: 이름\ndefinition: 정의\ndomains: [영역]\ndeprecatedAliases: []\ncustom:\n  nested: [${value}]\n`;
       const parsed = parseYaml(source, 'terms.yaml');
       if (!parsed.success) throw new Error('파싱이 실패했습니다.');
       const result = validateDocument({

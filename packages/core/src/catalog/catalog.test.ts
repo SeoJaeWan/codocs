@@ -42,6 +42,7 @@ const orderDocument = {
     data: {
       name: '주문',
       domains: ['판매'],
+      deprecatedAliases: [],
       definition: '설명',
       id: 'a',
     },
@@ -91,6 +92,7 @@ const documentA = {
     data: {
       name: 'A',
       domains: ['판매'],
+      deprecatedAliases: [],
       definition: '설명',
       id: 'a',
     },
@@ -105,6 +107,7 @@ const purchaseOrder = {
     data: {
       name: '주문',
       domains: ['구매'],
+      deprecatedAliases: [],
       definition: '설명',
       id: 'b',
     },

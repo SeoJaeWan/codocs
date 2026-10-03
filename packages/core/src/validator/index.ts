@@ -153,7 +153,7 @@ const documentStructure = z
     definition: nonblank,
     domains: z.array(nonblank).min(1),
     examples: z.array(nonblank).optional(),
-    deprecatedAliases: z.array(deprecatedAlias).optional(),
+    deprecatedAliases: z.array(deprecatedAlias),
     kind: z.enum(documentKinds).optional(),
     status: z.enum(documentStatuses).optional(),
   })
