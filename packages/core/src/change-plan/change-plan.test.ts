@@ -1141,7 +1141,7 @@ describe('planDocumentChange', () => {
         );
     });
 
-    it('알 수 없는 속성이 있는 원문에서 무변경 요청을 하면 경고와 함께 완료한다', () => {
+    it('알 수 없는 속성이 있는 원문에서 무변경 요청을 하면 경고 없이 완료한다', () => {
       const raw = base + 'custom: value\n';
       const catalog: Catalog = {
         ...baseCatalog,
@@ -1176,13 +1176,7 @@ describe('planDocumentChange', () => {
 
       expect(result.status).toBe(changePlanStatuses.unchanged);
       if (result.status === changePlanStatuses.unchanged)
-        expect(result.diagnostics).toContainEqual(
-          expect.objectContaining({
-            code: schemaDiagnosticCodes.unknownField,
-            severity: diagnosticSeverities.warning,
-            message: schemaDiagnosticMessages.unknownField,
-          }),
-        );
+        expect(result.diagnostics).toEqual([]);
     });
 
     it('다른 문서의 필드 오류가 있으면 대상 문서 수정 후보에는 포함하지 않는다', () => {

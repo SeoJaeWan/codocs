@@ -43,7 +43,6 @@ export const schemaDiagnosticCodes = {
   /** 문자열·ID·열거 값·배열 길이 또는 JSON 값이 계약과 다르면 반환한다. */
   invalidFieldValue: 'invalid_field_value',
   /** 문서의 업무 스키마에 없는 사용자 속성을 보존하며 경고한다. */
-  unknownField: 'unknown_field',
 } as const;
 
 /** 사용자에게 반환하는 스키마 진단의 고정 문구다. 오류 코드 하나에 여러 원인별 문구가 대응할 수 있다. */
@@ -67,7 +66,6 @@ export const schemaDiagnosticMessages = {
   /** 이전 ID가 현재 ID와 같을 때 사용한다. */
   deprecatedAliasMatchesCurrentId: '이전 ID가 현재 ID와 같습니다.',
   /** 업무 스키마에 없는 사용자 속성을 보존하며 경고할 때 사용한다. */
-  unknownField: '알려지지 않은 사용자 속성을 보존합니다.',
 } as const;
 
 /** 코드 정의에서 도출한 스키마 진단 코드 타입이다. */

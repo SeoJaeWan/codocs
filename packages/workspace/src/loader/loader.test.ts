@@ -290,19 +290,35 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       expect(result.documents[0]?.diagnostics[0]?.range).toBeDefined();
     });
   });
-  it('스키마 경고만 있으면 유효 문서와 원래 사용자 속성 좌표를 보존한다', /** 미등록 필드는 성공을 막지 않는다. */ async () => {
-    await document('warning.yaml', raw + 'custom: 보존\r\n');
+  it('사용자 속성만 추가하면 진단 없이 유효 문서로 읽고 값을 보존한다', /** 사용자 속성은 경고하지 않는다. */ async () => {
+    await document('custom.yaml', raw + 'custom: 보존\r\n');
     const result = await loadWorkspace({ cwd: project });
     const item = result.documents[0];
     expect(result.status).toBe('complete');
     expect(item).toMatchObject({
       status: 'valid',
       data: { custom: '보존' },
+      diagnostics: [],
+    });
+  });
+  it('스키마 경고만 있으면 유효 문서와 경고 좌표를 보존한다', /** 현재 ID와 같은 이전 ID 경고는 성공을 막지 않는다. */ async () => {
+    await document(
+      'warning.yaml',
+      raw.replace(
+        'deprecatedAliases: []',
+        'deprecatedAliases:\r\n  - id: shared-term',
+      ),
+    );
+    const result = await loadWorkspace({ cwd: project });
+    const item = result.documents[0];
+    expect(result.status).toBe('complete');
+    expect(item).toMatchObject({
+      status: 'valid',
       diagnostics: [
         {
-          code: 'unknown_field',
+          code: 'invalid_field_value',
           severity: 'warning',
-          range: { start: { line: 5, character: 0 } },
+          range: { start: { line: 5, character: 8 } },
         },
       ],
     });

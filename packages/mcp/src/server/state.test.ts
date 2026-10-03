@@ -320,7 +320,7 @@ describe('MCP refresh 집계·중복·커서', () => {
       countsComplete: true,
       fileCount: 4,
       itemCount: 1,
-      warningCount: 1,
+      warningCount: 0,
     });
     const diagnostics = result.diagnostics as { severity: string }[];
     expect(result.errorCount).toBe(
