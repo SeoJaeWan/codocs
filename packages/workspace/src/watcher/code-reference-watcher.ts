@@ -11,7 +11,6 @@ export type CodeWatchExclusion = (
 ) => boolean;
 /**
  * 코드와 프로젝트 Git 메타데이터의 변경을 문서 감시와 분리한다.
- * @codocs [[작업 공간:작업 공간 파일 감시]]#L66-L69
  */
 export class CodeReferenceWatcher {
   #watchers: FSWatcher[] = [];

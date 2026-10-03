@@ -49,7 +49,7 @@ import {
 } from '../diagnostic-status/index.js';
 
 /** 실제 VS Code API와 language client SDK를 소유하는 확장 runtime이다.
- * @codocs [[VS Code:VS Code]] */
+ * */
 export class VscodeExtensionRuntime {
   readonly #context: vscode.ExtensionContext;
   readonly #output: vscode.OutputChannel;
@@ -176,7 +176,7 @@ export class VscodeExtensionRuntime {
 }
 
 /** folder마다 Node IPC 프로세스 하나와 watcher를 관리한다.
- * @codocs [[VS Code:언어 서버 연결]] */
+ * */
 export class VscodeFolderClient implements FolderClientBoundary {
   readonly #folder: vscode.WorkspaceFolder;
   readonly #serverPath: string;
@@ -203,7 +203,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
   }
 
   /** 대상 URI가 아니라 출처 문서의 소유 client에서 선택을 확인한다.
-   * @codocs [[VS Code:원문 열기]]#L15-L16 */
+   * */
   async confirmSource(argument: OpenSourceCommandArgument): Promise<unknown> {
     const client = this.#client;
     const generation = this.#sessionGeneration;
@@ -286,7 +286,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
         { scheme: 'file' },
         {
           /** 원문 수정 없이 서버가 확인한 문서 전체 Hint만 표시한다.
-           * @codocs [[VS Code:언어 서버 연결]]#L50-L51 */
+           * */
           provideInlayHints: async (document, range, token) => {
             if (!owns(document)) return [];
             const hints = await this.#latestQuery(
@@ -395,8 +395,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
   }
 
   /** folder용 watcher와 language client를 시작한다.
-   * @codocs [[VS Code:언어 서버 연결]]#L11
-   * @codocs [[VS Code:언어 서버 연결]]#L18-L19 */
+   * */
   async start(): Promise<void> {
     if (this.#client) return;
     this.#stopping = false;
@@ -463,7 +462,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
   }
 
   /** 시작 중인 client를 정리하고 현재 열린 문서를 다시 동기화한다.
-   * @codocs [[VS Code:언어 서버 연결]]#L34-L35 */
+   * */
   async restart(): Promise<void> {
     if (this.#client?.state === State.Starting)
       await this.#waitForStartTransition(this.#client);
@@ -496,7 +495,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
   }
 
   /** 현재 folder가 소유한 문서만 language client에 전달한다.
-   * @codocs [[VS Code:언어 서버 연결]]#L20-L21 */
+   * */
   #documentMiddleware(): Middleware {
     const synchronized = new Set<string>();
     /** 현재 workspace folder를 경로 소유권 경계로 변환한다. */
@@ -590,7 +589,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
   }
 
   /** 예기치 않은 연결 오류의 재시작·중단 정책을 반환한다.
-   * @codocs [[VS Code:언어 서버 연결]]#L32-L33 */
+   * */
   #errorHandler(): ErrorHandler {
     return {
       /** 전송 오류로 SDK stop을 호출하면 closed의 재시작이 억제되므로 종료 판정은 closed에 맡긴다. */
@@ -682,7 +681,7 @@ function existingTextTabColumn(uri: string): vscode.ViewColumn | undefined {
 }
 
 /** 원문 열기 순수 경계를 VS Code의 문서·탭 API에 연결한다.
- * @codocs [[VS Code:원문 열기]]#L29-L30 */
+ * */
 function vscodeOpenSourceHost(
   confirmSource: OpenSourceHost['confirmSource'],
   reportError: OpenSourceHost['reportError'],

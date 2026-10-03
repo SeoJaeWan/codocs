@@ -55,7 +55,6 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
       expect(result.data.name).toBe(request.set.name);
     });
 
-    /** @codocs [[작업 공간:작업 공간 변경 계획]]#L26 */
     it('기존 ID를 변경하면 주석·개행·이전 ID 이력을 포함한 후보를 반환한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
@@ -86,7 +85,6 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
       );
     });
 
-    /** @codocs [[작업 공간:작업 공간 변경 계획]]#L27-L29 */
     it('ID 변경 후보를 계획하면 파일과 요청 객체를 수정하지 않는다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(

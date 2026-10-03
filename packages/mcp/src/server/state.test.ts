@@ -98,7 +98,6 @@ function payload(response: unknown): Record<string, unknown> {
   return value.structuredContent;
 }
 
-// @codocs [[MCP:사용 가이드]]#L21-L23
 describe('색인 상태와 독립된 MCP guide', () => {
   it.each(['initialization', 'refresh'])(
     '%s의 실제 읽기가 대기 중이면 guide는 스캔을 추가하지 않고 응답한다',
@@ -156,7 +155,6 @@ describe('색인 상태와 독립된 MCP guide', () => {
 });
 
 describe('MCP 저장 후 색인 복구', () => {
-  // @codocs [[MCP:도구 결과]]#L42-L44
   it('실제 저장 후 두 관측 오류가 나면 저장 revision을 보존하고 refresh로 복구한다', async () => {
     const attempts: number[] = [];
     await connect(

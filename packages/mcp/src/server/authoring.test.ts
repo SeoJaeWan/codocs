@@ -56,7 +56,6 @@ function payload(response: unknown): Record<string, unknown> {
 }
 
 describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
-  // @codocs [[MCP:검증 오류가 있는 문서를 조회하고 수정하는 절차]]#L23
   it('최신 get revision으로 선택 속성을 unset하면 나머지 원문을 보존하고 검증한다', async () => {
     const document = {
       id: 'a',
