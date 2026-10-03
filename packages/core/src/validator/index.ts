@@ -249,12 +249,7 @@ function diagnosticRange(
       candidate.fieldPath.length === target.length &&
       candidate.fieldPath.every((part, index) => part === target[index]),
   );
-  const offsets =
-    target.length === 0
-      ? input.rootRange
-      : code === schemaDiagnosticCodes.unknownField
-        ? field?.key
-        : field?.value;
+  const offsets = target.length === 0 ? input.rootRange : field?.value;
   if (!offsets || offsets.start > offsets.end) return undefined;
   const start = offsetToPosition(input.source, offsets.start);
   const end = offsetToPosition(input.source, offsets.end);
@@ -267,9 +262,7 @@ function diagnostic(
   code: SchemaDiagnosticCode,
   fieldPath: FieldPath,
   message: string,
-  severity: DiagnosticSeverity = code === schemaDiagnosticCodes.unknownField
-    ? diagnosticSeverities.warning
-    : diagnosticSeverities.error,
+  severity: DiagnosticSeverity = diagnosticSeverities.error,
 ): SchemaDiagnostic {
   const range = diagnosticRange(input, fieldPath, code);
   return {
@@ -306,39 +299,6 @@ function deprecatedAliasWarnings(
   return warnings;
 }
 
-/** 알려진 업무 객체의 미등록 키만 경고하며 사용자 JSON 내부는 해석하지 않는다. */
-function unknownWarnings(input: ValidateDocumentInput): SchemaDiagnostic[] {
-  const warnings: SchemaDiagnostic[] = [];
-  /** 직접 업무 속성만 검사하고 비문자열 키는 JSON 오류에 맡긴다. */
-  function collect(
-    value: unknown,
-    known: readonly string[],
-    path: FieldPath,
-  ): void {
-    if (typeof value !== 'object' || value === null || Array.isArray(value))
-      return;
-    for (const key of Object.keys(value))
-      if (!known.includes(key))
-        warnings.push(
-          diagnostic(
-            input,
-            schemaDiagnosticCodes.unknownField,
-            [...path, key],
-            schemaDiagnosticMessages.unknownField,
-          ),
-        );
-  }
-  collect(input.data, Object.keys(documentStructure.shape), []);
-  const aliases = ownValue(input.data, 'deprecatedAliases');
-  if (Array.isArray(aliases))
-    for (let index = 0; index < aliases.length; index++)
-      collect(ownValue(aliases, index), Object.keys(deprecatedAlias.shape), [
-        'deprecatedAliases',
-        index,
-      ]);
-  return warnings;
-}
-
 /** Zod 오류를 원래 입력의 존재 여부와 자료형으로 제품 오류 코드에 연결한다. */
 function issueCode(
   data: unknown,
@@ -371,10 +331,7 @@ function issueCode(
 export function validateDocument(
   input: ValidateDocumentInput,
 ): DocumentValidationResult {
-  const warnings = [
-    ...unknownWarnings(input),
-    ...deprecatedAliasWarnings(input),
-  ];
+  const warnings = deprecatedAliasWarnings(input);
   const result = documentSchema.safeParse(input.data);
   if (result.success)
     return { success: true, data: result.data, errors: [], warnings };

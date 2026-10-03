@@ -111,7 +111,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
     }
   });
 
-  it('kind, status, examples를 가진 문서를 검증하면 값을 그대로 보존하고 각 속성에 unknown_field 경고만 반환한다', /** 세 속성은 더 이상 제품 속성이 아니므로 값 형식도 검사하지 않는다. */ () => {
+  it('kind, status, examples를 가진 문서를 검증하면 값을 그대로 보존하고 경고 없이 성공한다', /** 세 속성은 더 이상 제품 속성이 아니므로 값 형식도 검사하지 않는다. */ () => {
     const data = {
       ...term,
       kind: 'Policy',
@@ -123,17 +123,11 @@ describe('validateDocument: 문서 스키마 검증', () => {
 
     expect(result.success).toBe(true);
     expect(result.errors).toEqual([]);
-    expect(
-      result.warnings.map((issue) => [issue.code, issue.fieldPath]),
-    ).toEqual([
-      [schemaDiagnosticCodes.unknownField, ['kind']],
-      [schemaDiagnosticCodes.unknownField, ['status']],
-      [schemaDiagnosticCodes.unknownField, ['examples']],
-    ]);
+    expect(result.warnings).toEqual([]);
     if (result.success) expect(result.data).toEqual(data);
   });
 
-  it('이전 형식을 검사하면 새 필수 필드를 대신 채우지 않고 이전 속성을 경고한다', /** 호환 변환 없이 사용자 속성으로 보존하며 필수 속성 누락을 진단한다. */ () => {
+  it('이전 형식을 검사하면 새 필수 필드를 대신 채우지 않고 누락 오류만 반환한다', /** 호환 변환 없이 사용자 속성으로 보존하며 필수 속성 누락을 진단한다. */ () => {
     const legacy = {
       type: 'knowledge',
       id: 'legacy',
@@ -149,12 +143,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
       ['domains'],
       ['deprecatedAliases'],
     ]);
-    expect(result.warnings.map((issue) => issue.fieldPath)).toEqual([
-      ['type'],
-      ['title'],
-      ['body'],
-      ['domain'],
-    ]);
+    expect(result.warnings).toEqual([]);
     const valid = { ...legacy, ...term };
     const accepted = validateDocument({ data: valid });
     expect(accepted.success).toBe(true);
@@ -363,7 +352,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
     });
   });
 
-  it('필수 필드를 생략하면 missing 오류와 안전한 사용자 경고를 함께 반환한다', /** 오류가 있어도 aliases 경고를 별도로 수집한다. */ () => {
+  it('필수 필드를 생략하면 사용자 속성이 있어도 missing 오류만 반환하고 경고는 없다', /** 오류가 있어도 사용자 속성은 경고하지 않는다. */ () => {
     const { name: omitted, ...rest } = term;
     expect(omitted).toBeDefined();
     const result = validateDocument({
@@ -376,12 +365,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
         code: schemaDiagnosticCodes.missingRequiredField,
       }),
     );
-    expect(result.warnings).toContainEqual(
-      expect.objectContaining({
-        fieldPath: ['aliases'],
-        code: schemaDiagnosticCodes.unknownField,
-      }),
-    );
+    expect(result.warnings).toEqual([]);
   });
 
   it('사용자 JSON 값과 업무 별칭의 사용자 속성을 검사하면 모든 값과 키를 보존한다', /** 사용자 객체 내부의 name·status는 업무 스키마로 해석하지 않는다. */ () => {
@@ -399,16 +383,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
     const result = validateDocument({ data });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data).toEqual(data);
-    expect(result.warnings.map((issue) => issue.fieldPath)).toEqual([
-      ['aliases'],
-      ['custom'],
-      ['deprecatedAliases', 0, 'custom'],
-    ]);
-    expect(result.warnings.map((issue) => issue.message)).toEqual([
-      schemaDiagnosticMessages.unknownField,
-      schemaDiagnosticMessages.unknownField,
-      schemaDiagnosticMessages.unknownField,
-    ]);
+    expect(result.warnings).toEqual([]);
   });
 
   it.each([NaN, Infinity, -Infinity])(
@@ -559,7 +534,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
       expect(Object.hasOwn(result.data, '__proto__')).toBe(true);
       expect(result.data).toEqual(data);
     }
-    expect(result.warnings).toHaveLength(2);
+    expect(result.warnings).toEqual([]);
   });
 
   it.each([null, [], 'term', 1, false, {}])(
@@ -603,14 +578,6 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
             section: 'errors',
             expected: '{message: "안내"}',
           },
-          {
-            newlineName,
-            newline,
-            name: '알 수 없는 키',
-            fieldPath: ['aliases'],
-            section: 'warnings',
-            expected: 'aliases',
-          },
         ] as const,
     ),
   )(
@@ -624,7 +591,6 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
         'definition: 정의',
         'domains: ["😀", false]',
         'deprecatedAliases: [{message: "안내"}]',
-        'aliases: [old]',
         '# 뒤 주석',
         '',
       ].join(newline);
