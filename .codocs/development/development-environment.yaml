@@ -15,7 +15,8 @@ definition: |
   package.json 스크립트는 사람이 직접 실행하는 진입점만 둔다.
 
   - prepare·build·typecheck·lint·format·test: 개발과 검사
-  - test:vscode: CI의 실제 VS Code UI 테스트 진입점. 로컬 자동 실행은 지원하지 않으며 직접 확인은 [[VS Code에서 직접 실행하기]]를 따른다.
+  - test:vscode: CI의 실제 VS Code UI 테스트 진입점. 로컬 자동 실행은 지원하지 않으며 직접 확인은 [[직접 실행하기]]를 따른다.
+  - dev:vscode·dev:mcp: 빌드한 뒤 개발용 VS Code 창과 MCP Inspector를 연다. 파일 변경을 감시하지 않으며 사용법은 [[직접 실행하기]]를 따른다.
   - changeset·release:pack·release:verify: 변경 기록과 배포 파일 조립·검증([[배포]])
 
   여러 검사를 묶는 check류 스크립트나 CI 전용 조합 스크립트는 두지 않는다. 빠른 검사는 커밋 훅이, 전체 검사는 PR CI가 맡는다([[검사와 병합]]). 게시 단계는 로컬의 실수 게시를 막기 위해 스크립트로 두지 않는다.
