@@ -5,7 +5,7 @@
 Codocs connects code to project knowledge stored in local `.codocs` YAML files. Record domain terms, business rules, and development conventions once, then use the same knowledge in VS Code and your AI assistant.
 
 - **MCP:** Let your AI assistant find, read, create, and update project knowledge.
-- **VS Code:** Hover over code identifiers, follow explicit document links, and navigate back to the code references.
+- **VS Code:** Follow explicit `@codocs` and document links, and navigate back to the code references.
 
 Use either integration on its own, or both. Codocs supports projects on local disks on Windows and macOS. Document names and content can be written in any language.
 
@@ -67,9 +67,6 @@ Open the project folder containing `.codocs` to start using the extension.
 
 ### Features
 
-- **Code hover:** Read a matching document's name, definition, and domain by hovering over an English code identifier.
-- **Source navigation:** Open the original YAML document from a hover link.
-- **Related knowledge:** Follow links to referenced documents, documents that refer to the current one, and other terms matched in the identifier.
 - **Document diagnostics:** Check YAML syntax, required fields, duplicate IDs, and reference errors in `.codocs` documents.
 - **Document links:** Navigate to resolved `[[Document name]]` references in YAML content.
 - **Explicit code links:** Write `@codocs [[Document name]]`, `@codocs [[Document name]]#L11`, or `@codocs [[Domain:Document name]]#L11-L12` in project text to link to a document, line, or inclusive line range.
@@ -90,7 +87,7 @@ definition: |
   An order records a customer's purchase and its fulfillment rules.
 ```
 
-Hover over the `order` identifier in code to read its definition, or ask your AI assistant to retrieve it through MCP. Use document references such as `[[Order]]` to connect related knowledge.
+Link code to the document with `@codocs [[Order]]` in a comment, or ask your AI assistant to retrieve it through MCP. Use document references such as `[[Order]]` to connect related knowledge. Codocs does not connect a document just because a variable or function has the same name.
 
 See the [writing guide](docs/guide/README.md) and [sample project](examples/.codocs) for more examples. The detailed guide and sample project are currently in Korean.
 
