@@ -13,10 +13,9 @@ let session: WorkspaceQuerySession;
 const orderPath = path.join('.codocs', 'order.yaml');
 const purchasePath = path.join('.codocs', 'purchase-order.yaml');
 const sourcePath = path.join('.codocs', 'source.yaml');
-const order =
-  'id: order\nname: 주문\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: 주문 설명\n';
+const order = 'id: order\nname: 주문\ndomains: [판매]\ndefinition: 주문 설명\n';
 const purchaseOrder =
-  'id: purchase-order\nname: 주문\ndomains: [구매]\ndeprecatedAliases: []\ndefinition: 구매 주문 설명\n';
+  'id: purchase-order\nname: 주문\ndomains: [구매]\ndefinition: 구매 주문 설명\n';
 
 /** 프로젝트 .codocs에 테스트 문서를 쓴다. 키는 .codocs 아래 파일 이름이다. */
 async function writeDocuments(files: Record<string, string>): Promise<void> {
@@ -72,11 +71,11 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
         'order.yaml': order,
         'purchase-order.yaml': purchaseOrder,
         'a.yaml':
-          'id: a\nname: 가\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[판매:주문]] 그리고 [[판매:주문]]"\n',
+          'id: a\nname: 가\ndomains: [판매]\ndefinition: "[[판매:주문]] 그리고 [[판매:주문]]"\n',
         'b.yaml':
-          'id: b\nname: 나\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[판매:주문]]"\n',
+          'id: b\nname: 나\ndomains: [판매]\ndefinition: "[[판매:주문]]"\n',
         'c.yaml':
-          'id: c\nname: 다\ndomains: [구매]\ndeprecatedAliases: []\ndefinition: "[[구매:주문]]"\n',
+          'id: c\nname: 다\ndomains: [구매]\ndefinition: "[[구매:주문]]"\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -104,9 +103,8 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       await writeDocuments({
         'order.yaml': order,
         'a.yaml':
-          'id: a\nname: 가\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[주문]] [[주문]]"\n',
-        'b.yaml':
-          'id: b\nname: 나\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[주문]]"\n',
+          'id: a\nname: 가\ndomains: [판매]\ndefinition: "[[주문]] [[주문]]"\n',
+        'b.yaml': 'id: b\nname: 나\ndomains: [판매]\ndefinition: "[[주문]]"\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -126,9 +124,8 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       await writeDocuments({
         'order.yaml': order,
         'payment.yaml':
-          'id: payment\nname: 결제\ndomains: [구매]\ndeprecatedAliases: []\ndefinition: 결제 설명\n',
-        'a.yaml':
-          'id: a\nname: 가\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[주문]]"\n',
+          'id: payment\nname: 결제\ndomains: [구매]\ndefinition: 결제 설명\n',
+        'a.yaml': 'id: a\nname: 가\ndomains: [판매]\ndefinition: "[[주문]]"\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -145,8 +142,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
     it('새 이름에 콜론이 있으면 참조에서 역슬래시로 escape한다', async () => {
       await writeDocuments({
         'order.yaml': order,
-        'a.yaml':
-          'id: a\nname: 가\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[주문]]"\n',
+        'a.yaml': 'id: a\nname: 가\ndomains: [판매]\ndefinition: "[[주문]]"\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -164,7 +160,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
 
   describe('모호했던 참조의 후보 보고와 선택', () => {
     const ambiguousSource =
-      'id: source\nname: 출처\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[주문]]"\n';
+      'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n';
 
     it('원래 모호한 참조는 선택이 없으면 고치지 않고 후보의 도메인·이름·경로와 함께 미해결로 보고한다', async () => {
       await writeDocuments({
@@ -243,7 +239,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       await writeDocuments({
         'order.yaml': order,
         'other.yaml':
-          'id: other\nname: 새주문\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: 설명\n',
+          'id: other\nname: 새주문\ndomains: [판매]\ndefinition: 설명\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -294,7 +290,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
         path.join(root, '.codocs', 'source.yaml'),
         Buffer.concat([
           Buffer.from(
-            'id: source\nname: 출처\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[주문]]"\n# ',
+            'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n# ',
           ),
           Buffer.from([0xff]),
           Buffer.from('\n'),
@@ -329,9 +325,9 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       await writeDocuments({
         'order.yaml': order,
         'source.yaml':
-          'id: source\nname: 출처\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[주문]]"\n',
+          'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n',
         'unrelated.yaml':
-          'id: unrelated\nname: 무관\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: 설명\n',
+          'id: unrelated\nname: 무관\ndomains: [판매]\ndefinition: 설명\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -350,7 +346,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       await writeDocuments({
         'order.yaml': order,
         'source.yaml':
-          'id: source\nname: 출처\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[주문]]"\n',
+          'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n',
       });
       const before = {
         order: await readFile(path.join(root, '.codocs', 'order.yaml'), 'utf8'),
@@ -378,7 +374,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
 
 describe('WorkspaceQuerySession.applyRename: 이름 변경 반영과 색인', () => {
   const sourceDocument =
-    'id: source\nname: 출처\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: "[[주문]]"\n';
+    'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n';
 
   it('미리보기의 revision으로 반영하면 파일을 바꾸고 저장 직후 색인에 새 이름을 게시한다', async () => {
     await writeDocuments({
@@ -409,6 +405,41 @@ describe('WorkspaceQuerySession.applyRename: 이름 변경 반영과 색인', ()
     expect(
       await readFile(path.join(root, '.codocs', 'source.yaml'), 'utf8'),
     ).toContain('[[새주문]]');
+  });
+
+  it('deprecatedAliases가 있는 대상 문서와 참조 문서의 이름을 변경하면 두 문서의 키만 지우고 참조를 바꾸며 관계없는 문서는 그대로 둔다', async () => {
+    const orderWithAlias =
+      'id: order\nname: 주문\ndomains: [판매]\n# 보존 주석\ndeprecatedAliases:\n  - id: old-order\ndefinition: 주문 설명\n';
+    const sourceWithAlias =
+      '{id: source, name: 출처, domains: [판매], deprecatedAliases: [{id: old-source}], definition: "[[주문]]"}\n';
+    const unrelated =
+      'id: unrelated\nname: 관계없음\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: 다른 설명\n';
+    await writeDocuments({
+      'order.yaml': orderWithAlias,
+      'source.yaml': sourceWithAlias,
+      'unrelated.yaml': unrelated,
+    });
+    const preview = await session.previewRename({
+      targetPath: orderPath,
+      newName: '새주문',
+    });
+    if (!preview.success) throw new Error('미리보기가 실패했다');
+    const result = await session.applyRename({
+      targetPath: orderPath,
+      newName: '새주문',
+      revisions: preview.revisions,
+    });
+
+    expect(result).toMatchObject({ success: true, saved: true, changed: true });
+    const read = (name: string) =>
+      readFile(path.join(root, '.codocs', name), 'utf8');
+    expect(await read('order.yaml')).toBe(
+      'id: order\nname: 새주문\ndomains: [판매]\n# 보존 주석\ndefinition: 주문 설명\n',
+    );
+    expect(await read('source.yaml')).toBe(
+      '{id: source, name: 출처, domains: [판매], definition: "[[새주문]]"}\n',
+    );
+    expect(await read('unrelated.yaml')).toBe(unrelated);
   });
 
   it('반영 직후 같은 요청을 다시 미리보기하면 변경 없이 ready로 보고한다', async () => {

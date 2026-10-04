@@ -23,7 +23,7 @@ beforeEach(async () => {
   await writeFile(source, original);
   await writeFile(
     path.join(root, '.codocs', 'second.yaml'),
-    'id: second\nname: 둘째 문서\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
+    'id: second\nname: 둘째 문서\ndomains: [업무]\ndefinition: 본문\n',
   );
   sessions = [];
 });
@@ -52,7 +52,7 @@ function revision(bytes: Uint8Array | string): string {
 }
 
 describe('WorkspaceQuerySession.write 실제 IO', () => {
-  it('ID와 이전 ID를 한 파일에 반영하고 저장 직후 참조·진단·목록을 게시한다', async () => {
+  it('ID를 바꾸면 이전 ID와 deprecatedAliases 없이 한 파일에 반영하고 저장 직후 참조·진단·목록을 게시한다', async () => {
     const current = session();
     const result = await current.write({
       mode: 'update',
@@ -70,9 +70,10 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     const bytes = await readFile(source);
     expect(result.revision).toBe(revision(bytes));
     expect(bytes.toString()).toContain('id: renamed');
-    expect(bytes.toString()).toContain('id: first');
-    expect(bytes.toString()).toContain('id: old-first');
-    expect(bytes.toString()).toContain('message: 유지할 안내');
+    expect(bytes.toString()).not.toContain('id: first');
+    expect(bytes.toString()).not.toContain('old-first');
+    expect(bytes.toString()).not.toContain('deprecatedAliases');
+    expect(bytes.toString()).not.toContain('message: 유지할 안내');
     const fetched = await current.get(['renamed', 'first']);
     expect(fetched).toMatchObject({
       success: true,
@@ -267,25 +268,24 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     expect(result.revision).toBe(revision(await readFile(createdPath)));
   });
 
-  it('과거 ID를 다시 현재 ID로 선택하면 이전 목록의 새 현재 ID를 제거한다', async () => {
+  it('저장하는 문서에 deprecatedAliases가 있으면 수정과 함께 그 키 블록만 지운다', async () => {
     const current = session();
     const result = await current.write({
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { id: 'old-first' },
+      set: { definition: '새 설명' },
     });
     expect(result).toMatchObject({
       success: true,
       saved: true,
       indexUpdated: true,
-      id: 'old-first',
+      id: 'first',
     });
     const text = await readFile(source, 'utf8');
-    expect(text).toContain('id: old-first');
-    expect(text).toContain('- id: first');
-    expect(text).not.toContain('- id: old-first');
-    expect(text).not.toContain('message: 유지할 안내');
+    expect(text).toBe(
+      'id: first\nname: 첫 문서\ndomains: [업무]\ndefinition: 새 설명\n',
+    );
   });
 
   it('첫 색인 오류는 저장 없이 반복하지 않고 해당 경로만 추가 복구한다', async () => {

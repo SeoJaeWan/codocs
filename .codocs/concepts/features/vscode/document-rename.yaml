@@ -2,7 +2,6 @@ id: document-rename
 name: 'VS Code 문서 이름 변경'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   VS Code 문서 이름 변경은 편집기에서 .codocs 문서의 name을 바꾸면서 그 문서를 가리키던 참조를 함께 고치는 동작이다.
   무엇을 고치는지와 결과 상태, 반영 방식은 [[이름 변경]]이 정하며, 이 문서는 편집기에서 시작하는 위치와 사용자가 보는 선택·알림만 설명한다.

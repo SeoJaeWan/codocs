@@ -2,7 +2,6 @@ id: rename
 name: '이름 변경'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   이름 변경은 문서의 name을 바꾸면서 그 문서를 가리키던 [[문서 참조]]를 함께 고치는 작업이다.
   참조는 이름으로 대상을 찾으므로 name만 바꾸면 기존 참조가 끊기거나 다른 도메인의 같은 이름 문서를 가리키게 된다.

@@ -2,7 +2,6 @@ id: development-environment
 name: '개발 환경'
 domains:
   - '개발'
-deprecatedAliases: []
 definition: |
   이 저장소를 개발하는 데 쓰는 도구·스크립트·실행 런타임·빌드 산출물이다.
   검사가 실행되는 시점과 병합 조건은 [[검사와 병합]], 배포 파일을 만들고 게시하는 흐름은 [[배포]]에서 정한다.

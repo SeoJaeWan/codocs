@@ -90,7 +90,7 @@ function read(name: string): Promise<string> {
 
 /** 문서 원문을 만든다. */
 function doc(id: string, name: string, domain: string, body: string): string {
-  return `id: ${id}\nname: '${name}'\ndomains:\n  - '${domain}'\ndeprecatedAliases: []\ndefinition: |\n  ${body}\n`;
+  return `id: ${id}\nname: '${name}'\ndomains:\n  - '${domain}'\ndefinition: |\n  ${body}\n`;
 }
 
 const order = doc('order', '주문', '판매', '주문의 의미다.');

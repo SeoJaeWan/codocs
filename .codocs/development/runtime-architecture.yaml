@@ -2,7 +2,6 @@ id: runtime-architecture
 name: '실행 구조'
 domains:
   - '개발'
-deprecatedAliases: []
 definition: |
   패키지와 실행 프로세스 사이의 책임 및 의존 방향을 정의한다.
   IDE와 AI가 같은 계산 규칙을 사용하면서 호스트·프로토콜·파일 IO를 분리해 재사용하기 위한 구조다.

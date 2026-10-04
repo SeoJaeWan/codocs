@@ -2,7 +2,6 @@ id: rename-tool
 name: 'codocs_rename'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   문서의 name을 바꾸고 그 문서를 가리키던 참조를 함께 고치는 [[MCP 도구]]다. 요청 하나는 문서 하나의 이름을 다룬다.
   무엇을 고치고 어떤 참조를 남기는지의 규칙은 [[이름 변경]]을 따르며, 이 문서는 도구의 입력과 응답만 설명한다.

@@ -255,7 +255,7 @@ describe('language server stdio 프로세스', () => {
           textDocument: { uri, version: 2 },
           contentChanges: [
             {
-              text: 'id: source\nname: 출처\ndefinition: 삭제\ndomains: [업무]\ndeprecatedAliases: []\n',
+              text: 'id: source\nname: 출처\ndefinition: 삭제\ndomains: [업무]\n',
             },
           ],
         });
@@ -300,7 +300,7 @@ describe('language server stdio 프로세스', () => {
     await mkdir(path.join(root, '.codocs'));
     await writeFile(
       path.join(root, '.codocs/반납 구역.yaml'),
-      'id: return-zone\r\nname: Return Zone\r\ndefinition: 한글 본문\r\ndomains: [test]\r\ndeprecatedAliases: []\r\n',
+      'id: return-zone\r\nname: Return Zone\r\ndefinition: 한글 본문\r\ndomains: [test]\r\n',
       'utf8',
     );
     await build({
@@ -401,17 +401,17 @@ describe('language server stdio 프로세스', () => {
     await Promise.all([
       writeFile(
         path.join(parent, '.codocs/parent-zone.yaml'),
-        'id: parent-zone\nname: Parent Zone\ndefinition: parent\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: parent-zone\nname: Parent Zone\ndefinition: parent\ndomains: [test]\n',
         'utf8',
       ),
       writeFile(
         path.join(nested, '.codocs/nested-zone.yaml'),
-        'id: nested-zone\nname: Nested Zone\ndefinition: nested\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: nested-zone\nname: Nested Zone\ndefinition: nested\ndomains: [test]\n',
         'utf8',
       ),
       writeFile(
         path.join(sibling, '.codocs/sibling-zone.yaml'),
-        'id: sibling-zone\nname: Sibling Zone\ndefinition: sibling\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: sibling-zone\nname: Sibling Zone\ndefinition: sibling\ndomains: [test]\n',
         'utf8',
       ),
     ]);
@@ -537,7 +537,7 @@ describe('language server stdio 프로세스', () => {
       await mkdir(path.join(missing, '.codocs'));
       await writeFile(
         path.join(missing, '.codocs/created-zone.yaml'),
-        'id: created-zone\nname: Created Zone\ndefinition: created\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: created-zone\nname: Created Zone\ndefinition: created\ndomains: [test]\n',
         'utf8',
       );
       await firstClient.request(8, workspaceRefreshRequestMethod, {
@@ -554,7 +554,7 @@ describe('language server stdio 프로세스', () => {
 
       await writeFile(
         path.join(missing, '.codocs/created-zone.yaml'),
-        'id: changed-zone\nname: Changed Zone\ndefinition: changed\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: changed-zone\nname: Changed Zone\ndefinition: changed\ndomains: [test]\n',
         'utf8',
       );
       firstClient.send('textDocument/didChange', {
@@ -628,12 +628,11 @@ describe('language server stdio 프로세스', () => {
     const root = await mkdtemp(path.join(fixtureParent, 'server-rename-'));
     const output = path.join(root, 'server.cjs');
     await mkdir(path.join(root, '.codocs'));
-    const order =
-      'id: order\nname: 주문\ndomains: [test]\ndefinition: 설명\ndeprecatedAliases: []\n';
+    const order = 'id: order\nname: 주문\ndomains: [test]\ndefinition: 설명\n';
     await writeFile(path.join(root, '.codocs/order.yaml'), order, 'utf8');
     await writeFile(
       path.join(root, '.codocs/ref.yaml'),
-      'id: ref\nname: 참조\ndomains: [test]\ndefinition: 본문 [[주문]]\ndeprecatedAliases: []\n',
+      'id: ref\nname: 참조\ndomains: [test]\ndefinition: 본문 [[주문]]\n',
       'utf8',
     );
     await build({

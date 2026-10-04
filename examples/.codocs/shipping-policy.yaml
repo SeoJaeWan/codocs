@@ -2,7 +2,6 @@ id: sample-shipping-policy
 name: '가상 배송:정책'
 domains:
   - sample-sales
-deprecatedAliases: []
 definition: |
   가상 교육 프로젝트의 배송 접수 기준이다. 실제 배송 정책으로 사용하지 않는다.
   [[가상 주문]]의 요청 지역이 가상 구역 A이면 접수하고 그 밖의 지역은 거절한다.

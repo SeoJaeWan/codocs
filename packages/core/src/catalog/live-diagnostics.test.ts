@@ -11,7 +11,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
     const saved = {
       path: 'target.yaml',
       parsed: parseYaml(
-        'id: target\nname: 대상\ndefinition: 설명\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: target\nname: 대상\ndefinition: 설명\ndomains: [test]\n',
       ),
     };
     const catalog = buildCatalog({
@@ -21,7 +21,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
     const live = {
       path: 'source.yaml',
       parsed: parseYaml(
-        '# 😀\r\nid: target\r\nname: 출처\r\ndefinition: 설명\r\ndomains: [test]\r\ndeprecatedAliases: []\r\n',
+        '# 😀\r\nid: target\r\nname: 출처\r\ndefinition: 설명\r\ndomains: [test]\r\n',
       ),
     };
     const result = resolveLiveDocument(catalog, live);
@@ -46,7 +46,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
     const saved = {
       path: 'source.yaml',
       parsed: parseYaml(
-        'id: source\nname: 출처\ndefinition: 설명\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: source\nname: 출처\ndefinition: 설명\ndomains: [test]\n',
       ),
     };
     const catalog = buildCatalog({
@@ -63,13 +63,13 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
         {
           path: 'source.yaml',
           parsed: parseYaml(
-            'id: same\nname: 출처\ndefinition: 설명\ndomains: [test]\ndeprecatedAliases: []\n',
+            'id: same\nname: 출처\ndefinition: 설명\ndomains: [test]\n',
           ),
         },
         {
           path: 'target.yaml',
           parsed: parseYaml(
-            'id: same\nname: 대상\ndefinition: 설명\ndomains: [test]\ndeprecatedAliases: []\n',
+            'id: same\nname: 대상\ndefinition: 설명\ndomains: [test]\n',
           ),
         },
       ],
@@ -77,7 +77,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
     const result = resolveLiveDocument(catalog, {
       path: 'source.yaml',
       parsed: parseYaml(
-        'id: unique\nname: 출처\ndefinition: 설명\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: unique\nname: 출처\ndefinition: 설명\ndomains: [test]\n',
       ),
     });
     expect(result.diagnostics).toEqual([]);
@@ -93,7 +93,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
         {
           path: 'target.yaml',
           parsed: parseYaml(
-            'id: same\nname: 대상\ndefinition: 설명\ndomains: [test]\ndeprecatedAliases: []\n',
+            'id: same\nname: 대상\ndefinition: 설명\ndomains: [test]\n',
           ),
         },
       ],
@@ -121,13 +121,13 @@ describe('저장 이름·도메인 색인과 현재 편집 진단', () => {
   const source = {
     path: 'source.yaml',
     parsed: parseYaml(
-      'id: source\nname: Same\ndefinition: 설명\ndomains: [shared]\ndeprecatedAliases: []\n',
+      'id: source\nname: Same\ndefinition: 설명\ndomains: [shared]\n',
     ),
   };
   const target = {
     path: 'target.yaml',
     parsed: parseYaml(
-      'id: target\nname: Same\ndefinition: 설명\ndomains: [shared, other]\ndeprecatedAliases: []\n',
+      'id: target\nname: Same\ndefinition: 설명\ndomains: [shared, other]\n',
     ),
   };
 
@@ -163,9 +163,7 @@ describe('저장 이름·도메인 색인과 현재 편집 진단', () => {
     });
     const result = resolveLiveDocument(catalog, {
       path: source.path,
-      parsed: parseYaml(
-        'id: source\ndefinition: 설명\ndeprecatedAliases: []\n' + fields + '\n',
-      ),
+      parsed: parseYaml('id: source\ndefinition: 설명\n' + fields + '\n'),
     });
     expect(result.diagnostics).toEqual([]);
     expect(catalog.documents.get(target.path)?.diagnostics).toContainEqual(
@@ -184,7 +182,7 @@ describe('저장 이름·도메인 색인과 현재 편집 진단', () => {
     const result = resolveLiveDocument(catalog, {
       path: source.path,
       parsed: parseYaml(
-        '# 😀\r\nid: source\r\nname: Same\r\ndefinition: 설명\r\ndomains: [shared, other, shared]\r\ndeprecatedAliases: []\r\n',
+        '# 😀\r\nid: source\r\nname: Same\r\ndefinition: 설명\r\ndomains: [shared, other, shared]\r\n',
       ),
     });
     const diagnostics = result.documentDiagnostics.filter(
@@ -211,7 +209,7 @@ describe('편집 중인 출처의 참조 해석', () => {
     const observation = (id: string, name: string, definition: string) => ({
       path: `${id}.yaml`,
       parsed: parseYaml(
-        `id: ${id}\nname: ${name}\ndefinition: "${definition}"\ndomains: [test]\ndeprecatedAliases: []\n`,
+        `id: ${id}\nname: ${name}\ndefinition: "${definition}"\ndomains: [test]\n`,
       ),
     });
     const catalog = buildCatalog({

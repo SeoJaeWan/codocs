@@ -2,7 +2,6 @@ id: reference-link
 name: '참조 링크'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   참조 링크는 YAML 본문의 [[문서 참조]]를 눌러 대상 문서로 이동하게 하는 [[편집기 기능]]이다.
   definition의 참조만 링크가 되며 이름·ID 같은 다른 속성에 쓴 같은 표기는 링크가 되지 않는다.

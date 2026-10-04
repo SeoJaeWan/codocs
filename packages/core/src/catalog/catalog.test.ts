@@ -41,7 +41,6 @@ const orderDocument = {
     data: {
       name: '주문',
       domains: ['판매'],
-      deprecatedAliases: [],
       definition: '설명',
       id: 'a',
     },
@@ -91,7 +90,6 @@ const documentA = {
     data: {
       name: 'A',
       domains: ['판매'],
-      deprecatedAliases: [],
       definition: '설명',
       id: 'a',
     },
@@ -106,7 +104,6 @@ const purchaseOrder = {
     data: {
       name: '주문',
       domains: ['구매'],
-      deprecatedAliases: [],
       definition: '설명',
       id: 'b',
     },
@@ -779,14 +776,12 @@ describe('buildCatalog: 문서 색인', () => {
         path: 'a.yaml',
         parsed: {
           ...parsedBase,
-          source:
-            '{"name":"주문","domains":["판매"],"definition":"설명","id":"a","deprecatedAliases":42}',
+          source: '{"name":"주문","domains":[],"definition":"설명","id":"a"}',
           data: {
             name: '주문',
-            domains: ['판매'],
+            domains: [],
             definition: '설명',
             id: 'a',
-            deprecatedAliases: 42,
           },
         },
       } satisfies CatalogObservation;

@@ -136,16 +136,12 @@ const id = nonblank.refine(
   { message: schemaDiagnosticMessages.invalidId },
 );
 const userValue = z.custom<JsonValue>();
-const deprecatedAlias = z
-  .object({ id, message: nonblank.optional() })
-  .catchall(userValue);
 const documentStructure = z
   .object({
     id,
     name: nonblank,
     definition: nonblank,
     domains: z.array(nonblank).min(1),
-    deprecatedAliases: z.array(deprecatedAlias),
   })
   .catchall(userValue);
 
@@ -159,8 +155,6 @@ export const documentFields = {
   definition: documentStructure.keyof().enum.definition,
   /** 문서가 속하는 도메인 이름 목록이다. */
   domains: documentStructure.keyof().enum.domains,
-  /** 이전 ID와 전환 안내다. */
-  deprecatedAliases: documentStructure.keyof().enum.deprecatedAliases,
 } satisfies Record<keyof typeof documentStructure.shape, string>;
 /** 스키마에서 도출한 문서 필드 이름이다. */
 export type DocumentField =
@@ -275,30 +269,6 @@ function diagnostic(
   };
 }
 
-/** 현재 ID와 같은 이전 ID만 경고하며 사용자가 작성한 항목은 제거하지 않는다. */
-function deprecatedAliasWarnings(
-  input: ValidateDocumentInput,
-): SchemaDiagnostic[] {
-  const currentId = ownValue(input.data, 'id');
-  const aliases = ownValue(input.data, 'deprecatedAliases');
-  if (typeof currentId !== 'string' || !Array.isArray(aliases)) return [];
-  const warnings: SchemaDiagnostic[] = [];
-  for (let index = 0; index < aliases.length; index++) {
-    const alias = ownValue(aliases, index);
-    if (ownValue(alias, 'id') !== currentId) continue;
-    warnings.push(
-      diagnostic(
-        input,
-        schemaDiagnosticCodes.invalidFieldValue,
-        ['deprecatedAliases', index, 'id'],
-        schemaDiagnosticMessages.deprecatedAliasMatchesCurrentId,
-        diagnosticSeverities.warning,
-      ),
-    );
-  }
-  return warnings;
-}
-
 /** Zod 오류를 원래 입력의 존재 여부와 자료형으로 제품 오류 코드에 연결한다. */
 function issueCode(
   data: unknown,
@@ -331,10 +301,9 @@ function issueCode(
 export function validateDocument(
   input: ValidateDocumentInput,
 ): DocumentValidationResult {
-  const warnings = deprecatedAliasWarnings(input);
   const result = documentSchema.safeParse(input.data);
   if (result.success)
-    return { success: true, data: result.data, errors: [], warnings };
+    return { success: true, data: result.data, errors: [], warnings: [] };
   const errors = result.error.issues.map(
     /** Zod의 경로를 공통 문자열 키·숫자 인덱스 경로로 변환한다. */ (issue) =>
       diagnostic(
@@ -347,5 +316,5 @@ export function validateDocument(
         issue.message,
       ),
   );
-  return { success: false, errors, warnings };
+  return { success: false, errors, warnings: [] };
 }

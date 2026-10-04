@@ -2,7 +2,6 @@ id: duplicates-tool
 name: 'codocs_duplicates'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   문서 본문에서 같은 설명이 반복되는 곳을 찾는 [[MCP 도구]]다.
   반복 후보와 원문 위치를 돌려주는 검토 정보이며, 설명을 합치거나 나눌지는 사용자가 판단한다.

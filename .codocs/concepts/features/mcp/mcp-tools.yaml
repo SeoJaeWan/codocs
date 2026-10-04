@@ -2,7 +2,6 @@ id: mcp-tools
 name: 'MCP 도구'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   MCP 도구는 AI가 [[MCP 서버]]를 통해 프로젝트의 문서를 찾고 읽고 수정할 때 호출하는 기능이다.
   AI는 전체 문서를 한 번에 읽지 않고 목록에서 필요한 문서를 골라 읽은 뒤 판단한다.

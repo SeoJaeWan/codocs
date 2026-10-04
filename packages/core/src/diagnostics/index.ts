@@ -63,8 +63,6 @@ export const schemaDiagnosticMessages = {
   blankString: '빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다.',
   /** ID가 소문자·숫자·하이픈 규칙에 맞지 않을 때 사용한다. */
   invalidId: 'ID는 소문자·숫자를 하이픈으로 연결해야 합니다.',
-  /** 이전 ID가 현재 ID와 같을 때 사용한다. */
-  deprecatedAliasMatchesCurrentId: '이전 ID가 현재 ID와 같습니다.',
   /** 업무 스키마에 없는 사용자 속성을 보존하며 경고할 때 사용한다. */
 } as const;
 

@@ -2,7 +2,6 @@ id: reference
 name: '참조'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   참조는 지식 사이를 잇는 링크다. 문서와 문서를 연결해 관련 원문으로 이동하고 되돌아오게 한다.
 

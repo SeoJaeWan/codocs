@@ -20,7 +20,7 @@ let root: string;
 let folder: string;
 let target: string;
 const original =
-  'id: first\nname: First\ndefinition: Original\ndomains: [test]\ndeprecatedAliases: []\n';
+  'id: first\nname: First\ndefinition: Original\ndomains: [test]\n';
 const input = {
   mode: 'update',
   id: 'first',

@@ -347,7 +347,7 @@ describe('detectDuplicates: 고정 사례 회귀', () => {
     expect(result.candidates).toHaveLength(1);
     const [candidate] = result.candidates;
     expect(candidate?.kind).toBe(duplicateMatchKinds.similar);
-    expect(candidate?.a.offsetRange).toEqual({ start: 1581, end: 1640 });
+    expect(candidate?.a.offsetRange).toEqual({ start: 1537, end: 1596 });
     expect(candidate?.b.offsetRange).toEqual({ start: 504, end: 555 });
     expect(candidate?.scores.jaccard).toBeCloseTo(0.6833333333333333, 10);
     expect(candidate?.scores.ordered).toBeCloseTo(0.8727272727272727, 10);

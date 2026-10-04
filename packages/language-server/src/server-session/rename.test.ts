@@ -15,7 +15,7 @@ function document(
   definition: string,
   domain = 'test',
 ) {
-  return `id: ${id}\nname: ${name}\ndomains: [${domain}]\ndefinition: ${definition}\ndeprecatedAliases: []\n`;
+  return `id: ${id}\nname: ${name}\ndomains: [${domain}]\ndefinition: ${definition}\n`;
 }
 
 /** 프로젝트 상대 경로의 file URI를 만든다. */

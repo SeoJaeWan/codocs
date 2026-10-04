@@ -2,7 +2,6 @@ id: guide-tool
 name: 'codocs_guide'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   문서 형식과 작성·수정 방법 안내를 읽는 [[MCP 도구]]다.
   사용자 가이드와 같은 원문을 Markdown으로 돌려주며, 서버와 함께 배포된 원문을 읽으므로 색인이 준비 중이거나 실패한 상태에서도 기다리지 않고 안내한다.

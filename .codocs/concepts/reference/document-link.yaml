@@ -2,7 +2,6 @@ id: document-link
 name: '문서 참조'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   문서 본문에서 `\[[이름]]`으로 다른 문서를 가리키는 [[참조]]다.
   설명에 필요한 다른 문서를 연결하며, 편집기에서는 클릭해 대상 문서로 이동한다.

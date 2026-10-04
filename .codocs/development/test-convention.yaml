@@ -2,7 +2,6 @@ id: test-convention
 name: '테스트 컨벤션'
 domains:
   - '개발'
-deprecatedAliases: []
 definition: |
   이 저장소의 테스트 종류와 실행 위치, 테스트를 작성하는 규칙이다.
   기능 테스트는 .codocs에 정의한 명세를 기준으로 구현이 그 계약을 지키는지 확인하는 것이 기본이다.

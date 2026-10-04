@@ -10,7 +10,7 @@ let root: string;
 let session: LanguageServerSession;
 let sourceUri: string;
 const targetText =
-  'id: target\nname: 대상\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 원래 본문\n';
+  'id: target\nname: 대상\ndomains: [업무]\ndefinition: 원래 본문\n';
 
 beforeEach(async () => {
   await mkdir('.workbench/fixtures', { recursive: true });
@@ -34,7 +34,7 @@ afterEach(async () => {
 describe('live YAML과 디스크 대상의 연결', () => {
   it('편집 뒤 native 대상 이름·경로를 바꾸고 이전 선택을 거부하며 새 본문 선택만 확인한다', async () => {
     const source =
-      'id: source\nname: Source\ndefinition: "[[Old]]"\ndomains: [업무]\ndeprecatedAliases: []\n';
+      'id: source\nname: Source\ndefinition: "[[Old]]"\ndomains: [업무]\n';
     await writeFile(path.join(root, '.codocs/source.yaml'), source);
     await writeFile(
       path.join(root, '.codocs/대상 문서.yaml'),
@@ -42,7 +42,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
     );
     await writeFile(
       path.join(root, '.codocs/direct [이름] %.yaml'),
-      'id: direct\nname: "Direct <name>"\ndefinition: Direct body\ndomains: [업무]\ndeprecatedAliases: []\n',
+      'id: direct\nname: "Direct <name>"\ndefinition: Direct body\ndomains: [업무]\n',
     );
     await session.refreshWorkspaces();
     const capture = vi.spyOn(SourceSelections.prototype, 'capture');
@@ -86,7 +86,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
   it('열린 대상 문서의 저장하지 않은 이름은 출처 참조의 대상 판단에 쓰지 않는다', async () => {
     const source =
-      'id: source\nname: Source\ndefinition: "[[대상]]"\ndomains: [업무]\ndeprecatedAliases: []\n';
+      'id: source\nname: Source\ndefinition: "[[대상]]"\ndomains: [업무]\n';
     await writeFile(path.join(root, '.codocs/source.yaml'), source);
     await session.refreshWorkspaces();
     session.openDocument({
@@ -143,7 +143,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
   it('대상 문서의 이름을 저장해 색인이 갱신되면 열린 문서의 참조를 다시 판단한다', async () => {
     const source =
-      'id: source\nname: 출처\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: "[[대상]]"\n';
+      'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n';
     session.openDocument({
       textDocument: {
         uri: sourceUri,
@@ -170,7 +170,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
         uri: sourceUri,
         version: 1,
         languageId: 'yaml',
-        text: 'id: source\nname: 출처\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: "[[대상]]"\n',
+        text: 'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n',
       },
     });
     await session.documentDiagnostics(sourceUri);
@@ -217,7 +217,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
         uri,
         version: 1,
         languageId: 'yaml',
-        text: 'id: source\nname: 출처\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: "[[대상]]"\n',
+        text: 'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n',
       },
     });
     const links = await session.documentLinks(uri);

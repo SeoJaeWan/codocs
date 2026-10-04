@@ -54,7 +54,7 @@ describe('최초 조회와 실제 파일 감시 연결', () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
     await writeFile(
       target,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 이전\n',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n',
     );
     const watchers: WorkspaceWatcher[] = [];
     const originalStart = Object.getOwnPropertyDescriptor(
@@ -73,7 +73,7 @@ describe('최초 조회와 실제 파일 감시 연결', () => {
       expect(start).toHaveBeenCalledOnce();
       await writeFile(
         target,
-        'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 최신\n',
+        'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 최신\n',
       );
       await vi.waitFor(
         () => expect(watchers[0]?.hasPendingChanges).toBe(true),
@@ -89,7 +89,7 @@ describe('최초 조회와 실제 파일 감시 연결', () => {
       references.push(
         active.references({
           sourcePath: '.codocs/source.yaml',
-          text: 'id: source\nname: source\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: "[[alpha]]"\n',
+          text: 'id: source\nname: source\ndomains: [업무]\ndefinition: "[[alpha]]"\n',
           documentVersion: 1,
         }),
       );
@@ -113,7 +113,7 @@ describe('최초 조회와 실제 파일 감시 연결', () => {
             document: { definition: '최신' },
             revision: createHash('sha256')
               .update(
-                'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 최신\n',
+                'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 최신\n',
               )
               .digest('hex'),
           },
@@ -141,7 +141,7 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
       await mkdir(directory);
       await writeFile(
         target,
-        'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 이전\n',
+        'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n',
       );
       const events: string[] = [];
       const start = Object.getOwnPropertyDescriptor(
@@ -161,14 +161,14 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
         if (operation === '추가')
           await writeFile(
             path.join(directory, 'beta.yaml'),
-            'id: beta\nname: beta\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 추가\n',
+            'id: beta\nname: beta\ndomains: [업무]\ndefinition: 추가\n',
           );
         else if (operation === '삭제') await rm(target);
         else if (operation === '교체 저장') {
           const temporary = path.join(project, 'temporary.yaml');
           await writeFile(
             temporary,
-            'id: beta\nname: beta\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 교체\n',
+            'id: beta\nname: beta\ndomains: [업무]\ndefinition: 교체\n',
           );
           await rename(temporary, target);
         } else if (operation === '폴더 이동') await rename(directory, moved);
@@ -179,7 +179,7 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
           await mkdir(directory);
           await writeFile(
             path.join(directory, 'beta.yaml'),
-            'id: beta\nname: beta\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 재생성\n',
+            'id: beta\nname: beta\ndomains: [업무]\ndefinition: 재생성\n',
           );
         }
         await vi.waitFor(
@@ -226,7 +226,7 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
     await mkdir(codocs);
     await writeFile(
       path.join(codocs, 'alpha.yaml'),
-      'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 생성\n',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 생성\n',
     );
     await vi.waitFor(
       async () =>
@@ -276,7 +276,7 @@ describe('최초 읽기 중 감시 실패 상태의 전달', () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
     await writeFile(
       target,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
     );
     boundary.afterRead = async (file) => {
       if (file !== target) return;

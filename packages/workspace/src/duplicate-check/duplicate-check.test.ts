@@ -72,7 +72,7 @@ async function file(name: string, raw: string): Promise<string> {
 
 /** definition 하나만 가진 유효한 문서 원문이다. */
 function raw(id: string, definition: string): string {
-  return `id: ${id}\nname: 문서 ${id}\ndomains: [업무]\ndefinition: ${JSON.stringify(definition)}\ndeprecatedAliases: []\n`;
+  return `id: ${id}\nname: 문서 ${id}\ndomains: [업무]\ndefinition: ${JSON.stringify(definition)}\n`;
 }
 
 /** success가 true인 응답만 통과시킨다. */
@@ -163,7 +163,7 @@ describe('WorkspaceQuerySession.duplicates: 전체 검사', () => {
   it('한 문서의 definition과 examples가 같은 문장을 가지면 문서 내부 반복 후보를 반환한다', async () => {
     await file(
       'alpha.yaml',
-      `id: alpha\nname: 문서 alpha\ndomains: [업무]\ndefinition: ${JSON.stringify(repeated)}\nexamples:\n  - ${JSON.stringify(repeated)}\ndeprecatedAliases: []\n`,
+      `id: alpha\nname: 문서 alpha\ndomains: [업무]\ndefinition: ${JSON.stringify(repeated)}\nexamples:\n  - ${JSON.stringify(repeated)}\n`,
     );
 
     const result = succeeded(await session().duplicates());
