@@ -25,7 +25,6 @@ definition: |
 
   - Ubuntu: typecheck·lint·Prettier 검사를 단계별로 한 번 실행하고, 배포 파일(tgz·VSIX)을 한 번 조립해 다음 job에 넘긴다.
   - Windows·macOS: build·test, 배포 파일 검증, 넘겨받은 VSIX를 설치한 UI 테스트를 각각 실행한다. 경로·파일 교체·링크·프로세스처럼 OS마다 결과가 다른 계약이 있어 두 OS 모두에서 실행한다.
-  - Windows·macOS: [[직접 실행하기]]의 dev:vscode·dev:mcp가 각 OS의 셸에서 경로를 해석해 도구를 시작하는지 확인한다. 사람이 쓰는 스크립트가 한 OS에서만 깨지는 것을 병합 전에 막기 위해서이며, 창 조작과 기능 동작은 확인하지 않는다.
 
   Draft PR에서는 제품 검사 job을 실행하지 않아 러너를 쓰지 않는다. 필수 검사 required-ci만 짧게 실행해 실패로 끝낸다. main 병합을 받아 Draft Version PR을 갱신하는 Action의 작업도 제품 검사와 구분한다.
   GitHub Actions는 Draft 여부로 실행 생성을 막지 못하므로 Draft에서 생긴 실행도 만들어지지만, 제품 검사를 생략하고 required-ci를 실패로 끝낸다. 이 실행은 PR의 취소 범위에서 분리해 늦게 도착해도 진행 중인 리뷰 준비 실행을 취소하지 않는다. Draft에서 push한 변경은 이후 리뷰 준비 전환의 실행이 검사한다.
