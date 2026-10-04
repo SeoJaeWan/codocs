@@ -5,8 +5,11 @@
 | `build/build.mjs`     | 빌드·번들·타입 검사                         |
 | `test/runtime/`       | 최종 CI 후보 준비·실제 읽기 제한 fixture    |
 | `test/support/`       | 여러 패키지 테스트가 공유하는 보조 코드     |
+| `dev/`                | 직접 실행용 개발용 VS Code 창 실행기        |
 | `toolchain.mjs`       | 저장소 루트와 고정 Node·pnpm 실행 환경 확인 |
 | `development-checks/` | 자체 ESLint 규칙과 인접 회귀 검사           |
+
+`pnpm dev:vscode`·`pnpm dev:mcp`는 사람이 직접 실행하는 진입점이며 CI와 커밋 훅은 실행하지 않는다. 사용법은 `.codocs`의 「직접 실행하기」를 따른다. `dev/open-vscode.mjs`는 `dev:vscode`가 개발용 확장·사용자 데이터 경로를 절대 경로로 바꿔 VS Code CLI(`code`)에 넘기는 일만 한다.
 
 각 도구의 테스트는 구현과 같은 폴더에 둔다. 패키지 전용 보조 코드와 mock은 해당 패키지의 `test-support`에서 관리한다.
 
