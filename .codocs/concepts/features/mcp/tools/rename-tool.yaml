@@ -12,7 +12,7 @@ definition: |
 
   모든 mode가 받는 값은 다음과 같다.
   - mode: preview 또는 apply.
-  - id: 이름을 바꿀 문서의 현재 ID. 이전 ID는 받지 않는다.
+  - id: 이름을 바꿀 문서의 현재 ID.
   - newName: 새 이름.
   - selections: 모호한 참조의 대상을 고르는 목록. 생략할 수 있다.
 

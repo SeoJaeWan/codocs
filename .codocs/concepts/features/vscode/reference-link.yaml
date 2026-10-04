@@ -18,7 +18,7 @@ definition: |
 
   ## 후보의 표시 이름
 
-  [[코드 호버]]나 참조 링크에서 이름이 같은 후보가 여러 개면 도메인과 .codocs 기준 상대 경로를 함께 보여준다. 예를 들어 `예약 — 결제 · payment/reservation.yaml`과 `예약 — 배송 · shipping/reservation.yaml`처럼 표시한다.
+  참조 링크에서 이름이 같은 후보가 여러 개면 도메인과 .codocs 기준 상대 경로를 함께 보여준다. 예를 들어 `예약 — 결제 · payment/reservation.yaml`과 `예약 — 배송 · shipping/reservation.yaml`처럼 표시한다.
   이름이 겹치지 않으면 이름만 보여주며, 표시에 쓴 도메인이나 경로를 후보의 우선순위로 쓰지 않는다.
 
   ## 누를 때의 확인
