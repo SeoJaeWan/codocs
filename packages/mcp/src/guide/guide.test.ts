@@ -6,10 +6,7 @@ import { createCodocsGuideHandler, guideTopics } from './index.js';
 
 const assets = pathToFileURL(path.resolve('docs/guide') + path.sep);
 
-// @codocs [[MCP:사용 가이드]]
 describe('createCodocsGuideHandler', () => {
-  // @codocs [[MCP:사용 가이드]]#L10
-  // @codocs [[MCP:사용 가이드]]#L16
   it('주제를 생략하면 overview 원문과 여섯 주제를 반환한다', async () => {
     const guide = createCodocsGuideHandler(assets);
     const result = await guide();
@@ -65,7 +62,6 @@ describe('createCodocsGuideHandler', () => {
     });
   });
 
-  // @codocs [[MCP:사용 가이드]]#L11
   it('배포 원문 파일이 없으면 파일 접근 실패를 반환한다', async () => {
     await mkdir('.workbench', { recursive: true });
     const directory = await mkdtemp(path.resolve('.workbench/guide-missing-'));

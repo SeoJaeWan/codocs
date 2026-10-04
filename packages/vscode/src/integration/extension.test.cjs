@@ -48,12 +48,29 @@ function codeAnchors(hover, name = '') {
   );
 }
 
-// @codocs [[VS Code:VS Code]]
+/** 화면의 name 값을 실제 마우스로 눌러 커서를 두고 F2로 새 이름을 입력해 확정한다. */
+async function startRename(c, name, newName) {
+  await c.driver.clickText(name);
+  // 실제 클릭이 반영된 편집기 커서가 name 행에 놓일 때까지 기다린다.
+  await c.until(
+    () => c.vscode.window.activeTextEditor?.selection.start.line === 1,
+    'cursor placed on the name value',
+  );
+  await c.driver.key('F2', 'F2', 113);
+  // 시작 위치 확인이 끝나 입력 창이 포커스를 받은 뒤에만 입력한다.
+  await c.until(
+    () => c.driver.isFocused('.rename-box'),
+    'rename input focused',
+  );
+  await c.driver.insertText(newName);
+  await c.driver.key('Enter', 'Enter', 13);
+}
+
 module.exports.scenarios = [
   {
     id: 'hover-content-and-relations',
     /** 실제 코드 Hover의 본문·관계 앵커를 관측하고 각각 클릭한다.
-     * @codocs [[VS Code:원문 열기]]#L11 */
+     * */
     async run(c) {
       for (const [label, target] of [
         ['원문 열기', zone],
@@ -80,7 +97,7 @@ module.exports.scenarios = [
   {
     id: 'yaml-single-special-path',
     /** 특수 출처·대상 경로의 YAML 링크를 OS 수정 키 클릭으로 연다.
-     * @codocs [[VS Code:원문 열기]]#L18 */
+     * */
     async run(c) {
       await c.open(source);
       const hover = await c.driver.hover('[[Zone]]', 'Zone', 0, {
@@ -102,7 +119,7 @@ module.exports.scenarios = [
   {
     id: 'yaml-multiple-candidates',
     /** 복수 후보를 모두 표시하고 선택한 앵커의 파일만 연다.
-     * @codocs [[VS Code:원문 열기]]#L20 */
+     * */
     async run(c) {
       for (const candidate of ['a', 'b']) {
         await c.open('.codocs/ambiguous.yaml');
@@ -117,8 +134,7 @@ module.exports.scenarios = [
   {
     id: 'dirty-target-tab',
     /** 기존 미저장 대상의 내용·탭을 보존하며 상단으로 이동한다.
-     * @codocs [[VS Code:원문 열기]]#L25-L26
-     * @codocs [[VS Code:원문 열기]]#L29-L30 */
+     * */
     async run(c) {
       const document = await c.open(zone);
       const disk = await c.fs.readFile(document.uri.fsPath, 'utf8');
@@ -147,12 +163,6 @@ module.exports.scenarios = [
     /** 참조 편집과 저장 뒤 새 Hover·링크·진단을 관측한다. */
     async run(c) {
       const document = await c.open('.codocs/old-source.yaml');
-      await c.until(
-        () =>
-          c.diagnostics('.codocs/old-source.yaml', 'deprecated_reference')
-            .length === 1,
-        'deprecated warning',
-      );
       await c.driver.hover('[[Old]]', 'Old', 0, {
         providerLabel: 'Old',
         nativeLabel: '원문 열기: Old (.codocs/old.yaml)',
@@ -160,12 +170,6 @@ module.exports.scenarios = [
       await c.replace(
         document,
         document.getText().replace('[[Old]]', '[[Direct]]'),
-      );
-      await c.until(
-        () =>
-          c.diagnostics('.codocs/old-source.yaml', 'deprecated_reference')
-            .length === 0,
-        'changed-reference warning cleared',
       );
       await c.driver.hover('[[Direct]]', 'Direct', 0, {
         providerLabel: 'Direct',
@@ -207,7 +211,7 @@ module.exports.scenarios = [
       await c.until(() => c.tabs(zone).length === 0, 'saved target tab closed');
       await c.fs.writeFile(
         document.uri.fsPath,
-        'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\n',
+        'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       await c.driver.hover('zone', 'External body');
       await c.driver.clickAnchor('원문 열기');
@@ -231,12 +235,12 @@ module.exports.scenarios = [
       ).href;
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: zone\nname: Zone\ndefinition: Changed after display [[Old]]\ndomains: [test]\n',
+        'id: zone\nname: Zone\ndefinition: Changed after display [[Unknown Target]]\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       // 새 저장 원문의 실제 진단 게시로 완료 snapshot을 관측한다.
       // 기존 Hover와 href는 유지하며 제품 조회·명시 refresh는 호출하지 않는다.
       await c.until(
-        () => c.diagnostics(zone, 'deprecated_reference').length === 1,
+        () => c.diagnostics(zone, 'reference_not_found').length === 1,
         'changed target completed snapshot',
       );
       await c.driver.clickAnchor('원문 열기', href);
@@ -258,7 +262,7 @@ module.exports.scenarios = [
       const beforeOutput = await c.output();
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\n',
+        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       await c.driver.clickAnchor('원문 열기', href);
       await c.until(
@@ -284,7 +288,7 @@ module.exports.scenarios = [
   {
     id: 'nested-workspace-owner',
     /** 같은 ID라도 가장 가까운 workspace의 표시 내용·링크만 사용한다.
-     * @codocs [[VS Code:언어 서버 연결]]#L20 */
+     * */
     async run(c) {
       await c.open('nested/source.java');
       const hover = await c.driver.hover('zone', 'Nested workspace body');
@@ -297,7 +301,7 @@ module.exports.scenarios = [
   {
     id: 'explicit-link-open',
     /** 코드의 명시 링크 셋을 OS 수정 키 클릭으로 열어 상단·행·범위 선택을 관측한다.
-     * @codocs [[VS Code:원문 열기]]#L25-L27 */
+     * */
     async run(c) {
       const text = await c.fs.readFile(c.uri(navigation).fsPath, 'utf8');
       await c.open('navigation/explicit-whole.java');
@@ -325,7 +329,7 @@ module.exports.scenarios = [
   {
     id: 'explicit-link-dirty-target',
     /** 미저장 행이 삽입된 대상에서 저장 행 번호가 아닌 현재 원문의 11·12행을 선택한다.
-     * @codocs [[VS Code:원문 열기]]#L35-L38 */
+     * */
     async run(c) {
       const document = await c.open(dirtyNavigation);
       const disk = await c.fs.readFile(document.uri.fsPath, 'utf8');
@@ -414,7 +418,7 @@ module.exports.scenarios = [
       );
       await c.create(
         recoveredNavigation,
-        'id: recovered-nav-target\nname: Recovered Nav Target\ndefinition: Recovered body\ndomains: [test]\n',
+        'id: recovered-nav-target\nname: Recovered Nav Target\ndefinition: Recovered body\ndomains: [test]\ndeprecatedAliases: []\n',
       );
       await c.until(
         () =>
@@ -440,8 +444,7 @@ module.exports.scenarios = [
   {
     id: 'explicit-link-rejected',
     /** 미저장 대상에서 끝 행을 지운 뒤 클릭하면 Output에 실패만 남고 편집기·탭이 유지된다.
-     * @codocs [[VS Code:원문 열기]]#L37
-     * @codocs [[VS Code:원문 열기]]#L21 */
+     * */
     async run(c) {
       const document = await c.open(rejectedNavigation);
       const disk = await c.fs.readFile(document.uri.fsPath, 'utf8');
@@ -485,7 +488,7 @@ module.exports.scenarios = [
   {
     id: 'reverse-single-direct',
     /** 코드 하나가 연결한 YAML 행을 수정 키로 클릭하면 코드의 @codocs 표기가 선택된다.
-     * @codocs [[VS Code:원문 열기]]#L40 */
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-single.yaml';
       const code = 'navigation/reverse-single.java';
@@ -508,7 +511,7 @@ module.exports.scenarios = [
   {
     id: 'reverse-folder-recreate',
     /** 범위 안 폴더를 지웠다 다시 만들어도 연결된 코드 수집이 완료로 돌아오고 이후 편집이 반영된다.
-     * @codocs [[VS Code:원문 열기]]#L40 */
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-recreate.yaml';
       const folder = 'navigation/recreate';
@@ -530,7 +533,7 @@ module.exports.scenarios = [
   {
     id: 'reverse-multiple-hover',
     /** 구현·테스트 두 연결을 Hover의 위치별 앵커로 각각 클릭해 해당 표기를 선택한다.
-     * @codocs [[Language Server:IDE 지원]]#L29 */
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-multiple.yaml';
       for (const [label, code] of [
@@ -558,7 +561,7 @@ module.exports.scenarios = [
   {
     id: 'reverse-overlap-yaml-link',
     /** 이름 링크와 겹친 행은 YAML 링크가 문서를 열고 코드 연결은 Hover 앵커로만 연다.
-     * @codocs [[Language Server:IDE 지원]]#L35 */
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-overlap.yaml';
       const code = 'navigation/reverse-overlap.java';
@@ -585,8 +588,7 @@ module.exports.scenarios = [
   {
     id: 'whole-single-gesture',
     /** 문서 전체 코드 하나는 상단 Inlay label을 수정 키로 클릭해 표기를 선택한다.
-     * @codocs [[Language Server:IDE 지원]]#L43
-     * @codocs [[Language Server:IDE 지원]]#L46 */
+     * */
     async run(c) {
       const code = 'navigation/whole-single.java';
       await c.open('.codocs/whole-single.yaml');
@@ -602,7 +604,7 @@ module.exports.scenarios = [
   {
     id: 'whole-multiple-hover',
     /** 문서 전체 코드 둘은 Inlay label Hover의 앵커로 고른 표기를 선택한다.
-     * @codocs [[Language Server:IDE 지원]]#L43 */
+     * */
     async run(c) {
       const code = 'navigation/whole-multiple-test.java';
       await c.open('.codocs/whole-multiple.yaml');
@@ -618,6 +620,58 @@ module.exports.scenarios = [
         await markerSelection(c, code, '@codocs [[Whole Multiple]]'),
         'whole multiple marker selected',
       );
+    },
+  },
+  {
+    id: 'rename-ambiguous-reference-picker',
+    /** name 값에서 F2로 새 이름을 입력하고 선택 목록에서 모호한 참조의 대상을 골라 디스크에 반영한다. */
+    async run(c) {
+      const target = '.codocs/rename-twin-a.yaml';
+      const reference = '.codocs/rename-twin-ref.yaml';
+      const other = '.codocs/rename-twin-b.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const otherBefore = await read(other);
+      await c.open(target);
+      await startRename(c, 'Rename Twin', 'Rename Twin Renamed');
+      await c.driver.chooseQuickInput('alpha');
+      await c.until(
+        async () =>
+          (await read(reference)).includes('[[Rename Twin Renamed]]') &&
+          (await read(target)).includes('name: Rename Twin Renamed'),
+        'rename written to disk',
+      );
+      c.assert.equal(await read(other), otherBefore);
+      await c.until(
+        async () =>
+          (await c.driver.workbenchState()).notifications.some((text) =>
+            text.includes('바꿨습니다'),
+          ),
+        'rename result notification',
+      );
+    },
+  },
+  {
+    id: 'rename-dirty-file-abort',
+    /** 영향받는 파일에 미저장 수정이 있으면 F2 이름 입력 뒤 중단 안내가 보이고 어느 파일도 바뀌지 않는다. */
+    async run(c) {
+      const target = '.codocs/rename-target.yaml';
+      const reference = '.codocs/rename-ref.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const targetBefore = await read(target);
+      const referenceBefore = await read(reference);
+      const dirty = await c.open(reference);
+      await c.replace(dirty, referenceBefore + '# unsaved\n');
+      await c.open(target);
+      await startRename(c, 'Rename Target', 'Rename Target Renamed');
+      await c.until(
+        () => c.driver.hasText('저장하지 않은 수정이 있는 파일'),
+        'dirty file abort message',
+      );
+      c.assert.equal(await read(target), targetBefore);
+      c.assert.equal(await read(reference), referenceBefore);
+      c.assert.ok(dirty.isDirty);
     },
   },
 ];

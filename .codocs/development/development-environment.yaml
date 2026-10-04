@@ -2,85 +2,38 @@ id: development-environment
 name: '개발 환경'
 domains:
   - '개발'
+deprecatedAliases: []
 definition: |
-  ## 도구와 확인 방법
+  이 저장소를 개발하는 데 쓰는 도구·스크립트·실행 런타임·빌드 산출물이다.
+  검사가 실행되는 시점과 병합 조건은 [[검사와 병합]], 배포 파일을 만들고 게시하는 흐름은 [[배포]]에서 정한다.
 
-  pnpm workspaces로 내부 패키지를 관리한다.
-  Vitest는 동작 테스트, tsc는 타입 검사, ESLint·typescript-eslint·eslint-plugin-jsdoc·eslint-plugin-check-file은 규칙 검사, Prettier는 서식을 담당한다.
+  ## 도구와 스크립트
 
-  Vitest는 TypeScript 설정과 선택 실행의 편의성으로 선정했으며 Jest 대비 보편적인 속도 우위를 약속하지 않는다.
-  pnpm test는 코드 옆의 제품 로직·IO·프로토콜·자체 도구 테스트를 표준 러너로 실행한다. 자체 수집기 대신 러너의 설정과 선택 기능을 사용한다.
-  package.json 스크립트는 사람이 직접 실행하는 진입점만 둔다. prepare·build·typecheck·lint·format·test·test:vscode·changeset·release:pack·release:verify로 구성하며, 여러 검사를 묶는 check류 스크립트나 CI 전용 조합 스크립트는 두지 않는다. 빠른 검사는 커밋 훅이, 전체 검사는 PR CI가 담당한다.
-  각 패키지의 package.json에는 스크립트를 두지 않는다. 타입 검사와 빌드는 루트 pnpm typecheck·pnpm build가 패키지 의존 순서에 따라 선언 파일부터 만들어 처리한다. 패키지 단위로 실행하면 이전에 빌드한 선언 파일로 검사하여 다른 패키지의 변경을 놓칠 수 있다.
-  서식 검사는 CI에서 prettier . --check로 파일을 수정하지 않고 확인한다. 별도 format:check 스크립트를 두지 않으며 pnpm format은 서식을 수정한다. 별도 개발 규칙 검사와 비공개 내부 패키지 소비 검사는 두지 않는다. 게시 단계는 [[배포]]에 따라 package.json 스크립트로 두지 않는다.
-  pnpm test:vscode는 GitHub Actions의 실제 VS Code UI 검사 진입점으로 사용한다. 설치한 VSIX의 활성화·서버 연결 API 확인과 실제 Hover·링크 클릭 검사의 역할은 [[테스트 컨벤션]]에서 정한다. 로컬 자동 실행은 지원하지 않으며 수동 개발은 [[VS Code에서 직접 실행하기]]를 따른다.
-  CI의 VS Code 검사 버전은 workflow에 정확한 버전으로 고정하고 Windows·macOS job이 같은 버전을 사용한다. 검사 버전은 PR로 변경한다. 최소 버전의 별도 실행과 의도한 실패·시간 초과·취소의 lifecycle 시험은 두지 않는다.
-  CI job마다 다운로드·프로필·확장·작업 공간 경로를 격리하고 준비를 순서대로 실행한다. 공식 VS Code 도구의 다운로드·실행 파일·CLI 경로 helper를 우선 사용하며 자체 공유 캐시·잠금·복구·전체 트리 지문을 유지하지 않는다. 실제 실행 실패·시간 제한·취소·정리·증거 수집에 필요한 최소 기능은 유지한다.
-  벤치마크와 성능 모드·측정 계측·전용 도구는 [[테스트 컨벤션]]의 제거 범위를 따른다.
+  pnpm workspaces로 내부 패키지를 관리한다. Vitest는 동작 테스트, tsc는 타입 검사, ESLint는 규칙 검사([[코드 컨벤션]]), Prettier는 서식을 맡는다.
+  Vitest는 TypeScript 설정과 선택 실행이 편해서 골랐으며 Jest보다 빠르다는 보장은 하지 않는다.
 
-  ## PR 검사와 병합 기준
+  package.json 스크립트는 사람이 직접 실행하는 진입점만 둔다.
 
-  기능·수정 PR은 main을 대상으로 한다. 별도 통합 브랜치를 두지 않으며 출시 시점은 [[배포]]의 Version PR 병합으로 정한다. 기능 PR과 Version PR 모두 아래 검사와 병합 기준을 적용한다.
+  - prepare·build·typecheck·lint·format·test: 개발과 검사
+  - test:vscode: CI의 실제 VS Code UI 테스트 진입점. 로컬 자동 실행은 지원하지 않으며 직접 확인은 [[직접 실행하기]]를 따른다.
+  - dev:vscode·dev:mcp: 빌드한 뒤 개발용 VS Code 창과 MCP Inspector를 연다. 파일 변경을 감시하지 않으며 사용법은 [[직접 실행하기]]를 따른다.
+  - changeset·release:pack·release:verify: 변경 기록과 배포 파일 조립·검증([[배포]])
 
-  Draft PR은 제품 검사를 생략한다. 정적 검사·패키징·양 OS 검사 job은 Draft가 아닐 때만 실행하여 러너를 사용하지 않는다. 필수 검사인 required-ci만 Draft에서도 짧게 실행하여 실패로 끝나며, 그 밖의 결과 집계만을 위한 러너는 시작하지 않는다.
-  main 병합을 받아 Draft Version PR을 갱신하는 Action의 관리 작업은 제품 검사와 구분한다. 이 작업을 이유로 Draft PR의 검사 러너를 시작하지 않는다.
-  리뷰 준비 PR은 문서 변경을 포함해 변경 경로와 관계없이 동일한 전체 CI를 실행한다. 경로별 검사 선택이나 생략 규칙을 두지 않는다.
-  타입·린트·서식은 Ubuntu에서 한 번, 단계별로 나누어 검사한다. 빌드·코드 옆의 OS 동작 검사·최종 MCP와 VSIX 설치 확인·실제 VS Code UI 검사는 Windows·macOS에서 수행한다. 코드 옆 테스트에는 경로·파일 교체·링크·프로세스처럼 OS별로 결과가 다른 계약이 있으므로 양 OS에서 모두 실행한다. UI 검사는 workflow에 고정한 같은 VS Code 버전을 사용하고 실제 실행 종료 때 자원을 정리한다.
-  커밋 훅의 통과 여부로 PR CI를 생략하지 않는다. 커밋 훅은 우회될 수 있고 스테이징 파일과 현재 OS만 검사하므로 PR CI가 최종 확인을 맡는다.
+  여러 검사를 묶는 check류 스크립트나 CI 전용 조합 스크립트는 두지 않는다. 빠른 검사는 커밋 훅이, 전체 검사는 PR CI가 맡는다([[검사와 병합]]). 게시 단계는 로컬의 실수 게시를 막기 위해 스크립트로 두지 않는다.
+  각 패키지의 package.json에는 스크립트를 두지 않는다. 타입 검사와 빌드는 루트의 pnpm typecheck·pnpm build가 패키지 의존 순서대로 선언 파일부터 만들어 처리한다. 패키지 단위로 실행하면 이전에 빌드한 선언 파일로 검사해 다른 패키지의 변경을 놓칠 수 있기 때문이다.
+  pnpm format은 서식을 고치고, CI는 `prettier . --check`로 파일을 바꾸지 않고 확인한다.
 
-  PR CI는 PR 열기·추가 push·다시 열기·리뷰 준비 전환에서 시작하며 수동 실행도 지원한다. 같은 PR의 추가 push는 진행 중인 이전 실행을 취소하고 최신 변경을 검사한다. 리뷰 준비 전환에서만 시작하면 리뷰 준비 PR의 추가 push와 [[배포]]의 Version PR 갱신을 검사하지 못하므로 추가 push에서도 시작한다.
-  Draft 상태에서 발생한 이벤트의 실행은 PR의 취소 범위에서 분리한다. GitHub Actions는 Draft 여부로 실행 생성 자체를 거르지 못하므로 이 실행도 만들어지지만 제품 검사 job을 생략하고 required-ci를 실패로 끝내며, 이벤트가 리뷰 준비 전환보다 늦게 도착해도 진행 중인 리뷰 준비 실행을 취소하지 않는다. Draft 여부는 이벤트가 발생한 시점의 PR 상태로 판단하며, Draft에서 push한 변경은 이후 리뷰 준비 전환의 실행이 검사한다.
-  Draft 전환이나 PR 닫기에서 진행 중인 실행을 취소하기 위한 별도 이벤트 처리나 실행 이름 규칙은 두지 않는다. 취소 범위는 workflow와 PR을 기준으로 분리하여 다른 PR·배포·수동 실행에 영향을 주지 않는다. 제목·본문·라벨만 바뀌면 제품 검사를 재실행하지 않는다.
-
-  main 변경은 PR로만 반영하며 Rulesets로 최신 main 반영과 required-ci 통과를 병합 조건으로 요구한다. 직접 push와 PR·필수 검사 우회는 관리자와 GitHub App에게도 허용하지 않는다. 사람의 리뷰 승인 횟수는 필수 조건으로 두지 않는다. Rulesets가 없으면 필수 검사 결과가 병합을 막지 못하므로 적용 여부를 실제로 확인한다.
-  병합 방식은 merge commit만 허용하여 PR 브랜치와 작업별 커밋의 이력을 보존한다. squash·rebase 병합은 Rulesets에서 허용하지 않는다.
-  PR CI 통과 뒤 main이 바뀌면 PR을 업데이트하고 같은 CI를 다시 통과해야 한다. 검사 대상이 바뀌지 않았다면 병합 직전 별도 검사를 추가하지 않는다.
-  required-ci는 필요한 job의 실패·취소·예상 밖 생략을 통과로 처리하지 않는다.
-  required-ci는 Draft에서 생략하지 않고 실패로 끝낸다. 조건으로 생략된 job은 필수 검사에서 성공으로 처리되고, 같은 커밋에 실행이 여러 개면 가장 최근에 생성된 실행의 결과로 병합 여부가 정해진다. 따라서 Draft 이벤트의 실행이 리뷰 준비 실행보다 늦게 생성되면 생략된 결과가 검사하지 않았거나 검사에 실패한 커밋의 병합을 허용하게 된다. 이 경우 리뷰 준비 실행이 성공했더라도 병합이 막히며, 리뷰 준비 전환을 다시 하거나 새 커밋을 push하여 새 실행으로 검사한다. 임의의 수동 실행은 리뷰 준비 상태의 필수 검사를 대신하지 않는다.
-  main 병합 후에는 PR CI를 다시 실행하지 않는다. 최신 main 반영을 병합 조건으로 요구하므로 병합 결과는 PR에서 검사한 내용과 같다. main push에서는 [[배포]]의 Version PR 갱신과 게시만 실행한다.
-
-  ## CI 결과와 실행 도구
-
-  CI의 흐름 제어와 결과 집계는 [[배포]]의 흐름 제어 경계에 따라 GitHub Actions 기능으로 처리한다. required-ci는 정적 검사·패키징·양 OS 검사 job의 결과를 needs로 집계하는 workflow job이며, 소스·실행·artifact 식별자나 UI 증거를 자체 스크립트로 대조하지 않는다. UI 검사의 성공은 실행기의 결과로 판단한다.
-  여러 job의 공통 준비인 Node·pnpm 설정과 의존성 설치는 저장소의 composite action으로 공유한다.
-
-  성공한 실행의 결과는 PR의 검사 목록과 Actions 실행에서 확인하며 PR 댓글을 남기지 않는다. 실패하면 같은 workflow의 마지막 job이 실패한 job·단계와 Actions 실행 링크를 PR 댓글 하나로 남긴다. 이후 실행이 성공하면 그 댓글을 해결됨으로 수정하며 삭제하지 않는다. 별도 결과 보고 workflow는 두지 않는다.
-  취소되거나 늦게 끝난 이전 실행이 최신 실행의 결과를 덮어쓰지 않게 한다.
-  성공한 실행의 상세 진단 파일은 별도 업로드하지 않으며 일반 콘솔 로그는 Actions 실행에서 확인한다. 실패한 실행은 원인 분석에 필요한 최소 진단 자료만 보관한다.
-
-  JavaScript Action은 지원되는 Node 24 실행 기반을 사용한다. 프로젝트 Node 버전 선택과 Action 자체의 runs.using 런타임은 별도로 확인한다.
-  Action은 검증한 commit revision으로 고정한다. Action의 manifest나 내부 동작을 자체 테스트로 대조하지 않는다. 배포 workflow의 저장소 설정과 실제 권한 확인은 [[배포]]가 소유하며, 로컬 테스트 통과를 실제 Rulesets 적용 근거로 사용하지 않는다.
-
-  ## 커밋 검사
-
-  커밋 훅은 lint-staged로 스테이징된 파일의 lint·서식을 처리한 다음 pnpm typecheck와 pnpm test를 실행한다. lint-staged만으로 타입 검사와 코드 테스트를 대신하지 않는다.
-  인덱스 복사본 생성·의존성 재설치·전체 린트/빌드 검사를 수행하는 자체 커밋 검사 도구는 두지 않는다. 실제 VS Code UI와 최종 배포 패키지 검사는 커밋 훅에 포함하지 않는다.
-  부분 스테이징·미추적 파일·기존 작업을 보존하며 pnpm typecheck와 pnpm test는 현재 작업 트리에서 실행한다. 이를 Git 인덱스만의 검증으로 표현하지 않는다. 확정된 커밋의 전체 검증은 PR CI에서 수행한다.
-  커밋 훅이나 필수 검사가 실패하면 커밋·병합·푸시를 완료 처리하지 않는다. HUSKY=0, --no-verify, hooksPath 변경 등으로 훅을 우회하거나 작업 트리에서 별도로 통과한 검사로 실패한 훅을 대체하지 않는다. 원인을 수정하고 동일한 스테이징 내용에 대해 훅 전체가 통과한 뒤 진행한다.
-
-  Node에서 도구를 찾을 때는 현재 프로세스가 사용하는 package manager와 manifest의 버전을 기준으로 확인하고, Windows의 .cmd·.ps1 wrapper와 macOS·Linux의 실행 파일 차이를 함께 처리한다.
-  도구를 찾지 못한 경우 기능·회귀 테스트 실패와 구분되는 환경 준비 오류로 기록하며, 도구 탐색 오류를 숨기기 위해 검사를 건너뛰지 않는다.
-  지원 OS별로 같은 검증 명령을 실행해 명령 자체의 호환성을 확인하고, 한 OS에서의 도구 실행 성공을 다른 OS의 검증 결과로 간주하지 않는다.
+  도구를 찾을 때는 현재 프로세스가 쓰는 package manager와 manifest 버전을 기준으로 하고, Windows의 .cmd·.ps1 wrapper와 macOS·Linux 실행 파일의 차이를 함께 처리한다.
+  도구를 찾지 못하면 테스트 실패와 구분되는 환경 준비 오류로 기록하며 검사를 건너뛰어 숨기지 않는다. 한 OS에서 명령이 성공했다고 다른 OS의 결과로 보지 않는다.
 
   ## 실행 런타임
 
-  개발·자동 테스트는 Node.js 24 LTS, 독립 MCP는 24.x로 시작한다.
-  다른 메이저는 검증 후 추가하고 세부 버전을 기록한다.
-
-  [[실행 구조]]의 VS Code 확장과 언어 서버는 VS Code 내장 런타임에 맞춰 빌드한다.
-  Hover 사용에 별도 Node.js 설치를 요구하지 않는 방향이다.
+  개발과 자동 테스트는 Node.js 24 LTS, 독립 MCP는 24.x로 시작한다. 다른 메이저 버전은 검증한 뒤 추가하고 세부 버전을 기록한다.
+  MCP TypeScript SDK의 버전은 Node.js·Zod 조합으로 검증한다.
+  [[VS Code 확장]]과 언어 서버는 VS Code 내장 런타임에 맞춰 빌드하며 호버를 쓰는 데 별도 Node.js 설치를 요구하지 않는다.
 
   ## 빌드 산출물
 
-  core/workspace는 tsc로 JavaScript와 타입 선언, mcp는 tsc로 실행 JavaScript를 만든다.
-  MCP의 CLI 진입점은 `packages/mcp/dist/cli.js`이며 빌드한 JavaScript를 Node로 실행한다.
-  language-server는 의존성과 함께 esbuild로 번들하고 vscode는 CommonJS 번들로 제공한다.
-
-  core/workspace/mcp 결과물은 ESM·NodeNext와 상대 .js import를 사용한다.
-  esbuild가 타입 검사를 대신하지 않는다.
-
-  가이드와 예시도 배포에 포함하며 사용자 환경에서는 TypeScript 즉석 변환 없이 빌드된 JavaScript를 실행한다.
-  정확한 target과 언어 서버 번들 형식·버전 조합은 지원 환경 시험으로 확정한다.
-
-  공개 배포는 내부 tsc 구조를 유지하면서 별도 staging을 조립한다. MCP CLI와 내부 의존성을 Node 24용 ESM 번들로 묶고 dist/runtime/cli.js에 배치하여 가이드의 import.meta.url 상대 경로를 보존한다. VSIX는 기존 CommonJS 확장·언어 서버 번들을 사용하며 별도 시스템 Node 설치가 필요하지 않다.
-  pnpm release:pack과 pnpm release:verify의 산출물·검증 경계는 [[배포]]에서 정의한다. CI의 VS Code 검사는 패키징 job이 만든 같은 VSIX를 설치하여 사용하고 검증 도중 제품을 다시 패키징하지 않는다.
+  core·workspace는 tsc로 JavaScript와 타입 선언을, mcp는 tsc로 실행 JavaScript(`packages/mcp/dist/cli.js`)를 만든다. 결과물은 ESM·NodeNext와 상대 .js import를 사용한다.
+  language-server는 의존성과 함께 esbuild로 번들하고 vscode는 CommonJS 번들로 만든다. esbuild는 타입 검사를 대신하지 않는다.
+  공개 배포 파일의 조립은 [[배포]]에서 정한다.

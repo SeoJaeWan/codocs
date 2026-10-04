@@ -268,7 +268,7 @@ describe('parseYaml과 getStringMapping: YAML 표기별 문자열 위치 연결'
         ).toEqual(['이름']);
     },
   );
-  it('Unicode escape와 작은따옴표가 문자를 생성하면 각 해석 코드 단위에 전체 원문 기여 범위를 제공한다', /** 이모지 두 코드 단위와 escape 대괄호는 실제 escape 구간을 공유한다. @codocs [[문자열 위치 대응]]#L23-L25 */ () => {
+  it('Unicode escape와 작은따옴표가 문자를 생성하면 각 해석 코드 단위에 전체 원문 기여 범위를 제공한다', /** 이모지 두 코드 단위와 escape 대괄호는 실제 escape 구간을 공유한다. */ () => {
     const source =
       String.raw`definition: "\U0001f600 \u005b\u005bA]]"` +
       "\nname: 'it''s'\n";

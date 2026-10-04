@@ -31,7 +31,7 @@ let project: string;
 let codocs: string;
 let outside: string;
 const raw =
-  'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\n';
+  'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\ndeprecatedAliases: []\r\n';
 beforeEach(
   /** 고유한 실제 프로젝트와 외부 폴더를 준비한다. */ async () => {
     fixture = await mkdtemp(path.join(tmpdir(), 'codocs-loader-'));
@@ -175,7 +175,6 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       documents: [],
     });
   });
-  /** @codocs [[작업 공간:문서 탐색]]#L16-L17 @codocs [[작업 공간:탐색 상태]]#L16 @codocs [[작업 공간:작업 공간 진단]]#L15-L16 */
   it('하위 정션은 경고 후 제외하고 일반 문서는 계속 읽는다', async () => {
     await document('ordinary.yaml', raw);
     await writeFile(path.join(outside, 'external.yaml'), raw);
@@ -291,19 +290,35 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       expect(result.documents[0]?.diagnostics[0]?.range).toBeDefined();
     });
   });
-  it('스키마 경고만 있으면 유효 문서와 원래 사용자 속성 좌표를 보존한다', /** 미등록 필드는 성공을 막지 않는다. */ async () => {
-    await document('warning.yaml', raw + 'custom: 보존\r\n');
+  it('사용자 속성만 추가하면 진단 없이 유효 문서로 읽고 값을 보존한다', /** 사용자 속성은 경고하지 않는다. */ async () => {
+    await document('custom.yaml', raw + 'custom: 보존\r\n');
     const result = await loadWorkspace({ cwd: project });
     const item = result.documents[0];
     expect(result.status).toBe('complete');
     expect(item).toMatchObject({
       status: 'valid',
       data: { custom: '보존' },
+      diagnostics: [],
+    });
+  });
+  it('스키마 경고만 있으면 유효 문서와 경고 좌표를 보존한다', /** 현재 ID와 같은 이전 ID 경고는 성공을 막지 않는다. */ async () => {
+    await document(
+      'warning.yaml',
+      raw.replace(
+        'deprecatedAliases: []',
+        'deprecatedAliases:\r\n  - id: shared-term',
+      ),
+    );
+    const result = await loadWorkspace({ cwd: project });
+    const item = result.documents[0];
+    expect(result.status).toBe('complete');
+    expect(item).toMatchObject({
+      status: 'valid',
       diagnostics: [
         {
-          code: 'unknown_field',
+          code: 'invalid_field_value',
           severity: 'warning',
-          range: { start: { line: 4, character: 0 } },
+          range: { start: { line: 5, character: 8 } },
         },
       ],
     });
@@ -353,7 +368,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       ioFailures.clear();
     }
   });
-  it('하위 폴더 열거가 실패하면 누락 범위와 정상 파일을 함께 반환한다', /** 폴더 열거의 EACCES 응답을 주입한다.  @codocs [[작업 공간:탐색 상태]]#L12 @codocs [[작업 공간:불완전한 탐색]]#L11-L13 */ async () => {
+  it('하위 폴더 열거가 실패하면 누락 범위와 정상 파일을 함께 반환한다', /** 폴더 열거의 EACCES 응답을 주입한다. */ async () => {
     await document('restricted/hidden.yaml', raw);
     await document('ok.yaml', raw);
     const folder = path.join(codocs, 'restricted');

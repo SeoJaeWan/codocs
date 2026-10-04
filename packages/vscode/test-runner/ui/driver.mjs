@@ -163,6 +163,34 @@ function textPoint({ text, occurrence }) {
   return null;
 }
 
+/** 열린 선택 목록의 보이는 항목 문구와 클릭 좌표를 읽는다. */
+function quickInputRows() {
+  const widget = [...document.querySelectorAll('.quick-input-widget')].find(
+    /** 실제로 표시된 선택 목록만 고른다. */ (node) => {
+      const rect = node.getBoundingClientRect();
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        getComputedStyle(node).display !== 'none'
+      );
+    },
+  );
+  if (!widget) return null;
+  return [...widget.querySelectorAll('.monaco-list-row')]
+    .map(
+      /** 항목의 문구와 클릭 좌표를 읽는다. */ (row) => {
+        const rect = row.getBoundingClientRect();
+        return {
+          text: row.innerText.replace(/\s+/gu, ' ').trim(),
+          x: rect.x + rect.width / 2,
+          y: rect.y + rect.height / 2,
+          visible: rect.width > 0 && rect.height > 0,
+        };
+      },
+    )
+    .filter((row) => row.visible);
+}
+
 /** 실제 표시된 Hover의 본문과 앵커만 읽고 command 인수를 해석하지 않는다. */
 function hoverState() {
   const popup = [...document.querySelectorAll('.monaco-hover')].find(
@@ -300,6 +328,57 @@ export class RendererDriver {
       code,
       windowsVirtualKeyCode,
     });
+  }
+
+  /** 화면의 문자 범위 가운데를 실제 마우스로 눌러 커서를 둔다. */
+  async clickText(text, occurrence = 0) {
+    await this.dismiss();
+    const point = await until(
+      () => this.evaluate(textPoint, { text, occurrence }),
+      `visible text ${text}`,
+    );
+    await this.click(point);
+  }
+
+  /** 포커스된 입력에 실제 문자 입력을 전달한다. */
+  async insertText(text) {
+    await this.command('Input.insertText', { text });
+  }
+
+  /** 선택자에 맞는 요소 안에 키보드 포커스가 있는지 읽는다. */
+  async isFocused(selector) {
+    return this.evaluate(
+      /** 포커스된 요소가 선택자 안에 있는지 관측한다. */ (value) =>
+        !!document.activeElement?.closest(value),
+      selector,
+    );
+  }
+
+  /** 화면에 보이는 문구에 주어진 텍스트가 있는지 읽는다. */
+  async hasText(text) {
+    return this.evaluate(
+      /** 화면 전체의 보이는 문구를 관측한다. */ (value) =>
+        document.body.innerText.includes(value),
+      text,
+    );
+  }
+
+  /** 열린 선택 목록에서 문구가 든 유일한 항목을 실제 마우스로 선택한다. */
+  async chooseQuickInput(text) {
+    const row = await until(
+      /** 선택 목록이 표시되고 항목이 하나로 정해질 때까지 읽는다. */ async () => {
+        const rows = await this.evaluate(quickInputRows);
+        const matches = rows?.filter((item) => item.text.includes(text)) ?? [];
+        if (matches.length > 1)
+          throw new Error(
+            `Expected one quick input row ${text}, got ${matches.length}`,
+          );
+        return matches[0] ?? false;
+      },
+      `quick input row ${text}`,
+    );
+    await this.click(row);
+    return row;
   }
 
   /** 이전 Hover를 닫고 포인터를 편집기 밖으로 옮긴다. */

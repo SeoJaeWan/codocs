@@ -53,7 +53,6 @@ describe('현재 OS 경로와 watcher 이벤트·종료 처리', () => {
     }
   });
 
-  /** @codocs [[작업 공간:작업 공간 파일 감시]]#L27 */
   it('poll 원시 관측의 접근 시간만 바뀌면 재읽기 신호를 만들지 않는다', async () => {
     const watcher = await createWorkspaceWatcher(contract.root);
     const listener = vi.fn();

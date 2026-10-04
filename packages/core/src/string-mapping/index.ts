@@ -1,7 +1,7 @@
 import { CST, isMap, isScalar, isSeq } from 'yaml';
 import type { FieldPath, OffsetRange } from '../diagnostics/index.js';
 
-/** 해석 문자열의 각 UTF-16 코드 단위를 실제 스칼라 원문 구간에 연결한다. AST/CST는 공개하지 않는다. @codocs [[문자열 위치 대응]] */
+/** 해석 문자열의 각 UTF-16 코드 단위를 실제 스칼라 원문 구간에 연결한다. AST/CST는 공개하지 않는다. */
 export interface StringSourceMapping {
   fieldPath: FieldPath;
   value: string;
@@ -286,7 +286,7 @@ function blockScalar(token: CST.BlockScalar): Unit[] {
   }
   return result;
 }
-/** 공개 AST/CST의 문자열 스칼라만 매핑하고 해석값 일치가 확인된 결과만 공개한다. @codocs [[문자열 위치 대응]]#L18-L25 */
+/** 공개 AST/CST의 문자열 스칼라만 매핑하고 해석값 일치가 확인된 결과만 공개한다. */
 export function collectStringMappings(
   value: unknown,
   fieldPath: FieldPath,

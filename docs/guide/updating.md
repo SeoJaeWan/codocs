@@ -1,16 +1,28 @@
-# 문서 수정과 폐기
+# 문서 수정
 
 [전체 순서와 주제](README.md)
 
 ## 내용 갱신과 이름 변경
 
 개발 진행만 바뀌면 문서를 수정하지 않는다. 설명하는 의미·동작·정책이 바뀌면 담당 원문에 합의한 조건·근거·예외를 반영한다.
-원문을 갱신한 뒤 그 내용을 사용하는 문서의 설명과 참조도 확인한다. 내용의 합의·적용 상태는 `status`로 표현하며 개발 진행도와 구분한다.
+원문을 갱신한 뒤 그 내용을 사용하는 문서의 설명과 참조도 확인한다.
 코드에서 특정 문서 행을 참조하는 경우, 변경한 뒤 코드 링크가 의도한 문서 행을 여는지 확인한다.
 
-이름 변경 계산은 대상 이름 필드와 연결된 참조의 변경 후보를 보여준다.
-모호한 참조나 여러 도메인은 사용자의 후보·도메인 선택이 필요할 수 있고, 같은 도메인의 새 이름 충돌은 변경을 차단한다.
-미리보기의 `ready` 상태는 파일 저장 허용을 의미하지 않는다. 저장 기능은 최신 원문, 각 대상의 쓰기 가능 여부와 YAML 따옴표·escape를 다시 확인해야 한다.
+문서의 `name`은 `codocs_write`의 update로 바꾸지 않는다. 다른 이름이면 `name_change_not_allowed`로 저장하지 않고 `codocs_rename`을 안내한다.
+이름 변경은 미리보기와 반영 두 단계다. MCP에서는 `codocs_rename`을 쓰고, VS Code에서는 문서의 `name` 값이나 참조에서 이름 바꾸기(F2)를 쓴다.
+
+1. 먼저 `codocs_rename({"mode":"preview","id":"sample-order","newName":"새 주문"})`로 미리본다. 파일은 바뀌지 않는다.
+2. 응답의 `status`를 확인한다. `ready`는 고칠 내용을 모두 계산했다는 뜻이며 저장해도 된다는 허가가 아니다.
+3. `unresolved`이면 `impacts`에서 `reason`이 `selection_required`나 `domain_required`인 참조의 후보(`before.candidates`)를 사용자에게 보여주고 대상을 고르게 한다.
+   고른 결과는 `selections`에 담아 preview를 다시 요청한다. 항목은 `sourcePath`, `occurrenceIndex`, 고른 후보의 `targetPath`(필요하면 `domain`)이며 preview 응답의 값을 그대로 쓴다.
+   고르지 않은 모호한 참조는 고치지 않고 미해결로 남는다.
+4. `blocked`이면 `blockingReason`을 확인한다. 같은 도메인에 새 이름의 문서가 있거나 프로젝트 탐색이 끝나지 않았거나 선택이 잘못된 경우 등이며, 이 상태에서는 반영할 수 없다.
+5. 반영은 같은 `id`·`newName`·`selections`에 preview 응답의 `revisions`를 고치지 않고 더해 `{"mode":"apply", ...}`로 보낸다. `revisions`가 없으면 `invalid_input`이다.
+
+반영은 미리보기 결과를 보관하지 않고 다시 계산한다. 미리본 뒤 영향받는 파일이 바뀌어 `revision_conflict`가 오거나 영향받는 파일이 달라져 `rename_affected_files_changed`가 오면 아무 파일도 바뀌지 않았으므로 preview부터 다시 한다.
+결과는 파일마다 `files[].state`(`changed`·`restored`·`restore_failed`·`unchanged`)로 알린다. 여러 파일을 한 번에 바꾸는 원자성은 보장하지 않으며, `rename_restore_failed`가 오면 알려준 파일을 직접 확인한다.
+`indexUpdated: false`이면 `codocs_write`와 같이 파일을 다시 저장하지 않고 [색인 복구](validation.md#저장-후-색인-복구)를 따른다.
+VS Code에서는 영향받는 파일에 저장하지 않은 수정이 있으면 시작 전에 중단한다.
 
 명시적인 ID 변경 기능은 직전 ID를 `deprecatedAliases`에 보존하고 새 현재 ID가 이전 목록에 있으면 제거한다.
 같은 이전 ID를 중복 추가하지 않고 작성한 변경 안내를 유지한다. YAML을 직접 편집할 때는 필요한 이전 ID 목록도 직접 관리한다.
@@ -28,7 +40,7 @@ update 요청의 `set`/`unset`으로는 `deprecatedAliases`를 직접 바꿀 수
   "id": "sample-order",
   "revision": "읽은 revision",
   "set": { "definition": "가상 주문의 검토한 새 설명이다." },
-  "unset": ["examples"]
+  "unset": ["reviewNote"]
 }
 ```
 
@@ -56,15 +68,9 @@ revision 값만 바꿔 이전 set을 자동 재적용하지 않는다.
 ## 상호 참조를 처음 만드는 순서
 
 1. `codocs_write({"mode":"create","path":".codocs/a.yaml","document":{"id":"a","name":"가상 A","domains":["연습"],"definition":"가상 A의 의미다."}})`
-2. `codocs_write({"mode":"create","path":".codocs/b.yaml","document":{"id":"b","name":"가상 B","domains":["연습"],"definition":"[[가상 A]]를 사용하는 절차다.","kind":"procedure"}})`
+2. `codocs_write({"mode":"create","path":".codocs/b.yaml","document":{"id":"b","name":"가상 B","domains":["연습"],"definition":"[[가상 A]]를 사용하는 절차다."}})`
 3. `codocs_get({"ids":["a"]})`로 A의 최신 원문과 revision을 읽는다.
 4. 검토한 A 본문에 B를 연결한다: `codocs_write({"mode":"update","id":"a","revision":"A의 최신 revision","set":{"definition":"가상 A의 의미다. 사용 절차는 [[가상 B]]에서 확인한다."}})`
 5. `codocs_validate({})`로 양쪽 참조를 확인한다.
 
 create 경로가 이미 있으면 덮어쓰지 않는다. 실패를 update로 자동 전환하거나 처리 지연 때문에 create를 반복하지 않는다.
-
-## 적용 종료와 보존
-
-적용이 끝난 내용은 `set: {"status":"deprecated"}`로 참고용 상태를 표시할 수 있다.
-폐기 이유와 대체 원문을 본문에 설명하고 참조하는 문서가 계속 연결할 필요가 있는지 검토한다.
-폐기 문서의 연결은 유지되며 참조 위치에 경고를 제공한다. 상태 변경만으로 코드·참조·파일을 자동 삭제하지 않는다.

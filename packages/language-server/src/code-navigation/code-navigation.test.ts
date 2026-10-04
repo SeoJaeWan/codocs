@@ -196,7 +196,6 @@ describe('미완료 단일 출현과 저장 문서 탐색', () => {
     const owner: CodeOwner = { ...ownerBase, session };
     const navigation = new CodeNavigation();
     const hints = await navigation.hints(owner);
-    // @codocs [[IDE 지원]]#L51-L54
     expect((hints[0]!.label as { value: string }[])[0]!.value).toBe(
       '확인된 코드 1곳 · 수집 중',
     );
@@ -330,7 +329,6 @@ describe('역참조 밑줄의 공백 제외', () => {
       { ...ownerBase, text, session },
       [yamlLink(2, 2, 7), yamlLink(2, 9, 14), yamlLink(3, 2, 7)],
     );
-    // @codocs [[IDE 지원]]#L29-L36
     expect(links.map((link) => link.range)).toEqual([
       { start: { line: 0, character: 2 }, end: { line: 0, character: 7 } },
       { start: { line: 3, character: 0 }, end: { line: 3, character: 1 } },

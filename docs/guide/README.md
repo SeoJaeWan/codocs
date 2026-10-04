@@ -11,7 +11,6 @@ AI도 `codocs_guide`를 호출하면 이 디렉터리의 같은 원문을 읽는
 4. [수정 절차](updating.md)에 따라 저장 전에 `codocs_duplicates`로 초안을 검토하고(저장을 막지 않는 검토 정보), 최신 revision으로 set/unset을 요청하고 저장 여부와 색인 상태를 확인한다.
 5. [검증과 복구](validation.md)에서 오류·경고를 확인하고 필요한 수정과 refresh를 수행한다.
 
-`status: confirmed`는 합의된 내용이라는 뜻이다. 구현 완료나 AI가 사실을 자동 검증했다는 보장이 아니다.
 개발 진행도와 이슈·PR 배정은 작업 관리 도구에서 관리한다.
 
 ## 주제 선택
@@ -22,7 +21,7 @@ AI도 `codocs_guide`를 호출하면 이 디렉터리의 같은 원문을 읽는
 | schema     | [YAML 속성과 허용 값](schema.md)                |
 | writing    | [설명의 책임과 이름·참조·코드 연결](writing.md) |
 | examples   | [실행 가능한 가상 프로젝트](examples.md)        |
-| updating   | [revision 수정·삭제·폐기·충돌](updating.md)     |
+| updating   | [revision 수정·삭제·충돌](updating.md)          |
 | validation | [진단과 색인 복구](validation.md)               |
 
 `codocs_guide({})`는 overview를 반환한다. 예를 들어 `codocs_guide({"topic":"updating"})`으로 수정 안내를 읽는다.

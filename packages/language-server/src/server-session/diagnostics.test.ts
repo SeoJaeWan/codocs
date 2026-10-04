@@ -23,7 +23,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 let root: string;
 let session: LanguageServerSession;
 let uri: string;
-const saved = 'id: target\nname: 출처\ndefinition: 설명\ndomains: [test]\n';
+const saved =
+  'id: target\nname: 출처\ndefinition: 설명\ndomains: [test]\ndeprecatedAliases: []\n';
 
 beforeEach(async () => {
   io.blocked = '';
@@ -33,7 +34,7 @@ beforeEach(async () => {
   await writeFile(path.join(root, '.codocs/source.yaml'), saved);
   await writeFile(
     path.join(root, '.codocs/target.yaml'),
-    'id: target\nname: 대상\ndefinition: 설명\ndomains: [test]\n',
+    'id: target\nname: 대상\ndefinition: 설명\ndomains: [test]\ndeprecatedAliases: []\n',
   );
   uri = pathToFileURL(path.join(root, '.codocs/source.yaml')).href;
   session = new LanguageServerSession();
@@ -109,7 +110,6 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
         (item) => item.uri === uri,
       );
       expect(failure?.reason).toContain(code);
-      // @codocs [[IDE 지원]]#L62-L65
       expect(failure?.previousDiagnostics).toContainEqual(
         expect.stringContaining('ID'),
       );
@@ -167,7 +167,6 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
   });
   it('파일을 열지 않아도 전체 저장 색인의 중복 위치를 반환한다', async () => {
     const result = await session.diagnostics();
-    // @codocs [[IDE 지원]]#L58-L59
     expect(result?.documents).toHaveLength(2);
     expect(
       result?.documents.find((document) => document.uri === uri)?.diagnostics,
@@ -200,7 +199,6 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
     const restored = (await session.diagnostics())?.documents.find(
       (document) => document.uri === uri,
     );
-    // @codocs [[문서 동기화]]#L58
     expect(restored).not.toHaveProperty('version');
     expect(restored?.diagnostics).toContainEqual(
       expect.objectContaining({ code: catalogDiagnosticCodes.duplicateId }),
@@ -268,7 +266,7 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
         uri: other,
         languageId: 'yaml',
         version: 1,
-        text: 'id: unsaved\nname: 새 문서\ndefinition: 설명\ndomains: [test]\n',
+        text: 'id: unsaved\nname: 새 문서\ndefinition: 설명\ndomains: [test]\ndeprecatedAliases: []\n',
       },
     });
     const result = await session.diagnostics();

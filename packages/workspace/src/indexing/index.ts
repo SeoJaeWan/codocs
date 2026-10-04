@@ -54,7 +54,6 @@ function failure(scope: WorkspaceScanFailure): CatalogFailure {
  * 파싱 성공 데이터와 원문 문자열 매핑은 검증 성공 여부와 무관하게 같은 모델을 재사용한다.
  * @param scan 로더가 확인한 문서와 실패 범위다.
  * @returns 확인한 상태와 발견 경로별 관측이다. 순환 건너뜀은 누락 실패로 바꾸지 않는다.
- * @codocs [[작업 공간:작업 공간 색인 구성]]#L11-L14
  */
 export function toCatalogScan(scan: WorkspaceScanResult): CatalogScan {
   return {
@@ -70,9 +69,6 @@ export function toCatalogScan(scan: WorkspaceScanResult): CatalogScan {
  * @param scan 실제 로더 또는 결정적인 테스트에서 제공한 새 스캔이다.
  * @param previous 같은 프로젝트의 이전 색인이다. 다른 프로젝트 색인을 섞지 않는다.
  * @returns core의 경로별 문서 색인과 실패 상태다. 저장·watcher·rename 실행은 수행하지 않는다.
- * @codocs [[작업 공간:작업 공간 색인 구성]]
- * @codocs [[작업 공간:불완전한 탐색에서 색인과 연결을 유지하는 절차]]#L12-L22
- * @codocs [[작업 공간:미확인 문서]]#L6-L8
  */
 export function buildWorkspaceCatalog(
   scan: WorkspaceScanResult,

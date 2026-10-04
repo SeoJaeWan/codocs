@@ -33,7 +33,7 @@ beforeAll(async () => {
     await mkdir(path.join(project, '.codocs'), { recursive: true });
     await writeFile(
       path.join(project, '.codocs', `${id}.yaml`),
-      `id: ${id}\nname: ${id}\ndomains: [test]\ndefinition: 본문\n`,
+      `id: ${id}\nname: ${id}\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 본문\n`,
     );
   }
 });
@@ -81,7 +81,6 @@ function payload(response: unknown): Record<string, unknown> {
 }
 
 describe('소스 MCP stdio 서버', () => {
-  // @codocs [[MCP:MCP 도구 호출]]#L11-L12
   it('초기화 후 쓰기를 포함한 도구를 제공하고 실제 문서를 목록·상세·검증·갱신한다', async () => {
     const { client, transport } = await clientFor(projectA);
     try {
@@ -92,6 +91,7 @@ describe('소스 MCP stdio 서버', () => {
         'codocs_refresh',
         'codocs_validate',
         'codocs_write',
+        'codocs_rename',
         'codocs_duplicates',
         'codocs_guide',
       ]);
@@ -142,7 +142,6 @@ describe('소스 MCP stdio 서버', () => {
     }
   });
 
-  // @codocs [[MCP:검증 오류가 있는 문서를 조회하고 수정하는 절차]]#L15-L17
   it('큰 정상 문서와 .inf 원문을 혼합 조회해 본문·직접 참조·revision·진단을 전부 보존한다', async () => {
     const selected = path.join(fixture, 'large');
     const folder = path.join(selected, '.codocs');
@@ -152,24 +151,24 @@ describe('소스 MCP stdio 서버', () => {
       (_, index) => `target-${String(index).padStart(2, '0')}`,
     );
     const definition = `${targets.map((_, index) => `[[Target ${String(index).padStart(2, '0')}]]`).join(' ')} ${'x'.repeat(500_000)}`;
-    const rawYaml = `id: invalid\nname: Invalid\ndomains: [test]\ndefinition: ${'y'.repeat(500_000)}\nvalue: .inf\n`;
+    const rawYaml = `id: invalid\nname: Invalid\ndomains: [test]\ndeprecatedAliases: []\ndefinition: ${'y'.repeat(500_000)}\nvalue: .inf\n`;
     await writeFile(
       path.join(folder, 'normal.yaml'),
-      `id: normal\nname: Normal\ndomains: [test]\ndefinition: ${JSON.stringify(definition)}\n`,
+      `id: normal\nname: Normal\ndomains: [test]\ndeprecatedAliases: []\ndefinition: ${JSON.stringify(definition)}\n`,
     );
     for (const [index, id] of targets.entries())
       await writeFile(
         path.join(folder, `${id}.yaml`),
-        `id: ${id}\nname: Target ${String(index).padStart(2, '0')}\ndomains: [test]\ndefinition: 대상\n`,
+        `id: ${id}\nname: Target ${String(index).padStart(2, '0')}\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 대상\n`,
       );
     await writeFile(path.join(folder, 'invalid.yaml'), rawYaml);
     await writeFile(
       path.join(folder, 'conflict-a.yaml'),
-      'id: shared\nname: Conflict A\ndomains: [test]\ndefinition: 본문\n',
+      'id: shared\nname: Conflict A\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 본문\n',
     );
     await writeFile(
       path.join(folder, 'conflict-b.yaml'),
-      'id: shared\nname: Conflict B\ndomains: [test]\ndefinition: 본문\n',
+      'id: shared\nname: Conflict B\ndomains: [test]\ndeprecatedAliases: []\ndefinition: 본문\n',
     );
     const { client } = await clientFor(selected);
     try {
