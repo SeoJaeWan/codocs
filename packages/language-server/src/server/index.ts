@@ -17,6 +17,12 @@ import {
   snapshotChangedMethod,
 } from '../navigation/index.js';
 import { diagnosticStatusMethod } from '../diagnostics/index.js';
+import {
+  applyRenameMethod,
+  planRenameMethod,
+  prepareRenameMethod,
+  type PrepareRenameRequest,
+} from '../rename/index.js';
 
 /** 프로토콜 외 로그를 stdout과 분리하는 최소 로거다. */
 export interface ServerLogger {
@@ -158,6 +164,15 @@ export function bindLanguageServer(
   connection.onDocumentLinkResolve((link) => session.resolveDocumentLink(link));
   connection.onRequest(confirmSourceMethod, (input: unknown) =>
     session.confirmSource(input),
+  );
+  connection.onRequest(prepareRenameMethod, (request: PrepareRenameRequest) =>
+    session.prepareRename(request),
+  );
+  connection.onRequest(planRenameMethod, (input: unknown) =>
+    session.planRename(input),
+  );
+  connection.onRequest(applyRenameMethod, (input: unknown) =>
+    session.applyRename(input),
   );
   /** 초기화 완료 뒤 workspace folder 변경 알림을 등록한다. */
   const initialized: Parameters<Connection['onInitialized']>[0] = () => {
