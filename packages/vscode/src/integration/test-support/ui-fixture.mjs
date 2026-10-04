@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /** 섹션 문서의 `_codocs` 메타데이터 블록을 만든다. 세 행을 차지하며 parent를 주면 두 행이 더해진다. */
@@ -214,7 +214,19 @@ export function uiFiles() {
 export async function createFixture(root) {
   for (const [relative, content] of Object.entries(uiFiles())) {
     const file = path.join(root, relative);
+    // 사례마다 복원할 때 내용이 같은 파일은 다시 쓰지 않는다. 다시 쓰면 감시자가 색인 갱신을 시작해 다음 사례와 겹친다.
+    if ((await currentContent(file)) === content) continue;
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, content);
+  }
+}
+
+/** 파일의 현재 원문을 읽고 없으면 undefined를 반환한다. */
+async function currentContent(file) {
+  try {
+    return await readFile(file, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') return undefined;
+    throw error;
   }
 }

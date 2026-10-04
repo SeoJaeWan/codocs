@@ -53,6 +53,37 @@ async function workspaceReady(c) {
   await c.driver.hover('[[Old]]', 'Old', 0, { providerLabel: 'Old' });
 }
 
+/** 이름 변경 반영이 색인 갱신과 겹쳐 거부될 때 workspace가 보여주는 안내다. */
+const indexNotReadyNotice = '문서 색인을 구성하는 중입니다';
+
+/**
+ * 이름 변경을 시작하고 디스크에 반영될 때까지 기다린다.
+ * fixture 복원 뒤 감시자의 색인 갱신이 아직 진행 중이면 반영이 index_not_ready로 거부되므로,
+ * 그 안내가 보이고 아무것도 쓰이지 않았을 때만 안내를 지우고 다시 시도한다.
+ */
+async function renameWhenIndexed(c, start, written, label, attempts = 5) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    await c.vscode.commands.executeCommand('notifications.clearAll');
+    await workspaceReady(c);
+    await start();
+    const outcome = await c.until(
+      /** 반영 완료 또는 색인 준비 전 거부 중 먼저 관측된 결과를 돌려준다. */ async () => {
+        if (await written()) return 'written';
+        const { notifications } = await c.driver.workbenchState();
+        return (
+          notifications.some((text) => text.includes(indexNotReadyNotice)) &&
+          'index-not-ready'
+        );
+      },
+      label,
+    );
+    if (outcome === 'written') return;
+  }
+  c.assert.fail(
+    `${label}: ${attempts}번 모두 색인 갱신 중이라 반영되지 않았습니다.`,
+  );
+}
+
 /** 화면의 name 값을 실제 마우스로 눌러 커서를 두고 F2로 새 이름을 입력해 확정한다. */
 async function startRename(c, name, newName) {
   await c.driver.clickText(name);
@@ -606,13 +637,15 @@ module.exports.scenarios = [
       /** 디스크에 저장된 현재 원문을 읽는다. */
       const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
       const otherBefore = await read(other);
-      await workspaceReady(c);
-      await c.open(target);
-      await startRename(c, 'Rename Twin', 'Rename Twin Renamed');
-      // 같은 이름의 후보는 도메인 없이 경로로 구분되고 도메인 선택 단계가 없다.
-      const picked = await c.driver.chooseQuickInput('rename-twin-a.yaml');
-      c.assert.ok(!picked.text.includes('alpha'));
-      await c.until(
+      await renameWhenIndexed(
+        c,
+        /** 대상 name에서 F2로 새 이름을 넣고 모호한 참조의 대상 파일을 고른다. */ async () => {
+          await c.open(target);
+          await startRename(c, 'Rename Twin', 'Rename Twin Renamed');
+          // 같은 이름의 후보는 도메인 없이 경로로 구분되고 도메인 선택 단계가 없다.
+          const picked = await c.driver.chooseQuickInput('rename-twin-a.yaml');
+          c.assert.ok(!picked.text.includes('alpha'));
+        },
         async () =>
           (await read(reference)).includes('[[Rename Twin Renamed]]') &&
           (await read(target)).includes('name: Rename Twin Renamed'),
@@ -636,10 +669,12 @@ module.exports.scenarios = [
       const child = '.codocs/rename-parent-child.yaml';
       /** 디스크에 저장된 현재 원문을 읽는다. */
       const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
-      await workspaceReady(c);
-      await c.open(target);
-      await startRename(c, 'Rename Parent Target', 'Rename Parent Renamed');
-      await c.until(
+      await renameWhenIndexed(
+        c,
+        /** 부모 문서 name에서 F2로 새 이름을 넣는다. */ async () => {
+          await c.open(target);
+          await startRename(c, 'Rename Parent Target', 'Rename Parent Renamed');
+        },
         async () =>
           (await read(child)).includes('- Rename Parent Renamed') &&
           (await read(target)).includes('name: Rename Parent Renamed'),
