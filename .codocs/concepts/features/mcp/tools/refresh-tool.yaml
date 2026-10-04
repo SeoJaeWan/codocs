@@ -1,0 +1,16 @@
+id: refresh-tool
+name: 'codocs_refresh'
+domains:
+  - '제품 개념'
+deprecatedAliases: []
+definition: |
+  프로젝트의 문서 색인 전체를 다시 구성하는 [[MCP 도구]]다.
+  서버는 .codocs의 파일 변경을 감시해 색인에 반영하므로 평소에는 필요 없으며, 감시가 끊겼거나 저장 뒤 색인 반영이 실패했을 때 복구용으로 쓴다.
+
+  ## 결과
+
+  문서와 코드의 [[탐색]]을 처음부터 다시 하고 감시도 다시 연결한다. 문서 원문은 바꾸지 않는다.
+  scanStatus와 함께 fileCount(읽기나 해석에 실패한 파일 포함), itemCount(목록 전체 수, ID가 충돌한 문서는 하나로 셈), errorCount·warningCount(파일 수가 아닌 진단 수)를 돌려준다.
+  countsComplete는 전체를 확인한 집계인지 나타내며 partial이면 false다. 부분 집계를 완료된 집계처럼 보여주지 않는다.
+  오류 문서를 포함해 재구성을 마친 경우도 요청 처리는 성공이다.
+  재구성이 진행 중일 때 다시 요청하면 같은 작업을 공유하고 같은 완료 결과를 돌려준다.

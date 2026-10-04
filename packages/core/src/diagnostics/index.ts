@@ -43,7 +43,6 @@ export const schemaDiagnosticCodes = {
   /** 문자열·ID·열거 값·배열 길이 또는 JSON 값이 계약과 다르면 반환한다. */
   invalidFieldValue: 'invalid_field_value',
   /** 문서의 업무 스키마에 없는 사용자 속성을 보존하며 경고한다. */
-  unknownField: 'unknown_field',
 } as const;
 
 /** 사용자에게 반환하는 스키마 진단의 고정 문구다. 오류 코드 하나에 여러 원인별 문구가 대응할 수 있다. */
@@ -67,7 +66,6 @@ export const schemaDiagnosticMessages = {
   /** 이전 ID가 현재 ID와 같을 때 사용한다. */
   deprecatedAliasMatchesCurrentId: '이전 ID가 현재 ID와 같습니다.',
   /** 업무 스키마에 없는 사용자 속성을 보존하며 경고할 때 사용한다. */
-  unknownField: '알려지지 않은 사용자 속성을 보존합니다.',
 } as const;
 
 /** 코드 정의에서 도출한 스키마 진단 코드 타입이다. */
@@ -102,8 +100,6 @@ export const catalogDiagnosticCodes = {
   unconfirmedReference: 'unconfirmed_reference',
   /** 확정 경로 대상에 문서 오류가 있을 때 연결을 유지하며 경고한다. */
   referenceTargetError: 'reference_target_error',
-  /** 확정 대상의 문서 상태가 폐기일 때 등장마다 경고한다. */
-  deprecatedReference: 'deprecated_reference',
 } as const;
 /** 색인 계층이 소유하는 고정 문구다. */
 export const catalogDiagnosticMessages = {
@@ -114,7 +110,6 @@ export const catalogDiagnosticMessages = {
   selfReference: '같은 발견 문서를 자기 참조할 수 없습니다.',
   unconfirmedReference: '스캔이 불완전하여 참조 대상을 확정할 수 없습니다.',
   referenceTargetError: '확정 참조 대상에 문서 오류가 있습니다.',
-  deprecatedReference: '폐기 상태의 문서를 참조하고 있습니다.',
 } as const;
 /** 상수에서 도출한 색인 진단 코드다. */
 export type CatalogDiagnosticCode =
@@ -234,9 +229,9 @@ export interface SourceRange {
   start: SourcePosition;
   end: SourcePosition;
 }
-/** 매핑 키와 배열 인덱스로 구성한 경로다. @codocs [[필드 경로]] */
+/** 매핑 키와 배열 인덱스로 구성한 경로다. */
 export type FieldPath = readonly (string | number)[];
-/** 각 계층이 코드 타입을 지정하는 공통 진단이다. 기본 코드는 core 진단이며 미확인 메타데이터는 생략한다. @codocs [[진단]]#L14-L25 */
+/** 각 계층이 코드 타입을 지정하는 공통 진단이다. 기본 코드는 core 진단이며 미확인 메타데이터는 생략한다. */
 export interface Diagnostic<Code extends string = DiagnosticCode> {
   code: Code;
   severity: DiagnosticSeverity;

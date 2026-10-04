@@ -24,7 +24,7 @@ let root: string;
 let folder: string;
 let originalFile: string;
 const original =
-  '# 원문 주석\r\nid: first\r\nname: 첫 문서\r\ndefinition: 설명\r\ndomains: [업무]\r\n';
+  '# 원문 주석\r\nid: first\r\nname: 첫 문서\r\ndefinition: 설명\r\ndomains: [업무]\r\ndeprecatedAliases: []\r\n';
 const document = {
   id: 'created',
   name: '새 문서',
@@ -97,7 +97,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
       path.join(folder, 'new', 'nested', 'created.yaml'),
     );
     expect(bytes.toString()).toBe(
-      'id: created\nname: 새 문서\ndefinition: 설명\ndomains:\n  - 업무\n',
+      'id: created\nname: 새 문서\ndefinition: 설명\ndomains:\n  - 업무\ndeprecatedAliases: []\n',
     );
     expect(result.revision).toBe(sha256(bytes));
     expect(sawTemp).toBe(true);
@@ -132,7 +132,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     const bytes = await readFile(originalFile);
     expect(bytes.toString()).toContain('# 원문 주석\r\n');
     expect(bytes.toString()).toContain('id: renamed\r\n');
-    expect(bytes.toString()).toContain('deprecatedAliases:\r\n  - id: first');
+    expect(bytes.toString()).toContain('deprecatedAliases: \r\n  - id: first');
     expect(result.revision).toBe(sha256(bytes));
   });
 
@@ -228,7 +228,6 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     expect(await readdir(folder)).toEqual(['first.yaml']);
   });
 
-  /** @codocs [[작업 공간:쓰기 조정]]#L20-L21 @codocs [[작업 공간:저장]]#L26 */
   it('대상 선검사 뒤 다른 생성이 끼어도 하드링크가 덮어쓰지 않는다', async () => {
     const scan = await loadWorkspace({ cwd: root });
     const target = path.join(folder, 'created.yaml');
@@ -257,7 +256,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     const scan = await loadWorkspace({ cwd: root });
     const target = path.join(folder, 'created.yaml');
     const source =
-      'id: created\nname: 다른 생성\ndefinition: 설명\ndomains: [업무]\n';
+      'id: created\nname: 다른 생성\ndefinition: 설명\ndomains: [업무]\ndeprecatedAliases: []\n';
     const result = await saveWorkspaceChange(
       { mode: 'create', path: '.codocs/created.yaml', document },
       scan,
@@ -272,7 +271,6 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     expect(await readFile(target, 'utf8')).toBe(source);
   });
 
-  /** @codocs [[작업 공간:저장]]#L19-L21 */
   it('주석 한 바이트가 뒤늦게 바뀌면 revision_conflict로 차단한다', async () => {
     const { scan, input } = await updateRequest();
     const changed = original.replace('원문 주석', '사람의 주석');
@@ -316,7 +314,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
       beforeApply: async () => {
         await writeFile(
           path.join(folder, 'other.yaml'),
-          'id: new-id\nname: 충돌\ndefinition: 설명\ndomains: [업무]\n',
+          'id: new-id\nname: 충돌\ndefinition: 설명\ndomains: [업무]\ndeprecatedAliases: []\n',
         );
       },
     });
@@ -389,7 +387,6 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     }
   });
 
-  /** @codocs [[작업 공간:저장]]#L45-L48 @codocs [[작업 공간:쓰기 조정]]#L24 */
   it('반영 뒤 임시 정리 실패는 저장 성공과 후속 진단을 함께 반환한다', async () => {
     const scan = await loadWorkspace({ cwd: root });
     const result = await saveWorkspaceChange(

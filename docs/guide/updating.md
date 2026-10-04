@@ -1,11 +1,11 @@
-# 문서 수정과 폐기
+# 문서 수정
 
 [전체 순서와 주제](README.md)
 
 ## 내용 갱신과 이름 변경
 
 개발 진행만 바뀌면 문서를 수정하지 않는다. 설명하는 의미·동작·정책이 바뀌면 담당 원문에 합의한 조건·근거·예외를 반영한다.
-원문을 갱신한 뒤 그 내용을 사용하는 문서의 설명과 참조도 확인한다. 내용의 합의·적용 상태는 `status`로 표현하며 개발 진행도와 구분한다.
+원문을 갱신한 뒤 그 내용을 사용하는 문서의 설명과 참조도 확인한다.
 코드에서 특정 문서 행을 참조하는 경우, 변경한 뒤 코드 링크가 의도한 문서 행을 여는지 확인한다.
 
 이름 변경 계산은 대상 이름 필드와 연결된 참조의 변경 후보를 보여준다.
@@ -28,7 +28,7 @@ update 요청의 `set`/`unset`으로는 `deprecatedAliases`를 직접 바꿀 수
   "id": "sample-order",
   "revision": "읽은 revision",
   "set": { "definition": "가상 주문의 검토한 새 설명이다." },
-  "unset": ["examples"]
+  "unset": ["reviewNote"]
 }
 ```
 
@@ -56,15 +56,9 @@ revision 값만 바꿔 이전 set을 자동 재적용하지 않는다.
 ## 상호 참조를 처음 만드는 순서
 
 1. `codocs_write({"mode":"create","path":".codocs/a.yaml","document":{"id":"a","name":"가상 A","domains":["연습"],"definition":"가상 A의 의미다."}})`
-2. `codocs_write({"mode":"create","path":".codocs/b.yaml","document":{"id":"b","name":"가상 B","domains":["연습"],"definition":"[[가상 A]]를 사용하는 절차다.","kind":"procedure"}})`
+2. `codocs_write({"mode":"create","path":".codocs/b.yaml","document":{"id":"b","name":"가상 B","domains":["연습"],"definition":"[[가상 A]]를 사용하는 절차다."}})`
 3. `codocs_get({"ids":["a"]})`로 A의 최신 원문과 revision을 읽는다.
 4. 검토한 A 본문에 B를 연결한다: `codocs_write({"mode":"update","id":"a","revision":"A의 최신 revision","set":{"definition":"가상 A의 의미다. 사용 절차는 [[가상 B]]에서 확인한다."}})`
 5. `codocs_validate({})`로 양쪽 참조를 확인한다.
 
 create 경로가 이미 있으면 덮어쓰지 않는다. 실패를 update로 자동 전환하거나 처리 지연 때문에 create를 반복하지 않는다.
-
-## 적용 종료와 보존
-
-적용이 끝난 내용은 `set: {"status":"deprecated"}`로 참고용 상태를 표시할 수 있다.
-폐기 이유와 대체 원문을 본문에 설명하고 참조하는 문서가 계속 연결할 필요가 있는지 검토한다.
-폐기 문서의 연결은 유지되며 참조 위치에 경고를 제공한다. 상태 변경만으로 코드·참조·파일을 자동 삭제하지 않는다.

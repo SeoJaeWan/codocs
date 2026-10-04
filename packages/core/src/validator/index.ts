@@ -14,13 +14,6 @@ import {
 } from '../diagnostics/index.js';
 import type { FieldRanges } from '../parser/index.js';
 import { offsetToPosition } from '../parser/index.js';
-import {
-  documentKinds,
-  documentStatuses,
-  type DocumentKind,
-  type DocumentStatus,
-} from './domain-values.js';
-export * from './domain-values.js';
 
 /** 사용자 속성이 보존할 수 있는 재귀 JSON 값이다. 숫자는 유한해야 한다. */
 export type JsonValue =
@@ -152,10 +145,7 @@ const documentStructure = z
     name: nonblank,
     definition: nonblank,
     domains: z.array(nonblank).min(1),
-    examples: z.array(nonblank).optional(),
-    deprecatedAliases: z.array(deprecatedAlias).optional(),
-    kind: z.enum(documentKinds).optional(),
-    status: z.enum(documentStatuses).optional(),
+    deprecatedAliases: z.array(deprecatedAlias),
   })
   .catchall(userValue);
 
@@ -169,14 +159,8 @@ export const documentFields = {
   definition: documentStructure.keyof().enum.definition,
   /** 문서가 속하는 도메인 이름 목록이다. */
   domains: documentStructure.keyof().enum.domains,
-  /** 참조를 추출하는 예시 문자열 목록이다. */
-  examples: documentStructure.keyof().enum.examples,
   /** 이전 ID와 전환 안내다. */
   deprecatedAliases: documentStructure.keyof().enum.deprecatedAliases,
-  /** 문서 내용의 종류다. */
-  kind: documentStructure.keyof().enum.kind,
-  /** 문서 내용의 합의 상태다. */
-  status: documentStructure.keyof().enum.status,
 } satisfies Record<keyof typeof documentStructure.shape, string>;
 /** 스키마에서 도출한 문서 필드 이름이다. */
 export type DocumentField =
@@ -251,7 +235,7 @@ export type DocumentValidationResult =
       warnings: readonly SchemaDiagnostic[];
     };
 
-/** 확인된 경로의 범위만 선택하며 누락은 직접 부모의 값 범위를 사용한다. @codocs [[진단]]#L24-L25 */
+/** 확인된 경로의 범위만 선택하며 누락은 직접 부모의 값 범위를 사용한다. */
 function diagnosticRange(
   input: ValidateDocumentInput,
   fieldPath: FieldPath,
@@ -265,12 +249,7 @@ function diagnosticRange(
       candidate.fieldPath.length === target.length &&
       candidate.fieldPath.every((part, index) => part === target[index]),
   );
-  const offsets =
-    target.length === 0
-      ? input.rootRange
-      : code === schemaDiagnosticCodes.unknownField
-        ? field?.key
-        : field?.value;
+  const offsets = target.length === 0 ? input.rootRange : field?.value;
   if (!offsets || offsets.start > offsets.end) return undefined;
   const start = offsetToPosition(input.source, offsets.start);
   const end = offsetToPosition(input.source, offsets.end);
@@ -283,9 +262,7 @@ function diagnostic(
   code: SchemaDiagnosticCode,
   fieldPath: FieldPath,
   message: string,
-  severity: DiagnosticSeverity = code === schemaDiagnosticCodes.unknownField
-    ? diagnosticSeverities.warning
-    : diagnosticSeverities.error,
+  severity: DiagnosticSeverity = diagnosticSeverities.error,
 ): SchemaDiagnostic {
   const range = diagnosticRange(input, fieldPath, code);
   return {
@@ -298,7 +275,7 @@ function diagnostic(
   };
 }
 
-/** 현재 ID와 같은 이전 ID만 경고하며 사용자가 작성한 항목은 제거하지 않는다. @codocs [[문서 검증]]#L35-L40 */
+/** 현재 ID와 같은 이전 ID만 경고하며 사용자가 작성한 항목은 제거하지 않는다. */
 function deprecatedAliasWarnings(
   input: ValidateDocumentInput,
 ): SchemaDiagnostic[] {
@@ -319,39 +296,6 @@ function deprecatedAliasWarnings(
       ),
     );
   }
-  return warnings;
-}
-
-/** 알려진 업무 객체의 미등록 키만 경고하며 사용자 JSON 내부는 해석하지 않는다. */
-function unknownWarnings(input: ValidateDocumentInput): SchemaDiagnostic[] {
-  const warnings: SchemaDiagnostic[] = [];
-  /** 직접 업무 속성만 검사하고 비문자열 키는 JSON 오류에 맡긴다. */
-  function collect(
-    value: unknown,
-    known: readonly string[],
-    path: FieldPath,
-  ): void {
-    if (typeof value !== 'object' || value === null || Array.isArray(value))
-      return;
-    for (const key of Object.keys(value))
-      if (!known.includes(key))
-        warnings.push(
-          diagnostic(
-            input,
-            schemaDiagnosticCodes.unknownField,
-            [...path, key],
-            schemaDiagnosticMessages.unknownField,
-          ),
-        );
-  }
-  collect(input.data, Object.keys(documentStructure.shape), []);
-  const aliases = ownValue(input.data, 'deprecatedAliases');
-  if (Array.isArray(aliases))
-    for (let index = 0; index < aliases.length; index++)
-      collect(ownValue(aliases, index), Object.keys(deprecatedAlias.shape), [
-        'deprecatedAliases',
-        index,
-      ]);
   return warnings;
 }
 
@@ -380,17 +324,14 @@ function issueCode(
   return schemaDiagnosticCodes.invalidFieldValue;
 }
 
-/** IO 없이 전체 문서를 검증한다. 입력 데이터와 원문·범위를 변경하지 않는다. @codocs [[문서 검증]]
+/** IO 없이 전체 문서를 검증한다. 입력 데이터와 원문·범위를 변경하지 않는다.
  * @param input 호출자가 읽거나 병합한 전체 데이터와 선택적인 위치다.
  * @returns 성공 문서 또는 오류와 별도의 사용자 속성 경고다. 저장 허용은 판단하지 않는다.
  */
 export function validateDocument(
   input: ValidateDocumentInput,
 ): DocumentValidationResult {
-  const warnings = [
-    ...unknownWarnings(input),
-    ...deprecatedAliasWarnings(input),
-  ];
+  const warnings = deprecatedAliasWarnings(input);
   const result = documentSchema.safeParse(input.data);
   if (result.success)
     return { success: true, data: result.data, errors: [], warnings };
@@ -407,19 +348,4 @@ export function validateDocument(
       ),
   );
   return { success: false, errors, warnings };
-}
-
-/** 문서 종류 원본 정의로 외부 값을 확인한다. */
-export function isDocumentKind(value: unknown): value is DocumentKind {
-  return (
-    typeof value === 'string' &&
-    Object.values(documentKinds).some((item) => item === value)
-  );
-}
-/** 문서 상태 원본 정의로 외부 값을 확인한다. */
-export function isDocumentStatus(value: unknown): value is DocumentStatus {
-  return (
-    typeof value === 'string' &&
-    Object.values(documentStatuses).some((item) => item === value)
-  );
 }

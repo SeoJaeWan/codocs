@@ -20,8 +20,6 @@ export function containsWorkspacePath(parent: string, child: string): boolean {
 
 /**
  * 단일 프로젝트의 진행 중 탐색끼리 공유하는 발견 경로별 읽기 캐시다. 디스크 최신성 판단은 호출자가 무효화한다.
- * @codocs [[작업 공간:문서 탐색]]#L31-L40
- * @codocs [[작업 공간:발견 경로]]#L18
  */
 export class WorkspaceObservationCache {
   #generation = 0;

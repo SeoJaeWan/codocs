@@ -25,7 +25,7 @@ beforeAll(async () => {
   for (const id of ['alpha', 'bravo'])
     await writeFile(
       path.join(fixture, '.codocs', `${id}.yaml`),
-      `id: ${id}\nname: ${id}\ndomains: [test]\ndefinition: ${repeated}\n`,
+      `id: ${id}\nname: ${id}\ndomains: [test]\ndeprecatedAliases: []\ndefinition: ${repeated}\n`,
     );
 });
 
@@ -40,9 +40,7 @@ function structured(response: unknown): Record<string, unknown> {
     .structuredContent;
 }
 
-// @codocs [[MCP:본문 중복 검토 요청]]
 describe('codocs_duplicates stdio 도구', () => {
-  // @codocs [[MCP:본문 중복 검토 요청]]#L10-L11
   it('일곱 도구를 나열하고 전체·초안 검토와 만료 커서를 실제 stdio로 반환한다', async () => {
     const transport = new StdioClientTransport({
       command: process.execPath,

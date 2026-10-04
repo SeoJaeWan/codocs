@@ -23,7 +23,7 @@ beforeEach(async () => {
   await writeFile(source, original);
   await writeFile(
     path.join(root, '.codocs', 'second.yaml'),
-    'id: second\nname: 둘째 문서\ndomains: [업무]\ndefinition: 본문\n',
+    'id: second\nname: 둘째 문서\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
   );
   sessions = [];
 });
@@ -273,7 +273,6 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     expect(text).not.toContain('message: 유지할 안내');
   });
 
-  /** @codocs [[작업 공간:저장 후 색인 갱신 실패를 복구하는 절차]]#L14 @codocs [[작업 공간:저장 후 색인 갱신 실패를 복구하는 절차]]#L30 */
   it('첫 색인 오류는 저장 없이 반복하지 않고 해당 경로만 추가 복구한다', async () => {
     const attempts: number[] = [];
     const current = session({
@@ -304,7 +303,6 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     });
   });
 
-  /** @codocs [[작업 공간:저장 후 색인 갱신 실패를 복구하는 절차]]#L21-L22 */
   it('두 색인 오류 뒤에도 저장 revision과 진단 및 refresh 안내를 유지한다', async () => {
     const attempts: number[] = [];
     const current = session({

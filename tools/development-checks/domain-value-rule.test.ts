@@ -69,10 +69,10 @@ describe('도메인 값 ESLint 규칙: 선언 문맥 검사', () => {
       ).toEqual([]);
     },
   );
-  it('같은 confirmed 문자열을 서로 다른 도메인에 쓰면 각 선언의 상수를 안내한다', async () => {
-    const code = `import { type CatalogConfirmation, type DocumentStatus } from '@codocs/core';
-const observed: CatalogConfirmation = 'confirmed';
-const document: DocumentStatus = 'confirmed';`;
+  it('같은 unconfirmed 문자열을 서로 다른 도메인에 쓰면 각 선언의 상수를 안내한다', async () => {
+    const code = `import { type CatalogConfirmation, type ReferenceResolutionStatus } from '@codocs/core';
+const observed: CatalogConfirmation = 'unconfirmed';
+const resolution: ReferenceResolutionStatus = 'unconfirmed';`;
     const results = await eslint.lintText(preamble + code, {
       filePath: path.join(process.cwd(), 'packages/workspace/src/index.ts'),
     });
@@ -82,8 +82,8 @@ const document: DocumentStatus = 'confirmed';`;
         .map((message) => message.message),
     );
     expect(messages).toHaveLength(2);
-    expect(messages[0]).toContain('catalogConfirmations.confirmed');
-    expect(messages[1]).toContain('documentStatuses.confirmed');
+    expect(messages[0]).toContain('catalogConfirmations.unconfirmed');
+    expect(messages[1]).toContain('referenceResolutionStatuses.unconfirmed');
   });
 });
 

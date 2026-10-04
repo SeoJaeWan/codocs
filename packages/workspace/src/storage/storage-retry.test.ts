@@ -20,7 +20,7 @@ let root: string;
 let folder: string;
 let target: string;
 const original =
-  'id: first\nname: First\ndefinition: Original\ndomains: [test]\n';
+  'id: first\nname: First\ndefinition: Original\ndomains: [test]\ndeprecatedAliases: []\n';
 const input = {
   mode: 'update',
   id: 'first',
@@ -84,7 +84,6 @@ describe.skipIf(process.platform !== 'win32')(
       }
     });
 
-    /** @codocs [[작업 공간:쓰기 조정]]#L54-L55 */
     it('실제 공유 거부가 계속되면 네 번 안에 실패하고 원본과 오류를 보존한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const release = await holdWindowsFile(target);
@@ -115,7 +114,6 @@ describe.skipIf(process.platform !== 'win32')(
       }
     });
 
-    /** @codocs [[작업 공간:쓰기 조정]]#L57 */
     it('재시도 전에 외부 원문이 바뀌면 새 revision을 자동 적용하지 않는다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const changed = original.replace('Original', 'External');

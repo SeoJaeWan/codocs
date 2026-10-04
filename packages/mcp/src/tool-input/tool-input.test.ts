@@ -8,9 +8,7 @@ import {
   parseValidateInput,
 } from './index.js';
 
-// @codocs [[MCP:MCP 도구 호출]]
 describe('MCP 일곱 입력 계약', () => {
-  // @codocs [[MCP:MCP 도구 호출]]#L11-L13
   it('일곱 스키마를 정의하고 알 수 없는 최상위 속성을 거부한다', () => {
     expect([...codocsInputSchemas.keys()]).toEqual([
       'codocs_list',
@@ -61,7 +59,6 @@ describe('MCP 일곱 입력 계약', () => {
     expect(acceptsToolInput('codocs_duplicates', { cursor: 1 })).toBe(false);
   });
 
-  // @codocs [[MCP:조회]]#L26-L27
   it('ID는 중복 제거 후 상한을 검사하며 사용자 속성은 삭제하지 않는다', () => {
     expect(parseGetInput({ ids: [] })).toBeUndefined();
     expect(
@@ -95,7 +92,6 @@ describe('MCP 일곱 입력 계약', () => {
     );
   });
 
-  // @codocs [[MCP:문서 검증 요청]]#L11-L13
   it('검증 입력은 선택 문자열 하나만 허용하고 복수 경로는 거부한다', () => {
     expect(parseValidateInput({})).toEqual({});
     expect(parseValidateInput({ path: '.codocs/a.yaml' })).toEqual({
