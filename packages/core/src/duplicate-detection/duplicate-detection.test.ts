@@ -389,7 +389,6 @@ describe('detectDuplicates: 반복 후보 계산', () => {
     const [candidate] = result.candidates;
     expect(candidate?.a.path).toBe('a.yaml');
     expect(candidate?.b.path).toBe('a.yaml');
-    // @codocs [[본문 중복 탐지]]#L18-L19
     expect(candidate?.a.offsetRange?.start).toBeLessThan(
       candidate?.b.offsetRange?.start ?? 0,
     );
@@ -520,7 +519,6 @@ describe('detectDuplicates: 반복 후보 계산', () => {
     const prepared = prepareDuplicateDocument(
       input('a.yaml', yamlOf(sentence)),
     );
-    // @codocs [[본문 중복 탐지]]#L26
     expect(prepared.fields[0]?.segments[0]?.text).toBe(sentence);
     const negated = detectDuplicates([
       input('a.yaml', yamlOf(sentence)),
@@ -547,7 +545,6 @@ describe('detectDuplicates: 반복 후보 계산', () => {
     expect(byPair.get('a.yaml|c.yaml')?.linkDestinations.differ).toBe(false);
     const differing = byPair.get('a.yaml|b.yaml');
     expect(differing?.kind).toBe(duplicateMatchKinds.similar);
-    // @codocs [[본문 중복 탐지]]#L27
     expect(differing?.scores).toEqual({ jaccard: 1, ordered: 1 });
     expect(differing?.linkDestinations).toEqual({
       a: ['./one.md'],
@@ -563,7 +560,6 @@ describe('detectDuplicates: 반복 후보 계산', () => {
       input('a.yaml', yamlOf(first)),
       input('b.yaml', yamlOf(first)),
     ]);
-    // @codocs [[본문 중복 탐지]]#L15
     expect(result.skippedInputs).toEqual([
       {
         path: 'broken.yaml',

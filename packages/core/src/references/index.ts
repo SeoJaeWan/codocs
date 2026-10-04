@@ -46,45 +46,104 @@ export interface ReferenceExtraction {
   occurrences: readonly ReferenceOccurrence[];
   diagnostics: readonly ReferenceDiagnostic[];
 }
-/** 바로 앞 연속 백슬래시 개수가 홀수인지 검사한다. */
+/**
+ * 바로 앞의 연속 백슬래시가 홀수라 글자로 쓰였는지 확인한다.
+ */
 function escaped(value: string, index: number): boolean {
   let count = 0;
   while (index > 0 && value[--index] === '\\') count++;
   return count % 2 === 1;
 }
-/** 첫 비이스케이프 콜론으로 도메인을 나누고 이름 내부 콜론은 명시적 escape만 허용한다. */
+/** 대괄호 안에서 escape되지 않은 콜론의 위치를 모두 찾는다. */
+function unescapedColons(value: string): number[] {
+  const colons: number[] = [];
+  for (let index = 0; index < value.length; index++)
+    if (value[index] === ':' && !escaped(value, index)) colons.push(index);
+  return colons;
+}
+/**
+ * 참조 표기에서 첫 번째 escape되지 않은 콜론 앞을 도메인, 뒤를 이름으로 나눈다.
+ */
+function splitDomain(
+  value: string,
+  separator: number | undefined,
+): { name: string; domain?: string } {
+  if (separator === undefined) return { name: value };
+  return {
+    name: value.slice(separator + 1),
+    domain: value.slice(0, separator),
+  };
+}
+/**
+ * 이름과 도메인에 `\:`로 쓴 콜론을 콜론 글자로 되돌린다.
+ */
+function unescapeColon(text: string): string {
+  return text.replace(/\\:/gu, ':');
+}
+/**
+ * 대괄호 안의 구성이 빈 이름·도메인, 남은 대괄호, 두 번째 콜론 중 하나면 문법 오류로 판정한다.
+ */
+function invalidComponents(
+  value: string,
+  colons: readonly number[],
+  parts: { name: string; domain?: string },
+): boolean {
+  return (
+    /[\[\]]/u.test(value) ||
+    colons.length > 1 ||
+    !parts.name.length ||
+    parts.domain === ''
+  );
+}
+/** 대괄호 안의 원문을 도메인과 이름으로 해석한다. 문법 오류이면 undefined다. */
 export function parseReferenceComponents(
   value: string,
 ): { name: string; domain?: string } | undefined {
-  let separator = -1;
-  for (let index = 0; index < value.length; index++) {
-    if (value[index] === '[' || value[index] === ']') return undefined;
-    if (value[index] === ':' && !escaped(value, index)) {
-      if (separator >= 0) return undefined;
-      separator = index;
+  const colons = unescapedColons(value);
+  const parts = splitDomain(value, colons[0]);
+  if (invalidComponents(value, colons, parts)) return undefined;
+  const name = unescapeColon(parts.name);
+  return parts.domain === undefined
+    ? { name }
+    : { name, domain: unescapeColon(parts.domain) };
+}
+/** 본문에서 찾은 참조 표기 구간이다. closed가 false이면 닫히지 않은 참조다. */
+interface ReferenceSpan {
+  start: number;
+  end: number;
+  closed: boolean;
+}
+/**
+ * 본문에서 참조 표기 구간을 찾는다. 닫히지 않은 참조는 다음 `[[` 앞이나 본문 끝에서 끝낸다.
+ */
+function scanReferenceSpans(value: string): ReferenceSpan[] {
+  const spans: ReferenceSpan[] = [];
+  let start: number | undefined;
+  for (let index = 0; index < value.length - 1; index++) {
+    if (value.startsWith('[[', index) && !escaped(value, index)) {
+      if (start !== undefined) spans.push({ start, end: index, closed: false });
+      start = index;
+      index++;
+    } else if (start !== undefined && value.startsWith(']]', index)) {
+      spans.push({ start, end: index + 2, closed: true });
+      start = undefined;
+      index++;
     }
   }
-  const name = (separator < 0 ? value : value.slice(separator + 1)).replace(
-    /\\:/gu,
-    ':',
-  );
-  const domain =
-    separator < 0 ? undefined : value.slice(0, separator).replace(/\\:/gu, ':');
-  if (!name.length || domain === '') return undefined;
-  return { name, ...(domain !== undefined ? { domain } : {}) };
+  if (start !== undefined)
+    spans.push({ start, end: value.length, closed: false });
+  return spans;
 }
 /** 자료형이 정상인 본문과 예문 경로만 고른다. */
 function bodyPaths(data: Record<string, unknown>): FieldPath[] {
   const paths: FieldPath[] = [];
   if (typeof data.definition === 'string')
     paths.push([documentFields.definition]);
-  if (Array.isArray(data.examples))
-    for (let index = 0; index < data.examples.length; index++)
-      if (typeof data.examples[index] === 'string')
-        paths.push([documentFields.examples, index]);
   return paths;
 }
-/** YAML 성공 결과의 정해진 본문만 추출한다. 스키마 검증·ID·파일 IO에 의존하지 않고 입력을 변경하지 않는다. @codocs [[참조 추출]] */
+/**
+ * 문서 본문에서 참조 표기를 찾아 이름과 도메인으로 해석하고, 문법 오류인 표기는 그 위치에 진단한다.
+ */
 export function extractReferences(
   parsed: YamlParseResult,
   path?: string,
@@ -101,23 +160,20 @@ export function extractReferences(
     );
     if (!mapping) continue;
     const value = mapping.value;
-    let start: number | undefined;
-    /** 실제 문자열 범위의 등장과 문법 오류를 함께 기록한다. @codocs [[참조 추출]]#L20-L32 */
-    function record(end: number, closed: boolean): void {
-      if (start === undefined) return;
-      const decodedRange = { start, end };
+    for (const span of scanReferenceSpans(value)) {
+      const decodedRange = { start: span.start, end: span.end };
       const offsetRange = getStringRange(parsed, fieldPath, decodedRange);
-      if (!offsetRange) return;
+      if (!offsetRange) continue;
       const begin = offsetToPosition(source, offsetRange.start);
       const finish = offsetToPosition(source, offsetRange.end);
-      if (!begin || !finish) return;
+      if (!begin || !finish) continue;
       const range = { start: begin, end: finish };
-      const parts = closed
-        ? parseReferenceComponents(value.slice(start + 2, end - 2))
+      const parts = span.closed
+        ? parseReferenceComponents(value.slice(span.start + 2, span.end - 2))
         : undefined;
       const location = {
         fieldPath: [...fieldPath],
-        text: value.slice(start, end),
+        text: value.slice(span.start, span.end),
         decodedRange,
         offsetRange,
         range,
@@ -138,18 +194,6 @@ export function extractReferences(
           ...(path !== undefined ? { path } : {}),
         });
     }
-    for (let index = 0; index < value.length - 1; index++) {
-      if (value.startsWith('[[', index) && !escaped(value, index)) {
-        if (start !== undefined) record(index, false);
-        start = index;
-        index++;
-      } else if (start !== undefined && value.startsWith(']]', index)) {
-        record(index + 2, true);
-        start = undefined;
-        index++;
-      }
-    }
-    if (start !== undefined) record(value.length, false);
   }
   return { occurrences, diagnostics };
 }

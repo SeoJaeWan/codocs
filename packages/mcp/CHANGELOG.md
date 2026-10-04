@@ -1,5 +1,13 @@
 # @codocs/mcp
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [fa61fc1]
+- Updated dependencies [a4f2418]
+  - @codocs/workspace@0.0.2
+
 ## 0.0.3
 
 ### Patch Changes

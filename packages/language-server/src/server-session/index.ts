@@ -60,6 +60,16 @@ import {
   escapeMarkdown,
 } from '../hover/index.js';
 import {
+  nameValueRange,
+  renameRequestFailureCodes,
+  type ApplyRenameResponse,
+  type PlanRenameResponse,
+  type PrepareRenameRequest,
+  type PrepareRenameResponse,
+  type RenameFileUris,
+  type RenameRequestFailure,
+} from '../rename/index.js';
+import {
   SourceSelections,
   selectionTarget,
   type CandidateSession,
@@ -158,6 +168,8 @@ export interface WorkspaceSessionBoundary extends Partial<
     | 'confirmCodeReference'
     | 'releaseCodeReference'
     | 'onDidChangeCodeReferences'
+    | 'previewRename'
+    | 'applyRename'
   >
 > {
   readonly readiness: WorkspaceReadiness;
@@ -186,7 +198,7 @@ interface WorkspaceBinding {
 const defaultSessionFactory: WorkspaceSessionFactory = (rootPath) =>
   createWorkspaceQuerySession({ cwd: rootPath });
 
-/** LSP 연결과 분리해 문서·작업 공간·비동기 최신성을 관리한다. @codocs [[문서 동기화]] */
+/** LSP 연결과 분리해 문서·작업 공간·비동기 최신성을 관리한다. */
 export class LanguageServerSession {
   readonly documents = new SynchronizedDocuments();
   readonly #sessionFactory: WorkspaceSessionFactory;
@@ -237,7 +249,7 @@ export class LanguageServerSession {
     return this.#workspaces.size;
   }
 
-  /** didOpen 원문을 언어·확장자와 무관하게 저장한다. @codocs [[문서 동기화]]#L18-L21 */
+  /** didOpen 원문을 언어·확장자와 무관하게 저장한다. */
   openDocument(
     params: DidOpenTextDocumentParams,
   ): ReturnType<SynchronizedDocuments['open']> {
@@ -270,7 +282,7 @@ export class LanguageServerSession {
     };
   }
 
-  /** 편집 출처에 묶인 조회·선택을 무효화한다. @codocs [[문서 동기화]]#L36-L38 */
+  /** 편집 출처에 묶인 조회·선택을 무효화한다. */
   #documentChanged(uri: string): void {
     this.#diagnosticEpoch++;
     this.#live.delete(uri);
@@ -293,7 +305,7 @@ export class LanguageServerSession {
       .join('/');
   }
 
-  /** 같은 문서·완료 관측의 참조 요청을 공유하며 늦은 결과를 폐기한다. @codocs [[문서 동기화]]#L44-L47 */
+  /** 같은 문서·완료 관측의 참조 요청을 공유하며 늦은 결과를 폐기한다. */
   async #references(
     uri: string,
   ): Promise<WorkspaceLiveReferenceSuccess | undefined> {
@@ -389,7 +401,7 @@ export class LanguageServerSession {
     return selection ? selectionTarget(selection) : undefined;
   }
 
-  /** 단일 확정 YAML 참조에만 본문 링크를 제공한다. @codocs [[IDE 지원]]#L71-L77 */
+  /** 단일 확정 YAML 참조에만 본문 링크를 제공한다. */
   async #yamlLinks(
     uri: string,
     cancellation?: CancellationToken,
@@ -451,7 +463,7 @@ export class LanguageServerSession {
     };
   }
 
-  /** 명시 링크를 우선하고 YAML 이름 링크와 단일 역참조를 함께 제공한다. @codocs [[IDE 지원]]#L98-L101 */
+  /** 명시 링크를 우선하고 YAML 이름 링크와 단일 역참조를 함께 제공한다. */
   async documentLinks(
     uri: string,
     cancellation?: CancellationToken,
@@ -484,7 +496,7 @@ export class LanguageServerSession {
     return [...forward.links, ...yaml, ...reverse];
   }
 
-  /** 열린 source들을 같은 프로젝트의 overlay에 먼저 반영한다. @codocs [[문서 동기화]]#L61-L62 */
+  /** 열린 source들을 같은 프로젝트의 overlay에 먼저 반영한다. */
   async #prepareCodeBuffers(session: CodeSession): Promise<void> {
     for (const document of this.documents.all()) {
       const owner = this.#codeOwner(document.uri);
@@ -501,7 +513,7 @@ export class LanguageServerSession {
     );
   }
 
-  /** 문서 전체 코드 출현은 원문 수정 없이 첫 행 Hint로 제공한다. @codocs [[IDE 지원]]#L40-L47 */
+  /** 문서 전체 코드 출현은 원문 수정 없이 첫 행 Hint로 제공한다. */
   async inlayHints(
     uri: string,
     cancellation?: CancellationToken,
@@ -536,7 +548,7 @@ export class LanguageServerSession {
     };
   }
 
-  /** 열린 원문을 우선하여 모든 저장 지식 문서를 진단하고 실패 관측을 분리한다. @codocs [[IDE 지원]]#L58-L66 */
+  /** 열린 원문을 우선하여 모든 저장 지식 문서를 진단하고 실패 관측을 분리한다. */
   async diagnostics(): Promise<
     | {
         documents: {
@@ -731,7 +743,116 @@ export class LanguageServerSession {
     );
   }
 
-  /** 요청 시점의 원문을 매칭하고 완료 시점에도 같은 버전인지 확인한다. @codocs [[문서 동기화]]#L27-L29 */
+  /**
+   * 이름 바꾸기를 시작할 수 있는 위치인지 확인하고 바꿀 문서와 현재 이름을 돌려준다.
+   * 문서의 name 값이나 하나의 문서로 확정되는 참조에서만 시작할 수 있다.
+   * @param request 편집 중인 문서와 커서 위치다.
+   * @returns 시작할 수 없는 위치이면 null이다.
+   */
+  async prepareRename(
+    request: PrepareRenameRequest,
+  ): Promise<PrepareRenameResponse | null> {
+    const uri = request.textDocument.uri;
+    const document = this.documents.get(uri);
+    const workspace = this.#workspaceForDocument(uri);
+    if (!document || !workspace || !this.#isKnowledgeDocument(uri, workspace))
+      return null;
+    const offset = document.offsetAt(request.position);
+    const name = nameValueRange(document.getText());
+    if (name && name.range.start <= offset && offset <= name.range.end)
+      return {
+        range: utf16OffsetsToRange(document, name.range),
+        placeholder: name.name,
+        targetPath: path.relative(workspace.rootPath, fileURLToPath(uri)),
+      };
+    const version = document.version;
+    const references = await this.#references(uri);
+    if (
+      !references ||
+      this.documents.get(uri)?.version !== version ||
+      references.catalogVersion !== workspace.session.catalogVersion
+    )
+      return null;
+    const item = references.occurrences.find(
+      ({ occurrence }) =>
+        occurrence.offsetRange.start <= offset &&
+        offset < occurrence.offsetRange.end,
+    );
+    const target = item?.resolution.target;
+    if (
+      !item ||
+      item.resolution.status !== referenceResolutionStatuses.resolved ||
+      target?.name === undefined
+    )
+      return null;
+    return {
+      range: item.occurrence.range,
+      placeholder: target.name,
+      targetPath: target.path,
+    };
+  }
+
+  /** 파일과 색인을 바꾸지 않고 이름 변경을 계산한다. */
+  async planRename(input: unknown): Promise<PlanRenameResponse> {
+    const request = this.#renameRequest(input);
+    if ('success' in request) return request;
+    if (!request.workspace.session.previewRename)
+      return renameFailure(renameRequestFailureCodes.renameUnsupported);
+    const result = await request.workspace.session.previewRename(request.input);
+    return {
+      ...result,
+      fileUris: this.#renameFileUris(request.workspace, [
+        ...(result.success ? Object.keys(result.revisions) : []),
+      ]),
+    };
+  }
+
+  /** 미리보기와 같은 입력과 revision으로 이름 변경을 파일에 반영한다. */
+  async applyRename(input: unknown): Promise<ApplyRenameResponse> {
+    const request = this.#renameRequest(input);
+    if ('success' in request) return request;
+    if (!request.workspace.session.applyRename)
+      return renameFailure(renameRequestFailureCodes.renameUnsupported);
+    const result = await request.workspace.session.applyRename(request.input);
+    return {
+      ...result,
+      fileUris: this.#renameFileUris(request.workspace, [
+        ...result.files.map((file) => file.path),
+        ...(result.success ? [] : Object.keys(result.preview?.revisions ?? {})),
+      ]),
+    };
+  }
+
+  /** 요청의 출처 문서로 작업 공간을 고르고 세션에 넘길 입력만 남긴다. */
+  #renameRequest(
+    input: unknown,
+  ): { workspace: WorkspaceBinding; input: object } | RenameRequestFailure {
+    const uri =
+      typeof input === 'object' && input !== null && 'textDocument' in input
+        ? (input.textDocument as { uri?: unknown } | null)?.uri
+        : undefined;
+    const workspace =
+      typeof uri === 'string' ? this.#workspaceForDocument(uri) : undefined;
+    if (!workspace || typeof input !== 'object' || input === null)
+      return renameFailure(renameRequestFailureCodes.workspaceNotFound);
+    // 세션은 대상·새 이름·선택·revision만 읽고 나머지 필드는 무시한다.
+    return { workspace, input };
+  }
+
+  /** 프로젝트 상대 경로를 작업 공간 루트 기준 file URI로 바꾼다. */
+  #renameFileUris(
+    workspace: WorkspaceBinding,
+    paths: readonly string[],
+  ): RenameFileUris['fileUris'] {
+    return Object.fromEntries(
+      [...new Set(paths)].map((item) => [
+        item,
+        pathToFileURL(path.resolve(workspace.rootPath, item)).href,
+      ]),
+    );
+  }
+
+  /** 요청 시점의 원문을 매칭하고 완료 시점에도 같은 버전인지 확인한다. */
   async matchDocument(
     request: DocumentMatchRequest,
   ): Promise<DocumentMatchResponse> {
@@ -781,7 +902,7 @@ export class LanguageServerSession {
     return mapMatchResult(current, workspace, result);
   }
 
-  /** 같은 코드·catalog 관측의 커서 후보와 경로 상세로 표준 Hover를 만든다. @codocs [[문서 동기화]]#L32 @codocs [[코드 호버]]#L42 */
+  /** 같은 코드·catalog 관측의 커서 후보와 경로 상세로 표준 Hover를 만든다. */
   async hoverDocument(
     params: HoverParams,
     cancellation?: CancellationToken,
@@ -1216,6 +1337,22 @@ function staleResult(
     uri,
     requestedVersion,
     ...(currentVersion === undefined ? {} : { currentVersion }),
+  };
+}
+
+/** 이름 변경 요청을 시작하지 못한 고정 실패를 만든다. */
+function renameFailure(
+  code: RenameRequestFailure['error']['code'],
+): RenameRequestFailure {
+  return {
+    success: false,
+    error: {
+      code,
+      message:
+        code === renameRequestFailureCodes.workspaceNotFound
+          ? '출처 문서의 작업 공간을 찾을 수 없습니다.'
+          : '작업 공간 세션이 이름 변경을 지원하지 않습니다.',
+    },
   };
 }
 

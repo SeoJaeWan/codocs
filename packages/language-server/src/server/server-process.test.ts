@@ -1,7 +1,14 @@
 import { build } from 'esbuild';
 import { trackChildClosure } from '../../../../tools/test/support/child-process.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
@@ -154,8 +161,7 @@ describe('language server stdio 프로세스', () => {
         path.resolve('.workbench/fixtures/protocol-links-'),
       );
       await mkdir(path.join(root, '.codocs'));
-      const target =
-        'id: target\nname: 대상\ndefinition: 설명\nstatus: deprecated\n';
+      const target = 'id: target\nname: 대상\ndefinition: 설명\n';
       await writeFile(path.join(root, '.codocs/target.yaml'), target);
       if (ambiguous)
         await writeFile(
@@ -242,7 +248,7 @@ describe('language server stdio 프로세스', () => {
               expect.objectContaining({
                 code: ambiguous
                   ? 'reference_ambiguous'
-                  : 'deprecated_reference',
+                  : 'reference_target_error',
                 severity: ambiguous ? 1 : 2,
               }),
             ]) as unknown,
@@ -252,7 +258,7 @@ describe('language server stdio 프로세스', () => {
           textDocument: { uri, version: 2 },
           contentChanges: [
             {
-              text: 'id: source\nname: 출처\ndefinition: 삭제\ndomains: [업무]\n',
+              text: 'id: source\nname: 출처\ndefinition: 삭제\ndomains: [업무]\ndeprecatedAliases: []\n',
             },
           ],
         });
@@ -297,7 +303,7 @@ describe('language server stdio 프로세스', () => {
     await mkdir(path.join(root, '.codocs'));
     await writeFile(
       path.join(root, '.codocs/반납 구역.yaml'),
-      'id: return-zone\r\nname: Return Zone\r\ndefinition: 한글 본문\r\ndomains: [test]\r\n',
+      'id: return-zone\r\nname: Return Zone\r\ndefinition: 한글 본문\r\ndomains: [test]\r\ndeprecatedAliases: []\r\n',
       'utf8',
     );
     await build({
@@ -424,17 +430,17 @@ describe('language server stdio 프로세스', () => {
     await Promise.all([
       writeFile(
         path.join(parent, '.codocs/parent-zone.yaml'),
-        'id: parent-zone\nname: Parent Zone\ndefinition: parent\ndomains: [test]\n',
+        'id: parent-zone\nname: Parent Zone\ndefinition: parent\ndomains: [test]\ndeprecatedAliases: []\n',
         'utf8',
       ),
       writeFile(
         path.join(nested, '.codocs/nested-zone.yaml'),
-        'id: nested-zone\nname: Nested Zone\ndefinition: nested\ndomains: [test]\n',
+        'id: nested-zone\nname: Nested Zone\ndefinition: nested\ndomains: [test]\ndeprecatedAliases: []\n',
         'utf8',
       ),
       writeFile(
         path.join(sibling, '.codocs/sibling-zone.yaml'),
-        'id: sibling-zone\nname: Sibling Zone\ndefinition: sibling\ndomains: [test]\n',
+        'id: sibling-zone\nname: Sibling Zone\ndefinition: sibling\ndomains: [test]\ndeprecatedAliases: []\n',
         'utf8',
       ),
     ]);
@@ -589,7 +595,7 @@ describe('language server stdio 프로세스', () => {
       await mkdir(path.join(missing, '.codocs'));
       await writeFile(
         path.join(missing, '.codocs/created-zone.yaml'),
-        'id: created-zone\nname: Created Zone\ndefinition: created\ndomains: [test]\n',
+        'id: created-zone\nname: Created Zone\ndefinition: created\ndomains: [test]\ndeprecatedAliases: []\n',
         'utf8',
       );
       await firstClient.request(6, workspaceRefreshRequestMethod, {
@@ -612,7 +618,7 @@ describe('language server stdio 프로세스', () => {
 
       await writeFile(
         path.join(missing, '.codocs/created-zone.yaml'),
-        'id: changed-zone\nname: Changed Zone\ndefinition: changed\ndomains: [test]\n',
+        'id: changed-zone\nname: Changed Zone\ndefinition: changed\ndomains: [test]\ndeprecatedAliases: []\n',
         'utf8',
       );
       firstClient.send('textDocument/didChange', {
@@ -714,6 +720,96 @@ describe('language server stdio 프로세스', () => {
       }
     } finally {
       await stopChild(firstChild);
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('prepareRename·planRename·applyRename 요청을 실제 LSP 프레임으로 처리해 파일에 반영한다', async () => {
+    const fixtureParent = path.resolve('.workbench/fixtures');
+    await mkdir(fixtureParent, { recursive: true });
+    const root = await mkdtemp(path.join(fixtureParent, 'server-rename-'));
+    const output = path.join(root, 'server.cjs');
+    await mkdir(path.join(root, '.codocs'));
+    const order =
+      'id: order\nname: 주문\ndomains: [test]\ndefinition: 설명\ndeprecatedAliases: []\n';
+    await writeFile(path.join(root, '.codocs/order.yaml'), order, 'utf8');
+    await writeFile(
+      path.join(root, '.codocs/ref.yaml'),
+      'id: ref\nname: 참조\ndomains: [test]\ndefinition: 본문 [[주문]]\ndeprecatedAliases: []\n',
+      'utf8',
+    );
+    await build({
+      entryPoints: [fileURLToPath(new URL('../index.ts', import.meta.url))],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      target: 'node20.19',
+      alias: {
+        '@codocs/core': path.resolve('packages/core/src/index.ts'),
+        '@codocs/workspace': path.resolve('packages/workspace/src/index.ts'),
+      },
+    });
+    const child = spawn(process.execPath, [output, '--stdio'], {
+      cwd: root,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    const client = new StdioProtocolClient(child);
+    try {
+      const rootUri = pathToFileURL(root).href;
+      const orderUri = pathToFileURL(
+        path.join(root, '.codocs/order.yaml'),
+      ).href;
+      await client.request(1, 'initialize', {
+        processId: null,
+        rootUri: null,
+        capabilities: { workspace: { workspaceFolders: true } },
+        workspaceFolders: [{ uri: rootUri, name: 'fixture' }],
+      });
+      client.send('initialized', {});
+      client.send('textDocument/didOpen', {
+        textDocument: {
+          uri: orderUri,
+          languageId: 'yaml',
+          version: 1,
+          text: order,
+        },
+      });
+      await client.request(2, workspaceRefreshRequestMethod, {});
+      const targetPath = path.join('.codocs', 'order.yaml');
+
+      const prepared = await client.request(3, 'codocs/prepareRename', {
+        textDocument: { uri: orderUri },
+        position: { line: 1, character: 7 },
+      });
+      const planned = await client.request(4, 'codocs/planRename', {
+        textDocument: { uri: orderUri },
+        targetPath,
+        newName: '새주문',
+      });
+      const revisions = (planned.result as { revisions: object }).revisions;
+      const applied = await client.request(5, 'codocs/applyRename', {
+        textDocument: { uri: orderUri },
+        targetPath,
+        newName: '새주문',
+        revisions,
+      });
+
+      expect(prepared.result).toMatchObject({
+        placeholder: '주문',
+        targetPath,
+      });
+      expect(planned.result).toMatchObject({ success: true, status: 'ready' });
+      expect(applied.result).toMatchObject({ success: true, changed: true });
+      expect(
+        await readFile(path.join(root, '.codocs/ref.yaml'), 'utf8'),
+      ).toContain('[[새주문]]');
+      await client.request(6, 'shutdown', null);
+      client.send('exit');
+      child.stdin.end();
+    } finally {
+      await stopChild(child);
       await rm(root, { recursive: true, force: true });
     }
   });

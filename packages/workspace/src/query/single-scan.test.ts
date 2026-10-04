@@ -27,7 +27,7 @@ describe('문서 저장 한 번의 색인 갱신', () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
     await writeFile(
       target,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 이전\n',
     );
     const starts: Record<string, unknown>[] = [];
     const published: Record<string, unknown>[] = [];
@@ -47,7 +47,7 @@ describe('문서 저장 한 번의 색인 갱신', () => {
     };
     await writeFile(
       target,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 최신 정의\n',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 최신 정의\n',
     );
     await new Promise((resolve) => setTimeout(resolve, settleMilliseconds));
     expect(starts.length - baseline.starts).toBe(1);
@@ -63,7 +63,7 @@ describe('문서 저장 한 번의 색인 갱신', () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
     await writeFile(
       target,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 처음\n',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 처음\n',
     );
     const starts: Record<string, unknown>[] = [];
     session = createWorkspaceQuerySession({ cwd: project }, (kind, detail) => {
@@ -75,7 +75,7 @@ describe('문서 저장 한 번의 색인 갱신', () => {
     for (const definition of ['둘째 정의', '셋째 정의']) {
       await writeFile(
         target,
-        `id: alpha\nname: alpha\ndomains: [업무]\ndefinition: ${definition}\n`,
+        `id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: ${definition}\n`,
       );
       await new Promise((resolve) => setTimeout(resolve, settleMilliseconds));
       expect(await session.get(['alpha'])).toMatchObject({

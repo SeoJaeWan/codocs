@@ -38,17 +38,18 @@ Windows에서는 JSON의 command 값으로 `C:\\absolute\\install\\node_modules\
 
 ### 사용할 수 있는 도구
 
-| 도구                | 역할                                          |
-| ------------------- | --------------------------------------------- |
-| `codocs_list`       | 필터와 페이지 단위로 문서 목록 검색           |
-| `codocs_get`        | 문서 본문·참조·revision 조회                  |
-| `codocs_write`      | 문서 생성 및 읽은 revision을 사용한 수정      |
-| `codocs_duplicates` | 프로젝트 전체나 저장 전 초안의 반복 구절 검토 |
-| `codocs_validate`   | 문서의 오류·경고 확인                         |
-| `codocs_refresh`    | 프로젝트 지식 색인 재구성                     |
-| `codocs_guide`      | 문서 작성·수정·복구 가이드 조회               |
+| 도구                | 역할                                                     |
+| ------------------- | -------------------------------------------------------- |
+| `codocs_list`       | 필터와 페이지 단위로 문서 목록 검색                      |
+| `codocs_get`        | 문서 본문·참조·revision 조회                             |
+| `codocs_write`      | 문서 생성 및 읽은 revision을 사용한 수정                 |
+| `codocs_rename`     | 문서 이름과 그 문서를 가리키는 참조를 함께 미리보고 변경 |
+| `codocs_duplicates` | 프로젝트 전체나 저장 전 초안의 반복 구절 검토            |
+| `codocs_validate`   | 문서의 오류·경고 확인                                    |
+| `codocs_refresh`    | 프로젝트 지식 색인 재구성                                |
+| `codocs_guide`      | 문서 작성·수정·복구 가이드 조회                          |
 
-AI 도우미에게 “주문의 정의를 찾아줘”, “프로젝트 문서의 오류를 확인해줘”, “이 비즈니스 규칙을 문서로 작성해줘”처럼 요청할 수 있다. 문서를 수정할 때는 `codocs_get`으로 먼저 읽고, `codocs_duplicates`로 초안의 반복 구절을 검토할 수 있으며(저장을 막지 않는 검토 정보), 응답의 revision을 `codocs_write`에 전달한다.
+AI 도우미에게 “주문의 정의를 찾아줘”, “프로젝트 문서의 오류를 확인해줘”, “이 비즈니스 규칙을 문서로 작성해줘”처럼 요청할 수 있다. 문서를 수정할 때는 `codocs_get`으로 먼저 읽고, `codocs_duplicates`로 초안의 반복 구절을 검토할 수 있으며(저장을 막지 않는 검토 정보), 응답의 revision을 `codocs_write`에 전달한다. 문서 이름을 바꿀 때는 `codocs_rename`으로 미리본 뒤 그 결과를 반영하며, `codocs_write`는 문서의 이름을 바꾸지 않는다.
 
 ## VS Code
 
