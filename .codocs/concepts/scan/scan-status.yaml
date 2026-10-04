@@ -1,13 +1,12 @@
-id: scan-status
-name: '탐색 상태'
-domains:
-  - '제품 개념'
-definition: |
+_codocs:
+  id: scan-status
+  name: 탐색 상태
+  parent:
+    - 탐색
+개요: |
   탐색 상태는 [[탐색]]이 대상 파일을 얼마나 확인했는지 나타낸다.
   일부만 확인했거나 실패한 결과를 "없음"이나 "완료"로 보여주지 않는다.
-
-  ## 상태 값
-
+상태 값: |
   응답의 scanStatus로 전달한다.
 
   - complete: 탐색할 범위를 모두 확인했다. .codocs가 없는 프로젝트도 빈 프로젝트로 complete다.
