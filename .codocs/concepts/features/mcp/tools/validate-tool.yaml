@@ -1,19 +1,16 @@
-id: validate-tool
-name: 'codocs_validate'
-domains:
-  - '제품 개념'
-definition: |
+_codocs:
+  id: validate-tool
+  name: codocs_validate
+  parent:
+    - MCP 도구
+개요: |
   프로젝트 전체나 YAML 파일 하나의 문서 문제를 확인하는 [[MCP 도구]]다.
   문서 하나의 형식 검사인 [[문서 검증]]과 프로젝트의 ID·이름 충돌, 참조 검사를 함께 적용한다.
-
-  ## 입력
-
+입력: |
   path를 생략하면 .codocs 전체를 검사한다.
   path에는 프로젝트 루트 기준 .codocs 아래의 상대 경로로 YAML 파일 하나를 지정한다. [[codocs_get]]의 source.path를 그대로 쓸 수 있다.
   .codocs 밖, 절대 경로, 폴더, 와일드카드, 여러 경로는 허용하지 않으며, 절대 경로를 보내면 상대 경로로 고치라고 안내한다. 링크·정션 경로는 따라가지 않고 거부한다.
-
-  ## 결과
-
+결과: |
   파일 하나를 지정해도 전체 색인으로 ID 중복과 참조 대상을 확인하되, 그 파일의 진단과 관련 충돌 파일 경로만 돌려준다.
   ID가 없거나 YAML을 해석하지 못한 파일도 경로로 검사할 수 있다.
   예를 들어 A와 B의 ID가 같고 C에 YAML 오류가 있을 때, A를 지정하면 A의 중복 ID 진단과 B의 경로만 주고 C의 오류는 빼며, path를 생략하면 세 문제를 모두 준다.

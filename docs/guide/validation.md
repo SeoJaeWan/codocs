@@ -4,7 +4,8 @@
 
 ## 이름 충돌과 불완전한 탐색
 
-ID가 여러 발견 경로에 있으면 `duplicate_id`다. 같은 도메인에 같은 이름이 있으면 `duplicate_name`이다. 다른 도메인의 동명은 허용한다.
+ID가 여러 발견 경로에 있으면 `duplicate_id`다. 같은 이름이 여러 발견 경로에 있으면 폴더가 달라도 `duplicate_name`이다. 이름은 프로젝트 전체에서 유일해야 한다.
+`_codocs.parent`에 적은 이름의 문서가 없으면 `parent_not_found`, `parent`를 따라가면 자기 자신으로 돌아오면 `parent_cycle`이다.
 
 일부 파일이나 폴더를 읽지 못한 상태에서는 `scanStatus: partial`과 함께 확인한 결과를 성공으로 제공한다. 이전 색인에서 보존한 문서는 `confirmation: unconfirmed`와 마지막 원문 `revision`을 유지하고, `unconfirmed_reference` 진단으로 최신성·존재를 보장하지 않음을 알린다. 보이지 않은 후보가 있을 수 있으므로 색인에 없는 ID를 `not_found`로 확정하지 않으며, 전체 탐색이 완료된 `scanStatus: complete`에서만 부재·단일 대상·충돌을 다시 계산한다. 프로젝트나 `.codocs` 자체를 탐색하지 못한 `failed`는 `success: false`와 원인을 반환한다.
 
@@ -12,7 +13,7 @@ ID가 여러 발견 경로에 있으면 `duplicate_id`다. 같은 도메인에 �
 
 `codocs_validate({})`는 프로젝트 전체를, `{"path":".codocs/order.yaml"}`은 파일 하나를 검사한다.
 진단의 code·message·severity·path와 제공되는 위치를 확인한다. 문서 오류를 정상 보고한 결과도 `success: true`다.
-오류는 YAML 구문·필수 속성·허용 값·충돌·참조 대상을 수정한 뒤 재검증한다. 경고는 사용자 필드 보존처럼 원인을 검토한다.
+오류는 YAML 구문·`_codocs`와 섹션·허용 값·충돌·`parent` 대상·참조 대상을 수정한 뒤 재검증한다. 경고는 원인을 검토한다.
 자연어 설명의 사실 여부나 업무 정책의 타당성을 자동 보장하는 검사는 아니다.
 
 초기화와 전체 refresh 중에는 list/get/write/validate가 준비 중 상태를 알릴 수 있다. 기존 요청의 완료를 기다리고 guide로 안내를 읽는다.
