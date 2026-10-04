@@ -32,7 +32,7 @@ describe('SourceSelections', () => {
       'file:///c%3A/space%20/source.ts',
       1,
       session,
-      { text: 'target' },
+      { reference: { name: 'target' }, sourcePath: '.codocs/source.yaml' },
       target,
       1,
     )!;
@@ -53,7 +53,10 @@ describe('SourceSelections', () => {
       releaseCandidate: vi.fn(),
     };
     const selections = new SourceSelections();
-    const origin = { text: 'target' };
+    const origin = {
+      reference: { name: 'target' },
+      sourcePath: '.codocs/source.yaml',
+    };
     const selected = selections.capture(
       sourceUri,
       1,
@@ -93,7 +96,7 @@ describe('SourceSelections', () => {
       sourceUri,
       1,
       session,
-      { text: 'target' },
+      { reference: { name: 'target' }, sourcePath: '.codocs/source.yaml' },
       target,
       1,
     );

@@ -78,10 +78,6 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       success: true,
       results: [{ found: true, revision: result.revision }, { found: false }],
     });
-    expect(await current.match('first old-first')).toMatchObject({
-      success: true,
-      candidates: [{ id: 'renamed' }],
-    });
     const listed = await current.list();
     expect(listed).toMatchObject({ success: true, totalCount: 2 });
     const diagnostics = await current.diagnostics();

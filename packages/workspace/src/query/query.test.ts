@@ -319,79 +319,32 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
   });
-  describe('전체 텍스트 매칭', () => {
-    it('저장하지 않은 주석·문자열·불완전 원문을 요청마다 새 UTF-16 범위로 매칭한다', async () => {
-      await file(
-        'user-name.yaml',
-        'id: user-name\nname: user name\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
-      );
-      await file(
-        'return-zone.yaml',
-        'id: return-zone\nname: return zone\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
-      );
-      const session = createWorkspaceQuerySession({ cwd: project });
-      const text = '😀// userName\r\nconst broken = "returnZone';
-      const first = await session.match(text);
-      if (!first.success) throw new Error('초기 매칭 실패');
+  it('문서 ID 목록이 같아도 .codocs 변경을 새 catalog 버전의 다음 조회에 반영한다', async () => {
+    await file(
+      'stable.yaml',
+      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 이전 본문\ndeprecatedAliases: []\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    await session.list();
+    const firstVersion = session.catalogVersion;
+    const listGeneration = session.generation;
+    await file(
+      'stable.yaml',
+      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 새 본문\ndeprecatedAliases: []\n',
+    );
 
-      expect(first).toMatchObject({
-        scanStatus: scanStatuses.complete,
-        partial: false,
-        candidates: [{ id: 'user-name' }, { id: 'return-zone' }],
-      });
-      expect(first.evidence.map((item) => item.range)).toEqual([
-        {
-          start: text.indexOf('userName'),
-          end: text.indexOf('userName') + 'userName'.length,
-        },
-        {
-          start: text.indexOf('returnZone'),
-          end: text.indexOf('returnZone') + 'returnZone'.length,
-        },
-      ]);
-
-      const edited = await session.match('// returnZone');
-      expect(edited).toMatchObject({
-        success: true,
-        catalogVersion: first.catalogVersion,
-        candidates: [{ id: 'return-zone' }],
-      });
-      if (edited.success)
-        expect(
-          edited.candidates.map((candidate) => candidate.id),
-        ).not.toContain('user-name');
-    });
-
-    it('문서 ID 목록이 같아도 .codocs 변경을 새 catalog 버전의 다음 매칭에 반영한다', async () => {
-      await file(
-        'stable.yaml',
-        'id: stable\nname: stable\ndomains: [업무]\ndefinition: 본문\ndeprecatedAliases: [{ id: alpha }]\n',
-      );
-      const session = createWorkspaceQuerySession({ cwd: project });
-      const first = await session.match('alpha');
-      if (!first.success) throw new Error('초기 매칭 실패');
-      const listGeneration = session.generation;
-      await file(
-        'stable.yaml',
-        'id: stable\nname: stable\ndomains: [업무]\ndefinition: 본문\ndeprecatedAliases: [{ id: beta }]\n',
-      );
-
-      await vi.waitFor(
-        async () => {
-          const synchronized = await session.match('beta');
-          expect(synchronized).toMatchObject({
-            success: true,
-            candidates: [{ id: 'stable' }],
-          });
-          if (!synchronized.success) throw new Error('매칭 동기화 실패');
-          expect(synchronized.catalogVersion).toBeGreaterThan(
-            first.catalogVersion,
-          );
-        },
-        { timeout: 5_000, interval: 25 },
-      );
-      expect(session.generation).toBe(listGeneration);
-    });
+    await vi.waitFor(
+      async () => {
+        const synchronized = await session.get(['stable']);
+        expect(synchronized).toMatchObject({
+          success: true,
+          results: [{ id: 'stable', document: { definition: '새 본문' } }],
+        });
+        expect(session.catalogVersion).toBeGreaterThan(firstVersion);
+      },
+      { timeout: 5_000, interval: 25 },
+    );
+    expect(session.generation).toBe(listGeneration);
   });
 
   it('refresh 집계는 같은 탐색의 파일·비필터 목록·진단을 반영한다', async () => {
@@ -473,7 +426,6 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       expect(session.limitedReadAvailable).toBe(true);
       const list = await session.list();
       const get = await session.get(['alpha', 'outside']);
-      const match = await session.match('outside');
       expect(list).toMatchObject({
         success: true,
         scanStatus: 'partial',
@@ -493,14 +445,6 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         expect(get.results[1]?.diagnostics).not.toContainEqual(
           expect.objectContaining({ code: queryDiagnosticCodes.notFound }),
         );
-      expect(match).toMatchObject({
-        success: true,
-        scanStatus: 'partial',
-        partial: true,
-        candidates: [],
-      });
-      if (match.success)
-        expect(match.diagnostics[0]?.message).toContain('codocs_refresh');
     } finally {
       spy.mockRestore();
       await session.close();
@@ -1193,25 +1137,22 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
 });
 
 describe('경로와 catalog 버전 기반 문서 조회', () => {
-  it('이전 ID로 찾은 현재 ID 누락 문서를 경로로 조회하면 내용과 진단을 유지한다', async () => {
+  it('현재 ID가 누락된 문서를 경로로 조회하면 내용과 진단을 유지한다', async () => {
     const documentPath = await file(
       'missing-id.yaml',
       'name: 이전 이름\ndomains: [업무]\ndefinition: 본문\ndeprecatedAliases: [{ id: old-name }]\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const matched = await session.match('oldName');
-    if (!matched.success) throw new Error('코드 매칭 실패');
-    const candidate = matched.candidates[0];
-    if (!candidate) throw new Error('이전 ID 후보 없음');
+    await session.refresh();
 
     const result = await session.getByPaths(
-      [candidate.path],
-      matched.catalogVersion,
+      [path.relative(project, documentPath)],
+      session.catalogVersion,
     );
 
     expect(result).toMatchObject({
       success: true,
-      catalogVersion: matched.catalogVersion,
+      catalogVersion: session.catalogVersion,
       results: [
         {
           path: path.relative(project, documentPath),
@@ -1241,12 +1182,11 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       'id: target\nname: 대상\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const matched = await session.match('source target');
-    if (!matched.success) throw new Error('코드 매칭 실패');
+    await session.refresh();
 
     const result = await session.getByPaths(
       ['.codocs/source.yaml', '.codocs/target.yaml'],
-      matched.catalogVersion,
+      session.catalogVersion,
     );
 
     expect(result).toMatchObject({
@@ -1275,17 +1215,16 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       'id: stable\nname: stable\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 이전 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const first = await session.match('stable');
-    if (!first.success) throw new Error('초기 매칭 실패');
+    await session.refresh();
+    const first = { catalogVersion: session.catalogVersion };
     await file(
       'stable.yaml',
       'id: stable\nname: stable\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 새 본문\n',
     );
     await vi.waitFor(
       async () => {
-        const changed = await session.match('stable');
-        if (!changed.success) throw new Error('변경 매칭 실패');
-        expect(changed.catalogVersion).toBeGreaterThan(first.catalogVersion);
+        await session.list();
+        expect(session.catalogVersion).toBeGreaterThan(first.catalogVersion);
       },
       { timeout: 5_000, interval: 25 },
     );
@@ -1311,8 +1250,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       'id: alpha\nname: alpha\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const initial = await session.match('alpha');
-    if (!initial.success) throw new Error('초기 매칭 실패');
+    await session.refresh();
     ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
     const refreshed = await session.refresh();
     if (!refreshed.success) throw new Error('부분 갱신 실패');
@@ -1345,14 +1283,11 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       'id: Invalid_Id\r\nname: 오류 문서\r\ndomains: [업무]\r\ndefinition: 😀본문\r\ndeprecatedAliases: [{ id: old-name }]\r\n';
     await file('하위 폴더/오류 문서.yaml', raw);
     const session = createWorkspaceQuerySession({ cwd: project });
-    const matched = await session.match('oldName');
-    if (!matched.success) throw new Error('코드 매칭 실패');
-    const candidate = matched.candidates[0];
-    if (!candidate) throw new Error('형식 오류 ID 후보 없음');
+    await session.refresh();
 
     const result = await session.getByPaths(
-      [candidate.path],
-      matched.catalogVersion,
+      [path.join('.codocs', '하위 폴더', '오류 문서.yaml')],
+      session.catalogVersion,
     );
 
     expect(result).toMatchObject({
@@ -1584,18 +1519,17 @@ describe('live 참조와 선택 최신 확인', () => {
     },
   );
 
-  it('코드 매칭으로 명시 선택한 후보를 이동 후에도 원래 매칭 근거로 확인한다', async () => {
+  it('이름 참조로 명시 선택한 후보를 이동 후에도 원래 참조 근거로 확인한다', async () => {
     const original = await file(
       'target.yaml',
       'id: target\nname: 대상\ndefinition: 내용\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const matched = await session.match('target');
-    if (!matched.success) throw new Error('매칭 실패');
+    await session.refresh();
     const token = session.captureCandidate(
-      { text: 'target' },
+      { reference: { name: '대상' }, sourcePath: '.codocs/source.yaml' },
       '.codocs/target.yaml',
-      matched.catalogVersion,
+      session.catalogVersion,
     )!;
     await rename(original, path.join(project, '.codocs/moved.yaml'));
     await session.refresh();

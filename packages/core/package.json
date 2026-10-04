@@ -12,11 +12,7 @@
   "files": [
     "dist"
   ],
-  "devDependencies": {
-    "@types/pluralize": "0.0.33"
-  },
   "dependencies": {
-    "pluralize": "8.0.0",
     "yaml": "2.9.1",
     "zod": "4.6.5"
   },
