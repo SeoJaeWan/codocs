@@ -26,10 +26,13 @@ core에 이름 변경 수정안을 계산하는 `planRename`이 있지만 MCP·�
 - 원문의 따옴표·escape와 바꾸지 않은 내용은 보존한다.
 - 문서 하나를 다루는 `codocs_write`를 묵시적 일괄 쓰기로 바꾸지 않고 별도 기능(도구·편집기 명령)으로 제공한다.
 
-## 결정할 점
+## 결정 사항
 
-- 제공 경로: MCP 도구, VS Code 이름 변경(rename) 명령, 또는 둘 다
-- `codocs_write`의 set.name 변경과의 관계
+1. 도메인 붙이기·모호 참조 선택까지 전부 구현한다.
+2. MCP와 VS Code 둘 다 제공하며 계산·쓰기 로직을 공유한다.
+3. MCP는 `codocs_rename` 하나에 preview/apply 모드를 두고, apply는 파일별 revision을 확인한 뒤 다르면 거절한다(서버 무상태).
+4. VS Code는 F2로 시작하고 같은 쓰기 로직을 쓴다. 미저장 파일이 있으면 시작 전 중단하고 모호 참조는 QuickPick으로 고른다.
+5. `codocs_write` update에서 name 변경은 막고 `codocs_rename`을 안내한다.
 
 ## 검증
 
