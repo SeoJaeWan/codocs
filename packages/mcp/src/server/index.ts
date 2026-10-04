@@ -32,8 +32,7 @@ export interface CodocsToolResult {
 }
 
 /** 공통 결과 객체를 MCP 구조 결과와 JSON 텍스트에 손실 없이 담는다.
- * @codocs [[MCP:도구 결과]]
- * @codocs [[MCP:도구 결과]]#L17-L19 */
+ * */
 export function wrapCodocsResult(result: CodocsToolResult): CallToolResult {
   return {
     structuredContent: result as unknown as Record<string, unknown>,
@@ -43,8 +42,6 @@ export function wrapCodocsResult(result: CodocsToolResult): CallToolResult {
 }
 
 /** 한 세션을 공유하는 SDK 서버와 실행 handler를 연결한다. 세션 종료는 호출자가 소유한다.
- * @codocs [[MCP:MCP]]
- * @codocs [[MCP:MCP 도구 호출]]
  * @param session 조회와 변경이 공유할 프로젝트 세션이다.
  * @param guide 가이드 원문 경계다. 생략하면 배포된 자산을 읽는다.
  */
@@ -127,7 +124,7 @@ export function createCodocsServer(
   server.setRequestHandler(
     ListToolsRequestSchema,
     /** 실제 실행 가능한 도구만 나열한다.
-     * @codocs [[MCP:MCP 도구 호출]]#L11-L12 */ () => ({
+     * */ () => ({
       tools: Array.from(
         executionRegistry,
         /** 원본 스키마와 실행 설명을 같은 이름에 연결한다. */ ([
@@ -144,7 +141,7 @@ export function createCodocsServer(
   server.setRequestHandler(
     CallToolRequestSchema,
     /** 알려진 도구만 공통 결과로 포장한다.
-     * @codocs [[MCP:도구 결과]]#L21-L22 */ async (request, extra) => {
+     * */ async (request, extra) => {
       const name = request.params.name;
       const entry = executionRegistry.get(name as CodocsToolName);
       if (!entry)

@@ -30,7 +30,7 @@ interface Selection {
   candidateToken: string | undefined;
 }
 
-/** 임의 URI 대신 현재 서버가 발급한 선택 근거만 보관한다. @codocs [[IDE 지원]]#L94-L96 */
+/** 임의 URI 대신 현재 서버가 발급한 선택 근거만 보관한다. */
 export class SourceSelections {
   readonly #selections = new Map<string, Selection>();
 
@@ -76,7 +76,7 @@ export class SourceSelections {
     return { sourceUri, token };
   }
 
-  /** 닫기·원문 편집·서버 종료에서 출처의 모든 선택을 해제한다. @codocs [[문서 동기화]]#L38 */
+  /** 닫기·원문 편집·서버 종료에서 출처의 모든 선택을 해제한다. */
   release(sourceUri?: string): void {
     for (const [token, selection] of this.#selections) {
       if (sourceUri !== undefined && sourceUri !== selection.sourceUri)
@@ -87,7 +87,7 @@ export class SourceSelections {
     }
   }
 
-  /** 외부 인자는 토큰과 출처만 허용하고 최신 문서·세션을 전후로 확인한다. @codocs [[코드 호버]]#L44-L45 */
+  /** 외부 인자는 토큰과 출처만 허용하고 최신 문서·세션을 전후로 확인한다. */
   async confirm(
     input: unknown,
     current: (
@@ -118,7 +118,7 @@ export class SourceSelections {
   }
 }
 
-/** command 링크에 외부 URI나 추가 명령을 넣지 않는다. @codocs [[IDE 지원]]#L95-L96 */
+/** command 링크에 외부 URI나 추가 명령을 넣지 않는다. */
 export function selectionTarget(selection: SourceSelection): string {
   // Host URI 파싱과 CommandOpener의 추가 디코딩에서 URI 내부의 %를 보존한다.
   // 서버 resolve의 단일 디코딩도 같은 JSON 값을 복원한다.

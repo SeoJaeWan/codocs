@@ -14,8 +14,6 @@ import {
   catalogDiagnosticCodes,
   catalogDiagnosticMessages,
   diagnosticSeverities,
-  isDocumentKind,
-  isDocumentStatus,
   matchCode,
   parseYaml,
   changePlanStatuses,
@@ -493,14 +491,12 @@ function sessionInput(input: unknown): unknown {
 function normalizeFilters(input: CatalogListFilters): CatalogListFilters {
   return {
     ...(input.domain === undefined ? {} : { domain: input.domain }),
-    ...(input.kind === undefined ? {} : { kind: input.kind }),
-    ...(input.status === undefined ? {} : { status: input.status }),
   };
 }
 
 /** 커서와 함께 필터가 하나라도 명시되었는지 판별한다. */
 function hasSuppliedFilters(input: WorkspaceListInput): boolean {
-  return ['domain', 'kind', 'status'].some((key) => hasOwnData(input, key));
+  return ['domain'].some((key) => hasOwnData(input, key));
 }
 
 /** 목록에 보이는 모든 값만 canonical snapshot으로 해시한다. */
@@ -512,7 +508,6 @@ function fingerprint(items: readonly CatalogListItem[]): string {
 
 /**
  * HMAC 입력과 payload를 분리할 수 있는 URL-safe 토큰으로 만든다.
- * @codocs [[작업 공간:조회 커서]]#L11-L12
  */
 function encodeCursor(payload: CursorPayload): string {
   return encodeSignedCursor(payload);
@@ -526,8 +521,6 @@ function cursorPayload(value: unknown): CursorPayload | undefined {
   const listFingerprint = ownValue(value, 'fingerprint');
   const generation = ownValue(value, 'generation');
   const domain = ownValue(filters, 'domain');
-  const kind = ownValue(filters, 'kind');
-  const status = ownValue(filters, 'status');
   if (
     version !== cursorVersion ||
     !Number.isSafeInteger(position) ||
@@ -535,17 +528,13 @@ function cursorPayload(value: unknown): CursorPayload | undefined {
     typeof listFingerprint !== 'string' ||
     !Number.isSafeInteger(generation) ||
     (generation as number) < 0 ||
-    (domain !== undefined && typeof domain !== 'string') ||
-    (kind !== undefined && !isDocumentKind(kind)) ||
-    (status !== undefined && !isDocumentStatus(status))
+    (domain !== undefined && typeof domain !== 'string')
   )
     return undefined;
   return {
     version,
     filters: normalizeFilters({
       ...(typeof domain === 'string' ? { domain } : {}),
-      ...(isDocumentKind(kind) ? { kind } : {}),
-      ...(isDocumentStatus(status) ? { status } : {}),
     }),
     position: position as number,
     fingerprint: listFingerprint,
@@ -560,7 +549,6 @@ function decodeCursor(token: string): CursorPayload | undefined {
 
 /**
  * 커서가 만료되었음을 첫 페이지 대체 없이 반환한다.
- * @codocs [[작업 공간:목록 페이지 조회]]#L23-L24
  */
 function cursorExpired(
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>,
@@ -661,7 +649,6 @@ function scanRevisions(scan: WorkspaceScanResult): Map<string, string> {
 
 /**
  * 미확인 문서에 최신성 비보장 진단을 추가한다.
- * @codocs [[작업 공간:미확인 문서]]#L12-L13
  */
 function withConfirmationDiagnostic(
   result: CatalogGetResult,
@@ -753,7 +740,6 @@ export interface WorkspaceDiagnosticsSnapshot {
 
 /**
  * 실제 scan과 이전 Catalog를 직렬로 연결하는 process 범위 조회 세션이다.
- * @codocs [[작업 공간:작업 공간 조회 세션]]
  */
 export class WorkspaceQuerySession {
   readonly #input: unknown;
@@ -850,7 +836,6 @@ export class WorkspaceQuerySession {
 
   /**
    * 프로젝트 선택 후 첫 문서 IO 전에 구독과 감시 준비를 완료한다.
-   * @codocs [[작업 공간:색인 갱신]]#L39-L41
    */
   async #prepare(): Promise<WorkspaceScanResult | undefined> {
     if (this.#watcher || this.#closed) return;
@@ -1127,7 +1112,6 @@ export class WorkspaceQuerySession {
 
   /**
    * 저장은 한 번만 수행하고 색인 관측 실패에만 범위 재읽기를 추가 한 번 시도한다.
-   * @codocs [[작업 공간:저장 후 색인 갱신 실패를 복구하는 절차]]
    */
   async write(input: unknown): Promise<WorkspaceWriteResult> {
     if (this.#closed || this.#explicitRefreshPromise)
@@ -1272,7 +1256,6 @@ export class WorkspaceQuerySession {
 
   /**
    * 최신 실제 scan에서 필터 snapshot을 50개씩 반환한다.
-   * @codocs [[작업 공간:목록 페이지 조회]]
    */
   async list(input: WorkspaceListInput = {}): Promise<WorkspaceListResult> {
     if (this.#scan && this.#explicitRefreshPromise)
@@ -2255,7 +2238,6 @@ export class WorkspaceQuerySession {
 
   /**
    * 명시 refresh는 결과 변화와 무관하게 기존 커서 generation을 만료한다.
-   * @codocs [[작업 공간:색인 갱신]]#L33-L35
    */
   refresh(): Promise<WorkspaceRefreshResult> {
     if (this.#closed) return Promise.resolve(superseded());

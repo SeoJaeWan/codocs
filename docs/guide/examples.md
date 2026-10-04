@@ -12,10 +12,7 @@
 | [shipping-policy.yaml](../../examples/.codocs/shipping-policy.yaml) | 접수 기준의 유일한 소유자                 | 판단 대상인 용어                  |
 | [receipt.yaml](../../examples/.codocs/receipt.yaml)                 | 가상 접수건이라는 다른 이름의 사용 맥락   | 원래 용어                         |
 
-용어에는 `kind`를 생략하고, 규칙에는 `policy`, 절차에는 `procedure`를 쓴다.
 다른 이름을 같은 문서의 `aliases`로 등록해 이름 참조가 연결된다고 가정하지 않는다. 별도 이름 문서는 독립적인 사용 맥락을 설명하고 원뜻을 참조한다.
-예시의 접수건 안내는 `deprecated`로 보존한다. 이를 참조한 주문에는 `deprecated_reference` 경고가 생기지만 연결은 유지된다.
-이 경고는 예시의 의도이며, 파싱·스키마·참조 대상 해석 오류와 구분한다.
 
 정책 조건은 shipping-policy 한 곳에 있다. 처리 절차는 정책을 참조하고 판단 뒤 행동을 설명한다.
 이름·경로를 바꾸거나 설명을 분리했다는 이유만으로 기존 ID를 바꾸지 않는다. 예시에서는 `sample-receipt`를 유지한다.

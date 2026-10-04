@@ -1,4 +1,3 @@
-import { documentKinds, documentStatuses } from '@codocs/core';
 import type { WorkspaceListInput } from '@codocs/workspace';
 import { z } from 'zod';
 import { guideTopics } from '../guide/domain-values.js';
@@ -56,8 +55,6 @@ export type CodocsToolName =
 const listSchema = z.strictObject({
   cursor: z.string().optional(),
   domain: z.string().optional(),
-  kind: z.enum(documentKinds).optional(),
-  status: z.enum(documentStatuses).optional(),
 });
 const getSchema = z.strictObject({ ids: z.array(z.string().min(1)) });
 const validateSchema = z.strictObject({ path: z.string().optional() });
@@ -98,8 +95,7 @@ export function parseWriteInput(
 }
 
 /** 일곱 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다.
- * @codocs [[MCP:MCP 도구 호출]]
- * @codocs [[MCP:MCP 도구 호출]]#L22-L24 */
+ * */
 export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_list', listSchema],
   ['codocs_get', getSchema],
@@ -111,7 +107,7 @@ export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
 ]);
 
 /** SDK에 제공하는 JSON Schema는 실행 검증과 동일한 Zod 원본에서 생성한다.
- * @codocs [[MCP:MCP 도구 호출]]#L22-L24 */
+ * */
 export function codocsJsonInputSchema(
   name: CodocsToolName,
 ): Record<string, unknown> {
@@ -126,17 +122,15 @@ export function parseListInput(input: unknown): WorkspaceListInput | undefined {
   if (!dataOnly(input)) return undefined;
   const result = listSchema.safeParse(input);
   if (!result.success) return undefined;
-  const { cursor, domain, kind, status } = result.data;
+  const { cursor, domain } = result.data;
   return {
     ...(cursor === undefined ? {} : { cursor }),
     ...(domain === undefined ? {} : { domain }),
-    ...(kind === undefined ? {} : { kind }),
-    ...(status === undefined ? {} : { status }),
   };
 }
 
 /** ID를 첫 등장 순서로 중복 제거한 뒤 1~20개를 허용한다.
- * @codocs [[MCP:조회]]#L26-L27 */
+ * */
 export function parseGetInput(input: unknown): { ids: string[] } | undefined {
   if (!dataOnly(input)) return undefined;
   const result = getSchema.safeParse(input);
@@ -165,7 +159,7 @@ export function parseGuideInput(
 }
 
 /** 중복 검토 입력을 세션 입력으로 바꾼다. draft는 write와 같은 객체로 풀고 cursor는 그대로 전달한다.
- * @codocs [[MCP:본문 중복 검토 요청]] */
+ * */
 export function parseDuplicatesInput(
   input: unknown,
 ):

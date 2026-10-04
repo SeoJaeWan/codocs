@@ -75,7 +75,6 @@ async function selectedLink(
  * 시작 cwd 또는 그 기준의 project 디렉터리를 선택하고 실제 루트와 읽기·탐색 권한을 확인한다.
  * 상위 .codocs·Git을 탐색하지 않으며 .codocs 부재 여부를 루트 선택에 사용하지 않는다.
  * IO 실패는 진단으로 반환한다. 결과는 현 시점 확인이며 후속 IO를 위한 영구 허가가 아니다.
- * @codocs [[작업 공간:프로젝트 루트]]
  */
 export async function resolveProjectRoot(
   input: unknown = {},

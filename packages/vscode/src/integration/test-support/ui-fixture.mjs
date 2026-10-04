@@ -7,7 +7,7 @@ function rowsDocument(id, name) {
     { length: 10 },
     (_, index) => `  ${name} row ${String(index + 5).padStart(2, '0')}`,
   );
-  return `id: ${id}\nname: ${name}\ndomains: [test]\ndefinition: |\n${rows.join('\n')}\n`;
+  return `id: ${id}\nname: ${name}\ndomains: [test]\ndefinition: |\n${rows.join('\n')}\ndeprecatedAliases: []\n`;
 }
 
 /** 코드 파일의 둘째 행에 명시 표기를 둔 시험 원문을 만든다. */
@@ -17,7 +17,7 @@ function codeMarker(className, marker) {
 
 /** 셋째 행에 한 줄 정의를 둔 시험 문서를 만든다. */
 function inlineDocument(id, name, definition) {
-  return `id: ${id}\nname: ${name}\ndefinition: ${definition}\ndomains: [test]\n`;
+  return `id: ${id}\nname: ${name}\ndefinition: ${definition}\ndomains: [test]\ndeprecatedAliases: []\n`;
 }
 
 /** UI가 책임지는 대표 경로·관계·진단만 제공한다. */
@@ -26,28 +26,28 @@ export function uiFiles() {
     'source %20 한글#.java':
       'class Probe {\n  zoneAuxiliary();\n  direct();\n}\n',
     '.codocs/zone %20 한글#.yaml':
-      'id: zone\nname: Zone\ndefinition: Zone body [[Direct]]\ndomains: [test]\n',
+      'id: zone\nname: Zone\ndefinition: Zone body [[Direct]]\ndomains: [test]\ndeprecatedAliases: []\n',
     '.codocs/direct.yaml':
-      'id: direct\nname: Direct\ndefinition: Direct body\ndomains: [test]\n',
+      'id: direct\nname: Direct\ndefinition: Direct body\ndomains: [test]\ndeprecatedAliases: []\n',
     '.codocs/auxiliary.yaml':
-      'id: auxiliary\nname: Auxiliary\ndefinition: Auxiliary body\ndomains: [test]\n',
+      'id: auxiliary\nname: Auxiliary\ndefinition: Auxiliary body\ndomains: [test]\ndeprecatedAliases: []\n',
     '.codocs/referrer.yaml':
-      'id: referrer\nname: Referrer\ndefinition: Backlink [[Zone]]\ndomains: [test]\n',
+      'id: referrer\nname: Referrer\ndefinition: Backlink [[Zone]]\ndomains: [test]\ndeprecatedAliases: []\n',
     '.codocs/source %20 한글#.yaml':
-      'id: source\nname: Source\ndefinition: Body [[Zone]]\ndomains: [test]\n',
+      'id: source\nname: Source\ndefinition: Body [[Zone]]\ndomains: [test]\ndeprecatedAliases: []\n',
     '.codocs/ambiguous.yaml':
-      'id: ambiguous\nname: Ambiguous\ndefinition: Body [[Twin]]\ndomains: [test]\n',
+      'id: ambiguous\nname: Ambiguous\ndefinition: Body [[Twin]]\ndomains: [test]\ndeprecatedAliases: []\n',
     '.codocs/twin-a.yaml':
-      'id: twin-a\nname: Twin\ndefinition: Twin A body\ndomains: [alpha]\n',
+      'id: twin-a\nname: Twin\ndefinition: Twin A body\ndomains: [alpha]\ndeprecatedAliases: []\n',
     '.codocs/twin-b.yaml':
-      'id: twin-b\nname: Twin\ndefinition: Twin B body\ndomains: [beta]\n',
+      'id: twin-b\nname: Twin\ndefinition: Twin B body\ndomains: [beta]\ndeprecatedAliases: []\n',
     '.codocs/old.yaml':
-      'id: old\nname: Old\ndefinition: Old body\nstatus: deprecated\ndomains: [test]\n',
+      'id: old\nname: Old\ndefinition: Old body\ndomains: [test]\ndeprecatedAliases: []\n',
     '.codocs/old-source.yaml':
-      'id: old-source\nname: Old Source\ndefinition: Body [[Old]]\ndomains: [test]\n',
+      'id: old-source\nname: Old Source\ndefinition: Body [[Old]]\ndomains: [test]\ndeprecatedAliases: []\n',
     'nested/source.java': 'zone();\n',
     'nested/.codocs/zone.yaml':
-      'id: zone\nname: Nested Zone\ndefinition: Nested workspace body\ndomains: [nested]\n',
+      'id: zone\nname: Nested Zone\ndefinition: Nested workspace body\ndomains: [nested]\ndeprecatedAliases: []\n',
     // 코드 참조 이동: 기존 ID·이름·경로와 겹치지 않는 별도 문서와 코드만 사용한다.
     '.codocs/navigation-target.yaml': rowsDocument(
       'navigation-target',

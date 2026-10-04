@@ -72,7 +72,7 @@ async function file(name: string, raw: string): Promise<string> {
 
 /** definition 하나만 가진 유효한 문서 원문이다. */
 function raw(id: string, definition: string): string {
-  return `id: ${id}\nname: 문서 ${id}\ndomains: [업무]\ndefinition: ${JSON.stringify(definition)}\n`;
+  return `id: ${id}\nname: 문서 ${id}\ndomains: [업무]\ndefinition: ${JSON.stringify(definition)}\ndeprecatedAliases: []\n`;
 }
 
 /** success가 true인 응답만 통과시킨다. */
@@ -163,7 +163,7 @@ describe('WorkspaceQuerySession.duplicates: 전체 검사', () => {
   it('한 문서의 definition과 examples가 같은 문장을 가지면 문서 내부 반복 후보를 반환한다', async () => {
     await file(
       'alpha.yaml',
-      `id: alpha\nname: 문서 alpha\ndomains: [업무]\ndefinition: ${JSON.stringify(repeated)}\nexamples:\n  - ${JSON.stringify(repeated)}\n`,
+      `id: alpha\nname: 문서 alpha\ndomains: [업무]\ndefinition: ${JSON.stringify(repeated)}\nexamples:\n  - ${JSON.stringify(repeated)}\ndeprecatedAliases: []\n`,
     );
 
     const result = succeeded(await session().duplicates());
@@ -282,7 +282,6 @@ describe('WorkspaceQuerySession.duplicates: 문서별 준비 캐시', () => {
     expect(second.preparation).toEqual({ preparedCount: 0, reusedCount: 3 });
   });
 
-  /** @codocs [[작업 공간:작업 공간 중복 검사]]#L35 */
   it('한 문서를 수정한 뒤 다시 검사하면 그 문서만 다시 준비한다', async () => {
     await file('alpha.yaml', raw('alpha', repeated));
     await file('beta.yaml', raw('beta', repeated));
@@ -594,7 +593,6 @@ describe('WorkspaceQuerySession.duplicates: 초안 검사', () => {
     expect(result.candidates[0]?.b.fieldPath).toEqual(['examples', 0]);
   });
 
-  /** @codocs [[작업 공간:작업 공간 중복 검사]]#L25 */
   it('초안을 검사해도 파일 바이트·디렉터리 목록·색인 조회 결과가 바뀌지 않는다', async () => {
     const alpha = await file('alpha.yaml', raw('alpha', repeated));
     await file('beta.yaml', raw('beta', repeated));
@@ -638,7 +636,6 @@ describe('WorkspaceQuerySession.duplicates: 초안 검사', () => {
     expect(result.error).toBe(result.diagnostics?.[0]);
   });
 
-  /** @codocs [[작업 공간:작업 공간 중복 검사]]#L20 */
   it('같은 ID의 다른 경로 문서는 수정 대상의 원래 경로만 제외하므로 비교에 남는다', async () => {
     await file('alpha.yaml', raw('shared', repeated));
     await file('beta.yaml', raw('shared', repeated));
@@ -889,7 +886,6 @@ describe('WorkspaceQuerySession.duplicates: 결과 페이지와 커서 만료', 
     expect(second.returnedCount).toBe(8);
   });
 
-  /** @codocs [[작업 공간:작업 공간 중복 검사]]#L56 */
   it('페이지 사이에 비교한 문서의 원문이 바뀌면 source_changed 이유로 커서가 만료된다', async () => {
     await eightRepeatedDocuments();
     const target = session();
@@ -907,7 +903,6 @@ describe('WorkspaceQuerySession.duplicates: 결과 페이지와 커서 만료', 
     });
   });
 
-  /** @codocs [[작업 공간:작업 공간 중복 검사]]#L60 */
   it('다른 검사가 보관 결과를 대체하면 원문이 같아도 result_replaced 이유로 이전 커서가 만료된다', async () => {
     await eightRepeatedDocuments();
     const target = session();

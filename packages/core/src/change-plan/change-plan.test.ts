@@ -18,11 +18,18 @@ import type { YamlParseResult } from '../parser/index.js';
 import { changePlanStatuses, planDocumentChange } from './index.js';
 
 const path = '.codocs/zone.yaml';
-const base = 'id: zone\nname: 구역\ndomains: [운영]\ndefinition: 설명\n';
+const base =
+  'id: zone\nname: 구역\ndomains: [운영]\ndeprecatedAliases: []\ndefinition: 설명\n';
 const baseParsed: Extract<YamlParseResult, { success: true }> = {
   success: true,
   source: base,
-  data: { id: 'zone', name: '구역', domains: ['운영'], definition: '설명' },
+  data: {
+    id: 'zone',
+    name: '구역',
+    domains: ['운영'],
+    deprecatedAliases: [],
+    definition: '설명',
+  },
   fields: [],
   strings: [],
   diagnostics: [],
@@ -70,10 +77,9 @@ describe('planDocumentChange', () => {
       expect(result.status).toBe(changePlanStatuses.candidate);
       if (result.status !== changePlanStatuses.candidate) return;
       expect(result.path).toBe(baseContext.source.path);
-      // @codocs [[문서 변경 계획]]#L90
       expect(result.baseRevision).toBe(baseContext.source.revision);
       expect(result.raw).toBe(
-        'id: zone\nname: 구역\ndomains: [운영]\ndefinition: 새 설명\n',
+        'id: zone\nname: 구역\ndomains: [운영]\ndeprecatedAliases: []\ndefinition: 새 설명\n',
       );
       expect(result.data.definition).toBe(request.set.definition);
     });
@@ -96,8 +102,29 @@ describe('planDocumentChange', () => {
       if (result.status !== changePlanStatuses.candidate) return;
       expect(result.path).toBe(request.path);
       expect(result.id).toBe(request.document.id);
-      expect(result.data).toEqual(request.document);
+      expect(result.data).toEqual({
+        ...request.document,
+        deprecatedAliases: [],
+      });
       expect(result.raw).toContain('id: new-zone');
+    });
+
+    it('문서를 생성하면 요청에 없던 deprecatedAliases를 빈 배열로 원문에 저장한다', () => {
+      const request = {
+        mode: 'create',
+        path: '.codocs/new-zone.yaml',
+        document: {
+          id: 'new-zone',
+          name: '새 구역',
+          domains: ['운영'],
+          definition: '설명',
+        },
+      };
+      const result = planDocumentChange(request, { catalog: baseCatalog });
+
+      expect(result.status).toBe(changePlanStatuses.candidate);
+      if (result.status !== changePlanStatuses.candidate) return;
+      expect(result.raw).toContain('deprecatedAliases: []');
     });
 
     it('없는 선택 속성을 삭제하면 기존 revision을 담은 무변경 결과를 반환한다', () => {
@@ -127,7 +154,6 @@ describe('planDocumentChange', () => {
 
       expect(result.status).toBe(changePlanStatuses.candidate);
       if (result.status === changePlanStatuses.candidate)
-        // @codocs [[문서 변경 계획]]#L55
         expect(result.data.deprecatedAliases).toEqual([{ id: 'zone' }]);
     });
 
@@ -227,7 +253,7 @@ describe('planDocumentChange', () => {
   describe('문서 속성 편집과 기존 YAML 형식 보존', () => {
     it('설명만 바꾸면 수정하지 않은 따옴표·주석·CRLF·파일 끝을 보존한다', () => {
       const raw =
-        '# 앞 주석\r\nid: zone\r\nname: "구역" # 옆 주석\r\ndomains: [운영]\r\ndefinition: 설명';
+        '# 앞 주석\r\nid: zone\r\nname: "구역" # 옆 주석\r\ndomains: [운영]\r\ndeprecatedAliases: []\r\ndefinition: 설명';
       const catalog: Catalog = {
         ...baseCatalog,
         documents: new Map([
@@ -261,7 +287,7 @@ describe('planDocumentChange', () => {
       expect(result.status).toBe(changePlanStatuses.candidate);
       if (result.status === changePlanStatuses.candidate)
         expect(result.raw).toBe(
-          '# 앞 주석\r\nid: zone\r\nname: "구역" # 옆 주석\r\ndomains: [운영]\r\ndefinition: 새😀설명',
+          '# 앞 주석\r\nid: zone\r\nname: "구역" # 옆 주석\r\ndomains: [운영]\r\ndeprecatedAliases: []\r\ndefinition: 새😀설명',
         );
     });
 
@@ -357,7 +383,7 @@ describe('planDocumentChange', () => {
 
     it('들여쓴 문서의 배열을 교체하면 기존 속성 들여쓰기를 따른다', () => {
       const raw =
-        '  id: zone\n  name: 구역\n  domains: [운영]\n  definition: 설명\n  examples: [옛 예시]\n';
+        '  id: zone\n  name: 구역\n  domains: [운영]\n  deprecatedAliases: []\n  definition: 설명\n  examples: [옛 예시]\n';
       const catalog: Catalog = {
         ...baseCatalog,
         documents: new Map([
@@ -398,7 +424,7 @@ describe('planDocumentChange', () => {
 
     it('들여쓴 문서의 ID를 바꾸면 이전 ID 속성에도 같은 들여쓰기를 적용한다', () => {
       const raw =
-        '  id: zone\n  name: 구역\n  domains: [운영]\n  definition: 설명\n';
+        '  id: zone\n  name: 구역\n  domains: [운영]\n  deprecatedAliases: []\n  definition: 설명\n';
       const catalog: Catalog = {
         ...baseCatalog,
         documents: new Map([
@@ -435,7 +461,8 @@ describe('planDocumentChange', () => {
     });
 
     it('중괄호 매핑에 중첩 객체를 추가하면 그 값을 결과 데이터에 반영한다', () => {
-      const raw = '{id: zone, name: 구역, domains: [운영], definition: 설명}\n';
+      const raw =
+        '{id: zone, name: 구역, domains: [운영], deprecatedAliases: [], definition: 설명}\n';
       const catalog: Catalog = {
         ...baseCatalog,
         documents: new Map([
@@ -479,7 +506,7 @@ describe('planDocumentChange', () => {
       '중괄호 매핑의 %s 선택 속성을 삭제하면 결과 데이터에서 그 속성을 제거한다',
       (_position, key) => {
         const raw =
-          '{id: zone, name: 구역, domains: [운영], definition: 설명, first: 1, middle: 2, last: 3}\n';
+          '{id: zone, name: 구역, domains: [운영], deprecatedAliases: [], definition: 설명, first: 1, middle: 2, last: 3}\n';
         const catalog: Catalog = {
           ...baseCatalog,
           documents: new Map([
@@ -519,7 +546,7 @@ describe('planDocumentChange', () => {
 
     it('중괄호 매핑의 인접한 속성을 삭제하고 새 속성을 추가하면 한 후보에 모두 반영한다', () => {
       const raw =
-        '{id: zone, name: 구역, domains: [운영], definition: 설명, a: 1, b: 2, c: 3,}\n';
+        '{id: zone, name: 구역, domains: [운영], deprecatedAliases: [], definition: 설명, a: 1, b: 2, c: 3,}\n';
       const catalog: Catalog = {
         ...baseCatalog,
         documents: new Map([
@@ -561,7 +588,7 @@ describe('planDocumentChange', () => {
 
     it('중괄호 매핑의 마지막 속성을 삭제하고 새 속성을 추가하면 한 후보에 모두 반영한다', () => {
       const raw =
-        '{id: zone, name: 구역, domains: [운영], definition: 설명, old: 1,}\n';
+        '{id: zone, name: 구역, domains: [운영], deprecatedAliases: [], definition: 설명, old: 1,}\n';
       const catalog: Catalog = {
         ...baseCatalog,
         documents: new Map([
@@ -642,7 +669,7 @@ describe('planDocumentChange', () => {
 
     it('중괄호 매핑의 속성을 삭제하면 그 속성의 옆 주석을 함께 제거한다', () => {
       const raw =
-        '{id: zone, name: 구역, domains: [운영], definition: 설명, a: 1, # a comment\n # independent, comma\n b: 2}\n';
+        '{id: zone, name: 구역, domains: [운영], deprecatedAliases: [], definition: 설명, a: 1, # a comment\n # independent, comma\n b: 2}\n';
       const catalog: Catalog = {
         ...baseCatalog,
         documents: new Map([
@@ -683,7 +710,7 @@ describe('planDocumentChange', () => {
       '중괄호 매핑의 %s 속성을 삭제하면 쉼표가 든 독립 주석을 보존한다',
       (key) => {
         const raw =
-          '{id: zone, name: 구역, domains: [운영], definition: 설명, a: 1, # a comment\n # independent, comma\n b: 2}\n';
+          '{id: zone, name: 구역, domains: [운영], deprecatedAliases: [], definition: 설명, a: 1, # a comment\n # independent, comma\n b: 2}\n';
         const catalog: Catalog = {
           ...baseCatalog,
           documents: new Map([
@@ -723,7 +750,7 @@ describe('planDocumentChange', () => {
 
     it('중괄호 매핑의 중간 속성을 삭제하면 그 앞의 독립 주석을 보존한다', () => {
       const raw =
-        '{id: zone, name: 구역, domains: [운영], definition: 설명, # 옆\n # 독립 주석, 쉼표\n old: 1, tail: 2}\n';
+        '{id: zone, name: 구역, domains: [운영], deprecatedAliases: [], definition: 설명, # 옆\n # 독립 주석, 쉼표\n old: 1, tail: 2}\n';
       const catalog: Catalog = {
         ...baseCatalog,
         documents: new Map([
@@ -1019,7 +1046,10 @@ describe('planDocumentChange', () => {
     });
 
     it('원문에 잘못된 이전 ID가 있으면 무변경 요청도 실패한다', () => {
-      const raw = base + 'deprecatedAliases: [{id: Bad ID}]\n';
+      const raw = base.replace(
+        'deprecatedAliases: []',
+        'deprecatedAliases: [{id: Bad ID}]',
+      );
       const catalog: Catalog = {
         ...baseCatalog,
         documents: new Map([
@@ -1111,7 +1141,7 @@ describe('planDocumentChange', () => {
         );
     });
 
-    it('알 수 없는 속성이 있는 원문에서 무변경 요청을 하면 경고와 함께 완료한다', () => {
+    it('알 수 없는 속성이 있는 원문에서 무변경 요청을 하면 경고 없이 완료한다', () => {
       const raw = base + 'custom: value\n';
       const catalog: Catalog = {
         ...baseCatalog,
@@ -1146,19 +1176,13 @@ describe('planDocumentChange', () => {
 
       expect(result.status).toBe(changePlanStatuses.unchanged);
       if (result.status === changePlanStatuses.unchanged)
-        expect(result.diagnostics).toContainEqual(
-          expect.objectContaining({
-            code: schemaDiagnosticCodes.unknownField,
-            severity: diagnosticSeverities.warning,
-            message: schemaDiagnosticMessages.unknownField,
-          }),
-        );
+        expect(result.diagnostics).toEqual([]);
     });
 
     it('다른 문서의 필드 오류가 있으면 대상 문서 수정 후보에는 포함하지 않는다', () => {
       const otherPath = '.codocs/other.yaml';
       const otherRaw =
-        'id: other\nname: 다른 이름\ndomains: [운영]\ndefinition: ""\n';
+        'id: other\nname: 다른 이름\ndomains: [운영]\ndeprecatedAliases: []\ndefinition: ""\n';
       const otherDocument: CatalogDocument = {
         ...baseDocument,
         path: otherPath,
@@ -1215,7 +1239,7 @@ describe('planDocumentChange', () => {
           parsed: {
             ...baseParsed,
             source:
-              'id: other\nname: 다른 이름\ndomains: [운영]\ndefinition: 설명\n',
+              'id: other\nname: 다른 이름\ndomains: [운영]\ndeprecatedAliases: []\ndefinition: 설명\n',
             data: {
               id: 'other',
               name: '다른 이름',
@@ -1307,7 +1331,8 @@ describe('planDocumentChange', () => {
           path: targetPath,
           parsed: {
             ...baseParsed,
-            source: 'id: target\nname: 대상\ndomains: [운영]\ndefinition: ""\n',
+            source:
+              'id: target\nname: 대상\ndomains: [운영]\ndeprecatedAliases: []\ndefinition: ""\n',
             data: {
               id: 'target',
               name: '대상',

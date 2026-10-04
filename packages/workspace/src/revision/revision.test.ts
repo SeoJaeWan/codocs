@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { calculateRevision, decodeWorkspaceBytes } from './index.js';
 
 describe('decodeWorkspaceBytes: 원본 바이트 해석과 버전 계산', () => {
-  /** @codocs [[작업 공간:원문 버전]]#L6-L9 */
   it('유효한 UTF-8 바이트를 해석하면 원문과 원본 바이트의 SHA-256을 반환한다', () => {
     const bytes = Buffer.from('id: alpha\n', 'utf8');
     const result = decodeWorkspaceBytes(bytes);
@@ -31,7 +30,6 @@ describe('decodeWorkspaceBytes: 원본 바이트 해석과 버전 계산', () =>
     },
   );
 
-  /** @codocs [[작업 공간:원문 버전]]#L9 */
   it('잘못된 UTF-8 바이트 둘이 같은 대체 문자열로 해석되어도 서로 다른 원본 버전을 반환한다', () => {
     const first = Buffer.from([0x80]);
     const second = Buffer.from([0x81]);

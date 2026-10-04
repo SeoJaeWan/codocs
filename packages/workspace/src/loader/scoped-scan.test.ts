@@ -254,7 +254,6 @@ describe('loadWorkspace: 진행 중 전체 순회와 경로 보정', () => {
     }
   });
 
-  /** @codocs [[작업 공간:문서 탐색]]#L42 */
   it('같은 파일을 같은 세대에서 동시에 확인하면 하나의 읽기와 파싱을 공유한다', async () => {
     const a = path.join(codocs, 'a.yaml');
     await writeFile(a, rawA);
@@ -312,7 +311,6 @@ describe('loadWorkspacePath: 부재와 접근 실패', () => {
     ]);
   });
 
-  /** @codocs [[작업 공간:문서 탐색]]#L9 */
   it('경로 확인 후 파일 읽기에서 ENOENT가 나면 확정 부재 대신 실패를 반환한다', async () => {
     const a = path.join(codocs, 'a.yaml');
     await writeFile(a, rawA);

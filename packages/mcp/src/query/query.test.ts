@@ -64,7 +64,6 @@ function invalidInput() {
   };
 }
 
-// @codocs [[MCP:조회]]
 describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증', () => {
   describe('상세 조회 응답 전달', () => {
     it('유효한 ID 하나를 조회하면 작업 공간의 문서 응답을 그대로 반환한다', async () => {
@@ -140,7 +139,6 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(backend.get).toHaveBeenCalledWith(input.ids);
     });
 
-    // @codocs [[MCP:조회]]#L32
     it('중복 ID와 정상 문서를 함께 조회하면 충돌 결과의 금지 필드를 덧붙이지 않는다', async () => {
       const response = {
         success: true,
@@ -244,11 +242,11 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
   describe('요청 입력 검증과 backend 호출 방지', () => {
     it.each([
       { name: '알 수 없는 목록 속성', method: 'list', input: { limit: 10 } },
-      { name: '잘못된 종류 값', method: 'list', input: { kind: 'knowledge' } },
+      { name: 'kind 필터', method: 'list', input: { kind: 'policy' } },
       {
-        name: '명시적 undefined 상태',
+        name: 'status 필터',
         method: 'list',
-        input: { status: undefined },
+        input: { status: 'confirmed' },
       },
       { name: '빈 ID 목록', method: 'get', input: { ids: [] } },
       { name: '희소 ID 배열', method: 'get', input: { ids: Array(1) } },
@@ -316,7 +314,6 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(backend.get).not.toHaveBeenCalled();
     });
 
-    // @codocs [[MCP:조회]]#L26-L27
     it('같은 ID 21개를 전달하면 중복 제거한 한 ID로 backend를 호출한다', async () => {
       const response = {
         success: true,
@@ -350,7 +347,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { domain: '업무', kind: 'policy', status: 'confirmed' };
+      const input = { domain: '업무' };
 
       const result = await handlers.codocsList(input);
 
@@ -699,7 +696,6 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     expect(serialized).not.toContain('truncated');
   });
 
-  // @codocs [[MCP:본문 중복 검토 요청]]#L10-L11
   it('중복 검토는 draft를 write 입력으로 풀고 cursor·signal을 세션에 전달하며 잘못된 조합은 거부한다', async () => {
     const handlers = createCodocsQueryHandlers(
       backend as unknown as WorkspaceQuerySession,

@@ -249,7 +249,7 @@ function adjacentCommentEdit(entry: FlowEntry): Edit | undefined {
   };
 }
 
-/** 각 최상위 값·속성 범위만 수정한다. @codocs [[문서 변경 계획]]#L67-L82 */
+/** 각 최상위 값·속성 범위만 수정한다. */
 function editYaml(
   parsed: Extract<YamlParseResult, { success: true }>,
   expected: Record<string, unknown>,
@@ -443,7 +443,7 @@ function candidateDiagnostics(
   return temporary.documents.get(path)?.diagnostics ?? parsed.diagnostics;
 }
 
-/** create/update 요청을 파일 IO 없이 검증하고 YAML 후보를 계산한다. @codocs [[문서 변경 계획]] */
+/** create/update 요청을 파일 IO 없이 검증하고 YAML 후보를 계산한다. */
 export function planDocumentChange(
   input: unknown,
   context: ChangePlanContext,
@@ -474,7 +474,15 @@ function planDocumentChangeInternal(
     )
       return failure('invalidRequest');
     if (context.catalog.documents.has(path)) return failure('pathExists', path);
-    const validation = validateDocument({ data: input.document, path });
+    const validation = validateDocument({
+      data:
+        typeof input.document === 'object' &&
+        input.document !== null &&
+        !Array.isArray(input.document)
+          ? { ...input.document, [documentFields.deprecatedAliases]: [] }
+          : input.document,
+      path,
+    });
     if (!validation.success)
       return {
         status: changePlanStatuses.failed,
