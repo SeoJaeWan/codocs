@@ -1,4 +1,3 @@
-const code = 'source %20 한글#.java';
 const zone = '.codocs/zone %20 한글#.yaml';
 const source = '.codocs/source %20 한글#.yaml';
 
@@ -66,34 +65,16 @@ async function startRename(c, name, newName) {
   await c.driver.key('Enter', 'Enter', 13);
 }
 
+/** 출처 YAML의 [[Zone]] 링크가 표시되고 서버 준비가 끝날 때까지 Hover로 기다린다. */
+async function readyZoneLink(c) {
+  await c.open(source);
+  return c.driver.hover('[[Zone]]', 'Zone', 0, {
+    providerLabel: 'Zone',
+    nativeLabel: '원문 열기: Zone (.codocs/zone %20 한글#.yaml)',
+  });
+}
+
 module.exports.scenarios = [
-  {
-    id: 'hover-content-and-relations',
-    /** 실제 코드 Hover의 본문·관계 앵커를 관측하고 각각 클릭한다.
-     * */
-    async run(c) {
-      for (const [label, target] of [
-        ['원문 열기', zone],
-        ['Auxiliary', '.codocs/auxiliary.yaml'],
-        ['Direct', '.codocs/direct.yaml'],
-        ['Referrer', '.codocs/referrer.yaml'],
-      ]) {
-        await c.open(code);
-        const hover = await c.driver.hover('zone', 'Zone body');
-        for (const text of [
-          '현재 ID: zone',
-          '도메인: test',
-          '함께 매칭된 용어',
-          '이 문서가 참조',
-          '이 문서를 참조',
-        ])
-          c.assert.ok(hover.body.includes(text), text);
-        c.assert.ok(!hover.body.includes('Auxiliary body'));
-        await c.driver.clickAnchor(label);
-        await c.atTop(target);
-      }
-    },
-  },
   {
     id: 'yaml-single-special-path',
     /** 특수 출처·대상 경로의 YAML 링크를 OS 수정 키 클릭으로 연다.
@@ -147,9 +128,8 @@ module.exports.scenarios = [
         5,
       );
       const before = c.tabs(zone)[0];
-      await c.open(code);
-      await c.driver.hover('zone', 'Zone body');
-      await c.driver.clickAnchor('원문 열기');
+      await readyZoneLink(c);
+      await c.driver.yamlLink('[[Zone]]');
       await c.atTop(zone);
       c.assert.equal(c.tabs(zone).length, 1);
       c.assert.equal(c.tabs(zone)[0], before);
@@ -192,7 +172,7 @@ module.exports.scenarios = [
   },
   {
     id: 'saved-and-external-refresh',
-    /** 저장·외부 변경 뒤 새 포인터 조회에 최신 본문과 연결만 표시한다. */
+    /** 저장·외부 변경 뒤 YAML 참조 링크가 최신 대상 내용을 연다. */
     async run(c) {
       const document = await c.open(zone);
       await c.replace(
@@ -202,19 +182,27 @@ module.exports.scenarios = [
           .replace('Zone body [[Direct]]', 'Saved body [[Auxiliary]]'),
       );
       c.assert.equal(await document.save(), true);
-      await c.open(code);
-      const saved = await c.driver.hover('zone', 'Saved body');
-      c.assert.ok(saved.anchors.some((anchor) => anchor.label === 'Auxiliary'));
-      c.assert.ok(!saved.anchors.some((anchor) => anchor.label === 'Direct'));
-      await c.driver.dismiss();
+      await readyZoneLink(c);
+      await c.driver.yamlLink('[[Zone]]');
+      const saved = await c.atTop(zone);
+      await c.until(
+        () => saved.document.getText().includes('Saved body [[Auxiliary]]'),
+        'opened saved text settled',
+      );
+      c.assert.ok(!saved.document.getText().includes('Zone body'));
       c.assert.equal(await c.vscode.window.tabGroups.close(c.tabs(zone)), true);
       await c.until(() => c.tabs(zone).length === 0, 'saved target tab closed');
       await c.fs.writeFile(
         document.uri.fsPath,
-        'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: zone\nname: Zone\ndefinition: External body [[Unknown Target]]\ndomains: [test]\n',
       );
-      await c.driver.hover('zone', 'External body');
-      await c.driver.clickAnchor('원문 열기');
+      // 외부 변경의 실제 진단 게시로 완료 snapshot을 관측한다.
+      await c.until(
+        () => c.diagnostics(zone, 'reference_not_found').length === 1,
+        'external target completed snapshot',
+      );
+      await readyZoneLink(c);
+      await c.driver.yamlLink('[[Zone]]');
       const editor = await c.atTop(zone);
       await c.until(
         () => editor.document.getText().includes('External body'),
@@ -226,24 +214,20 @@ module.exports.scenarios = [
   },
   {
     id: 'stale-target-latest-content',
-    /** 표시된 같은 앵커를 클릭해 재확인한 최신 대상 내용만 연다. */
+    /** 화면에 남은 같은 YAML 링크를 클릭해 재확인한 최신 대상 내용만 연다. */
     async run(c) {
-      await c.open(code);
-      const hover = await c.driver.hover('zone', 'Zone body');
-      const href = hover.anchors.find(
-        (anchor) => anchor.label === '원문 열기',
-      ).href;
+      await readyZoneLink(c);
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: zone\nname: Zone\ndefinition: Changed after display [[Unknown Target]]\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: zone\nname: Zone\ndefinition: Changed after display [[Unknown Target]]\ndomains: [test]\n',
       );
       // 새 저장 원문의 실제 진단 게시로 완료 snapshot을 관측한다.
-      // 기존 Hover와 href는 유지하며 제품 조회·명시 refresh는 호출하지 않는다.
+      // 출처 편집기의 기존 링크는 유지하며 제품 조회·명시 refresh는 호출하지 않는다.
       await c.until(
         () => c.diagnostics(zone, 'reference_not_found').length === 1,
         'changed target completed snapshot',
       );
-      await c.driver.clickAnchor('원문 열기', href);
+      await c.driver.yamlLink('[[Zone]]');
       const editor = await c.atTop(zone);
       c.assert.ok(editor.document.getText().includes('Changed after display'));
     },
@@ -252,19 +236,16 @@ module.exports.scenarios = [
     id: 'stale-target-rejected-output',
     /** 대상 교체 뒤 실제 클릭 실패 기록과 작업 상태 보존을 관측한다. */
     async run(c) {
-      await c.open(code);
-      const hover = await c.driver.hover('zone', 'Zone body');
-      const href = hover.anchors.find(
-        (anchor) => anchor.label === '원문 열기',
-      ).href;
+      await readyZoneLink(c);
+      await c.driver.dismiss();
       const beforeEditor = c.editorState();
       const beforeUi = await c.driver.workbenchState();
       const beforeOutput = await c.output();
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\n',
       );
-      await c.driver.clickAnchor('원문 열기', href);
+      await c.driver.yamlLink('[[Zone]]');
       await c.until(
         /** 입력 계약의 성공·실패 관측을 검증한다. */ async () => {
           const output = await c.output();
@@ -278,22 +259,29 @@ module.exports.scenarios = [
         },
         'Codocs Output rejection',
       );
-      c.assert.deepEqual(c.editorState(), beforeEditor);
+      // 링크 클릭이 커서를 옮길 수는 있으나 다른 파일을 열거나 범위 선택으로 바꾸지는 않는다.
+      const after = c.editorState();
+      c.assert.equal(after.uri, beforeEditor.uri);
+      c.assert.deepEqual(after.tabs, beforeEditor.tabs);
+      c.assert.ok(
+        after.selection[0] === after.selection[2] &&
+          after.selection[1] === after.selection[3],
+      );
       c.assert.deepEqual(await c.driver.workbenchState(), beforeUi);
       c.assert.equal(c.tabs(zone).length, 0);
-      c.assert.deepEqual(c.editorState(), beforeEditor);
-      c.assert.deepEqual(await c.driver.workbenchState(), beforeUi);
     },
   },
   {
     id: 'nested-workspace-owner',
-    /** 같은 ID라도 가장 가까운 workspace의 표시 내용·링크만 사용한다.
+    /** 같은 이름이라도 가장 가까운 workspace의 문서로 YAML 링크가 이동한다.
      * */
     async run(c) {
-      await c.open('nested/source.java');
-      const hover = await c.driver.hover('zone', 'Nested workspace body');
-      c.assert.ok(!hover.body.includes('Zone body'));
-      await c.driver.clickAnchor('원문 열기');
+      await c.open('nested/.codocs/source.yaml');
+      const hover = await c.driver.hover('[[Zone]]', 'Zone', 0, {
+        providerLabel: 'Zone',
+      });
+      c.assert.ok(!hover.body.includes('zone %20 한글#.yaml'));
+      await c.driver.yamlLink('[[Zone]]');
       await c.atTop('nested/.codocs/zone.yaml');
       c.assert.equal(c.tabs(zone).length, 0);
     },
@@ -418,7 +406,7 @@ module.exports.scenarios = [
       );
       await c.create(
         recoveredNavigation,
-        'id: recovered-nav-target\nname: Recovered Nav Target\ndefinition: Recovered body\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: recovered-nav-target\nname: Recovered Nav Target\ndefinition: Recovered body\ndomains: [test]\n',
       );
       await c.until(
         () =>
