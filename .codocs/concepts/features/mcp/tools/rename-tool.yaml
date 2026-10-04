@@ -46,8 +46,10 @@ definition: |
   - invalidSelections: 잘못된 선택.
   - revisions: 영향받는 파일의 경로별 [[revision]].
 
-  impacts의 reason이 selection_required나 domain_required이면 사용자가 후보 중 하나를 골라야 하는 참조다. 후보는 before.candidates의 경로·이름·도메인이다.
-  그 밖의 reason은 고르지 않은 채로 남기거나 이름 변경으로 대상이 바뀐다는 알림이다.
+  impacts 중 다음은 사용자가 대상을 골라야 하는 참조다.
+  - before.status가 ambiguous인 참조: 이름 변경 뒤에도 모호하면 reason이 selection_required이고, 이름 변경 뒤 후보 하나로 바뀌면 changed_resolution이다. 후보는 before.candidates의 경로·이름·도메인이다.
+  - reason이 domain_required인 참조: 고른 문서가 여러 도메인에 속해 도메인도 골라야 한다.
+  before가 모호하지 않은 changed_resolution과 그 밖의 reason은 고르지 않은 채로 남기거나 이름 변경으로 대상이 바뀐다는 알림이다.
   blockingReason은 target_unavailable·invalid_name·name_conflict·unconfirmed·invalid_selection·source_not_lossless·unrepresentable 중 하나다.
   선택이 필요한 참조가 있으면 사용자에게 후보를 보여주고 고른 결과를 selections에 담아 preview를 다시 요청한다.
 
