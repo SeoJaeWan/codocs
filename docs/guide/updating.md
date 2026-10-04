@@ -24,10 +24,8 @@
 `indexUpdated: false`이면 `codocs_write`와 같이 파일을 다시 저장하지 않고 [색인 복구](validation.md#저장-후-색인-복구)를 따른다.
 VS Code에서는 영향받는 파일에 저장하지 않은 수정이 있으면 시작 전에 중단한다.
 
-명시적인 ID 변경 기능은 직전 ID를 `deprecatedAliases`에 보존하고 새 현재 ID가 이전 목록에 있으면 제거한다.
-같은 이전 ID를 중복 추가하지 않고 작성한 변경 안내를 유지한다. YAML을 직접 편집할 때는 필요한 이전 ID 목록도 직접 관리한다.
-update 요청의 `set`/`unset`으로는 `deprecatedAliases`를 직접 바꿀 수 없다. 이전 ID 목록은 ID를 실제로 변경할 때 자동으로 관리되며, 목록 자체를 고치려면 YAML을 직접 편집할 수 있다.
-이전 ID 목록의 유지가 사용자 코드의 자동 변경이나 이전 ID를 통한 문서 조회를 의미하지 않는다.
+ID를 바꿔도 과거 ID는 남기지 않는다. 이후 조회·수정은 새 ID로 하며, 다른 문서의 본문 참조나 사용자 코드는 자동으로 고쳐지지 않는다.
+문서에 예전 별칭 목록 필드(deprecated alias 필드)가 남아 있으면 Codocs가 저장할 때 이 키를 지운다. 이름 변경(`codocs_rename`)과 VS Code의 F2 이름 바꾸기로 저장되는 문서도 같다. 바뀌는 내용이 없어 저장하지 않는 요청은 이 키를 지우지 않는다.
 
 ## get에서 set/unset과 validate까지
 
@@ -46,7 +44,7 @@ update 요청의 `set`/`unset`으로는 `deprecatedAliases`를 직접 바꿀 수
 
 `codocs_write`의 set은 지정 속성만 바꾸고 unset은 선택 속성이나 사용자 속성을 삭제한다.
 필수 속성을 삭제할 수 없으며 같은 속성을 set과 unset에 함께 지정하지 않는다.
-`deprecatedAliases`는 이 요청으로 직접 편집하지 않는다. YAML 직접 편집과 ID 변경의 차이는 위 내용을 확인한다.
+저장하는 문서에 예전 별칭 목록 필드(deprecated alias 필드)가 있으면 수정과 함께 지워진다.
 저장 전에 `codocs_duplicates({"draft":{...}})`로 같은 초안의 반복 구절 후보를 확인할 수 있다. `draft`에는 위와 같은 `codocs_write` 입력을 그대로 넣는다.
 이 결과는 검토 정보이며 저장을 막지 않는다. `codocs_write`는 중복 검토를 실행하지 않고, 파일이나 색인도 바꾸지 않는다.
 `status`가 `complete`가 아니면 중복이 없다는 뜻이 아니다. 후보가 여러 페이지면 `nextCursor`를 `{"cursor":"..."}`로 보내 다음 페이지를 읽고, 원문이 바뀌어 `cursor_expired`가 오면 처음부터 다시 요청한다. 위치의 줄·문자 번호는 0부터 시작한다.
