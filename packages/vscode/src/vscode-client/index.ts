@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import path from 'node:path';
 import {
   CloseAction,
   ErrorAction,
@@ -36,6 +37,18 @@ import {
   openSourceFailureReasons,
 } from '../open-source/index.js';
 import { bundledServerPath } from '../package-assembly/index.js';
+import {
+  RenameAborted,
+  applyRenameMethod,
+  planRenameMethod,
+  prepareRenameMethod,
+  renameAbortReasons,
+  parsePrepareRenameResponse,
+  renameDocument,
+  renameMessages,
+  type RenameChoice,
+  type RenameHost,
+} from '../rename/index.js';
 import {
   isOwnedByWorkspaceRoot,
   type WorkspaceRoot,
@@ -119,7 +132,92 @@ export class VscodeExtensionRuntime {
           ),
       ),
     );
+    this.#disposables.push(
+      vscode.languages.registerRenameProvider(
+        { scheme: 'file', pattern: '**/.codocs/**/*.{yaml,yml}' },
+        {
+          /** 문서의 name 값이나 확정된 참조에서만 이름 바꾸기를 시작한다. */
+          prepareRename: async (document, position) => {
+            const prepared = await this.#prepareRename(document, position);
+            if (!prepared) throw new Error(renameMessages.notRenamable);
+            return {
+              range: new vscode.Range(
+                prepared.range.start.line,
+                prepared.range.start.character,
+                prepared.range.end.line,
+                prepared.range.end.character,
+              ),
+              placeholder: prepared.placeholder,
+            };
+          },
+          /** 미리보기·선택·반영을 진행하고 파일은 서버가 직접 쓰므로 빈 편집을 반환한다. */
+          provideRenameEdits: async (document, position, newName, token) => {
+            const prepared = await this.#prepareRename(document, position);
+            const client = this.#renameClient(document);
+            if (!prepared || !client)
+              throw new Error(renameMessages.notRenamable);
+            const input = {
+              textDocument: { uri: document.uri.toString() },
+              targetPath: prepared.targetPath,
+              newName,
+            };
+            /** 선택을 담아 미리보기를 요청한다. */
+            const planRename: RenameHost['planRename'] = (selections) =>
+              client.sendRenameRequest(planRenameMethod, {
+                ...input,
+                selections,
+              });
+            /** 같은 선택과 revision으로 반영을 요청한다. */
+            const applyRename: RenameHost['applyRename'] = (
+              selections,
+              revisions,
+            ) =>
+              client.sendRenameRequest(applyRenameMethod, {
+                ...input,
+                selections,
+                revisions,
+              });
+            /** 편집기가 이름 바꾸기를 취소했는지 확인한다. */
+            const isCancelled = (): boolean => token.isCancellationRequested;
+            try {
+              await renameDocument(
+                vscodeRenameHost(planRename, applyRename, isCancelled),
+              );
+            } catch (error: unknown) {
+              if (
+                error instanceof RenameAborted &&
+                error.reason === renameAbortReasons.cancelled
+              )
+                return new vscode.WorkspaceEdit();
+              throw error;
+            }
+            return new vscode.WorkspaceEdit();
+          },
+        },
+      ),
+    );
     await this.#manager.activate();
+  }
+
+  /** 문서를 소유한 folder의 이름 변경 가능 위치 확인 결과를 받는다. */
+  async #prepareRename(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+  ): Promise<ReturnType<typeof parsePrepareRenameResponse>> {
+    const client = this.#renameClient(document);
+    if (!client) return undefined;
+    return parsePrepareRenameResponse(
+      await client.sendRenameRequest(prepareRenameMethod, {
+        textDocument: { uri: document.uri.toString() },
+        position: { line: position.line, character: position.character },
+      }),
+    );
+  }
+
+  /** 출처 문서에 가장 가까운 workspace folder의 client를 반환한다. */
+  #renameClient(document: vscode.TextDocument): VscodeFolderClient | undefined {
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    return folder && this.#clients.get(folder.uri.toString());
   }
 
   /** 명령·watcher·listener·client와 서버 프로세스를 정리한다. */
@@ -241,6 +339,17 @@ export class VscodeFolderClient implements FolderClientBoundary {
         argument,
       );
     return result;
+  }
+
+  /** 이름 변경 서버 요청을 이 folder의 실행 중인 client에 보낸다. */
+  async sendRenameRequest(method: string, params: unknown): Promise<unknown> {
+    const client = this.#client;
+    if (!client?.isRunning())
+      throw new RenameAborted(
+        renameAbortReasons.planFailed,
+        renameMessages.planFailed('언어 서버가 실행 중이 아닙니다.'),
+      );
+    return client.sendRequest(method, params);
   }
 
   /** 완료 snapshot 게시 때 provider를 재등록해 Host의 이전 링크 캐시를 무효화한다. */
@@ -648,6 +757,78 @@ export class VscodeFolderClient implements FolderClientBoundary {
     if (selection === restart)
       await vscode.commands.executeCommand('codocs.restartLanguageServers');
   }
+}
+
+/** 두 file 경로가 같은 파일을 가리키는지 OS의 대소문자 규칙으로 비교한다. */
+function sameFilePath(left: string, right: string): boolean {
+  /** 플랫폼의 대소문자 규칙으로 경로를 정규화한다. */
+  const normalize = (value: string): string =>
+    process.platform === 'win32' || process.platform === 'darwin'
+      ? path.normalize(value).toLowerCase()
+      : path.normalize(value);
+  return normalize(left) === normalize(right);
+}
+
+/** 선택 목록 항목을 VS Code 선택 항목으로 바꾸며 고른 항목을 식별할 id를 보존한다. */
+function toQuickPickItem(
+  choice: RenameChoice,
+): vscode.QuickPickItem & { id: string } {
+  return {
+    label: choice.label,
+    ...(choice.description === undefined
+      ? {}
+      : { description: choice.description }),
+    ...(choice.detail === undefined ? {} : { detail: choice.detail }),
+    id: choice.id,
+  };
+}
+
+/** 이름 변경 흐름을 VS Code의 문서 상태·선택 목록·알림에 연결한다. */
+function vscodeRenameHost(
+  planRename: RenameHost['planRename'],
+  applyRename: RenameHost['applyRename'],
+  isCancelled: RenameHost['isCancelled'],
+): RenameHost {
+  return {
+    planRename,
+    applyRename,
+    isCancelled,
+    /** 열린 문서 중 저장하지 않은 수정이 있는 파일을 찾는다. */
+    findDirtyFiles: (uris) => {
+      const dirty = vscode.workspace.textDocuments.filter(
+        (document) => document.isDirty,
+      );
+      return uris.filter((uri) =>
+        dirty.some((document) =>
+          sameFilePath(document.uri.fsPath, vscode.Uri.parse(uri).fsPath),
+        ),
+      );
+    },
+    /** 고르지 않고 닫으면 undefined인 선택 목록을 보여준다. */
+    choose: async (prompt) => {
+      const picked = await vscode.window.showQuickPick(
+        prompt.choices.map(toQuickPickItem),
+        {
+          title: prompt.title,
+          placeHolder: prompt.placeHolder,
+          ignoreFocusOut: true,
+          matchOnDescription: true,
+          matchOnDetail: true,
+        },
+      );
+      return picked?.id;
+    },
+    /** 결과를 알림 메시지로 표시하며 사용자의 닫기를 기다리지 않는다. */
+    notify: (level, message) => {
+      const shown =
+        level === 'error'
+          ? vscode.window.showErrorMessage(message)
+          : level === 'warning'
+            ? vscode.window.showWarningMessage(message)
+            : vscode.window.showInformationMessage(message);
+      void Promise.resolve(shown).catch(() => undefined);
+    },
+  };
 }
 
 /** VS Code 문서와 원문 열기 경계가 공유하는 editor 관측이다. */
