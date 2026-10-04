@@ -53,10 +53,7 @@ export type CodocsToolName =
   | 'codocs_rename'
   | 'codocs_duplicates';
 
-const listSchema = z.strictObject({
-  cursor: z.string().optional(),
-  domain: z.string().optional(),
-});
+const listSchema = z.strictObject({ cursor: z.string().optional() });
 const getSchema = z.strictObject({ ids: z.array(z.string().min(1)) });
 const validateSchema = z.strictObject({ path: z.string().optional() });
 const guideSchema = z.strictObject({ topic: z.enum(guideTopics).optional() });
@@ -84,7 +81,6 @@ const renameBase = {
         sourcePath: z.string(),
         occurrenceIndex: z.number().int().nonnegative(),
         targetPath: z.string(),
-        domain: z.string().optional(),
       }),
     )
     .optional(),
@@ -158,11 +154,8 @@ export function parseListInput(input: unknown): WorkspaceListInput | undefined {
   if (!dataOnly(input)) return undefined;
   const result = listSchema.safeParse(input);
   if (!result.success) return undefined;
-  const { cursor, domain } = result.data;
-  return {
-    ...(cursor === undefined ? {} : { cursor }),
-    ...(domain === undefined ? {} : { domain }),
-  };
+  const { cursor } = result.data;
+  return cursor === undefined ? {} : { cursor };
 }
 
 /** ID를 첫 등장 순서로 중복 제거한 뒤 1~20개를 허용한다.

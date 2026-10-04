@@ -6,7 +6,7 @@ import { LanguageServerSession } from './index.js';
 let root: string;
 let session: LanguageServerSession;
 const target =
-  'id: target\nname: 대상\ndomains: [업무]\ndefinition: |\n  본문\n  두 번째\n  세 번째\n';
+  '_codocs:\n  id: target\n  name: 대상\ndefinition: |\n  본문\n  두 번째\n  세 번째\n';
 /** 공개 링크의 서버 선택 인자만 복원한다. */
 function argument(link: string): unknown {
   return (JSON.parse(decodeURIComponent(link.split('?')[1]!)) as unknown[])[0];
@@ -39,7 +39,7 @@ afterEach(async () => {
 });
 describe('명시 링크와 출처 확인', () => {
   it('확장자 없는 UTF-8 원문의 범위 표기는 전체 span 링크와 명시 번호를 반환한다', async () => {
-    const text = '😀 @codocs [[업무:대상]]#L5-L6';
+    const text = '😀 @codocs [[대상]]#L5-L6';
     const uri = await open('implementation', text);
     const links = await vi.waitFor(
       async () => {
@@ -173,7 +173,7 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
     const text = target.replace('  두 번째', '  [[다른]]');
     await writeFile(
       path.join(root, '.codocs/other.yaml'),
-      'id: other\nname: 다른\ndefinition: 다른 본문\n',
+      '_codocs:\n  id: other\n  name: 다른\ndefinition: 다른 본문\n',
     );
     const sourceUri = await open('source', '@codocs [[대상]]#L6');
     await session.documentLinks(sourceUri);
@@ -256,7 +256,7 @@ describe('정확한 역참조와 문서 전체 Hint', () => {
     expect(session.documents.get(uri)!.getText()).toBe(target);
   });
   it('이전 서버 세션이 발급한 코드 참조 링크를 새 세션에서 확인하면 이동 대상을 반환하지 않는다', async () => {
-    const text = '@codocs [[업무:대상]]#L5-L6';
+    const text = '@codocs [[대상]]#L5-L6';
     const uri = await open('implementation', text);
     const links = await vi.waitFor(
       async () => {

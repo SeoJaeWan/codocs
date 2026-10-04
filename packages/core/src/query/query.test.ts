@@ -29,7 +29,6 @@ const parsedBase = {
   diagnostics: [],
 };
 const documentBase = {
-  domains: ['도메인'],
   confirmation: catalogConfirmations.confirmed,
   documentDiagnostics: [],
   diagnostics: [],
@@ -38,7 +37,6 @@ const documentBase = {
   referencedBy: [],
 } satisfies Pick<
   CatalogDocument,
-  | 'domains'
   | 'confirmation'
   | 'documentDiagnostics'
   | 'diagnostics'
@@ -52,7 +50,6 @@ const catalogBase: Catalog = {
   documents: new Map(),
   idPaths: new Map(),
   namePaths: new Map(),
-  domainNamePaths: new Map(),
 };
 const alpha = {
   ...documentBase,
@@ -63,8 +60,8 @@ const alpha = {
     path: 'a.yaml',
     parsed: {
       ...parsedBase,
-      source: 'id: a\nname: A\n',
-      data: { id: 'a', name: 'A', domains: ['도메인'], definition: '설명' },
+      source: '_codocs:\n  id: a\n  name: A\n',
+      data: { _codocs: { id: 'a', name: 'A' }, definition: '설명' },
     },
   },
 } satisfies CatalogDocument;
@@ -125,7 +122,7 @@ describe('projectCatalogList: Catalog 문서 목록 투영', () => {
               path,
               parsed: {
                 ...parsedBase,
-                data: { id, name: '문서 ' + id, domains: ['도메인'] },
+                data: { _codocs: { id: id, name: '문서 ' + id } },
               },
             },
           } satisfies CatalogDocument;
@@ -162,44 +159,25 @@ describe('projectCatalogList: Catalog 문서 목록 투영', () => {
     }
     function documentWith(
       base: CatalogDocument,
-      domains: string[],
       extra: Record<string, unknown> = {},
     ): CatalogDocument {
       return {
         ...base,
-        domains,
         observation: {
           path: base.path,
           parsed: {
             ...parsedBase,
-            data: { id: base.id, name: base.name, domains, ...extra },
+            data: {
+              _codocs: { id: base.id, name: base.name },
+              ...extra,
+            },
           },
         },
       };
     }
 
-    it('한 문서가 도메인 조건을 만족하면 그 문서를 포함한다', () => {
-      const document = documentWith(alpha, ['판매', '공통']);
-
-      const result = projectCatalogList(catalogOf(document), {
-        domain: '판매',
-      });
-
-      expect(result.items.map((item) => item.id)).toEqual([document.id]);
-    });
-
-    it('도메인 조건이 일치하지 않으면 문서를 제외한다', () => {
-      const document = documentWith(alpha, ['판매']);
-
-      const result = projectCatalogList(catalogOf(document), {
-        domain: '구매',
-      });
-
-      expect(result.items).toEqual([]);
-    });
-
     it('문서에 kind와 status가 있어도 목록 항목에는 두 속성을 표시하지 않는다', () => {
-      const document = documentWith(alpha, ['판매'], {
+      const document = documentWith(alpha, {
         kind: 'policy',
         status: 'confirmed',
       });
@@ -209,38 +187,6 @@ describe('projectCatalogList: Catalog 문서 목록 투영', () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0]).not.toHaveProperty('kind');
       expect(result.items[0]).not.toHaveProperty('status');
-    });
-
-    it('같은 ID의 두 파일 중 한 경로만 도메인 조건에 맞으면 모든 충돌 경로를 반환한다', () => {
-      const matching = {
-        ...documentWith(alpha, ['판매']),
-        path: 'z.yaml',
-        id: 'shared',
-      } as CatalogDocument;
-      const other = {
-        ...documentWith(alpha, ['구매']),
-        path: 'a.yaml',
-        id: 'shared',
-      } as CatalogDocument;
-      const catalog: Catalog = {
-        ...catalogBase,
-        documents: new Map<string, CatalogDocument>([
-          [matching.path, matching],
-          [other.path, other],
-        ]),
-        idPaths: new Map([['shared', new Set(['z.yaml', 'a.yaml'])]]),
-      };
-
-      const result = projectCatalogList(catalog, { domain: '판매' });
-
-      expect(result.items).toEqual([
-        {
-          id: 'shared',
-          paths: ['a.yaml', 'z.yaml'],
-          hasErrors: true,
-          conflict: true,
-        },
-      ]);
     });
   });
 });
@@ -393,7 +339,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           parsed: {
             ...parsedBase,
             source: 'id: broken\nvalue: .nan\n',
-            data: { id: 'broken', value: NaN },
+            data: { _codocs: { id: 'broken', name: 'broken' }, value: NaN },
           },
         },
       } satisfies CatalogDocument;
@@ -433,7 +379,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path: 'source.yaml',
           parsed: {
             ...parsedBase,
-            data: { id: 'source', definition: '[[A]]' },
+            data: { _codocs: { id: 'source' }, definition: '[[A]]' },
           },
         },
         references: [alpha],
@@ -469,7 +415,13 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path: 'first.yaml',
           observation: {
             path: 'first.yaml',
-            parsed: { ...parsedBase, data: { id: 'zebra', name: 'Zebra' } },
+            parsed: {
+              ...parsedBase,
+              data: {
+                _codocs: { id: 'zebra', name: 'Zebra' },
+                definition: '본문',
+              },
+            },
           },
         } satisfies CatalogDocument;
         const beta = {
@@ -478,7 +430,13 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path: 'last.yaml',
           observation: {
             path: 'last.yaml',
-            parsed: { ...parsedBase, data: { id: 'beta', name: 'Beta' } },
+            parsed: {
+              ...parsedBase,
+              data: {
+                _codocs: { id: 'beta', name: 'Beta' },
+                definition: '본문',
+              },
+            },
           },
         } satisfies CatalogDocument;
         const source = {
@@ -521,7 +479,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path: 'source.yaml',
           parsed: {
             ...parsedBase,
-            data: { id: 'source', definition: '[[A]] [[A]]' },
+            data: { _codocs: { id: 'source' }, definition: '[[A]] [[A]]' },
           },
         },
       } satisfies CatalogDocument;
@@ -598,7 +556,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path: 'source.yaml',
           parsed: {
             ...parsedBase,
-            data: { id: 'source', definition: '[[Target]]' },
+            data: { _codocs: { id: 'source' }, definition: '[[Target]]' },
           },
         },
       } satisfies CatalogDocument;
@@ -634,7 +592,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path: 'target.yaml',
           parsed: {
             ...parsedBase,
-            data: { name: 'Target', domains: ['도메인'] },
+            data: { _codocs: { name: 'Target' } },
           },
         },
       } satisfies CatalogDocument;
@@ -657,7 +615,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path: 'source.yaml',
           parsed: {
             ...parsedBase,
-            data: { id: 'source', definition: '[[Target]]' },
+            data: { _codocs: { id: 'source' }, definition: '[[Target]]' },
           },
         },
       } satisfies CatalogDocument;
@@ -718,7 +676,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path: 'source.yaml',
           parsed: {
             ...parsedBase,
-            data: { id: 'source', definition: '[[Target]]' },
+            data: { _codocs: { id: 'source' }, definition: '[[Target]]' },
           },
         },
       } satisfies CatalogDocument;
@@ -758,7 +716,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path: 'source.yaml',
           parsed: {
             ...parsedBase,
-            data: { name: 'Source', domains: ['도메인'] },
+            data: { _codocs: { name: 'Source' } },
           },
         },
       } satisfies CatalogDocument;
@@ -769,7 +727,13 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
         referencedBy: [source],
         observation: {
           path: 'target.yaml',
-          parsed: { ...parsedBase, data: { id: 'target', name: 'Target' } },
+          parsed: {
+            ...parsedBase,
+            data: {
+              _codocs: { id: 'target', name: 'Target' },
+              definition: '본문',
+            },
+          },
         },
       } satisfies CatalogDocument;
       const catalog: Catalog = {
@@ -811,7 +775,10 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path,
           observation: {
             path,
-            parsed: { ...parsedBase, data: { id, name: id } },
+            parsed: {
+              ...parsedBase,
+              data: { _codocs: { id, name: id }, definition: '본문' },
+            },
           },
         } satisfies CatalogDocument;
       });
@@ -822,7 +789,13 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
         references: targets,
         observation: {
           path: 'source.yaml',
-          parsed: { ...parsedBase, data: { id: 'source', name: 'Source' } },
+          parsed: {
+            ...parsedBase,
+            data: {
+              _codocs: { id: 'source', name: 'Source' },
+              definition: '본문',
+            },
+          },
         },
       } satisfies CatalogDocument;
       const catalog: Catalog = {
@@ -857,7 +830,10 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
           path,
           observation: {
             path,
-            parsed: { ...parsedBase, data: { id, definition } },
+            parsed: {
+              ...parsedBase,
+              data: { _codocs: { id, name: id }, definition },
+            },
           },
         } satisfies CatalogDocument;
       });
@@ -889,10 +865,7 @@ describe('projectCatalogGet: ID별 문서 상세 투영', () => {
       };
       const ids = [alpha.id, alpha.id];
       const beforeIds = [...ids];
-      const beforeData = {
-        ...alpha.observation.parsed.data,
-        domains: [...alpha.observation.parsed.data.domains],
-      };
+      const beforeData = { ...alpha.observation.parsed.data };
 
       const result = projectCatalogGet(catalog, ids);
 
@@ -922,9 +895,7 @@ describe('projectCatalogPaths: 발견 경로별 문서 상세 투영', () => {
             parsed: {
               ...parsedBase,
               data: {
-                id: `document-${index + 1}`,
-                name: '같은 이름',
-                domains: ['도메인'],
+                _codocs: { id: `document-${index + 1}`, name: '같은 이름' },
                 definition: `본문 ${index + 1}`,
               },
             },
@@ -969,8 +940,8 @@ describe('projectCatalogPaths: 발견 경로별 문서 상세 투영', () => {
         path: 'target.yaml',
         parsed: {
           ...parsedBase,
-          source: 'id: target\nname: Target\n',
-          data: { id: 'target', name: 'Target', domains: ['도메인'] },
+          source: '_codocs:\n  id: target\n  name: Target\n',
+          data: { _codocs: { id: 'target', name: 'Target' } },
         },
       },
     } satisfies CatalogDocument;
@@ -1021,7 +992,7 @@ describe('projectCatalogPaths: 발견 경로별 문서 상세 투영', () => {
       severity: diagnosticSeverities.error,
       message: 'ID 오류',
       path: 'broken.yaml',
-      fieldPath: ['id'],
+      fieldPath: ['_codocs', 'id'],
     };
     const document = {
       ...documentBase,
@@ -1034,11 +1005,9 @@ describe('projectCatalogPaths: 발견 경로별 문서 상세 투영', () => {
         path: issue.path,
         parsed: {
           ...parsedBase,
-          source: 'name: Broken\n',
+          source: '_codocs:\n  name: Broken\n',
           data: {
-            ...(id === undefined ? {} : { id }),
-            name: 'Broken',
-            domains: ['도메인'],
+            _codocs: { ...(id === undefined ? {} : { id }), name: 'Broken' },
             definition: '본문',
           },
         },
@@ -1061,7 +1030,7 @@ describe('projectCatalogPaths: 발견 경로별 문서 상세 투영', () => {
         {
           path: document.path,
           found: true,
-          document: { name: 'Broken', definition: '본문' },
+          document: { _codocs: { name: 'Broken' }, definition: '본문' },
           diagnostics: [issue],
         },
       ],
@@ -1203,19 +1172,16 @@ describe('projectLiveReferences: live YAML와 디스크 색인의 결합', () =>
     },
   );
 
-  it('다른 필드 오류가 있어도 definition의 확인한 참조만 순서대로 반환한다', () => {
+  it('다른 필드 오류가 있어도 문자열 section의 확인한 참조만 순서대로 반환한다', () => {
     const catalog: Catalog = {
       ...catalogBase,
       documents: new Map([[alpha.path, alpha]]),
       namePaths: new Map([[alpha.name, new Set([alpha.path])]]),
-      domainNamePaths: new Map([
-        ['도메인', new Map([[alpha.name, new Set([alpha.path])]])],
-      ]),
     };
     const result = projectLiveReferences(
       catalog,
       'source.yaml',
-      'id: 123\nname: "[[무시]]"\ndefinition: "[[A]] [[도메인:A]]"\nexamples: [12, "[[A]]"]\ncustom: "[[무시]]"\n',
+      '_codocs:\n  id: 123\n  name: "[[무시]]"\n개요: "[[A]] [[도메인:A]]"\n예시: 12\n',
     );
     expect(result.occurrences.map((item) => item.occurrence.text)).toEqual([
       '[[A]]',

@@ -79,7 +79,7 @@ function input(
   };
 }
 
-/** 블록 스칼라 definition과 선택 examples를 가진 YAML 원문을 만든다. */
+/** 블록 스칼라 definition section과 선택 예시 section을 가진 YAML 원문을 만든다. */
 function yamlOf(
   definition: string,
   examples: readonly string[] = [],
@@ -90,13 +90,16 @@ function yamlOf(
       .split('\n')
       .map((line) => (line ? `  ${line}` : line))
       .join(eol);
-  const exampleLines = examples.map((example) => `  - '${example}'`);
+  const exampleLines = examples.map(
+    (example, index) => `예시${index + 1}: '${example}'`,
+  );
   return [
-    'id: sample',
-    "name: '문서'",
+    '_codocs:',
+    '  id: sample',
+    "  name: '문서'",
     'definition: |',
     indent(definition),
-    ...(examples.length ? ['examples:', ...exampleLines] : []),
+    ...exampleLines,
     '',
   ].join(eol);
 }
@@ -161,28 +164,28 @@ const fixtureCases = {
   duplicateId: {
     a: {
       path: 'integration/error-document-access.yaml',
-      start: 829,
-      end: 979,
-      line: 33,
+      start: 797,
+      end: 947,
+      line: 30,
     },
-    b: { path: 'integration/query.yaml', start: 3116, end: 3273, line: 51 },
+    b: { path: 'integration/query.yaml', start: 3108, end: 3265, line: 50 },
     jaccard: 0.7682926829268293,
     ordered: 0.9315960912052117,
   },
   guideScope: {
-    a: { path: 'document-model/document.yaml', start: 805, end: 850, line: 30 },
+    a: { path: 'document-model/document.yaml', start: 797, end: 842, line: 29 },
     b: {
       path: 'document-model/explanation-separation.yaml',
-      start: 512,
-      end: 562,
-      line: 20,
+      start: 504,
+      end: 554,
+      line: 19,
     },
     jaccard: 0.6792452830188679,
     ordered: 0.8631578947368421,
   },
   statusMeaning: {
-    a: { path: 'document-model/document.yaml', start: 789, end: 832, line: 31 },
-    b: { path: 'index.yaml', start: 630, end: 665, line: 31 },
+    a: { path: 'document-model/document.yaml', start: 781, end: 824, line: 30 },
+    b: { path: 'index.yaml', start: 580, end: 615, line: 26 },
     jaccard: 0.7142857142857143,
     ordered: 0.8974358974358975,
   },
@@ -297,10 +300,10 @@ describe('detectDuplicates: 고정 사례 회귀', () => {
     expect(result.candidates).toHaveLength(1);
     const [candidate] = result.candidates;
     expect(candidate?.kind).toBe(duplicateMatchKinds.exact);
-    expect(candidate?.a.offsetRange).toEqual({ start: 335, end: 382 });
-    expect(candidate?.b.offsetRange).toEqual({ start: 918, end: 965 });
-    expect(candidate?.a.range?.start.line).toBe(11);
-    expect(candidate?.b.range?.start.line).toBe(25);
+    expect(candidate?.a.offsetRange).toEqual({ start: 328, end: 375 });
+    expect(candidate?.b.offsetRange).toEqual({ start: 910, end: 957 });
+    expect(candidate?.a.range?.start.line).toBe(10);
+    expect(candidate?.b.range?.start.line).toBe(24);
     expect(candidate?.scores).toEqual({ jaccard: 1, ordered: 1 });
     expect(result.exactGroups).toHaveLength(1);
     expect(result.exactGroups[0]?.occurrences.map((item) => item.path)).toEqual(
@@ -314,7 +317,7 @@ describe('detectDuplicates: 고정 사례 회귀', () => {
     // 두 구절이 이어진 문단이라도 같은 문서 안 반복으로 묶이지 않아야 한다.
     expect(
       result.candidates.some((candidate) =>
-        touches(candidate, path, { start: 1009, end: 1113 }),
+        touches(candidate, path, { start: 1002, end: 1106 }),
       ),
     ).toBe(false);
   });
@@ -347,8 +350,8 @@ describe('detectDuplicates: 고정 사례 회귀', () => {
     expect(result.candidates).toHaveLength(1);
     const [candidate] = result.candidates;
     expect(candidate?.kind).toBe(duplicateMatchKinds.similar);
-    expect(candidate?.a.offsetRange).toEqual({ start: 1537, end: 1596 });
-    expect(candidate?.b.offsetRange).toEqual({ start: 504, end: 555 });
+    expect(candidate?.a.offsetRange).toEqual({ start: 1530, end: 1589 });
+    expect(candidate?.b.offsetRange).toEqual({ start: 498, end: 549 });
     expect(candidate?.scores.jaccard).toBeCloseTo(0.6833333333333333, 10);
     expect(candidate?.scores.ordered).toBeCloseTo(0.8727272727272727, 10);
     // 참조 표기 때문에 제외하지 않으며 구절에 참조 표기가 그대로 남는다.
@@ -394,15 +397,15 @@ describe('detectDuplicates: 반복 후보 계산', () => {
     );
   });
 
-  it('definition과 examples 항목에 같은 문장이 있으면 fieldPath로 구분한 후보를 반환한다', () => {
+  it('두 section에 같은 문장이 있으면 section 이름 fieldPath로 구분한 후보를 반환한다', () => {
     const result = detectDuplicates([input('a.yaml', yamlOf(first, [first]))]);
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]?.a.fieldPath).toEqual(['definition']);
-    expect(result.candidates[0]?.b.fieldPath).toEqual(['examples', 0]);
+    expect(result.candidates[0]?.b.fieldPath).toEqual(['예시1']);
   });
 
-  it('definition과 examples 밖의 문자열이 같으면 비교하지 않는다', () => {
-    const shared = `name: '${first}'\ndomains:\n  - '${first}'\n`;
+  it('_codocs 안의 문자열이 같으면 비교하지 않는다', () => {
+    const shared = `_codocs:\n  name: '${first}'\n`;
     const result = detectDuplicates([
       input('a.yaml', `${shared}definition: 서로 다른 첫 번째 정의다.\n`),
       input('b.yaml', `${shared}definition: 서로 다른 두 번째 정의다.\n`),
@@ -612,7 +615,7 @@ describe('detectDuplicates: UTF-16 원문 범위', () => {
   it('한글 구절을 CRLF 원문에서 찾으면 범위로 자른 값이 원문 구간과 같다', () => {
     const one = input(
       'a.yaml',
-      `id: a\r\ndefinition: ${first}\r\nexamples:\r\n  - ${first}\r\n`,
+      `_codocs:\r\n  id: a\r\n  name: a\r\ndefinition: ${first}\r\n예시: ${first}\r\n`,
     );
     const result = detectDuplicates([one]);
     const [candidate] = result.candidates;
@@ -620,17 +623,20 @@ describe('detectDuplicates: UTF-16 원문 범위', () => {
     expect(slice(one, candidate!.b)).toBe(first);
     // CRLF 원문의 줄 좌표는 \n 기준이며 문자 위치는 줄 시작부터 UTF-16 단위다.
     expect(candidate?.a.range).toEqual({
-      start: { line: 1, character: 'definition: '.length },
-      end: { line: 1, character: 'definition: '.length + first.length + 0 },
+      start: { line: 3, character: 'definition: '.length },
+      end: { line: 3, character: 'definition: '.length + first.length + 0 },
     });
-    expect(candidate?.b.range?.start).toEqual({ line: 3, character: 4 });
+    expect(candidate?.b.range?.start).toEqual({ line: 4, character: 4 });
   });
 
   it('서로게이트 쌍 이모지가 있는 구절도 범위와 문자 위치를 UTF-16 코드 단위로 반환한다', () => {
     const emoji =
       '완료한 작업을 표시할 때 😀 이모지와 한글을 함께 쓰는 안내 문장이다.';
     const one = input('a.yaml', `definition: ${emoji}\n`);
-    const two = input('b.yaml', `name: 문서\ndefinition: ${emoji}\n`);
+    const two = input(
+      'b.yaml',
+      `_codocs:\n  name: 문서\ndefinition: ${emoji}\n`,
+    );
     const [candidate] = detectDuplicates([one, two]).candidates;
     expect(slice(one, candidate!.a)).toBe(emoji);
     expect(slice(two, candidate!.b)).toBe(emoji);
@@ -659,8 +665,8 @@ describe('detectDuplicates: UTF-16 원문 범위', () => {
     const [candidate] = detectDuplicates([one, two]).candidates;
     expect(slice(one, candidate!.a)).toBe(`${first}\r\n  ${second}`);
     expect(candidate?.a.passage).toBe(`${first}\n${second}`);
-    expect(candidate?.a.range?.start.line).toBe(3);
-    expect(candidate?.a.range?.end.line).toBe(4);
+    expect(candidate?.a.range?.start.line).toBe(4);
+    expect(candidate?.a.range?.end.line).toBe(5);
   });
 
   it('문자열 매핑으로 원문 위치를 확인할 수 없으면 후보는 남기되 범위와 행을 만들지 않는다', () => {

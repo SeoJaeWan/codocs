@@ -12,7 +12,7 @@ import {
 } from '../diagnostics/index.js';
 import type { YamlParseResult } from '../parser/index.js';
 import { getStringRange, offsetToPosition } from '../parser/index.js';
-import { documentFields } from '../validator/index.js';
+import { codocsKey } from '../validator/index.js';
 import { referenceSyntaxStatuses } from './domain-values.js';
 export * from './domain-values.js';
 
@@ -134,12 +134,11 @@ function scanReferenceSpans(value: string): ReferenceSpan[] {
     spans.push({ start, end: value.length, closed: false });
   return spans;
 }
-/** 자료형이 정상인 본문과 예문 경로만 고른다. */
+/** `_codocs`를 제외한 모든 루트 키 중 문자열 section의 경로만 고른다. */
 function bodyPaths(data: Record<string, unknown>): FieldPath[] {
-  const paths: FieldPath[] = [];
-  if (typeof data.definition === 'string')
-    paths.push([documentFields.definition]);
-  return paths;
+  return Object.keys(data)
+    .filter((key) => key !== codocsKey && typeof data[key] === 'string')
+    .map((key) => [key]);
 }
 /**
  * 문서 본문에서 참조 표기를 찾아 이름과 도메인으로 해석하고, 문법 오류인 표기는 그 위치에 진단한다.

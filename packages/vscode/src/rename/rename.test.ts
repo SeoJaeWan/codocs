@@ -6,7 +6,6 @@ import {
   parsePrepareRenameResponse,
   renameAbortReasons,
   renameApplyErrorCodes,
-  renameChoiceReasons,
   renameDocument,
   renameFileStates,
   renameMessages,
@@ -18,16 +17,8 @@ const orderPath = '.codocs\\order.yaml';
 const refPath = '.codocs\\ref.yaml';
 const orderUri = 'file:///fixture/.codocs/order.yaml';
 const refUri = 'file:///fixture/.codocs/ref.yaml';
-const twinA = {
-  path: '.codocs\\twin-a.yaml',
-  name: '쌍둥이',
-  domains: ['alpha'],
-};
-const twinB = {
-  path: '.codocs\\twin-b.yaml',
-  name: '쌍둥이',
-  domains: ['beta'],
-};
+const twinA = { name: '쌍둥이', path: '.codocs\\twin-a.yaml' };
+const twinB = { name: '쌍둥이', path: '.codocs\\twin-b.yaml' };
 
 /** 서버가 돌려주는 미리보기 응답을 만든다. 달라지는 조건만 인자로 받는다. */
 function planResponse(
@@ -199,7 +190,7 @@ describe('renameDocument 저장하지 않은 파일 확인', () => {
 
 describe('renameDocument 모호한 참조 선택', () => {
   it.each(['selection_required', 'changed_resolution'])(
-    '모호한 참조가 %s로 보고되면 후보의 이름·도메인·경로를 담은 목록을 연다',
+    '모호한 참조가 %s로 보고되면 같은 이름의 후보를 경로로 구분한 목록을 연다',
     async (reason) => {
       const prompts: RenameChoicePrompt[] = [];
       const host = createHost({
@@ -227,13 +218,11 @@ describe('renameDocument 모호한 참조 선택', () => {
           {
             id: twinA.path,
             label: '쌍둥이',
-            description: 'alpha',
             detail: '.codocs/twin-a.yaml',
           },
           {
             id: twinB.path,
             label: '쌍둥이',
-            description: 'beta',
             detail: '.codocs/twin-b.yaml',
           },
         ],
@@ -338,72 +327,6 @@ describe('renameDocument 모호한 참조 선택', () => {
     );
   });
 
-  it('고른 문서가 여러 도메인에 속해 도메인이 필요하면 도메인 목록을 이어서 열고 고른 도메인을 선택에 담는다', async () => {
-    const both = {
-      path: '.codocs\\both.yaml',
-      name: '양쪽',
-      domains: ['alpha', 'beta'],
-    };
-    const prompts: RenameChoicePrompt[] = [];
-    const host = createHost({
-      planRename: vi
-        .fn()
-        .mockResolvedValueOnce(
-          planResponse({
-            status: 'unresolved',
-            impacts: [
-              {
-                ...ambiguousImpact(0),
-                before: { status: 'ambiguous', candidates: [both, twinB] },
-              },
-            ],
-          }),
-        )
-        .mockResolvedValueOnce(
-          planResponse({
-            status: 'unresolved',
-            impacts: [
-              {
-                ...ambiguousImpact(0, renameChoiceReasons.domainRequired),
-                before: { status: 'ambiguous', candidates: [both, twinB] },
-              },
-            ],
-          }),
-        )
-        .mockResolvedValueOnce(planResponse()),
-      choose: vi.fn((prompt: RenameChoicePrompt) => {
-        prompts.push(prompt);
-        return Promise.resolve(
-          prompt.choices.some((choice) => choice.id === both.path)
-            ? both.path
-            : 'beta',
-        );
-      }),
-    });
-
-    await renameDocument(host);
-
-    expect(prompts[1]).toEqual({
-      title: renameMessages.chooseDomainTitle('.codocs/ref.yaml', '[[쌍둥이]]'),
-      placeHolder: renameMessages.choosePlaceHolder,
-      choices: [
-        { id: 'alpha', label: 'alpha' },
-        { id: 'beta', label: 'beta' },
-      ],
-    });
-    expect(host.applyRename).toHaveBeenCalledWith(
-      [
-        {
-          sourcePath: refPath,
-          occurrenceIndex: 0,
-          targetPath: both.path,
-          domain: 'beta',
-        },
-      ],
-      expect.anything(),
-    );
-  });
-
   it('편집기가 이름 바꾸기를 취소하면 반영하지 않는다', async () => {
     const host = createHost({
       isCancelled: vi.fn(() => true),
@@ -420,7 +343,7 @@ describe('renameDocument 모호한 참조 선택', () => {
 
 describe('renameDocument 진행할 수 없는 상태', () => {
   it.each([
-    ['name_conflict', '같은 도메인에 새 이름과 같은 문서가 있습니다.'],
+    ['name_conflict', '프로젝트에 새 이름과 같은 문서가 있습니다.'],
     ['unconfirmed', '프로젝트 탐색이 끝나지 않아 이름을 바꿀 수 없습니다.'],
     ['invalid_name', '새 이름이 비어 있습니다.'],
   ])(

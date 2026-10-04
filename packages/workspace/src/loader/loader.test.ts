@@ -31,7 +31,7 @@ let project: string;
 let codocs: string;
 let outside: string;
 const raw =
-  'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\n';
+  '_codocs:\r\n  id: shared-term\r\n  name: 용어\r\ndefinition: 정의\r\n';
 beforeEach(
   /** 고유한 실제 프로젝트와 외부 폴더를 준비한다. */ async () => {
     fixture = await mkdtemp(path.join(tmpdir(), 'codocs-loader-'));
@@ -239,7 +239,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
         {
           status: workspaceDocumentStatuses.valid,
           raw,
-          data: { id: 'shared-term', name: '용어' },
+          data: { _codocs: { id: 'shared-term', name: '용어' } },
         },
       ]);
     });
@@ -280,7 +280,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
         diagnostics: [
           expect.objectContaining({
             code: schemaDiagnosticCodes.missingRequiredField,
-            fieldPath: ['id'],
+            fieldPath: ['_codocs', 'id'],
             path: path.join('.codocs', 'missing.yaml'),
             severity: 'error',
           }),

@@ -67,7 +67,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('초기 요청은 실제 complete 색인을 기다린 뒤 진단 성공을 반환한다', async () => {
       await file(
         'alpha.yaml',
-        'id: alpha\nname: Alpha\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: alpha\n  name: Alpha\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       const result = await session.validate();
@@ -81,7 +81,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('partial 탐색에서 validate는 확인한 파일의 성공 진단을 반환하지 않는다', async () => {
       const target = await file(
         'alpha.yaml',
-        'id: alpha\nname: Alpha\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: alpha\n  name: Alpha\ndefinition: 본문\n',
       );
       ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
       const session = createWorkspaceQuerySession({ cwd: project });
@@ -96,7 +96,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('감시 실패 중 validate는 복구 안내가 있는 공통 실패를 반환한다', async () => {
       await file(
         'alpha.yaml',
-        'id: alpha\nname: Alpha\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: alpha\n  name: Alpha\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.validate();
@@ -125,7 +125,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('명시 refresh가 진행 중이면 validate는 이전 색인의 성공을 반환하지 않는다', async () => {
       await file(
         'alpha.yaml',
-        'id: alpha\nname: Alpha\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: alpha\n  name: Alpha\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.validate();
@@ -140,11 +140,11 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('전체 검증은 중복 ID와 별도 YAML 오류를 모두 보고하고 파일 검증은 대상과 관련 경로만 보고한다', async () => {
       await file(
         'a.yaml',
-        'id: shared\nname: A\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: shared\n  name: A\ndefinition: 본문\n',
       );
       await file(
         'b.yaml',
-        'id: shared\nname: B\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: shared\n  name: B\ndefinition: 본문\n',
       );
       await file('c.yaml', 'id: [\n');
       const session = createWorkspaceQuerySession({ cwd: project });
@@ -187,10 +187,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     });
 
     it('ID가 없는 문서와 파싱 실패 문서도 발견 경로로 검증한다', async () => {
-      await file(
-        'no-id.yaml',
-        'name: No ID\ndomains: [업무]\ndefinition: 본문\n',
-      );
+      await file('no-id.yaml', '_codocs:\n  name: No ID\ndefinition: 본문\n');
       await file('broken.yaml', 'id: [\n');
       const session = createWorkspaceQuerySession({ cwd: project });
 
@@ -251,7 +248,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('실제 파일의 접근 확인 실패는 경로와 EACCES를 반환한다', async () => {
       const target = await file(
         'locked.yaml',
-        'id: locked\nname: Locked\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: locked\n  name: Locked\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.validate();
@@ -270,7 +267,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('프로젝트 안의 절대 YAML 파일을 지정해도 invalid_path와 상대 경로 안내를 반환한다', async () => {
       const target = await file(
         'absolute.yaml',
-        'id: absolute\nname: Absolute\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: absolute\n  name: Absolute\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       const result = await session.validate(target);
@@ -287,7 +284,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       await mkdir(target);
       await writeFile(
         path.join(target, 'item.yaml'),
-        'id: item\nname: Item\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: item\n  name: Item\ndefinition: 본문\n',
       );
       await symlink(
         target,
@@ -310,7 +307,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       await session.validate();
       await file(
         'new.yaml',
-        'id: new\nname: New\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: new\n  name: New\ndefinition: 본문\n',
       );
       const result = await session.validate('.codocs/new.yaml');
       expect(result).toMatchObject({
@@ -322,7 +319,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   it('문서 ID 목록이 같아도 .codocs 변경을 새 catalog 버전의 다음 조회에 반영한다', async () => {
     await file(
       'stable.yaml',
-      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 이전 본문\n',
+      '_codocs:\n  id: stable\n  name: stable\ndefinition: 이전 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.list();
@@ -330,7 +327,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     const listGeneration = session.generation;
     await file(
       'stable.yaml',
-      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 새 본문\n',
+      '_codocs:\n  id: stable\n  name: stable\ndefinition: 새 본문\n',
     );
 
     await vi.waitFor(
@@ -350,14 +347,14 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   it('refresh 집계는 같은 탐색의 파일·비필터 목록·진단을 반영한다', async () => {
     await file(
       'alpha.yaml',
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
     );
     await file(
       'duplicate.yaml',
-      'id: alpha\nname: duplicate\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: alpha\n  name: duplicate\ndefinition: 본문\n',
     );
     await file('broken.yaml', 'id: [\n');
-    await file('unidentified.yaml', 'name: missing id\n');
+    await file('unidentified.yaml', '_codocs:\n  name: missing id\n');
     const session = createWorkspaceQuerySession({ cwd: project });
     const result = await session.refresh();
     const list = await session.list();
@@ -388,7 +385,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   it('partial refresh는 집계가 불완전함을 명시한다', async () => {
     const target = await file(
       'alpha.yaml',
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.list();
@@ -410,7 +407,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   it('감시 실패는 마지막 완료 snapshot만 미확인 조회로 제공한다', async () => {
     await file(
       'alpha.yaml',
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.list();
@@ -454,7 +451,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   it('완료 snapshot 없이 감시가 실패하면 조회 실패를 반환한다', async () => {
     const target = await file(
       'alpha.yaml',
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
     );
     ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
     const session = createWorkspaceQuerySession({ cwd: project });
@@ -486,7 +483,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   it('동시 refresh가 같은 결과와 한 세대를 공유하고 조회가 보유한 결과를 재사용한다', async () => {
     await file(
       'alpha.yaml',
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.list();
@@ -506,7 +503,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   describe('문서 목록과 상세 조회', () => {
     it('문서 하나가 있는 프로젝트를 목록 조회하면 한 항목과 완료 상태를 반환한다', async () => {
       const raw =
-        "id: alpha\r\nname: 알파\r\ndomains: [업무]\r\ndefinition: '본문'\r\n";
+        "_codocs:\r\n  id: alpha\r\n  name: 알파\r\ndefinition: '본문'\r\n";
       await file('alpha.yaml', raw);
       const session = createWorkspaceQuerySession({ cwd: project });
 
@@ -525,7 +522,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
 
     it('CRLF 문서를 상세 조회하면 원본 UTF-8 바이트의 revision을 반환한다', async () => {
       const raw =
-        "id: alpha\r\nname: 알파\r\ndomains: [업무]\r\ndefinition: '본문'\r\n";
+        "_codocs:\r\n  id: alpha\r\n  name: 알파\r\ndefinition: '본문'\r\n";
       await file('alpha.yaml', raw);
       const session = createWorkspaceQuerySession({ cwd: project });
       const ids = ['alpha'];
@@ -556,7 +553,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
           ids.map((id) =>
             file(
               `${id}.yaml`,
-              `id: ${id}\nname: ${id}\ndomains: [업무]\ndefinition: ${id} 본문\n`,
+              `_codocs:\n  id: ${id}\n  name: ${id}\ndefinition: ${id} 본문\n`,
             ),
           ),
         );
@@ -583,7 +580,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         ids.map((id) =>
           file(
             `${id}.yaml`,
-            `id: ${id}\nname: ${id}\ndomains: [업무]\ndefinition: ${id} 본문\n`,
+            `_codocs:\n  id: ${id}\n  name: ${id}\ndefinition: ${id} 본문\n`,
           ),
         ),
       );
@@ -601,11 +598,11 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('실제 파일의 이름 참조를 상세 조회하면 직접 참조와 역참조 ID를 반환한다', async () => {
       await file(
         'source.yaml',
-        "id: source\nname: 출발\ndomains: [업무]\ndefinition: '[[대상]]'\n",
+        "_codocs:\n  id: source\n  name: 출발\ndefinition: '[[대상]]'\n",
       );
       await file(
         'target.yaml',
-        'id: target\nname: 대상\ndomains: [업무]\ndefinition: 대상 본문\n',
+        '_codocs:\n  id: target\n  name: 대상\ndefinition: 대상 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
 
@@ -623,7 +620,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
 
   it('오류 문서의 원문과 byte revision을 함께 조회하고 별도 프로세스에서도 같은 revision을 계산한다', /** 실제 파일의 잘못된 UTF-8을 재인코딩하지 않는다. */ async () => {
     const raw =
-      'id: broken\nname: 오류 문서\ndefinition: 설명\ndomains: [도메인]\nvalue: .nan\n# �\n';
+      '_codocs:\n  id: broken\n  name: 오류 문서\ndefinition: 설명\nvalue: .nan\n# �\n';
     const bytes = Buffer.concat([
       Buffer.from(raw.slice(0, -2), 'utf8'),
       Buffer.from([0x80, 0x0a]),
@@ -653,7 +650,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   describe('부분 스캔 후 이전 조회 결과 보존', () => {
     it('문서 경로의 확인이 실패하면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
       const raw =
-        "id: alpha\nname: 알파\ndomains: [업무]\ndefinition: '이전 본문'\n";
+        "_codocs:\n  id: alpha\n  name: 알파\ndefinition: '이전 본문'\n";
       const target = await file('alpha.yaml', raw);
       const session = createWorkspaceQuerySession({ cwd: project });
       const initial = await session.get(['alpha']);
@@ -687,7 +684,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('부분 스캔에서 색인 밖 ID를 조회하면 부재로 확정하지 않는다', async () => {
       const target = await file(
         'alpha.yaml',
-        'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.get(['alpha']);
@@ -710,11 +707,11 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('부분 스캔에서 목록을 조회하면 이전 항목을 포함한 개수를 반환한다', async () => {
       const target = await file(
         'alpha.yaml',
-        'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
       );
       await file(
         'beta.yaml',
-        'id: beta\nname: beta\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: beta\n  name: beta\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.list();
@@ -734,7 +731,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   it('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 미지원 .codocs 정션으로 failed 전환을 만든다. */ async () => {
     await file(
       'alpha.yaml',
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     expect(await session.get(['alpha'])).toMatchObject({ success: true });
@@ -752,18 +749,14 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     expect(get).not.toHaveProperty('results');
   });
 
-  it('50개 고정 페이지가 cursor만으로 필터와 결정적 순서를 복원한다', /** 역순 생성과 필터 복원을 함께 확인한다. */ async () => {
+  it('50개 고정 페이지가 cursor만으로 결정적 순서를 복원한다', /** 역순 생성 순서를 복원한다. */ async () => {
     for (let index = 59; index >= 0; index--)
       await file(
         `doc-${index}.yaml`,
-        `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
+        `_codocs:\n  id: doc-${String(index).padStart(2, '0')}\n  name: doc-${String(index).padStart(2, '0')}\ndefinition: 본문\n`,
       );
-    await file(
-      'other.yaml',
-      'id: other\nname: other\ndomains: [기타]\ndefinition: 본문\n',
-    );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const first = await session.list({ domain: '업무' });
+    const first = await session.list();
     expect(first).toMatchObject({
       success: true,
       totalCount: 60,
@@ -797,7 +790,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
+          `_codocs:\n  id: doc-${String(index).padStart(2, '0')}\n  name: doc-${String(index).padStart(2, '0')}\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -805,7 +798,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         throw new Error('다음 cursor 없음');
       await file(
         'doc-50.yaml',
-        'id: doc-50\nname: doc-50\ndomains: [업무]\ndefinition: 새 본문\n',
+        '_codocs:\n  id: doc-50\n  name: doc-50\ndefinition: 새 본문\n',
       );
 
       await vi.waitFor(
@@ -829,21 +822,21 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
-    it('cursor와 최초 목록의 도메인과 다른 필터를 전달하면 입력 오류를 반환한다', async () => {
+    it('제거된 domain 입력을 전달하면 입력 오류를 반환한다', async () => {
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
+          `_codocs:\n  id: doc-${String(index).padStart(2, '0')}\n  name: doc-${String(index).padStart(2, '0')}\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
-      const first = await session.list({ domain: '업무' });
+      const first = await session.list();
       if (!first.success || !first.nextCursor)
         throw new Error('다음 cursor 없음');
 
       const result = await session.list({
         cursor: first.nextCursor,
-        domain: '기타',
-      });
+        domain: '업무',
+      } as never);
 
       expect(result).toMatchObject({
         success: false,
@@ -855,7 +848,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
+          `_codocs:\n  id: doc-${String(index).padStart(2, '0')}\n  name: doc-${String(index).padStart(2, '0')}\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -863,7 +856,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         throw new Error('다음 cursor 없음');
       await file(
         'doc-50.yaml',
-        'id: doc-50\nname: 표시 이름 변경\ndomains: [업무]\ndefinition: 본문\n',
+        '_codocs:\n  id: doc-50\n  name: 표시 이름 변경\ndefinition: 본문\n',
       );
 
       await vi.waitFor(
@@ -902,7 +895,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         for (let index = 0; index < 51; index++)
           await file(
             `doc-${index}.yaml`,
-            `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
+            `_codocs:\n  id: doc-${String(index).padStart(2, '0')}\n  name: doc-${String(index).padStart(2, '0')}\ndefinition: 본문\n`,
           );
         const session = createWorkspaceQuerySession({ cwd: project });
         const first = await session.list();
@@ -911,17 +904,17 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         if (changed === 'new')
           await file(
             'new.yaml',
-            'id: new\nname: new\ndomains: [업무]\ndefinition: 본문\n',
+            '_codocs:\n  id: new\n  name: new\ndefinition: 본문\n',
           );
         if (changed === 'error')
           await file(
             'doc-50.yaml',
-            "id: doc-50\nname: doc-50\ndomains: [업무]\ndefinition: '[[Missing]]'\n",
+            "_codocs:\n  id: doc-50\n  name: doc-50\ndefinition: '[[Missing]]'\n",
           );
         if (changed === 'conflict')
           await file(
             'duplicate.yaml',
-            'id: doc-50\nname: duplicate\ndomains: [업무]\ndefinition: 본문\n',
+            '_codocs:\n  id: doc-50\n  name: duplicate\ndefinition: 본문\n',
           );
 
         await vi.waitFor(
@@ -963,14 +956,14 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       { label: '문서를 삭제', replacement: null },
       {
         label: '마지막 문서 ID를 첫 번째로 정렬되는 ID로 변경',
-        replacement: 'id: aaa',
+        replacement: 'aaa',
       },
     ])('$label하면 기존 cursor를 만료한다', async ({ replacement }) => {
       for (let index = 0; index < 51; index++) {
         const id = `doc-${String(index).padStart(2, '0')}`;
         await file(
           `${id}.yaml`,
-          `id: ${id}\nname: ${id}\ndomains: [업무]\ndefinition: 본문\n`,
+          `_codocs:\n  id: ${id}\n  name: ${id}\ndefinition: 본문\n`,
         );
       }
       const session = createWorkspaceQuerySession({ cwd: project });
@@ -983,7 +976,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       } else {
         await file(
           'doc-50.yaml',
-          `${replacement}\nname: doc-50\ndomains: [업무]\ndefinition: 본문\n`,
+          `_codocs:\n  id: ${replacement}\n  name: doc-50\ndefinition: 본문\n`,
         );
       }
 
@@ -1015,48 +1008,6 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         },
       });
     });
-
-    it('문서의 도메인을 변경해 기존 필터에서 제외하면 기존 cursor를 만료한다', async () => {
-      for (let index = 0; index < 51; index++) {
-        const id = `doc-${String(index).padStart(2, '0')}`;
-        await file(
-          `${id}.yaml`,
-          `id: ${id}\nname: ${id}\ndomains: [업무]\ndefinition: 본문\n`,
-        );
-      }
-      const filters = { domain: '업무' };
-      const session = createWorkspaceQuerySession({ cwd: project });
-      const first = await session.list(filters);
-      if (!first.success || !first.nextCursor)
-        throw new Error('다음 cursor 없음');
-      const input = { cursor: first.nextCursor };
-      await file(
-        'doc-50.yaml',
-        `id: doc-50\nname: doc-50\ndomains: [기타]\ndefinition: 본문\n`,
-      );
-
-      await vi.waitFor(
-        async () => {
-          const synchronized = await session.list(filters);
-          expect(synchronized).toMatchObject({
-            success: true,
-            totalCount: 50,
-          });
-        },
-        { timeout: 5_000, interval: 25 },
-      );
-      const result = await session.list(input);
-
-      expect(result).toEqual({
-        success: false,
-        scanStatus: scanStatuses.complete,
-        error: {
-          code: workspaceQueryDiagnosticCodes.cursorExpired,
-          severity: diagnosticSeverities.error,
-          message: workspaceQueryDiagnosticMessages.cursorExpired,
-        },
-      });
-    });
   });
 
   describe('cursor 서명과 세션 수명', () => {
@@ -1064,7 +1015,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
+          `_codocs:\n  id: doc-${String(index).padStart(2, '0')}\n  name: doc-${String(index).padStart(2, '0')}\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -1095,7 +1046,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
+          `_codocs:\n  id: doc-${String(index).padStart(2, '0')}\n  name: doc-${String(index).padStart(2, '0')}\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -1115,7 +1066,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
+          `_codocs:\n  id: doc-${String(index).padStart(2, '0')}\n  name: doc-${String(index).padStart(2, '0')}\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -1140,7 +1091,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
   it('현재 ID가 누락된 문서를 경로로 조회하면 내용과 진단을 유지한다', async () => {
     const documentPath = await file(
       'missing-id.yaml',
-      'name: 이전 이름\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  name: 이전 이름\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.refresh();
@@ -1157,12 +1108,12 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
         {
           path: path.relative(project, documentPath),
           found: true,
-          document: { name: '이전 이름', definition: '본문' },
+          document: { _codocs: { name: '이전 이름' }, definition: '본문' },
           diagnostics: [
             {
               code: 'missing_required_field',
               path: path.relative(project, documentPath),
-              fieldPath: ['id'],
+              fieldPath: ['_codocs', 'id'],
             },
           ],
         },
@@ -1175,11 +1126,11 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
   it('직접 참조와 역참조를 경로 링크로 구분한다', async () => {
     await file(
       'source.yaml',
-      "id: source\nname: 출발\ndomains: [업무]\ndefinition: '[[대상]]'\n",
+      "_codocs:\n  id: source\n  name: 출발\ndefinition: '[[대상]]'\n",
     );
     await file(
       'target.yaml',
-      'id: target\nname: 대상\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: target\n  name: 대상\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.refresh();
@@ -1212,14 +1163,14 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
   it('본문 변경으로 catalog가 갱신되면 이전 버전의 경로 조회를 거부한다', async () => {
     await file(
       'stable.yaml',
-      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 이전 본문\n',
+      '_codocs:\n  id: stable\n  name: stable\ndefinition: 이전 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.refresh();
     const first = { catalogVersion: session.catalogVersion };
     await file(
       'stable.yaml',
-      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 새 본문\n',
+      '_codocs:\n  id: stable\n  name: stable\ndefinition: 새 본문\n',
     );
     await vi.waitFor(
       async () => {
@@ -1247,7 +1198,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
   it('부분 관측에서 확인하지 못한 경로는 부재로 확정하지 않는다', async () => {
     const target = await file(
       'alpha.yaml',
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.refresh();
@@ -1280,7 +1231,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
   it('한글과 공백이 있는 CRLF 문서의 ID 오류 위치와 revision을 그대로 반환한다', async () => {
     await mkdir(path.join(project, '.codocs', '하위 폴더'));
     const raw =
-      'id: Invalid_Id\r\nname: 오류 문서\r\ndomains: [업무]\r\ndefinition: 😀본문\r\n';
+      '_codocs:\r\n  id: Invalid_Id\r\n  name: 오류 문서\r\ndefinition: 😀본문\r\n';
     await file('하위 폴더/오류 문서.yaml', raw);
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.refresh();
@@ -1304,10 +1255,10 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
           },
           diagnostics: [
             expect.objectContaining({
-              fieldPath: ['id'],
+              fieldPath: ['_codocs', 'id'],
               range: {
-                start: { line: 0, character: 4 },
-                end: { line: 0, character: 14 },
+                start: { line: 1, character: 6 },
+                end: { line: 1, character: 16 },
               },
             }),
           ],
@@ -1328,11 +1279,11 @@ describe('live 참조와 선택 최신 확인', () => {
   it('미저장 본문을 조회하면 디스크 출처를 변경하지 않고 같은 버전의 대상 내용을 반환한다', async () => {
     await file(
       'target.yaml',
-      'id: target\nname: 대상\ndomains: [업무]\ndefinition: disk\nstatus: deprecated\n',
+      '_codocs:\n  id: target\n  name: 대상\ndefinition: disk\nstatus: deprecated\n',
     );
     await file(
       'source.yaml',
-      'id: source\nname: 출처\ndefinition: 저장된 본문\n',
+      '_codocs:\n  id: source\n  name: 출처\ndefinition: 저장된 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     const result = await session.references({
@@ -1365,7 +1316,10 @@ describe('live 참조와 선택 최신 확인', () => {
   });
 
   it('최초 탐색 중 새 버전 요청이 오면 이전 문서 결과를 적용하지 않는다', async () => {
-    await file('target.yaml', 'id: target\nname: 대상\ndefinition: disk\n');
+    await file(
+      'target.yaml',
+      '_codocs:\n  id: target\n  name: 대상\ndefinition: disk\n',
+    );
     const session = createWorkspaceQuerySession({ cwd: project });
     const first = session.references({
       sourcePath: '.codocs/source.yaml',
@@ -1489,7 +1443,7 @@ describe('live 참조와 선택 최신 확인', () => {
     async ({ moved }) => {
       const original = await file(
         'target.yaml',
-        'id: target\nname: 대상\ndomains: [업무]\ndefinition: 이전\n',
+        '_codocs:\n  id: target\n  name: 대상\ndefinition: 이전\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.refresh();
@@ -1503,7 +1457,7 @@ describe('live 참조와 선택 최신 확인', () => {
         await rename(original, path.join(project, '.codocs/새 경로.yaml'));
       await file(
         moved ? '새 경로.yaml' : 'target.yaml',
-        'id: target\nname: 대상\ndomains: [업무]\ndefinition: 최신\n',
+        '_codocs:\n  id: target\n  name: 대상\ndefinition: 최신\n',
       );
       await session.refresh();
       const confirmed = await session.confirmCandidate(token);
@@ -1522,7 +1476,7 @@ describe('live 참조와 선택 최신 확인', () => {
   it('이름 참조로 명시 선택한 후보를 이동 후에도 원래 참조 근거로 확인한다', async () => {
     const original = await file(
       'target.yaml',
-      'id: target\nname: 대상\ndefinition: 내용\n',
+      '_codocs:\n  id: target\n  name: 대상\ndefinition: 내용\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.refresh();
@@ -1542,18 +1496,18 @@ describe('live 참조와 선택 최신 확인', () => {
     { label: '삭제', raw: undefined },
     {
       label: '옛 경로를 다른 문서가 재사용',
-      raw: 'id: other\nname: 대상\ndefinition: 다른 문서\n',
+      raw: '_codocs:\n  id: other\n  name: 대상\ndefinition: 다른 문서\n',
     },
     {
       label: '미관측 내용 변경',
-      raw: 'id: target\nname: 대상\ndefinition: 변경\n',
+      raw: '_codocs:\n  id: target\n  name: 대상\ndefinition: 변경\n',
     },
   ])(
     '$label이 표시 후 발생하면 오래된 파일을 열 후보를 반환하지 않는다',
     async ({ raw }) => {
       const original = await file(
         'target.yaml',
-        'id: target\nname: 대상\ndefinition: 내용\n',
+        '_codocs:\n  id: target\n  name: 대상\ndefinition: 내용\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.refresh();
@@ -1569,7 +1523,10 @@ describe('live 참조와 선택 최신 확인', () => {
   );
 
   it('옛 경로 재사용을 완료 관측해도 다른 ID를 같은 선택으로 연결하지 않는다', async () => {
-    await file('target.yaml', 'id: target\nname: 대상\ndefinition: 내용\n');
+    await file(
+      'target.yaml',
+      '_codocs:\n  id: target\n  name: 대상\ndefinition: 내용\n',
+    );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.refresh();
     const token = session.captureCandidate(
@@ -1577,13 +1534,19 @@ describe('live 참조와 선택 최신 확인', () => {
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
-    await file('target.yaml', 'id: other\nname: 대상\ndefinition: 내용\n');
+    await file(
+      'target.yaml',
+      '_codocs:\n  id: other\n  name: 대상\ndefinition: 내용\n',
+    );
     await session.refresh();
     expect(await session.confirmCandidate(token)).toBeUndefined();
   });
 
   it('참조가 live 출처에서 삭제되면 기존 선택을 무효화한다', async () => {
-    await file('target.yaml', 'id: target\nname: 대상\ndefinition: 내용\n');
+    await file(
+      'target.yaml',
+      '_codocs:\n  id: target\n  name: 대상\ndefinition: 내용\n',
+    );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.references({
       sourcePath: '.codocs/source.yaml',
@@ -1604,7 +1567,10 @@ describe('live 참조와 선택 최신 확인', () => {
   });
 
   it('새 조회를 반복해도 대상 전체 색인 버전과 완료 알림을 변경하지 않는다', async () => {
-    await file('target.yaml', 'id: target\nname: 대상\ndefinition: 내용\n');
+    await file(
+      'target.yaml',
+      '_codocs:\n  id: target\n  name: 대상\ndefinition: 내용\n',
+    );
     const session = createWorkspaceQuerySession({ cwd: project });
     await session.refresh();
     const version = session.catalogVersion;

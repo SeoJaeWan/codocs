@@ -46,8 +46,8 @@ let fixture: string;
 let root: ProjectRoot;
 let codocs: string;
 let outside: string;
-const rawA = 'id: a\nname: A\ndefinition: A\n';
-const rawB = 'id: b\nname: B\ndefinition: B\n';
+const rawA = '_codocs:\n  id: a\n  name: A\ndefinition: A\n';
+const rawB = '_codocs:\n  id: b\n  name: B\ndefinition: B\n';
 beforeEach(async () => {
   await mkdir(path.join(process.cwd(), 'node_modules/.cache'), {
     recursive: true,

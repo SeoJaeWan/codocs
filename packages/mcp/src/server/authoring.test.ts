@@ -56,13 +56,11 @@ function payload(response: unknown): Record<string, unknown> {
 }
 
 describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
-  it('최신 get revision으로 선택 속성을 unset하면 나머지 원문을 보존하고 검증한다', async () => {
+  it('최신 get revision으로 선택 section을 unset하면 나머지 원문을 보존하고 검증한다', async () => {
     const document = {
-      id: 'a',
-      name: '가상 A',
+      _codocs: { id: 'a', name: '가상 A' },
       definition: '의미',
-      domains: ['연습'],
-      examples: ['선택 예문'],
+      예시: '선택 예문',
     };
     await client.callTool({
       name: 'codocs_write',
@@ -79,7 +77,7 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
           mode: 'update',
           id: 'a',
           revision: before.revision,
-          unset: ['examples'],
+          unset: ['예시'],
         },
       }),
     );
@@ -90,17 +88,15 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
       indexUpdated: true,
       revision: createHash('sha256').update(bytes).digest('hex'),
     });
-    expect(bytes.toString()).not.toContain('examples:');
+    expect(bytes.toString()).not.toContain('예시:');
     const after = payload(
       await client.callTool({ name: 'codocs_get', arguments: { ids: ['a'] } }),
     );
     expect(after.results).toMatchObject([
       {
         document: {
-          id: document.id,
-          name: document.name,
+          _codocs: { id: document._codocs.id, name: document._codocs.name },
           definition: document.definition,
-          domains: document.domains,
         },
       },
     ]);
@@ -118,10 +114,8 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
         mode: 'create',
         path: '.codocs/a.yaml',
         document: {
-          id: 'a',
-          name: '가상 A',
+          _codocs: { id: 'a', name: '가상 A' },
           definition: 'A의 의미',
-          domains: ['연습'],
         },
       },
     });
@@ -131,10 +125,8 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
         mode: 'create',
         path: '.codocs/b.yaml',
         document: {
-          id: 'b',
-          name: '가상 B',
+          _codocs: { id: 'b', name: '가상 B' },
           definition: '[[가상 A]]를 사용하는 절차',
-          domains: ['연습'],
         },
       },
     });
@@ -190,10 +182,8 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
           mode: 'create',
           path: '.codocs/a.yaml',
           document: {
-            id: 'a',
-            name: '가상 A',
+            _codocs: { id: 'a', name: '가상 A' },
             definition: '초기 설명',
-            domains: ['연습'],
           },
         },
       }),

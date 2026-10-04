@@ -13,9 +13,9 @@ let session: WorkspaceQuerySession;
 const orderPath = path.join('.codocs', 'order.yaml');
 const purchasePath = path.join('.codocs', 'purchase-order.yaml');
 const sourcePath = path.join('.codocs', 'source.yaml');
-const order = 'id: order\nname: 주문\ndomains: [판매]\ndefinition: 주문 설명\n';
+const order = '_codocs:\n  id: order\n  name: 주문\ndefinition: 주문 설명\n';
 const purchaseOrder =
-  'id: purchase-order\nname: 주문\ndomains: [구매]\ndefinition: 구매 주문 설명\n';
+  '_codocs:\n  id: purchase-order\n  name: 주문\ndefinition: 구매 주문 설명\n';
 
 /** 프로젝트 .codocs에 테스트 문서를 쓴다. 키는 .codocs 아래 파일 이름이다. */
 async function writeDocuments(files: Record<string, string>): Promise<void> {
@@ -56,7 +56,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
         changes: [
           {
             path: orderPath,
-            fieldPath: ['name'],
+            fieldPath: ['_codocs', 'name'],
             oldText: '주문',
             newText: '새주문',
           },
@@ -66,16 +66,12 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       });
     });
 
-    it('이 문서를 가리키는 참조 세 곳만 새 이름으로 고치고 다른 도메인 문서를 가리키는 참조는 고치지 않는다', async () => {
+    it('이 문서를 가리키는 참조는 새 이름으로 고치고 도메인을 적은 참조는 대상이 아니므로 고치지 않는다', async () => {
       await writeDocuments({
         'order.yaml': order,
-        'purchase-order.yaml': purchaseOrder,
         'a.yaml':
-          'id: a\nname: 가\ndomains: [판매]\ndefinition: "[[판매:주문]] 그리고 [[판매:주문]]"\n',
-        'b.yaml':
-          'id: b\nname: 나\ndomains: [판매]\ndefinition: "[[판매:주문]]"\n',
-        'c.yaml':
-          'id: c\nname: 다\ndomains: [구매]\ndefinition: "[[구매:주문]]"\n',
+          '_codocs:\n  id: a\n  name: 가\ndefinition: "[[주문]] 그리고 [[판매:주문]]"\n',
+        'b.yaml': '_codocs:\n  id: b\n  name: 나\ndefinition: "[[주문]]"\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -93,9 +89,8 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
             change.newText,
           ]),
       ).toEqual([
-        ['a.yaml', '[[판매:주문]]', '[[판매:새주문]]'],
-        ['a.yaml', '[[판매:주문]]', '[[판매:새주문]]'],
-        ['b.yaml', '[[판매:주문]]', '[[판매:새주문]]'],
+        ['a.yaml', '[[주문]]', '[[새주문]]'],
+        ['b.yaml', '[[주문]]', '[[새주문]]'],
       ]);
     });
 
@@ -103,8 +98,8 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       await writeDocuments({
         'order.yaml': order,
         'a.yaml':
-          'id: a\nname: 가\ndomains: [판매]\ndefinition: "[[주문]] [[주문]]"\n',
-        'b.yaml': 'id: b\nname: 나\ndomains: [판매]\ndefinition: "[[주문]]"\n',
+          '_codocs:\n  id: a\n  name: 가\ndefinition: "[[주문]] [[주문]]"\n',
+        'b.yaml': '_codocs:\n  id: b\n  name: 나\ndefinition: "[[주문]]"\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -120,29 +115,10 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       ).toEqual(['[[새주문]]', '[[새주문]]', '[[새주문]]']);
     });
 
-    it('새 이름이 다른 도메인 문서와 같으면 이 문서를 가리키던 참조에 대상 도메인을 붙인다', async () => {
-      await writeDocuments({
-        'order.yaml': order,
-        'payment.yaml':
-          'id: payment\nname: 결제\ndomains: [구매]\ndefinition: 결제 설명\n',
-        'a.yaml': 'id: a\nname: 가\ndomains: [판매]\ndefinition: "[[주문]]"\n',
-      });
-      const result = await session.previewRename({
-        targetPath: orderPath,
-        newName: '결제',
-      });
-
-      expect(result).toMatchObject({ success: true, status: 'ready' });
-      if (!result.success) return;
-      expect(
-        result.changes.find((change) => change.fieldPath[0] === 'definition'),
-      ).toMatchObject({ oldText: '[[주문]]', newText: '[[판매:결제]]' });
-    });
-
     it('새 이름에 콜론이 있으면 참조에서 역슬래시로 escape한다', async () => {
       await writeDocuments({
         'order.yaml': order,
-        'a.yaml': 'id: a\nname: 가\ndomains: [판매]\ndefinition: "[[주문]]"\n',
+        'a.yaml': '_codocs:\n  id: a\n  name: 가\ndefinition: "[[주문]]"\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -160,9 +136,9 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
 
   describe('모호했던 참조의 후보 보고와 선택', () => {
     const ambiguousSource =
-      'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n';
+      '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[주문]]"\n';
 
-    it('원래 모호한 참조는 선택이 없으면 고치지 않고 후보의 도메인·이름·경로와 함께 미해결로 보고한다', async () => {
+    it('원래 모호한 참조는 선택이 없으면 고치지 않고 후보의 이름·경로와 함께 미해결로 보고한다', async () => {
       await writeDocuments({
         'order.yaml': order,
         'purchase-order.yaml': purchaseOrder,
@@ -185,8 +161,8 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
           before: {
             status: 'ambiguous',
             candidates: [
-              { path: orderPath, name: '주문', domains: ['판매'] },
-              { path: purchasePath, name: '주문', domains: ['구매'] },
+              { name: '주문', path: orderPath },
+              { name: '주문', path: purchasePath },
             ],
           },
         }),
@@ -235,11 +211,11 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
   });
 
   describe('진행할 수 없는 이름 변경의 차단', () => {
-    it('대상 문서의 도메인에 새 이름과 같은 문서가 있으면 충돌 후보와 함께 blocked로 보고한다', async () => {
+    it('프로젝트에 새 이름과 같은 문서가 있으면 충돌 후보와 함께 blocked로 보고한다', async () => {
       await writeDocuments({
         'order.yaml': order,
         'other.yaml':
-          'id: other\nname: 새주문\ndomains: [판매]\ndefinition: 설명\n',
+          '_codocs:\n  id: other\n  name: 새주문\ndefinition: 설명\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -253,12 +229,10 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
         changes: [],
         conflicts: [
           {
-            domain: '판매',
             candidates: [
               {
-                path: path.join('.codocs', 'other.yaml'),
                 name: '새주문',
-                domains: ['판매'],
+                path: path.join('.codocs', 'other.yaml'),
               },
             ],
           },
@@ -290,7 +264,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
         path.join(root, '.codocs', 'source.yaml'),
         Buffer.concat([
           Buffer.from(
-            'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n# ',
+            '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[주문]]"\n# ',
           ),
           Buffer.from([0xff]),
           Buffer.from('\n'),
@@ -325,9 +299,9 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       await writeDocuments({
         'order.yaml': order,
         'source.yaml':
-          'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n',
+          '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[주문]]"\n',
         'unrelated.yaml':
-          'id: unrelated\nname: 무관\ndomains: [판매]\ndefinition: 설명\n',
+          '_codocs:\n  id: unrelated\n  name: 무관\ndefinition: 설명\n',
       });
       const result = await session.previewRename({
         targetPath: orderPath,
@@ -346,7 +320,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       await writeDocuments({
         'order.yaml': order,
         'source.yaml':
-          'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n',
+          '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[주문]]"\n',
       });
       const before = {
         order: await readFile(path.join(root, '.codocs', 'order.yaml'), 'utf8'),
@@ -366,7 +340,12 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       }).toEqual(before);
       expect(await session.get(['order'])).toMatchObject({
         success: true,
-        results: [{ found: true, document: { name: '주문' } }],
+        results: [
+          {
+            found: true,
+            document: { _codocs: { id: 'order', name: '주문' } },
+          },
+        ],
       });
     });
   });
@@ -374,7 +353,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
 
 describe('WorkspaceQuerySession.applyRename: 이름 변경 반영과 색인', () => {
   const sourceDocument =
-    'id: source\nname: 출처\ndomains: [판매]\ndefinition: "[[주문]]"\n';
+    '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[주문]]"\n';
 
   it('미리보기의 revision으로 반영하면 파일을 바꾸고 저장 직후 색인에 새 이름을 게시한다', async () => {
     await writeDocuments({
@@ -400,24 +379,31 @@ describe('WorkspaceQuerySession.applyRename: 이름 변경 반영과 색인', ()
     });
     expect(await session.get(['order'])).toMatchObject({
       success: true,
-      results: [{ found: true, document: { name: '새주문' } }],
+      results: [
+        {
+          found: true,
+          document: { _codocs: { id: 'order', name: '새주문' } },
+        },
+      ],
     });
     expect(
       await readFile(path.join(root, '.codocs', 'source.yaml'), 'utf8'),
     ).toContain('[[새주문]]');
   });
 
-  it('deprecatedAliases가 있는 대상 문서와 참조 문서의 이름을 변경하면 두 문서의 키만 지우고 참조를 바꾸며 관계없는 문서는 그대로 둔다', async () => {
-    const orderWithAlias =
-      'id: order\nname: 주문\ndomains: [판매]\n# 보존 주석\ndeprecatedAliases:\n  - id: old-order\ndefinition: 주문 설명\n';
-    const sourceWithAlias =
-      '{id: source, name: 출처, domains: [판매], deprecatedAliases: [{id: old-source}], definition: "[[주문]]"}\n';
+  it('이름을 바꾸면 다른 문서의 parent 항목도 원래 YAML 표기를 유지한 채 함께 고친다', async () => {
+    const child =
+      "_codocs:\n  id: child\n  name: 하위\n  parent:\n    - '주문' # 상위\n    - 기타\n개요: 설명\n";
+    const flow =
+      '{ _codocs: { id: flow, name: 흐름, parent: [주문] }, 개요: 설명 }\n';
     const unrelated =
-      'id: unrelated\nname: 관계없음\ndomains: [판매]\ndeprecatedAliases: []\ndefinition: 다른 설명\n';
+      '_codocs:\n  id: unrelated\n  name: 기타\n  parent: [하위]\n개요: 설명\n';
     await writeDocuments({
-      'order.yaml': orderWithAlias,
-      'source.yaml': sourceWithAlias,
+      'order.yaml': order,
+      'child.yaml': child,
+      'flow.yaml': flow,
       'unrelated.yaml': unrelated,
+      'source.yaml': sourceDocument,
     });
     const preview = await session.previewRename({
       targetPath: orderPath,
@@ -433,13 +419,14 @@ describe('WorkspaceQuerySession.applyRename: 이름 변경 반영과 색인', ()
     expect(result).toMatchObject({ success: true, saved: true, changed: true });
     const read = (name: string) =>
       readFile(path.join(root, '.codocs', name), 'utf8');
-    expect(await read('order.yaml')).toBe(
-      'id: order\nname: 새주문\ndomains: [판매]\n# 보존 주석\ndefinition: 주문 설명\n',
+    expect(await read('child.yaml')).toBe(
+      "_codocs:\n  id: child\n  name: 하위\n  parent:\n    - '새주문' # 상위\n    - 기타\n개요: 설명\n",
     );
-    expect(await read('source.yaml')).toBe(
-      '{id: source, name: 출처, domains: [판매], definition: "[[새주문]]"}\n',
+    expect(await read('flow.yaml')).toBe(
+      '{ _codocs: { id: flow, name: 흐름, parent: [새주문] }, 개요: 설명 }\n',
     );
     expect(await read('unrelated.yaml')).toBe(unrelated);
+    expect(await read('source.yaml')).toContain('[[새주문]]');
   });
 
   it('반영 직후 같은 요청을 다시 미리보기하면 변경 없이 ready로 보고한다', async () => {

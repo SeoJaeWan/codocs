@@ -10,7 +10,7 @@ let root: string;
 let session: LanguageServerSession;
 let sourceUri: string;
 const targetText =
-  'id: target\nname: 대상\ndomains: [업무]\ndefinition: 원래 본문\n';
+  '_codocs:\n  id: target\n  name: 대상\ndefinition: 원래 본문\n';
 
 beforeEach(async () => {
   await mkdir('.workbench/fixtures', { recursive: true });
@@ -34,7 +34,7 @@ afterEach(async () => {
 describe('live YAML과 디스크 대상의 연결', () => {
   it('편집 뒤 native 대상 이름·경로를 바꾸고 이전 선택을 거부하며 새 본문 선택만 확인한다', async () => {
     const source =
-      'id: source\nname: Source\ndefinition: "[[Old]]"\ndomains: [업무]\n';
+      '_codocs:\n  id: source\n  name: Source\ndefinition: "[[Old]]"\n';
     await writeFile(path.join(root, '.codocs/source.yaml'), source);
     await writeFile(
       path.join(root, '.codocs/대상 문서.yaml'),
@@ -42,7 +42,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
     );
     await writeFile(
       path.join(root, '.codocs/direct [이름] %.yaml'),
-      'id: direct\nname: "Direct <name>"\ndefinition: Direct body\ndomains: [업무]\n',
+      '_codocs:\n  id: direct\n  name: "Direct <name>"\ndefinition: Direct body\n',
     );
     await session.refreshWorkspaces();
     const capture = vi.spyOn(SourceSelections.prototype, 'capture');
@@ -86,7 +86,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
   it('열린 대상 문서의 저장하지 않은 이름은 출처 참조의 대상 판단에 쓰지 않는다', async () => {
     const source =
-      'id: source\nname: Source\ndefinition: "[[대상]]"\ndomains: [업무]\n';
+      '_codocs:\n  id: source\n  name: Source\ndefinition: "[[대상]]"\n';
     await writeFile(path.join(root, '.codocs/source.yaml'), source);
     await session.refreshWorkspaces();
     session.openDocument({
@@ -123,7 +123,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
         uri,
         version: 1,
         languageId: 'yaml',
-        text: 'id: source\nname: 출처\ndefinition: "[[대상]]"\n',
+        text: '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[대상]]"\n',
       },
     });
     const link = (await session.documentLinks(uri))[0]!;
@@ -143,7 +143,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
   it('대상 문서의 이름을 저장해 색인이 갱신되면 열린 문서의 참조를 다시 판단한다', async () => {
     const source =
-      'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n';
+      '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[대상]]"\n';
     session.openDocument({
       textDocument: {
         uri: sourceUri,
@@ -170,7 +170,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
         uri: sourceUri,
         version: 1,
         languageId: 'yaml',
-        text: 'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n',
+        text: '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[대상]]"\n',
       },
     });
     await session.documentDiagnostics(sourceUri);
@@ -217,7 +217,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
         uri,
         version: 1,
         languageId: 'yaml',
-        text: 'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n',
+        text: '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[대상]]"\n',
       },
     });
     const links = await session.documentLinks(uri);
@@ -234,13 +234,14 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
 
   it.each(['\n', '\r\n'])(
-    '줄바꿈 %j에서 미저장 definition 참조의 UTF-16 범위를 보존하고 examples 참조는 링크로 만들지 않는다',
+    '줄바꿈 %j에서 미저장 section 참조의 UTF-16 범위를 보존하고 문자열이 아닌 section의 참조는 링크로 만들지 않는다',
     async (newline) => {
       const text = [
-        'id: source',
-        'name: 출처',
+        '_codocs:',
+        '  id: source',
+        '  name: 출처',
         'definition: "😀 [[대상]] [[대상]]"',
-        'examples: ["[[업무:대상]]"]',
+        'examples: ["[[대상]]"]',
         'metadata: "[[대상]]"',
         '',
       ].join(newline);
@@ -249,10 +250,10 @@ describe('live YAML과 디스크 대상의 연결', () => {
       });
       const links = await session.documentLinks(sourceUri);
       const diagnostics = await session.documentDiagnostics(sourceUri);
-      expect(links).toHaveLength(2);
+      expect(links).toHaveLength(3);
       expect(links[0]?.range).toEqual({
-        start: { line: 2, character: 16 },
-        end: { line: 2, character: 22 },
+        start: { line: 3, character: 16 },
+        end: { line: 3, character: 22 },
       });
       expect(
         diagnostics!.diagnostics.some(
@@ -279,13 +280,13 @@ describe('live YAML과 디스크 대상의 연결', () => {
         uri: sourceUri,
         version: 1,
         languageId: 'yaml',
-        text: 'id: source\nname: 출처\ndefinition: "[[대상]]"\n',
+        text: '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[대상]]"\n',
       },
     });
     expect(await session.documentLinks(sourceUri)).toEqual([]);
     const hover = await session.hoverDocument({
       textDocument: { uri: sourceUri },
-      position: { line: 2, character: 15 },
+      position: { line: 3, character: 15 },
     });
     expect(JSON.stringify(hover)).toContain('other');
     expect(JSON.stringify(hover)).toContain('대상 문서');
@@ -322,7 +323,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
           uri: sourceUri,
           version: 1,
           languageId: 'yaml',
-          text: 'id: source\nname: 출처\ndefinition: "[[대상]]"\n',
+          text: '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[대상]]"\n',
         },
       });
       const links = await session.documentLinks(sourceUri);
@@ -335,7 +336,9 @@ describe('live YAML과 디스크 대상의 연결', () => {
         session.changeDocument({
           textDocument: { uri: sourceUri, version: 2 },
           contentChanges: [
-            { text: 'id: source\nname: 출처\ndefinition: 삭제\n' },
+            {
+              text: '_codocs:\n  id: source\n  name: 출처\ndefinition: 삭제\n',
+            },
           ],
         });
       if (action === 'close') session.closeDocument(sourceUri);
@@ -358,7 +361,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
           uri: sourceUri,
           version: 1,
           languageId: 'yaml',
-          text: 'id: source\nname: 출처\ndefinition: "[[대상]]"\n',
+          text: '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[대상]]"\n',
         },
       });
       const links = await session.documentLinks(sourceUri);

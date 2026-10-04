@@ -25,7 +25,7 @@ beforeAll(async () => {
   for (const id of ['alpha', 'bravo'])
     await writeFile(
       path.join(fixture, '.codocs', `${id}.yaml`),
-      `id: ${id}\nname: ${id}\ndomains: [test]\ndefinition: ${repeated}\n`,
+      `_codocs:\n  id: ${id}\n  name: ${id}\ndefinition: ${repeated}\n`,
     );
 });
 
@@ -75,9 +75,7 @@ describe('codocs_duplicates stdio 도구', () => {
               mode: 'create',
               path: '.codocs/charlie.yaml',
               document: {
-                id: 'charlie',
-                name: 'charlie',
-                domains: ['test'],
+                _codocs: { id: 'charlie', name: 'charlie' },
                 definition: repeated,
               },
             },

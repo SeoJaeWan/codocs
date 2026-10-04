@@ -1,7 +1,6 @@
-id: explanation-separation
-name: '설명 분리'
-domains:
-  - '문서 작성 가이드'
+_codocs:
+  id: explanation-separation
+  name: '설명 분리'
 definition: |
   한 문서의 일부를 독립적으로 찾고 유지할 문서로 나눌지 판단하는 기준이다.
   [[기본 작성 지침]]으로 주제와 질문을 정한 뒤 아래 기준을 적용한다. 권장 사항의 적용 범위도 그 지침에서 확인한다.

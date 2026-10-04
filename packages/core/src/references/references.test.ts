@@ -9,11 +9,11 @@ import { extractReferences } from './index.js';
 
 describe('extractReferences: 본문 문자열에서 참조 추출', () => {
   it('정의에 참조가 하나 있으면 이름과 실제 원문 위치를 반환한다', () => {
-    const source = 'definition: "[[대상]]"\nname: 출처\ndomains: [업무]\n';
+    const source = 'definition: "[[대상]]"\nname: 출처\n';
     const parsed = {
       success: true as const,
       source,
-      data: { definition: '[[대상]]', name: '출처', domains: ['업무'] },
+      data: { _codocs: { name: '출처' }, definition: '[[대상]]' },
       fields: [],
       strings: [
         {

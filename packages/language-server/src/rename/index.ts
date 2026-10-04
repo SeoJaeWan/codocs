@@ -1,5 +1,8 @@
 import {
+  codocsKey,
+  documentFields,
   getStringRange,
+  metadataFields,
   parseYaml,
   type OffsetRange,
   type RenameSelection,
@@ -82,9 +85,13 @@ export function nameValueRange(
 ): { range: OffsetRange; name: string } | undefined {
   const parsed = parseYaml(text);
   if (!parsed.success) return undefined;
-  const name = parsed.data['name'];
+  const metadata = parsed.data[codocsKey];
+  const name =
+    typeof metadata === 'object' && metadata !== null
+      ? (metadata as Record<string, unknown>)[metadataFields.name]
+      : undefined;
   if (typeof name !== 'string' || name.length === 0) return undefined;
-  const range = getStringRange(parsed, ['name'], {
+  const range = getStringRange(parsed, documentFields.name, {
     start: 0,
     end: name.length,
   });

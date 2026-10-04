@@ -77,7 +77,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             conflict: false,
             source: { path: '.codocs/normal.yaml' },
             confirmation: 'confirmed',
-            document: { id: 'normal' },
+            document: { _codocs: { id: 'normal' } },
             references: [],
             referencedBy: [],
             diagnostics: [],
@@ -103,7 +103,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         conflict: false,
         source: { path: '.codocs/normal.yaml' },
         confirmation: 'confirmed',
-        document: { id: 'normal', definition: '본문' },
+        document: { _codocs: { id: 'normal' }, definition: '본문' },
         revision: 'revision',
         references: ['target'],
         referencedBy: ['source'],
@@ -157,7 +157,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             conflict: false,
             source: { path: '.codocs/normal.yaml' },
             confirmation: 'confirmed',
-            document: { id: 'normal' },
+            document: { _codocs: { id: 'normal' } },
             references: [],
             referencedBy: [],
             diagnostics: [],
@@ -190,7 +190,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             conflict: false,
             source: { path: '.codocs/alpha.yaml' },
             confirmation: 'unconfirmed',
-            document: { id: 'alpha', definition: '이전' },
+            document: { _codocs: { id: 'alpha' }, definition: '이전' },
             revision: 'previous',
             references: [],
             referencedBy: [],
@@ -334,25 +334,15 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
   });
 
   describe('목록 조건과 cursor 응답 전달', () => {
-    it('목록 필터를 전달하면 backend에 같은 조건을 보내고 응답을 반환한다', async () => {
-      const response = {
-        success: true,
-        scanStatus: 'complete',
-        items: [],
-        totalCount: 51,
-        returnedCount: 50,
-        nextCursor: 'cursor',
-      };
-      backend.list.mockResolvedValue(response);
+    it('제거된 domain 인자를 전달하면 backend를 호출하지 않고 입력 오류를 반환한다', async () => {
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { domain: '업무' };
 
-      const result = await handlers.codocsList(input);
+      const result = await handlers.codocsList({ domain: '업무' });
 
-      expect(result).toBe(response);
-      expect(backend.list).toHaveBeenCalledWith(input);
+      expect(result).toEqual(invalidInput());
+      expect(backend.list).not.toHaveBeenCalled();
     });
 
     it('partial 목록의 공통 진단을 그대로 전달한다', async () => {
@@ -424,20 +414,6 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         backend as unknown as WorkspaceQuerySession,
       );
       const input = { cursor: 'cursor' };
-
-      const result = await handlers.codocsList(input);
-
-      expect(result).toBe(response);
-      expect(backend.list).toHaveBeenCalledWith(input);
-    });
-
-    it('cursor와 다른 도메인을 함께 전달하면 backend의 입력 오류를 그대로 반환한다', async () => {
-      const response = invalidInput();
-      backend.list.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers(
-        backend as unknown as WorkspaceQuerySession,
-      );
-      const input = { cursor: 'cursor', domain: '다른 업무' };
 
       const result = await handlers.codocsList(input);
 
@@ -649,7 +625,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         conflict: false,
         source: { path: '.codocs/json.yaml' },
         confirmation: 'confirmed',
-        document: { id: 'json', definition: large },
+        document: { _codocs: { id: 'json' }, definition: large },
         revision: 'json-revision',
         references: ['raw'],
         referencedBy: [],

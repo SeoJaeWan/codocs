@@ -24,11 +24,10 @@ import type { WorkspaceScanResult } from '../loader/index.js';
 import type { WorkspaceRenameFileState } from './domain-values.js';
 export * from './domain-values.js';
 
-/** 이름 변경 결과에서 참조 후보를 식별하는 도메인·이름·경로다. */
+/** 이름 변경 결과에서 참조 후보를 식별하는 이름·경로다. */
 export interface WorkspaceRenameCandidate {
   path: string;
   name?: string;
-  domains: readonly string[];
 }
 
 /** 참조가 가리키는 후보와 해석 상태다. */
@@ -37,7 +36,7 @@ export interface WorkspaceRenameResolution {
   candidates: readonly WorkspaceRenameCandidate[];
 }
 
-/** 고칠 위치와 바꾸기 전후의 표기다. name 변경은 occurrenceIndex가 없다. */
+/** 고칠 위치와 바꾸기 전후의 표기다. name과 parent 항목 변경은 occurrenceIndex가 없다. */
 export interface WorkspaceRenameChange {
   path: string;
   fieldPath: FieldPath;
@@ -59,9 +58,8 @@ export interface WorkspaceRenameImpact {
   after: WorkspaceRenameResolution;
 }
 
-/** 대상 문서가 속한 도메인에서 새 이름과 겹치는 문서다. */
+/** 프로젝트에서 새 이름과 겹치는 문서다. */
 export interface WorkspaceRenameConflict {
-  domain: string;
   candidates: readonly WorkspaceRenameCandidate[];
 }
 
@@ -140,20 +138,13 @@ function selection(value: unknown): RenameSelection | undefined {
   const sourcePath = ownValue(value, 'sourcePath');
   const occurrenceIndex = ownValue(value, 'occurrenceIndex');
   const targetPath = ownValue(value, 'targetPath');
-  const domain = ownValue(value, 'domain');
   if (
     typeof sourcePath !== 'string' ||
     typeof occurrenceIndex !== 'number' ||
-    typeof targetPath !== 'string' ||
-    (domain !== undefined && typeof domain !== 'string')
+    typeof targetPath !== 'string'
   )
     return undefined;
-  return {
-    sourcePath,
-    occurrenceIndex,
-    targetPath,
-    ...(domain === undefined ? {} : { domain }),
-  };
+  return { sourcePath, occurrenceIndex, targetPath };
 }
 
 /**
@@ -201,12 +192,11 @@ export function parseRenameRevisions(
   return result;
 }
 
-/** 후보를 도메인·이름·경로만 가진 값으로 줄인다. */
+/** 후보를 이름·경로만 가진 값으로 줄인다. */
 function candidate(item: ReferenceCandidate): WorkspaceRenameCandidate {
   return {
     path: item.path,
     ...(item.name === undefined ? {} : { name: item.name }),
-    domains: [...item.domains],
   };
 }
 
@@ -245,7 +235,7 @@ function changeReport(change: RenameChange): WorkspaceRenameChange {
 
 /** 충돌을 보고용 값으로 줄인다. */
 function conflict(item: RenameConflict): WorkspaceRenameConflict {
-  return { domain: item.domain, candidates: item.candidates.map(candidate) };
+  return { candidates: item.candidates.map(candidate) };
 }
 
 /** 계산을 진행할 수 없는 미리보기를 만든다. 변경은 항상 0개다. */

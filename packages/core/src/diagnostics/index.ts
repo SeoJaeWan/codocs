@@ -42,7 +42,6 @@ export const schemaDiagnosticCodes = {
   invalidFieldType: 'invalid_field_type',
   /** 문자열·ID·열거 값·배열 길이 또는 JSON 값이 계약과 다르면 반환한다. */
   invalidFieldValue: 'invalid_field_value',
-  /** 문서의 업무 스키마에 없는 사용자 속성을 보존하며 경고한다. */
 } as const;
 
 /** 사용자에게 반환하는 스키마 진단의 고정 문구다. 오류 코드 하나에 여러 원인별 문구가 대응할 수 있다. */
@@ -63,7 +62,12 @@ export const schemaDiagnosticMessages = {
   blankString: '빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다.',
   /** ID가 소문자·숫자·하이픈 규칙에 맞지 않을 때 사용한다. */
   invalidId: 'ID는 소문자·숫자를 하이픈으로 연결해야 합니다.',
-  /** 업무 스키마에 없는 사용자 속성을 보존하며 경고할 때 사용한다. */
+  /** `_codocs` 안에 id·name·parent 외의 키가 있을 때 사용한다. */
+  unknownMetadataKey: '`_codocs`에는 id, name, parent만 쓸 수 있습니다.',
+  /** `_codocs` 외에 밑줄로 시작하는 루트 키가 있을 때 사용한다. */
+  reservedRootKey: '밑줄(_)로 시작하는 루트 키는 `_codocs`만 쓸 수 있습니다.',
+  /** `_codocs` 외에 section이 하나도 없을 때 사용한다. */
+  sectionRequired: '문자열 section이 하나 이상 필요합니다.',
 } as const;
 
 /** 코드 정의에서 도출한 스키마 진단 코드 타입이다. */
@@ -86,8 +90,12 @@ export type ReferenceDiagnosticCode =
 export const catalogDiagnosticCodes = {
   /** 문자열 ID가 여러 발견 경로에 존재하면 모든 경로에 반환한다. */
   duplicateId: 'duplicate_id',
-  /** 같은 도메인의 통합 이름 공간에 여러 경로가 있으면 반환한다. */
+  /** 프로젝트 전체의 이름 공간에 같은 이름의 경로가 여러 개 있으면 반환한다. */
   duplicateName: 'duplicate_name',
+  /** `_codocs.parent`의 이름에 해당하는 문서가 없으면 반환한다. */
+  parentNotFound: 'parent_not_found',
+  /** `_codocs.parent` 관계가 순환하면 순환에 속한 문서에 반환한다. 자기 자신을 parent로 지정한 경우도 포함한다. */
+  parentCycle: 'parent_cycle',
   /** 완전한 색인에 이름 후보가 없을 때 반환한다. */
   missingReference: 'missing_reference',
   /** 완전한 색인에 이름 후보 경로가 여러 개일 때 반환한다. */
@@ -102,7 +110,9 @@ export const catalogDiagnosticCodes = {
 /** 색인 계층이 소유하는 고정 문구다. */
 export const catalogDiagnosticMessages = {
   duplicateId: '같은 ID를 가진 발견 경로가 여러 개입니다.',
-  duplicateName: '같은 도메인에 같은 이름을 가진 문서가 여러 개입니다.',
+  duplicateName: '같은 이름을 가진 문서가 여러 개입니다.',
+  parentNotFound: 'parent 이름에 해당하는 문서가 없습니다.',
+  parentCycle: 'parent 관계가 순환합니다.',
   missingReference: '참조 이름에 해당하는 문서가 없습니다.',
   ambiguousReference: '참조 이름에 해당하는 문서가 여러 개입니다.',
   selfReference: '같은 발견 문서를 자기 참조할 수 없습니다.',

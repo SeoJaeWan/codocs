@@ -13,7 +13,7 @@ let root: string;
 let source: string;
 let sessions: WorkspaceQuerySession[];
 const original =
-  'id: first\nname: 첫 문서\ndomains: [업무]\ndefinition: "[[둘째 문서]]"\ndeprecatedAliases:\n  - id: old-first\n    message: 유지할 안내\n';
+  '_codocs:\n  id: first\n  name: 첫 문서\ndefinition: "[[둘째 문서]]"\n';
 
 /** 저장 테스트마다 실제 프로젝트와 세션을 새로 소유한다. */
 beforeEach(async () => {
@@ -23,7 +23,7 @@ beforeEach(async () => {
   await writeFile(source, original);
   await writeFile(
     path.join(root, '.codocs', 'second.yaml'),
-    'id: second\nname: 둘째 문서\ndomains: [업무]\ndefinition: 본문\n',
+    '_codocs:\n  id: second\n  name: 둘째 문서\ndefinition: 본문\n',
   );
   sessions = [];
 });
@@ -52,13 +52,16 @@ function revision(bytes: Uint8Array | string): string {
 }
 
 describe('WorkspaceQuerySession.write 실제 IO', () => {
-  it('ID를 바꾸면 이전 ID와 deprecatedAliases 없이 한 파일에 반영하고 저장 직후 참조·진단·목록을 게시한다', async () => {
+  it('_codocs로 ID를 바꾸면 이전 ID를 남기지 않고 한 파일에 반영하고 저장 직후 참조·진단·목록을 게시한다', async () => {
     const current = session();
     const result = await current.write({
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { id: 'renamed', definition: '새 설명' },
+      set: {
+        _codocs: { id: 'renamed', name: '첫 문서' },
+        definition: '새 설명',
+      },
     });
     expect(result).toMatchObject({
       success: true,
@@ -71,9 +74,6 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     expect(result.revision).toBe(revision(bytes));
     expect(bytes.toString()).toContain('id: renamed');
     expect(bytes.toString()).not.toContain('id: first');
-    expect(bytes.toString()).not.toContain('old-first');
-    expect(bytes.toString()).not.toContain('deprecatedAliases');
-    expect(bytes.toString()).not.toContain('message: 유지할 안내');
     const fetched = await current.get(['renamed', 'first']);
     expect(fetched).toMatchObject({
       success: true,
@@ -95,7 +95,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '다른 이름' },
+      set: { _codocs: { id: 'first', name: '다른 이름' } },
     });
     expect(result).toMatchObject({
       success: false,
@@ -114,7 +114,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '첫 문서' },
+      set: { _codocs: { id: 'first', name: '첫 문서' } },
     });
     expect(same).toMatchObject({
       success: true,
@@ -127,14 +127,14 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      unset: ['name'],
+      unset: ['_codocs'],
     });
     expect(required).toMatchObject({ success: false, saved: false });
     const duplicate = await current.write({
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { id: 'second' },
+      set: { _codocs: { id: 'second', name: '첫 문서' } },
     });
     expect(duplicate).toMatchObject({ success: false, saved: false });
     const stale = await current.write({
@@ -172,15 +172,13 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     expect(await readFile(source, 'utf8')).toBe(original);
   });
 
-  it('같은 도메인의 동명은 차단하고 다른 도메인의 동명은 후보 안내 없이 저장한다', async () => {
+  it('프로젝트의 다른 문서와 같은 이름의 문서 생성은 차단한다', async () => {
     const current = session();
     const conflicting = await current.write({
       mode: 'create',
       path: '.codocs/conflict.yaml',
       document: {
-        id: 'conflict',
-        name: '첫 문서',
-        domains: ['업무'],
+        _codocs: { id: 'conflict', name: '첫 문서' },
         definition: '본문',
       },
     });
@@ -188,29 +186,13 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     expect(conflicting.diagnostics.map((item) => item.code)).toContain(
       'duplicate_name',
     );
-    const allowed = await current.write({
-      mode: 'create',
-      path: '.codocs/allowed.yaml',
-      document: {
-        id: 'allowed',
-        name: '첫 문서',
-        domains: ['별도'],
-        definition: '본문',
-      },
-    });
-    expect(allowed).toMatchObject({
-      success: true,
-      saved: true,
-      indexUpdated: true,
-    });
-    expect(allowed).not.toHaveProperty('sameNameCandidates');
-    expect(
-      await readFile(path.join(root, '.codocs', 'allowed.yaml'), 'utf8'),
-    ).toContain('id: allowed');
+    await expect(
+      readFile(path.join(root, '.codocs', 'conflict.yaml'), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('저장 직전 revision 경쟁은 최신 원문을 보존하고 다시 조회하도록 안내한다', async () => {
-    const changed = original.replace('유지할 안내', '사람이 수정한 안내');
+    const changed = original.replace('둘째 문서', '사람이 수정한 문서');
     const current = session({
       storage: {
         beforeApply: async () => {
@@ -249,9 +231,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'create',
       path: '.codocs/created.yaml',
       document: {
-        id: 'created',
-        name: '생성',
-        domains: ['별도'],
+        _codocs: { id: 'created', name: '생성' },
         definition: '본문',
       },
     });
@@ -266,26 +246,6 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       ioCode: 'EACCES',
     });
     expect(result.revision).toBe(revision(await readFile(createdPath)));
-  });
-
-  it('저장하는 문서에 deprecatedAliases가 있으면 수정과 함께 그 키 블록만 지운다', async () => {
-    const current = session();
-    const result = await current.write({
-      mode: 'update',
-      id: 'first',
-      revision: revision(original),
-      set: { definition: '새 설명' },
-    });
-    expect(result).toMatchObject({
-      success: true,
-      saved: true,
-      indexUpdated: true,
-      id: 'first',
-    });
-    const text = await readFile(source, 'utf8');
-    expect(text).toBe(
-      'id: first\nname: 첫 문서\ndomains: [업무]\ndefinition: 새 설명\n',
-    );
   });
 
   it('첫 색인 오류는 저장 없이 반복하지 않고 해당 경로만 추가 복구한다', async () => {
