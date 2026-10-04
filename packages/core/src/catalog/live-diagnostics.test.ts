@@ -39,7 +39,6 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
       }),
     );
     expect(catalog.idPaths.get('target')).toEqual(new Set([saved.path]));
-    // @codocs [[문서 색인]]#L31-L34
     expect(catalog.documents.has(live.path)).toBe(false);
   });
 
@@ -202,5 +201,31 @@ describe('저장 이름·도메인 색인과 현재 편집 진단', () => {
         }),
       );
     expect(catalog.documents.has(source.path)).toBe(false);
+  });
+});
+
+describe('편집 중인 출처의 참조 해석', () => {
+  it('저장 원문과 다른 참조로 편집하면 현재 편집 내용의 참조로 대상을 판단한다', () => {
+    const observation = (id: string, name: string, definition: string) => ({
+      path: `${id}.yaml`,
+      parsed: parseYaml(
+        `id: ${id}\nname: ${name}\ndefinition: "${definition}"\ndomains: [test]\n`,
+      ),
+    });
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [
+        observation('a', 'A', '설명'),
+        observation('b', 'B', '설명'),
+        observation('source', '출처', '[[A]]'),
+      ],
+    });
+    const result = resolveLiveDocument(
+      catalog,
+      observation('source', '출처', '[[B]]'),
+    );
+    expect(result.references.map((reference) => reference.path)).toEqual([
+      'b.yaml',
+    ]);
   });
 });

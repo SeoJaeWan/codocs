@@ -47,7 +47,7 @@ export interface CodeReferenceResolution {
 export function codeReferenceLineCount(text: string): number {
   return text.split(/\r\n|\r|\n/u).length;
 }
-/** 언어·YAML 필드·자기 참조 제한 없이 전체 텍스트의 명시 표기를 추출한다. @codocs [[명시적 코드 참조]]#L12-L28 */
+/** 언어·YAML 필드·자기 참조 제한 없이 전체 텍스트의 명시 표기를 추출한다. */
 export function extractCodeReferences(
   text: string,
 ): readonly CodeReferenceMarker[] {
@@ -106,7 +106,7 @@ export function extractCodeReferences(
   }
   return markers;
 }
-/** 저장 catalog만 사용하며 코드 출처를 YAML 자기 참조로 판단하지 않는다. @codocs [[명시적 코드 참조]]#L30-L40 */
+/** 저장 catalog만 사용하며 코드 출처를 YAML 자기 참조로 판단하지 않는다. */
 export function resolveCodeReference(
   catalog: Catalog,
   marker: CodeReferenceMarker,

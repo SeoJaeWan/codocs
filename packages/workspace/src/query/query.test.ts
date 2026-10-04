@@ -8,8 +8,6 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 import {
   catalogDiagnosticCodes,
   diagnosticSeverities,
-  documentKinds,
-  documentStatuses,
   queryDiagnosticCodes,
   scanStatuses,
   yamlDiagnosticCodes,
@@ -321,79 +319,32 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
   });
-  describe('전체 텍스트 매칭', () => {
-    it('저장하지 않은 주석·문자열·불완전 원문을 요청마다 새 UTF-16 범위로 매칭한다', async () => {
-      await file(
-        'user-name.yaml',
-        'id: user-name\nname: user name\ndomains: [업무]\ndefinition: 본문\n',
-      );
-      await file(
-        'return-zone.yaml',
-        'id: return-zone\nname: return zone\ndomains: [업무]\ndefinition: 본문\n',
-      );
-      const session = createWorkspaceQuerySession({ cwd: project });
-      const text = '😀// userName\r\nconst broken = "returnZone';
-      const first = await session.match(text);
-      if (!first.success) throw new Error('초기 매칭 실패');
+  it('문서 ID 목록이 같아도 .codocs 변경을 새 catalog 버전의 다음 조회에 반영한다', async () => {
+    await file(
+      'stable.yaml',
+      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 이전 본문\n',
+    );
+    const session = createWorkspaceQuerySession({ cwd: project });
+    await session.list();
+    const firstVersion = session.catalogVersion;
+    const listGeneration = session.generation;
+    await file(
+      'stable.yaml',
+      'id: stable\nname: stable\ndomains: [업무]\ndefinition: 새 본문\n',
+    );
 
-      expect(first).toMatchObject({
-        scanStatus: scanStatuses.complete,
-        partial: false,
-        candidates: [{ id: 'user-name' }, { id: 'return-zone' }],
-      });
-      expect(first.evidence.map((item) => item.range)).toEqual([
-        {
-          start: text.indexOf('userName'),
-          end: text.indexOf('userName') + 'userName'.length,
-        },
-        {
-          start: text.indexOf('returnZone'),
-          end: text.indexOf('returnZone') + 'returnZone'.length,
-        },
-      ]);
-
-      const edited = await session.match('// returnZone');
-      expect(edited).toMatchObject({
-        success: true,
-        catalogVersion: first.catalogVersion,
-        candidates: [{ id: 'return-zone' }],
-      });
-      if (edited.success)
-        expect(
-          edited.candidates.map((candidate) => candidate.id),
-        ).not.toContain('user-name');
-    });
-
-    it('문서 ID 목록이 같아도 .codocs 변경을 새 catalog 버전의 다음 매칭에 반영한다', async () => {
-      await file(
-        'stable.yaml',
-        'id: stable\nname: stable\ndomains: [업무]\ndefinition: 본문\ndeprecatedAliases: [{ id: alpha }]\n',
-      );
-      const session = createWorkspaceQuerySession({ cwd: project });
-      const first = await session.match('alpha');
-      if (!first.success) throw new Error('초기 매칭 실패');
-      const listGeneration = session.generation;
-      await file(
-        'stable.yaml',
-        'id: stable\nname: stable\ndomains: [업무]\ndefinition: 본문\ndeprecatedAliases: [{ id: beta }]\n',
-      );
-
-      await vi.waitFor(
-        async () => {
-          const synchronized = await session.match('beta');
-          expect(synchronized).toMatchObject({
-            success: true,
-            candidates: [{ id: 'stable' }],
-          });
-          if (!synchronized.success) throw new Error('매칭 동기화 실패');
-          expect(synchronized.catalogVersion).toBeGreaterThan(
-            first.catalogVersion,
-          );
-        },
-        { timeout: 5_000, interval: 25 },
-      );
-      expect(session.generation).toBe(listGeneration);
-    });
+    await vi.waitFor(
+      async () => {
+        const synchronized = await session.get(['stable']);
+        expect(synchronized).toMatchObject({
+          success: true,
+          results: [{ id: 'stable', document: { definition: '새 본문' } }],
+        });
+        expect(session.catalogVersion).toBeGreaterThan(firstVersion);
+      },
+      { timeout: 5_000, interval: 25 },
+    );
+    expect(session.generation).toBe(listGeneration);
   });
 
   it('refresh 집계는 같은 탐색의 파일·비필터 목록·진단을 반영한다', async () => {
@@ -475,7 +426,6 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       expect(session.limitedReadAvailable).toBe(true);
       const list = await session.list();
       const get = await session.get(['alpha', 'outside']);
-      const match = await session.match('outside');
       expect(list).toMatchObject({
         success: true,
         scanStatus: 'partial',
@@ -495,14 +445,6 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         expect(get.results[1]?.diagnostics).not.toContainEqual(
           expect.objectContaining({ code: queryDiagnosticCodes.notFound }),
         );
-      expect(match).toMatchObject({
-        success: true,
-        scanStatus: 'partial',
-        partial: true,
-        candidates: [],
-      });
-      if (match.success)
-        expect(match.diagnostics[0]?.message).toContain('codocs_refresh');
     } finally {
       spy.mockRestore();
       await session.close();
@@ -709,10 +651,9 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   });
 
   describe('부분 스캔 후 이전 조회 결과 보존', () => {
-    /** @codocs [[작업 공간:미확인 문서]]#L12-L13 */
     it('문서 경로의 확인이 실패하면 이전 본문과 revision을 미확인 상태로 반환한다', async () => {
       const raw =
-        "id: alpha\nname: 알파\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: '이전 본문'\n";
+        "id: alpha\nname: 알파\ndomains: [업무]\ndefinition: '이전 본문'\n";
       const target = await file('alpha.yaml', raw);
       const session = createWorkspaceQuerySession({ cwd: project });
       const initial = await session.get(['alpha']);
@@ -743,11 +684,10 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
-    /** @codocs [[작업 공간:작업 공간 조회 세션]]#L56 */
     it('부분 스캔에서 색인 밖 ID를 조회하면 부재로 확정하지 않는다', async () => {
       const target = await file(
         'alpha.yaml',
-        'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+        'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.get(['alpha']);
@@ -770,11 +710,11 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     it('부분 스캔에서 목록을 조회하면 이전 항목을 포함한 개수를 반환한다', async () => {
       const target = await file(
         'alpha.yaml',
-        'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+        'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
       );
       await file(
         'beta.yaml',
-        'id: beta\nname: beta\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+        'id: beta\nname: beta\ndomains: [업무]\ndefinition: 본문\n',
       );
       const session = createWorkspaceQuerySession({ cwd: project });
       await session.list();
@@ -794,7 +734,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   it('failed는 이전 Catalog를 응답에 노출하지 않고 확인된 원인으로 실패한다', /** 미지원 .codocs 정션으로 failed 전환을 만든다. */ async () => {
     await file(
       'alpha.yaml',
-      'id: alpha\nname: alpha\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
     expect(await session.get(['alpha'])).toMatchObject({ success: true });
@@ -816,26 +756,14 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     for (let index = 59; index >= 0; index--)
       await file(
         `doc-${index}.yaml`,
-        `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+        `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
       );
     await file(
       'other.yaml',
-      'id: other\nname: other\ndomains: [기타]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
-    );
-    await file(
-      'other-kind.yaml',
-      'id: other-kind\nname: other-kind\ndomains: [업무]\nkind: decision\nstatus: confirmed\ndefinition: 본문\n',
-    );
-    await file(
-      'other-status.yaml',
-      'id: other-status\nname: other-status\ndomains: [업무]\nkind: policy\nstatus: proposed\ndefinition: 본문\n',
+      'id: other\nname: other\ndomains: [기타]\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const first = await session.list({
-      domain: '업무',
-      kind: documentKinds.policy,
-      status: documentStatuses.confirmed,
-    });
+    const first = await session.list({ domain: '업무' });
     expect(first).toMatchObject({
       success: true,
       totalCount: 60,
@@ -865,12 +793,11 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
   });
 
   describe('목록 표시 변경에 따른 cursor 유효성', () => {
-    /** @codocs [[작업 공간:목록 페이지 조회]]#L19 @codocs [[작업 공간:조회 커서]]#L15 */
     it('본문만 변경하면 기존 cursor로 다음 페이지를 조회한다', async () => {
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -878,7 +805,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         throw new Error('다음 cursor 없음');
       await file(
         'doc-50.yaml',
-        'id: doc-50\nname: doc-50\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 새 본문\n',
+        'id: doc-50\nname: doc-50\ndomains: [업무]\ndefinition: 새 본문\n',
       );
 
       await vi.waitFor(
@@ -902,12 +829,11 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
-    /** @codocs [[작업 공간:목록 페이지 조회]]#L13 */
     it('cursor와 최초 목록의 도메인과 다른 필터를 전달하면 입력 오류를 반환한다', async () => {
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list({ domain: '업무' });
@@ -929,7 +855,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -937,7 +863,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         throw new Error('다음 cursor 없음');
       await file(
         'doc-50.yaml',
-        'id: doc-50\nname: 표시 이름 변경\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+        'id: doc-50\nname: 표시 이름 변경\ndomains: [업무]\ndefinition: 본문\n',
       );
 
       await vi.waitFor(
@@ -976,7 +902,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         for (let index = 0; index < 51; index++)
           await file(
             `doc-${index}.yaml`,
-            `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+            `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
           );
         const session = createWorkspaceQuerySession({ cwd: project });
         const first = await session.list();
@@ -985,17 +911,17 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         if (changed === 'new')
           await file(
             'new.yaml',
-            'id: new\nname: new\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+            'id: new\nname: new\ndomains: [업무]\ndefinition: 본문\n',
           );
         if (changed === 'error')
           await file(
             'doc-50.yaml',
-            "id: doc-50\nname: doc-50\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: '[[Missing]]'\n",
+            "id: doc-50\nname: doc-50\ndomains: [업무]\ndefinition: '[[Missing]]'\n",
           );
         if (changed === 'conflict')
           await file(
             'duplicate.yaml',
-            'id: doc-50\nname: duplicate\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n',
+            'id: doc-50\nname: duplicate\ndomains: [업무]\ndefinition: 본문\n',
           );
 
         await vi.waitFor(
@@ -1090,73 +1016,47 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
-    it.each([
-      {
-        label: '도메인',
-        domains: '기타',
-        kind: documentKinds.policy,
-        status: documentStatuses.confirmed,
-      },
-      {
-        label: '종류',
-        domains: '업무',
-        kind: documentKinds.decision,
-        status: documentStatuses.confirmed,
-      },
-      {
-        label: '상태',
-        domains: '업무',
-        kind: documentKinds.policy,
-        status: documentStatuses.proposed,
-      },
-    ])(
-      '문서의 $label을 변경해 기존 필터에서 제외하면 기존 cursor를 만료한다',
-      async ({ domains, kind, status }) => {
-        for (let index = 0; index < 51; index++) {
-          const id = `doc-${String(index).padStart(2, '0')}`;
-          await file(
-            `${id}.yaml`,
-            `id: ${id}\nname: ${id}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
-          );
-        }
-        const filters = {
-          domain: '업무',
-          kind: documentKinds.policy,
-          status: documentStatuses.confirmed,
-        };
-        const session = createWorkspaceQuerySession({ cwd: project });
-        const first = await session.list(filters);
-        if (!first.success || !first.nextCursor)
-          throw new Error('다음 cursor 없음');
-        const input = { cursor: first.nextCursor };
+    it('문서의 도메인을 변경해 기존 필터에서 제외하면 기존 cursor를 만료한다', async () => {
+      for (let index = 0; index < 51; index++) {
+        const id = `doc-${String(index).padStart(2, '0')}`;
         await file(
-          'doc-50.yaml',
-          `id: doc-50\nname: doc-50\ndomains: [${domains}]\nkind: ${kind}\nstatus: ${status}\ndefinition: 본문\n`,
+          `${id}.yaml`,
+          `id: ${id}\nname: ${id}\ndomains: [업무]\ndefinition: 본문\n`,
         );
+      }
+      const filters = { domain: '업무' };
+      const session = createWorkspaceQuerySession({ cwd: project });
+      const first = await session.list(filters);
+      if (!first.success || !first.nextCursor)
+        throw new Error('다음 cursor 없음');
+      const input = { cursor: first.nextCursor };
+      await file(
+        'doc-50.yaml',
+        `id: doc-50\nname: doc-50\ndomains: [기타]\ndefinition: 본문\n`,
+      );
 
-        await vi.waitFor(
-          async () => {
-            const synchronized = await session.list(filters);
-            expect(synchronized).toMatchObject({
-              success: true,
-              totalCount: 50,
-            });
-          },
-          { timeout: 5_000, interval: 25 },
-        );
-        const result = await session.list(input);
+      await vi.waitFor(
+        async () => {
+          const synchronized = await session.list(filters);
+          expect(synchronized).toMatchObject({
+            success: true,
+            totalCount: 50,
+          });
+        },
+        { timeout: 5_000, interval: 25 },
+      );
+      const result = await session.list(input);
 
-        expect(result).toEqual({
-          success: false,
-          scanStatus: scanStatuses.complete,
-          error: {
-            code: workspaceQueryDiagnosticCodes.cursorExpired,
-            severity: diagnosticSeverities.error,
-            message: workspaceQueryDiagnosticMessages.cursorExpired,
-          },
-        });
-      },
-    );
+      expect(result).toEqual({
+        success: false,
+        scanStatus: scanStatuses.complete,
+        error: {
+          code: workspaceQueryDiagnosticCodes.cursorExpired,
+          severity: diagnosticSeverities.error,
+          message: workspaceQueryDiagnosticMessages.cursorExpired,
+        },
+      });
+    });
   });
 
   describe('cursor 서명과 세션 수명', () => {
@@ -1164,7 +1064,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -1195,7 +1095,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -1211,12 +1111,11 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       });
     });
 
-    /** @codocs [[작업 공간:목록 페이지 조회]]#L20 */
     it('새 세션에서 이전 cursor를 사용하면 만료 오류를 반환한다', async () => {
       for (let index = 0; index < 51; index++)
         await file(
           `doc-${index}.yaml`,
-          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\nkind: policy\nstatus: confirmed\ndefinition: 본문\n`,
+          `id: doc-${String(index).padStart(2, '0')}\nname: doc-${String(index).padStart(2, '0')}\ndomains: [업무]\ndefinition: 본문\n`,
         );
       const session = createWorkspaceQuerySession({ cwd: project });
       const first = await session.list();
@@ -1238,25 +1137,22 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
 });
 
 describe('경로와 catalog 버전 기반 문서 조회', () => {
-  it('이전 ID로 찾은 현재 ID 누락 문서를 경로로 조회하면 내용과 진단을 유지한다', async () => {
+  it('현재 ID가 누락된 문서를 경로로 조회하면 내용과 진단을 유지한다', async () => {
     const documentPath = await file(
       'missing-id.yaml',
-      'name: 이전 이름\ndomains: [업무]\ndefinition: 본문\ndeprecatedAliases: [{ id: old-name }]\n',
+      'name: 이전 이름\ndomains: [업무]\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const matched = await session.match('oldName');
-    if (!matched.success) throw new Error('코드 매칭 실패');
-    const candidate = matched.candidates[0];
-    if (!candidate) throw new Error('이전 ID 후보 없음');
+    await session.refresh();
 
     const result = await session.getByPaths(
-      [candidate.path],
-      matched.catalogVersion,
+      [path.relative(project, documentPath)],
+      session.catalogVersion,
     );
 
     expect(result).toMatchObject({
       success: true,
-      catalogVersion: matched.catalogVersion,
+      catalogVersion: session.catalogVersion,
       results: [
         {
           path: path.relative(project, documentPath),
@@ -1286,12 +1182,11 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       'id: target\nname: 대상\ndomains: [업무]\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const matched = await session.match('source target');
-    if (!matched.success) throw new Error('코드 매칭 실패');
+    await session.refresh();
 
     const result = await session.getByPaths(
       ['.codocs/source.yaml', '.codocs/target.yaml'],
-      matched.catalogVersion,
+      session.catalogVersion,
     );
 
     expect(result).toMatchObject({
@@ -1320,17 +1215,16 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       'id: stable\nname: stable\ndomains: [업무]\ndefinition: 이전 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const first = await session.match('stable');
-    if (!first.success) throw new Error('초기 매칭 실패');
+    await session.refresh();
+    const first = { catalogVersion: session.catalogVersion };
     await file(
       'stable.yaml',
       'id: stable\nname: stable\ndomains: [업무]\ndefinition: 새 본문\n',
     );
     await vi.waitFor(
       async () => {
-        const changed = await session.match('stable');
-        if (!changed.success) throw new Error('변경 매칭 실패');
-        expect(changed.catalogVersion).toBeGreaterThan(first.catalogVersion);
+        await session.list();
+        expect(session.catalogVersion).toBeGreaterThan(first.catalogVersion);
       },
       { timeout: 5_000, interval: 25 },
     );
@@ -1356,8 +1250,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const initial = await session.match('alpha');
-    if (!initial.success) throw new Error('초기 매칭 실패');
+    await session.refresh();
     ioFailures.set(target, { operations: ['lstat'], code: 'EACCES' });
     const refreshed = await session.refresh();
     if (!refreshed.success) throw new Error('부분 갱신 실패');
@@ -1387,17 +1280,14 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
   it('한글과 공백이 있는 CRLF 문서의 ID 오류 위치와 revision을 그대로 반환한다', async () => {
     await mkdir(path.join(project, '.codocs', '하위 폴더'));
     const raw =
-      'id: Invalid_Id\r\nname: 오류 문서\r\ndomains: [업무]\r\ndefinition: 😀본문\r\ndeprecatedAliases: [{ id: old-name }]\r\n';
+      'id: Invalid_Id\r\nname: 오류 문서\r\ndomains: [업무]\r\ndefinition: 😀본문\r\n';
     await file('하위 폴더/오류 문서.yaml', raw);
     const session = createWorkspaceQuerySession({ cwd: project });
-    const matched = await session.match('oldName');
-    if (!matched.success) throw new Error('코드 매칭 실패');
-    const candidate = matched.candidates[0];
-    if (!candidate) throw new Error('형식 오류 ID 후보 없음');
+    await session.refresh();
 
     const result = await session.getByPaths(
-      [candidate.path],
-      matched.catalogVersion,
+      [path.join('.codocs', '하위 폴더', '오류 문서.yaml')],
+      session.catalogVersion,
     );
 
     expect(result).toMatchObject({
@@ -1461,11 +1351,9 @@ describe('live 참조와 선택 최신 확인', () => {
       ],
     });
     if (!result.success) throw new Error('참조 조회 실패');
-    expect(
-      result.diagnostics.filter(
-        (item) => item.code === catalogDiagnosticCodes.deprecatedReference,
-      ),
-    ).toHaveLength(2);
+    expect(result.diagnostics.map((item) => item.code)).not.toContain(
+      'deprecated_reference',
+    );
     expect(result.targets[0]).toMatchObject({
       source: {
         uri: pathToFileURL(path.join(project, '.codocs/target.yaml')).href,
@@ -1631,18 +1519,17 @@ describe('live 참조와 선택 최신 확인', () => {
     },
   );
 
-  it('코드 매칭으로 명시 선택한 후보를 이동 후에도 원래 매칭 근거로 확인한다', async () => {
+  it('이름 참조로 명시 선택한 후보를 이동 후에도 원래 참조 근거로 확인한다', async () => {
     const original = await file(
       'target.yaml',
       'id: target\nname: 대상\ndefinition: 내용\n',
     );
     const session = createWorkspaceQuerySession({ cwd: project });
-    const matched = await session.match('target');
-    if (!matched.success) throw new Error('매칭 실패');
+    await session.refresh();
     const token = session.captureCandidate(
-      { text: 'target' },
+      { reference: { name: '대상' }, sourcePath: '.codocs/source.yaml' },
       '.codocs/target.yaml',
-      matched.catalogVersion,
+      session.catalogVersion,
     )!;
     await rename(original, path.join(project, '.codocs/moved.yaml'));
     await session.refresh();

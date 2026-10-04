@@ -52,13 +52,13 @@ function revision(bytes: Uint8Array | string): string {
 }
 
 describe('WorkspaceQuerySession.write 실제 IO', () => {
-  it('ID와 이전 ID를 한 파일에 반영하고 저장 직후 참조·진단·목록을 게시한다', async () => {
+  it('ID를 바꾸면 이전 ID와 deprecatedAliases 없이 한 파일에 반영하고 저장 직후 참조·진단·목록을 게시한다', async () => {
     const current = session();
     const result = await current.write({
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { id: 'renamed', name: '새 이름' },
+      set: { id: 'renamed', definition: '새 설명' },
     });
     expect(result).toMatchObject({
       success: true,
@@ -70,17 +70,14 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     const bytes = await readFile(source);
     expect(result.revision).toBe(revision(bytes));
     expect(bytes.toString()).toContain('id: renamed');
-    expect(bytes.toString()).toContain('id: first');
-    expect(bytes.toString()).toContain('id: old-first');
-    expect(bytes.toString()).toContain('message: 유지할 안내');
+    expect(bytes.toString()).not.toContain('id: first');
+    expect(bytes.toString()).not.toContain('old-first');
+    expect(bytes.toString()).not.toContain('deprecatedAliases');
+    expect(bytes.toString()).not.toContain('message: 유지할 안내');
     const fetched = await current.get(['renamed', 'first']);
     expect(fetched).toMatchObject({
       success: true,
       results: [{ found: true, revision: result.revision }, { found: false }],
-    });
-    expect(await current.match('first old-first')).toMatchObject({
-      success: true,
-      candidates: [{ id: 'renamed' }],
     });
     const listed = await current.list();
     expect(listed).toMatchObject({ success: true, totalCount: 2 });
@@ -90,6 +87,25 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       diagnostics.documents.find((item) => item.path.endsWith('first.yaml'))
         ?.text,
     ).toContain('id: renamed');
+  });
+
+  it('수정 요청의 name이 현재 이름과 다르면 저장하지 않고 이름 변경 도구를 안내한다', async () => {
+    const current = session();
+    const result = await current.write({
+      mode: 'update',
+      id: 'first',
+      revision: revision(original),
+      set: { name: '다른 이름' },
+    });
+    expect(result).toMatchObject({
+      success: false,
+      saved: false,
+      changed: false,
+      error: { code: 'name_change_not_allowed' },
+    });
+    if (!result.success)
+      expect(result.error.message).toContain('codocs_rename');
+    expect(await readFile(source, 'utf8')).toBe(original);
   });
 
   it('무변경과 저장 전 충돌은 바이트를 보존하며 무변경에 색인 결과를 붙이지 않는다', async () => {
@@ -125,7 +141,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: 'old',
-      set: { name: '다름' },
+      set: { definition: '다름' },
     });
     expect(stale).toMatchObject({ success: false, saved: false });
     expect(await readFile(source, 'utf8')).toBe(original);
@@ -146,7 +162,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '수정' },
+      set: { definition: '수정' },
     });
     expect(result).toMatchObject({
       success: false,
@@ -206,7 +222,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '수정' },
+      set: { definition: '수정' },
     });
     expect(result).toMatchObject({
       success: false,
@@ -252,28 +268,26 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     expect(result.revision).toBe(revision(await readFile(createdPath)));
   });
 
-  it('과거 ID를 다시 현재 ID로 선택하면 이전 목록의 새 현재 ID를 제거한다', async () => {
+  it('저장하는 문서에 deprecatedAliases가 있으면 수정과 함께 그 키 블록만 지운다', async () => {
     const current = session();
     const result = await current.write({
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { id: 'old-first' },
+      set: { definition: '새 설명' },
     });
     expect(result).toMatchObject({
       success: true,
       saved: true,
       indexUpdated: true,
-      id: 'old-first',
+      id: 'first',
     });
     const text = await readFile(source, 'utf8');
-    expect(text).toContain('id: old-first');
-    expect(text).toContain('- id: first');
-    expect(text).not.toContain('- id: old-first');
-    expect(text).not.toContain('message: 유지할 안내');
+    expect(text).toBe(
+      'id: first\nname: 첫 문서\ndomains: [업무]\ndefinition: 새 설명\n',
+    );
   });
 
-  /** @codocs [[작업 공간:저장 후 색인 갱신 실패를 복구하는 절차]]#L14 @codocs [[작업 공간:저장 후 색인 갱신 실패를 복구하는 절차]]#L30 */
   it('첫 색인 오류는 저장 없이 반복하지 않고 해당 경로만 추가 복구한다', async () => {
     const attempts: number[] = [];
     const current = session({
@@ -288,7 +302,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '복구됨' },
+      set: { definition: '복구됨' },
     });
     expect(attempts).toEqual([1, 2]);
     expect(result).toMatchObject({
@@ -304,7 +318,6 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     });
   });
 
-  /** @codocs [[작업 공간:저장 후 색인 갱신 실패를 복구하는 절차]]#L21-L22 */
   it('두 색인 오류 뒤에도 저장 revision과 진단 및 refresh 안내를 유지한다', async () => {
     const attempts: number[] = [];
     const current = session({
@@ -317,7 +330,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '저장됨' },
+      set: { definition: '저장됨' },
     });
     expect(attempts).toEqual([1, 2]);
     expect(result).toMatchObject({
@@ -349,7 +362,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
         mode: 'update',
         id: 'first',
         revision: revision(original),
-        set: { name: '느린 저장' },
+        set: { definition: '느린 저장' },
       })
       .then((value) => {
         settled = true;
@@ -382,7 +395,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
         mode: 'update',
         id: 'first',
         revision: revision(original),
-        set: { name: '복구 지연' },
+        set: { definition: '복구 지연' },
       })
       .then((value) => {
         settled = true;
@@ -425,7 +438,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '저장됨' },
+      set: { definition: '저장됨' },
     });
     await entered;
     await current.close();

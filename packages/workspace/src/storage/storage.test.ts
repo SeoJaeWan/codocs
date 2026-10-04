@@ -44,7 +44,7 @@ function ioError(code: string): Error {
 
 /** 실제 프로젝트의 현재 관측에서 update 요청을 만든다. */
 async function updateRequest(
-  set: Record<string, unknown> = { name: '바뀐 문서' },
+  set: Record<string, unknown> = { definition: '바뀐 설명' },
 ) {
   const scan = await loadWorkspace({ cwd: root });
   const source = scan.documents.find(
@@ -119,7 +119,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     );
   });
 
-  it('update가 주석과 CRLF 및 이전 ID를 함께 보존해 반영한다', async () => {
+  it('update가 주석과 CRLF를 보존해 반영하며 이전 ID는 남기지 않는다', async () => {
     const { scan, input } = await updateRequest({ id: 'renamed' });
     const result = await saveWorkspaceChange(input, scan);
     expect(result).toMatchObject({
@@ -132,7 +132,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     const bytes = await readFile(originalFile);
     expect(bytes.toString()).toContain('# 원문 주석\r\n');
     expect(bytes.toString()).toContain('id: renamed\r\n');
-    expect(bytes.toString()).toContain('deprecatedAliases:\r\n  - id: first');
+    expect(bytes.toString()).not.toContain('deprecatedAliases');
     expect(result.revision).toBe(sha256(bytes));
   });
 
@@ -228,7 +228,6 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     expect(await readdir(folder)).toEqual(['first.yaml']);
   });
 
-  /** @codocs [[작업 공간:쓰기 조정]]#L20-L21 @codocs [[작업 공간:저장]]#L26 */
   it('대상 선검사 뒤 다른 생성이 끼어도 하드링크가 덮어쓰지 않는다', async () => {
     const scan = await loadWorkspace({ cwd: root });
     const target = path.join(folder, 'created.yaml');
@@ -272,7 +271,6 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     expect(await readFile(target, 'utf8')).toBe(source);
   });
 
-  /** @codocs [[작업 공간:저장]]#L19-L21 */
   it('주석 한 바이트가 뒤늦게 바뀌면 revision_conflict로 차단한다', async () => {
     const { scan, input } = await updateRequest();
     const changed = original.replace('원문 주석', '사람의 주석');
@@ -389,7 +387,6 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     }
   });
 
-  /** @codocs [[작업 공간:저장]]#L45-L48 @codocs [[작업 공간:쓰기 조정]]#L24 */
   it('반영 뒤 임시 정리 실패는 저장 성공과 후속 진단을 함께 반환한다', async () => {
     const scan = await loadWorkspace({ cwd: root });
     const result = await saveWorkspaceChange(

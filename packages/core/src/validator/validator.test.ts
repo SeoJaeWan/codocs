@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import type { SourcePosition } from '../diagnostics/index.js';
 import { parseYaml } from '../parser/index.js';
 import {
@@ -70,14 +69,29 @@ describe('validateDocument: 문서 스키마 검증', () => {
     if (result.success) expect(result.data).toEqual(data);
   });
 
-  it('복수 도메인과 모든 선택 속성을 함께 검사하면 종류 구분 없이 원문을 보존한다', /** 단일 문서에 예문·이전 명칭·정책 상태를 함께 허용한다. */ () => {
+  it('deprecatedAliases가 없는 문서를 검증하면 진단 0건이다', () => {
+    const result = validateDocument({ data: term });
+
+    expect(result.success).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('deprecatedAliases 값이 이상한 문서를 검증하면 경고 없이 값을 그대로 보존해 성공한다', () => {
+    const data = { ...term, deprecatedAliases: 3 };
+
+    const result = validateDocument({ data });
+
+    expect(result.success).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    if (result.success) expect(result.data).toEqual(data);
+  });
+
+  it('복수 도메인을 검사하면 종류 구분 없이 원문을 보존한다', /** 단일 문서에 복수 도메인을 허용한다. */ () => {
     const data = {
       ...term,
       domains: ['판매', '배송'],
-      examples: ['[[주문 처리]]'],
-      deprecatedAliases: [{ id: 'previous-order' }],
-      kind: 'policy',
-      status: 'confirmed',
     };
     const result = validateDocument({ data });
     expect(result.success).toBe(true);
@@ -88,7 +102,23 @@ describe('validateDocument: 문서 스키마 검증', () => {
     }
   });
 
-  it('이전 형식을 검사하면 새 필수 필드를 대신 채우지 않고 이전 속성을 경고한다', /** 호환 변환 없이 사용자 속성으로 보존하며 필수 속성 누락을 진단한다. @codocs [[문서 검증]]#L18-L20 */ () => {
+  it('kind, status, examples를 가진 문서를 검증하면 값을 그대로 보존하고 경고 없이 성공한다', /** 세 속성은 더 이상 제품 속성이 아니므로 값 형식도 검사하지 않는다. */ () => {
+    const data = {
+      ...term,
+      kind: 'Policy',
+      status: null,
+      examples: [false, '[[주문 처리]]'],
+    };
+
+    const result = validateDocument({ data });
+
+    expect(result.success).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    if (result.success) expect(result.data).toEqual(data);
+  });
+
+  it('이전 형식을 검사하면 새 필수 필드를 대신 채우지 않고 누락 오류만 반환한다', /** 호환 변환 없이 사용자 속성으로 보존하며 필수 속성 누락을 진단한다. */ () => {
     const legacy = {
       type: 'knowledge',
       id: 'legacy',
@@ -103,35 +133,14 @@ describe('validateDocument: 문서 스키마 검증', () => {
       ['definition'],
       ['domains'],
     ]);
-    expect(result.warnings.map((issue) => issue.fieldPath)).toEqual([
-      ['type'],
-      ['title'],
-      ['body'],
-      ['domain'],
-    ]);
+    expect(result.warnings).toEqual([]);
     const valid = { ...legacy, ...term };
     const accepted = validateDocument({ data: valid });
     expect(accepted.success).toBe(true);
     if (accepted.success) expect(accepted.data).toEqual(valid);
   });
 
-  it.each([
-    term,
-    { ...term, examples: [], deprecatedAliases: [] },
-    {
-      ...term,
-      examples: [' 예시 '],
-      deprecatedAliases: [
-        { id: 'previous-name' },
-        { id: 'previous-title', message: ' 안내 ' },
-      ],
-    },
-    knowledge,
-    { ...knowledge, kind: 'policy', status: 'proposed' },
-    { ...knowledge, kind: 'procedure', status: 'confirmed' },
-    { ...knowledge, kind: 'decision', status: 'deprecated' },
-    { ...knowledge, kind: 'discussion' },
-  ])(
+  it.each([term, knowledge])(
     '정상 문서와 선택 속성을 검사하면 원래 값으로 성공한다: %j',
     /** 선택 누락과 빈 선택 배열에 기본값을 넣지 않는다. */ (data) => {
       const result = validateDocument({ data });
@@ -139,43 +148,8 @@ describe('validateDocument: 문서 스키마 검증', () => {
       expect(result.errors).toEqual([]);
       expect(result.warnings).toEqual([]);
       if (result.success) expect(result.data).toEqual(data);
-      if (!Object.hasOwn(data, 'status') && result.success)
-        expect(result.data).not.toHaveProperty('status');
     },
   );
-
-  it('이전 ID 중복은 작성 순서와 값을 유지한 채 정상 문서로 반환한다', /** 변경 이력 항목을 검증 과정에서 임의로 합치지 않는다. */ () => {
-    const data = {
-      ...term,
-      deprecatedAliases: [
-        { id: 'previous-order', message: '첫 변경' },
-        { id: 'previous-order', message: '두 번째 변경' },
-      ],
-    };
-    const result = validateDocument({ data });
-    expect(result.success).toBe(true);
-    expect(result.warnings).toEqual([]);
-    if (result.success) expect(result.data).toEqual(data);
-  });
-
-  it('현재 ID와 같은 이전 ID는 값을 삭제하지 않고 해당 id 경로에 경고한다', /** 직접 YAML 편집으로 생긴 중복의 자동 정리를 수행하지 않는다. @codocs [[문서 검증]]#L39 */ () => {
-    const data = {
-      ...term,
-      deprecatedAliases: [{ id: term.id, message: '기존 안내' }],
-    };
-    const result = validateDocument({ data });
-    expect(result.success).toBe(true);
-    expect(result.errors).toEqual([]);
-    expect(result.warnings).toEqual([
-      expect.objectContaining({
-        code: schemaDiagnosticCodes.invalidFieldValue,
-        severity: diagnosticSeverities.warning,
-        message: schemaDiagnosticMessages.deprecatedAliasMatchesCurrentId,
-        fieldPath: ['deprecatedAliases', 0, 'id'],
-      }),
-    ]);
-    if (result.success) expect(result.data).toEqual(data);
-  });
 
   it.each([
     [
@@ -210,13 +184,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
       schemaDiagnosticMessages.invalidId,
     ],
     ['id', 7, schemaDiagnosticCodes.invalidFieldType, undefined],
-    ['examples', null, schemaDiagnosticCodes.invalidFieldType, undefined],
-    [
-      'deprecatedAliases',
-      null,
-      schemaDiagnosticCodes.invalidFieldType,
-      undefined,
-    ],
   ])(
     '알려진 %s 속성에 %j를 넣으면 약속한 오류로 실패한다',
     /** 빈 문자열·null·ID·자료형을 구분한다. */ (key, value, code, message) => {
@@ -249,41 +216,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
     [
       { ...knowledge, domains: [null] },
       ['domains', 0],
-      schemaDiagnosticCodes.invalidFieldType,
-    ],
-    [
-      { ...knowledge, kind: 'Policy' },
-      ['kind'],
-      schemaDiagnosticCodes.invalidFieldValue,
-    ],
-    [
-      { ...knowledge, status: null },
-      ['status'],
-      schemaDiagnosticCodes.invalidFieldType,
-    ],
-    [
-      { ...term, examples: [false] },
-      ['examples', 0],
-      schemaDiagnosticCodes.invalidFieldType,
-    ],
-    [
-      { ...term, deprecatedAliases: [{ id: 'old', message: '' }] },
-      ['deprecatedAliases', 0, 'message'],
-      schemaDiagnosticCodes.invalidFieldValue,
-    ],
-    [
-      { ...term, deprecatedAliases: [{ id: 'Bad-ID' }] },
-      ['deprecatedAliases', 0, 'id'],
-      schemaDiagnosticCodes.invalidFieldValue,
-    ],
-    [
-      { ...term, deprecatedAliases: [{}] },
-      ['deprecatedAliases', 0, 'id'],
-      schemaDiagnosticCodes.missingRequiredField,
-    ],
-    [
-      { ...term, deprecatedAliases: [null] },
-      ['deprecatedAliases', 0],
       schemaDiagnosticCodes.invalidFieldType,
     ],
   ] as const)(
@@ -341,7 +273,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
     });
   });
 
-  it('필수 필드를 생략하면 missing 오류와 안전한 사용자 경고를 함께 반환한다', /** 오류가 있어도 aliases 경고를 별도로 수집한다. */ () => {
+  it('필수 필드를 생략하면 사용자 속성이 있어도 missing 오류만 반환하고 경고는 없다', /** 오류가 있어도 사용자 속성은 경고하지 않는다. */ () => {
     const { name: omitted, ...rest } = term;
     expect(omitted).toBeDefined();
     const result = validateDocument({
@@ -354,15 +286,10 @@ describe('validateDocument: 문서 스키마 검증', () => {
         code: schemaDiagnosticCodes.missingRequiredField,
       }),
     );
-    expect(result.warnings).toContainEqual(
-      expect.objectContaining({
-        fieldPath: ['aliases'],
-        code: schemaDiagnosticCodes.unknownField,
-      }),
-    );
+    expect(result.warnings).toEqual([]);
   });
 
-  it('사용자 JSON 값과 업무 별칭의 사용자 속성을 검사하면 모든 값과 키를 보존한다', /** 사용자 객체 내부의 name·status는 업무 스키마로 해석하지 않는다. */ () => {
+  it('사용자 JSON 값과 사용자 속성을 검사하면 모든 값과 키를 보존한다', /** 사용자 객체 내부의 name·status는 업무 스키마로 해석하지 않는다. */ () => {
     const shared = {
       name: null,
       status: '',
@@ -372,21 +299,11 @@ describe('validateDocument: 문서 스키마 검증', () => {
       ...term,
       aliases: ['old'],
       custom: { a: shared, b: shared },
-      deprecatedAliases: [{ id: 'old', custom: shared }],
     };
     const result = validateDocument({ data });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data).toEqual(data);
-    expect(result.warnings.map((issue) => issue.fieldPath)).toEqual([
-      ['aliases'],
-      ['custom'],
-      ['deprecatedAliases', 0, 'custom'],
-    ]);
-    expect(result.warnings.map((issue) => issue.message)).toEqual([
-      schemaDiagnosticMessages.unknownField,
-      schemaDiagnosticMessages.unknownField,
-      schemaDiagnosticMessages.unknownField,
-    ]);
+    expect(result.warnings).toEqual([]);
   });
 
   it.each([NaN, Infinity, -Infinity])(
@@ -518,11 +435,10 @@ describe('validateDocument: 문서 스키마 검증', () => {
       expect(calls).toBe(0);
     });
 
-    it.each([
-      { name: 'examples', data: { ...term, examples: undefined } },
-      { name: 'status', data: { ...knowledge, status: undefined } },
-    ])('$name에 명시적 undefined를 전달하면 검증에 실패한다', ({ data }) => {
-      const result = validateDocument({ data });
+    it('필수 속성에 명시적 undefined를 전달하면 검증에 실패한다', () => {
+      const result = validateDocument({
+        data: { ...knowledge, definition: undefined },
+      });
       expect(result.success).toBe(false);
     });
   });
@@ -538,7 +454,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
       expect(Object.hasOwn(result.data, '__proto__')).toBe(true);
       expect(result.data).toEqual(data);
     }
-    expect(result.warnings).toHaveLength(2);
+    expect(result.warnings).toEqual([]);
   });
 
   it.each([null, [], 'term', 1, false, {}])(
@@ -570,25 +486,9 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
             newlineName,
             newline,
             name: '배열 원소',
-            fieldPath: ['examples', 1],
+            fieldPath: ['domains', 1],
             section: 'errors',
             expected: 'false',
-          },
-          {
-            newlineName,
-            newline,
-            name: '누락된 중첩 ID의 부모',
-            fieldPath: ['deprecatedAliases', 0, 'id'],
-            section: 'errors',
-            expected: '{message: "안내"}',
-          },
-          {
-            newlineName,
-            newline,
-            name: '알 수 없는 키',
-            fieldPath: ['aliases'],
-            section: 'warnings',
-            expected: 'aliases',
           },
         ] as const,
     ),
@@ -601,10 +501,7 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
         'id: Bad-ID # 값 뒤 주석',
         'name: 이름',
         'definition: 정의',
-        'domains: [영역]',
-        'examples: ["😀", false]',
-        'deprecatedAliases: [{message: "안내"}]',
-        'aliases: [old]',
+        'domains: ["😀", false]',
         '# 뒤 주석',
         '',
       ].join(newline);
@@ -626,15 +523,15 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
       if (!issue) return;
       expect(issueSlice(source, issue)).toBe(expected);
       expect(issue.path).toBe('terms.yaml');
-      if (fieldPath[0] === 'examples')
+      if (fieldPath[0] === 'domains')
         expect(issue.range).toEqual({
-          start: { line: 6, character: 17 },
-          end: { line: 6, character: 22 },
+          start: { line: 5, character: 16 },
+          end: { line: 5, character: 21 },
         });
     },
   );
 
-  it('최상위 필수 필드를 생략하면 문서 표시·독립 주석을 제외한 rootRange를 지목한다', /** 확인된 최상위 AST 매핑을 누락 속성의 부모로 사용한다. @codocs [[진단]]#L24-L25 */ () => {
+  it('최상위 필수 필드를 생략하면 문서 표시·독립 주석을 제외한 rootRange를 지목한다', /** 확인된 최상위 AST 매핑을 누락 속성의 부모로 사용한다. */ () => {
     const source =
       '# 앞\n---\n{id: order, definition: 정의, domains: [영역]} # 뒤\n';
     const parsed = parseYaml(source, 'terms.yaml');
@@ -657,7 +554,7 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
       );
   });
 
-  const invalidRangeData = { ...term, id: 'BAD', deprecatedAliases: [{}] };
+  const invalidRangeData = { ...term, id: 'BAD' };
   const invalidFields = [
     {
       fieldPath: ['id'],

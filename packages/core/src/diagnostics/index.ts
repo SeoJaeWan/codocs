@@ -43,7 +43,6 @@ export const schemaDiagnosticCodes = {
   /** 문자열·ID·열거 값·배열 길이 또는 JSON 값이 계약과 다르면 반환한다. */
   invalidFieldValue: 'invalid_field_value',
   /** 문서의 업무 스키마에 없는 사용자 속성을 보존하며 경고한다. */
-  unknownField: 'unknown_field',
 } as const;
 
 /** 사용자에게 반환하는 스키마 진단의 고정 문구다. 오류 코드 하나에 여러 원인별 문구가 대응할 수 있다. */
@@ -64,10 +63,7 @@ export const schemaDiagnosticMessages = {
   blankString: '빈 문자열이나 공백뿐인 문자열은 허용하지 않습니다.',
   /** ID가 소문자·숫자·하이픈 규칙에 맞지 않을 때 사용한다. */
   invalidId: 'ID는 소문자·숫자를 하이픈으로 연결해야 합니다.',
-  /** 이전 ID가 현재 ID와 같을 때 사용한다. */
-  deprecatedAliasMatchesCurrentId: '이전 ID가 현재 ID와 같습니다.',
   /** 업무 스키마에 없는 사용자 속성을 보존하며 경고할 때 사용한다. */
-  unknownField: '알려지지 않은 사용자 속성을 보존합니다.',
 } as const;
 
 /** 코드 정의에서 도출한 스키마 진단 코드 타입이다. */
@@ -102,8 +98,6 @@ export const catalogDiagnosticCodes = {
   unconfirmedReference: 'unconfirmed_reference',
   /** 확정 경로 대상에 문서 오류가 있을 때 연결을 유지하며 경고한다. */
   referenceTargetError: 'reference_target_error',
-  /** 확정 대상의 문서 상태가 폐기일 때 등장마다 경고한다. */
-  deprecatedReference: 'deprecated_reference',
 } as const;
 /** 색인 계층이 소유하는 고정 문구다. */
 export const catalogDiagnosticMessages = {
@@ -114,7 +108,6 @@ export const catalogDiagnosticMessages = {
   selfReference: '같은 발견 문서를 자기 참조할 수 없습니다.',
   unconfirmedReference: '스캔이 불완전하여 참조 대상을 확정할 수 없습니다.',
   referenceTargetError: '확정 참조 대상에 문서 오류가 있습니다.',
-  deprecatedReference: '폐기 상태의 문서를 참조하고 있습니다.',
 } as const;
 /** 상수에서 도출한 색인 진단 코드다. */
 export type CatalogDiagnosticCode =
@@ -135,6 +128,8 @@ export const changePlanDiagnosticCodes = {
   sourceNotLossless: 'source_not_lossless',
   /** 후보의 재파싱 데이터가 기대 데이터와 다르다. */
   candidateMismatch: 'candidate_mismatch',
+  /** 수정 요청의 name이 현재 이름과 달라 이름 변경이 필요하다. */
+  nameChangeNotAllowed: 'name_change_not_allowed',
 } as const;
 /** 후보 계산의 고정 진단 문구다. */
 export const changePlanDiagnosticMessages = {
@@ -145,10 +140,31 @@ export const changePlanDiagnosticMessages = {
   incompleteCatalog: '불완전한 관측에서 변경 후보의 충돌을 확정할 수 없습니다.',
   sourceNotLossless: '원본 UTF-8 바이트를 손실 없이 보존할 수 없습니다.',
   candidateMismatch: '후보를 다시 읽은 데이터가 요청한 데이터와 다릅니다.',
+  nameChangeNotAllowed:
+    '문서 이름은 수정 요청으로 바꿀 수 없습니다. 이름 변경은 codocs_rename으로 참조와 함께 바꾸세요.',
 } as const;
 /** 변경 후보 계산의 오류 코드다. */
 export type ChangePlanDiagnosticCode =
   (typeof changePlanDiagnosticCodes)[keyof typeof changePlanDiagnosticCodes];
+/** 이름 변경 반영이 반환하는 오류 코드다. @domainValues */
+export const renameDiagnosticCodes = {
+  /** 이름 변경을 진행할 수 없는 상태라 아무 파일도 바꾸지 않았다. */
+  blocked: 'rename_blocked',
+  /** 반영 때 다시 계산한 영향 파일이 미리보기에서 받은 파일 집합을 벗어난다. */
+  affectedFilesChanged: 'rename_affected_files_changed',
+  /** 중간 실패 뒤 이미 바꾼 파일을 원래 내용으로 되돌리지 못했다. */
+  restoreFailed: 'rename_restore_failed',
+} as const;
+/** 이름 변경 진단의 고정 문구다. */
+export const renameDiagnosticMessages = {
+  blocked: '이름 변경을 진행할 수 없어 파일을 바꾸지 않았습니다.',
+  affectedFilesChanged:
+    '미리보기 이후 영향받는 파일이 달라져 파일을 바꾸지 않았습니다. 미리보기를 다시 요청하세요.',
+  restoreFailed: '이미 바꾼 파일을 원래 내용으로 되돌리지 못했습니다.',
+} as const;
+/** 이름 변경 진단 코드의 원본 값에서 도출한 타입이다. */
+export type RenameDiagnosticCode =
+  (typeof renameDiagnosticCodes)[keyof typeof renameDiagnosticCodes];
 /** 조회 투영에서 외부 계약으로 정규화하는 진단 코드다. @domainValues */
 export const queryDiagnosticCodes = {
   /** 검증 경로가 프로젝트 상대 .codocs YAML 파일이 아니면 반환한다. */
@@ -216,7 +232,8 @@ export type DiagnosticCode =
   | CatalogDiagnosticCode
   | ChangePlanDiagnosticCode
   | QueryDiagnosticCode
-  | StorageDiagnosticCode;
+  | StorageDiagnosticCode
+  | RenameDiagnosticCode;
 /** 오류와 경고를 구분하는 공통 심각도다. */
 
 /** 시작 포함·끝 제외인 0 기반 UTF-16 원문 범위다. */
@@ -234,9 +251,9 @@ export interface SourceRange {
   start: SourcePosition;
   end: SourcePosition;
 }
-/** 매핑 키와 배열 인덱스로 구성한 경로다. @codocs [[필드 경로]] */
+/** 매핑 키와 배열 인덱스로 구성한 경로다. */
 export type FieldPath = readonly (string | number)[];
-/** 각 계층이 코드 타입을 지정하는 공통 진단이다. 기본 코드는 core 진단이며 미확인 메타데이터는 생략한다. @codocs [[진단]]#L14-L25 */
+/** 각 계층이 코드 타입을 지정하는 공통 진단이다. 기본 코드는 core 진단이며 미확인 메타데이터는 생략한다. */
 export interface Diagnostic<Code extends string = DiagnosticCode> {
   code: Code;
   severity: DiagnosticSeverity;

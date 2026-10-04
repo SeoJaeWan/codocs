@@ -147,7 +147,6 @@ function barrier(): { promise: Promise<void>; release: () => void } {
 }
 
 describe('최초 전체 순회 중 변경 범위 보정', () => {
-  /** @codocs [[작업 공간:색인 갱신]]#L31 @codocs [[작업 공간:작업 공간 조회 세션]]#L61 */
   it('변경이 없으면 각 원문을 한 번 읽고 파싱해 같은 초기화를 공유한다', async () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
     const raw = 'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n';
@@ -401,7 +400,7 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
       mode: 'update',
       id: 'alpha',
       revision: createHash('sha256').update(before).digest('hex'),
-      set: { name: '알파 저장' },
+      set: { definition: '알파 저장' },
     });
     expect(result).toMatchObject({
       success: true,
@@ -417,7 +416,7 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     expect(boundary.reads.get(beta)).toBe(3);
     expect(await session.get(['alpha', 'beta'])).toMatchObject({
       results: [
-        { found: true, document: { name: '알파 저장' } },
+        { found: true, document: { definition: '알파 저장' } },
         { found: true, document: { name: '베타 최신' } },
       ],
     });
@@ -548,7 +547,7 @@ describe('준비 상태별 저장 차단', () => {
     mode: 'update',
     id: 'alpha',
     revision: createHash('sha256').update(before).digest('hex'),
-    set: { name: '변경' },
+    set: { definition: '변경' },
   });
 
   it('최초 탐색이 끝나기 전에는 저장하지 않고 완료 뒤에만 반영한다', async () => {

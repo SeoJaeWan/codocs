@@ -10,7 +10,7 @@ let root: string;
 let session: LanguageServerSession;
 let sourceUri: string;
 const targetText =
-  'id: target\nname: 대상\ndomains: [업무]\ndefinition: 원래 본문\nstatus: deprecated\n';
+  'id: target\nname: 대상\ndomains: [업무]\ndefinition: 원래 본문\n';
 
 beforeEach(async () => {
   await mkdir('.workbench/fixtures', { recursive: true });
@@ -84,105 +84,87 @@ describe('live YAML과 디스크 대상의 연결', () => {
       capture.mockRestore();
     }
   });
-  it.each(['코드 Hover', 'YAML 본문'])(
-    '%s의 특수 경로 링크는 resolve와 Host 해석 뒤 같은 출처·토큰으로 대상을 확인한다',
-    async (kind) => {
-      const targetPath = path.join(root, '.codocs/한글 % # %20 %23.yaml');
-      await rename(path.join(root, '.codocs/대상 문서.yaml'), targetPath);
-      await session.refreshWorkspaces();
-      const uri = pathToFileURL(
-        path.join(
-          root,
-          kind === '코드 Hover'
-            ? '한글 % # %20.ts'
-            : '.codocs/한글 % # %23.yaml',
-        ),
-      ).href;
-      session.openDocument({
-        textDocument: {
-          uri,
-          version: 1,
-          languageId: kind === '코드 Hover' ? 'typescript' : 'yaml',
-          text:
-            kind === '코드 Hover'
-              ? 'target'
-              : 'id: source\nname: 출처\ndefinition: "[[대상]]"\n',
-        },
-      });
-      const link =
-        kind === 'YAML 본문'
-          ? (await session.documentLinks(uri))[0]!
-          : {
-              range: {
-                start: { line: 0, character: 0 },
-                end: { line: 0, character: 6 },
-              },
-              target: /command:codocs.openSource\?([^)]*)/u.exec(
-                (
-                  (await session.hoverDocument({
-                    textDocument: { uri },
-                    position: { line: 0, character: 1 },
-                  }))!.contents as { value: string }
-                ).value,
-              )![0],
-            };
-      expect(session.resolveDocumentLink(link)).toEqual(link);
-      const query = link.target!.slice(link.target!.indexOf('?') + 1);
-      const selection = (
-        JSON.parse(decodeURIComponent(decodeURIComponent(query))) as {
-          sourceUri: string;
-          token: string;
-        }[]
-      )[0]!;
-      expect(selection.sourceUri).toBe(uri);
-      expect(selection.token).toMatch(/^[\w-]{32}$/u);
-      expect(await session.confirmSource(selection)).toEqual({
-        uri: pathToFileURL(targetPath).href,
-      });
-    },
-  );
-  it('같은 대상을 가리키는 다른 매칭 문서가 남아도 선택한 관계가 사라지면 이전 링크를 거부한다', async () => {
-    await writeFile(
-      path.join(root, '.codocs/alpha.yaml'),
-      'id: alpha\nname: 알파\ndefinition: "[[관계 대상]]"\n',
-    );
-    const betaPath = path.join(root, '.codocs/beta.yaml');
-    await writeFile(
-      betaPath,
-      'id: beta\nname: 베타\ndefinition: "[[관계 대상]]"\n',
-    );
-    const relatedPath = path.join(root, '.codocs/related.yaml');
-    await writeFile(
-      relatedPath,
-      'id: related\nname: 관계 대상\ndefinition: 관계 본문\n',
-    );
+  it('열린 대상 문서의 저장하지 않은 이름은 출처 참조의 대상 판단에 쓰지 않는다', async () => {
+    const source =
+      'id: source\nname: Source\ndefinition: "[[대상]]"\ndomains: [업무]\n';
+    await writeFile(path.join(root, '.codocs/source.yaml'), source);
     await session.refreshWorkspaces();
-    const uri = pathToFileURL(path.join(root, 'source.ts')).href;
+    session.openDocument({
+      textDocument: {
+        uri: pathToFileURL(path.join(root, '.codocs/대상 문서.yaml')).href,
+        version: 1,
+        languageId: 'yaml',
+        text: targetText.replace('name: 대상', 'name: 다른 이름'),
+      },
+    });
+    session.openDocument({
+      textDocument: {
+        uri: sourceUri,
+        version: 1,
+        languageId: 'yaml',
+        text: source,
+      },
+    });
+    const links = await session.documentLinks(sourceUri);
+    expect(links).toHaveLength(1);
+    expect(links[0]!.tooltip).toBe(
+      '원문 열기: 대상 \\(\\.codocs/대상 문서\\.yaml\\)',
+    );
+  });
+  it('YAML 본문의 특수 경로 링크는 resolve와 Host 해석 뒤 같은 출처·토큰으로 대상을 확인한다', async () => {
+    const targetPath = path.join(root, '.codocs/한글 % # %20 %23.yaml');
+    await rename(path.join(root, '.codocs/대상 문서.yaml'), targetPath);
+    await session.refreshWorkspaces();
+    const uri = pathToFileURL(
+      path.join(root, '.codocs/한글 % # %23.yaml'),
+    ).href;
     session.openDocument({
       textDocument: {
         uri,
-        languageId: 'typescript',
         version: 1,
-        text: 'alphaBeta',
+        languageId: 'yaml',
+        text: 'id: source\nname: 출처\ndefinition: "[[대상]]"\n',
       },
     });
-    const hover = await session.hoverDocument({
-      textDocument: { uri },
-      position: { line: 0, character: 6 },
-    });
-    const markdown = (hover!.contents as { value: string }).value;
-    const query = /command:codocs.openSource\?([^)]*)/u.exec(
-      markdown.split('이 문서가 참조')[1]!,
-    )![1]!;
-    const selection = (JSON.parse(decodeURIComponent(query)) as unknown[])[0];
+    const link = (await session.documentLinks(uri))[0]!;
+    expect(session.resolveDocumentLink(link)).toEqual(link);
+    const query = link.target!.slice(link.target!.indexOf('?') + 1);
+    const selection = (
+      JSON.parse(decodeURIComponent(decodeURIComponent(query))) as {
+        sourceUri: string;
+        token: string;
+      }[]
+    )[0]!;
+    expect(selection.sourceUri).toBe(uri);
+    expect(selection.token).toMatch(/^[\w-]{32}$/u);
     expect(await session.confirmSource(selection)).toEqual({
-      uri: pathToFileURL(relatedPath).href,
+      uri: pathToFileURL(targetPath).href,
     });
-    await writeFile(betaPath, 'id: beta\nname: 베타\ndefinition: 관계 제거\n');
-    await session.refreshWorkspaces();
-    expect(await session.confirmSource(selection)).toBeNull();
   });
-  it('감시가 상태 변경을 게시하면 수동 refresh 없이 폐기 경고를 갱신한다', async () => {
+  it('대상 문서의 이름을 저장해 색인이 갱신되면 열린 문서의 참조를 다시 판단한다', async () => {
+    const source =
+      'id: source\nname: 출처\ndomains: [업무]\ndefinition: "[[대상]]"\n';
+    session.openDocument({
+      textDocument: {
+        uri: sourceUri,
+        version: 1,
+        languageId: 'yaml',
+        text: source,
+      },
+    });
+    expect(await session.documentLinks(sourceUri)).toHaveLength(1);
+    await writeFile(
+      path.join(root, '.codocs/대상 문서.yaml'),
+      targetText.replace('name: 대상', 'name: 새 이름'),
+    );
+    await vi.waitFor(
+      async () => {
+        expect(await session.documentLinks(sourceUri)).toHaveLength(0);
+      },
+      { timeout: 3000 },
+    );
+  });
+  it('감시가 대상 이름 변경을 게시하면 수동 refresh 없이 참조 진단을 갱신한다', async () => {
     session.openDocument({
       textDocument: {
         uri: sourceUri,
@@ -196,7 +178,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
     const unsubscribe = session.onDidChange(changed);
     await writeFile(
       path.join(root, '.codocs/대상 문서.yaml'),
-      targetText.replace('status: deprecated', 'status: confirmed'),
+      targetText.replace('name: 대상', 'name: 새 이름'),
     );
     await vi.waitFor(() => expect(changed).toHaveBeenCalled(), {
       timeout: 3000,
@@ -207,13 +189,13 @@ describe('live YAML과 디스크 대상의 연결', () => {
         expect(diagnostics).toBeDefined();
         expect(
           diagnostics!.diagnostics.some(
-            (item) => item.code === 'deprecated_reference',
+            (item) => item.code === 'reference_not_found',
           ),
-        ).toBe(false);
+        ).toBe(true);
       },
       { timeout: 3000 },
     );
-    expect(await session.documentLinks(sourceUri)).toHaveLength(1);
+    expect(await session.documentLinks(sourceUri)).toHaveLength(0);
     unsubscribe();
   });
 
@@ -222,9 +204,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
     await mkdir(path.join(nested, '.codocs'), { recursive: true });
     await writeFile(
       path.join(nested, '.codocs/nested.yaml'),
-      targetText
-        .replace('id: target', 'id: nested')
-        .replace('status: deprecated', 'status: confirmed'),
+      targetText.replace('id: target', 'id: nested'),
     );
     await session.changeWorkspaceFolders(
       [{ uri: pathToFileURL(nested).href, name: 'nested' }],
@@ -254,7 +234,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
 
   it.each(['\n', '\r\n'])(
-    '줄바꿈 %j에서 미저장 참조의 UTF-16 범위와 폐기 경고를 보존한다',
+    '줄바꿈 %j에서 미저장 definition 참조의 UTF-16 범위를 보존하고 examples 참조는 링크로 만들지 않는다',
     async (newline) => {
       const text = [
         'id: source',
@@ -269,20 +249,16 @@ describe('live YAML과 디스크 대상의 연결', () => {
       });
       const links = await session.documentLinks(sourceUri);
       const diagnostics = await session.documentDiagnostics(sourceUri);
-      expect(links).toHaveLength(3);
+      expect(links).toHaveLength(2);
       expect(links[0]?.range).toEqual({
         start: { line: 2, character: 16 },
         end: { line: 2, character: 22 },
       });
-      const warnings = diagnostics!.diagnostics.filter(
-        (item) => item.code === 'deprecated_reference',
-      );
-      expect(warnings).toHaveLength(links.length);
-      for (const [index, warning] of warnings.entries()) {
-        expect(warning.severity).toBe(2);
-        expect(warning.range).toEqual(links[index]!.range);
-        expect(warning.message).toContain('폐기');
-      }
+      expect(
+        diagnostics!.diagnostics.some(
+          (item) => item.code === 'deprecated_reference',
+        ),
+      ).toBe(false);
       const selected = JSON.parse(
         decodeURIComponent(links[0]!.target!.split('?')[1]!),
       ) as unknown[];
@@ -322,7 +298,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
         (item) => item.code === 'deprecated_reference',
       ),
     ).toBe(false);
-    // 본문은 이동하지 않고 각 Hover 후보는 선택한 발견 경로로 확인한다. @codocs [[IDE 지원]]#L74-L76
+    // 본문은 이동하지 않고 각 Hover 후보는 선택한 발견 경로로 확인한다.
     const value = (hover!.contents as { value: string }).value;
     const queries = [...value.matchAll(/command:codocs.openSource\?([^)]*)/gu)];
     const targets = await Promise.all(

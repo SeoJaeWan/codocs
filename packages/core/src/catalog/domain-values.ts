@@ -86,6 +86,10 @@ export const renameBlockingReasons = {
   unconfirmed: 'unconfirmed',
   /** 참조 선택 입력이 유효하지 않다. */
   invalidSelection: 'invalid_selection',
+  /** 바꿀 파일의 원본 UTF-8 바이트를 손실 없이 보존할 수 없다. */
+  sourceNotLossless: 'source_not_lossless',
+  /** 바꿀 위치의 YAML 표기 형식으로 새 값을 안전하게 쓸 수 없다. */
+  unrepresentable: 'unrepresentable',
 } as const;
 /** 원본 상수에서 도출한 RenameBlockingReason 타입이다. */
 export type RenameBlockingReason =
