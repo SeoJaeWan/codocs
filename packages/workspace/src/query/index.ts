@@ -84,10 +84,19 @@ import {
 } from '../paths/domain-values.js';
 import { WorkspaceWatcher } from '../watcher/index.js';
 import {
+  applyWorkspaceRename,
   saveWorkspaceChange,
   type WorkspaceStorageOptions,
   type WorkspaceStorageResult,
 } from '../storage/index.js';
+import { workspaceRenameFileStates } from '../rename/domain-values.js';
+import {
+  parseRenameRequest,
+  prepareWorkspaceRename,
+  type WorkspaceRenameApplyFailure,
+  type WorkspaceRenameApplySuccess,
+  type WorkspaceRenamePreview,
+} from '../rename/index.js';
 import {
   codocsDirectoryName,
   resolveProjectRoot,
@@ -214,6 +223,20 @@ export type WorkspaceWriteResult =
     })
   | (Extract<WorkspaceStorageResult, { success: false }> & {
       error: Diagnostic<string>;
+    });
+
+/** 이름 변경 미리보기 결과다. 파일과 색인은 바뀌지 않았다. */
+export type WorkspaceRenamePreviewResult = RequestResult<
+  { success: true; scanStatus: ScanStatus } & WorkspaceRenamePreview,
+  WorkspaceQueryFailure
+>;
+
+/** 이름 변경 반영 결과와 같은 세션에 게시된 색인 상태를 함께 전달한다. */
+export type WorkspaceRenameResult =
+  | (WorkspaceRenameApplySuccess & { indexUpdated?: boolean })
+  | (WorkspaceRenameApplyFailure & {
+      error: Diagnostic<string>;
+      indexUpdated?: boolean;
     });
 
 /** 실제 파일 연산과 저장 후 관측의 실패·지연만 주입하는 검사 경계다. */
@@ -1137,16 +1160,34 @@ export class WorkspaceQuerySession {
     const saved = await saveWorkspaceChange(input, scan, this.#options.storage);
     if (!saved.success) return this.#writeFailure(saved.diagnostics);
     if (!saved.saved) return saved;
-    let updated = false;
+    const indexFailure = await this.#publishSavedFiles([
+      { path: saved.source.path, revision: saved.revision },
+    ]);
+    if (!indexFailure) return { ...saved, indexUpdated: true };
+    return {
+      ...saved,
+      indexUpdated: false,
+      diagnostics: [...saved.diagnostics, indexFailure],
+    };
+  }
+
+  /**
+   * 저장한 파일들의 새 revision이 세션 색인에 게시되도록 기다린다. 관측 실패에만 범위 재읽기를 한 번 더 시도한다.
+   * @returns 모두 반영되면 undefined, 아니면 codocs_refresh를 안내하는 색인 갱신 실패 진단이다.
+   */
+  async #publishSavedFiles(
+    files: readonly { path: string; revision: string }[],
+  ): Promise<Diagnostic<string> | undefined> {
     let indexError: unknown;
     for (const attempt of [1, 2] as const) {
       try {
-        if (
-          await this.#publishSaved(saved.source.path, saved.revision, attempt)
-        ) {
-          updated = true;
-          break;
-        }
+        let updated = true;
+        for (const file of files)
+          if (!(await this.#publishSaved(file.path, file.revision, attempt))) {
+            updated = false;
+            break;
+          }
+        if (updated) return undefined;
         indexError =
           this.#scan?.status !== scanStatuses.complete
             ? this.#scan?.diagnostics[0]
@@ -1157,7 +1198,6 @@ export class WorkspaceQuerySession {
       }
       if (this.#closed) break;
     }
-    if (updated) return { ...saved, indexUpdated: true };
     const cause =
       indexError instanceof Error
         ? indexError.message
@@ -1170,19 +1210,102 @@ export class WorkspaceQuerySession {
             : '저장 경로의 원문 버전을 게시하지 못했습니다.';
     const ioCode = getIoErrorCode(indexError);
     return {
-      ...saved,
-      indexUpdated: false,
-      diagnostics: [
-        ...saved.diagnostics,
-        {
-          code: storageDiagnosticCodes.indexUpdateFailed,
-          severity: diagnosticSeverities.error,
-          message: storageDiagnosticMessages.indexUpdateFailed,
-          path: saved.source.path,
-          suggestion: `${cause} codocs_refresh로 색인을 다시 구성하세요.`,
-          ...(ioCode === undefined ? {} : { ioCode }),
-        },
-      ],
+      code: storageDiagnosticCodes.indexUpdateFailed,
+      severity: diagnosticSeverities.error,
+      message: storageDiagnosticMessages.indexUpdateFailed,
+      ...(files[0] ? { path: files[0].path } : {}),
+      suggestion: `${cause} codocs_refresh로 색인을 다시 구성하세요.`,
+      ...(ioCode === undefined ? {} : { ioCode }),
+    };
+  }
+
+  /**
+   * 문서 이름 변경을 파일·색인 변경 없이 계산한다. 같은 입력의 반영(applyRename)과 같은 규칙을 쓴다.
+   * @param input 대상 경로(targetPath), 새 이름(newName), 선택(selections)이다. 선택은 모호한 참조의 대상을 고른다.
+   * @returns 상태·변경 목록·선택이 필요한 참조와 후보·영향·충돌·차단 사유·영향 파일별 revision이다.
+   */
+  async previewRename(input: unknown): Promise<WorkspaceRenamePreviewResult> {
+    if (this.#closed || this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
+    const scan = await this.#current();
+    if (this.#closed || this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
+    if (scan.status === scanStatuses.failed) return scanFailure(scan);
+    const watchFailure = this.#watchFailure();
+    if (watchFailure) return this.#watchFailureResult(watchFailure);
+    const request = parseRenameRequest(input);
+    if (!request) return invalidInput(scan.status);
+    if (!this.#catalog) return scanFailure(scan);
+    const { preview } = prepareWorkspaceRename(request, scan, this.#catalog);
+    return { success: true, scanStatus: scan.status, ...preview };
+  }
+
+  /**
+   * 미리보기와 같은 입력·선택과 파일별 revision(revisions)을 받아 다시 계산한 뒤 영향 파일에 반영한다.
+   * revision이나 영향 파일 집합이 달라졌거나 blocked이거나 쓸 수 없는 파일이 있으면 아무 파일도 바꾸지 않는다.
+   * 저장 뒤 바꾼 파일의 색인 반영은 write와 같은 규칙이다(indexUpdated).
+   */
+  async applyRename(input: unknown): Promise<WorkspaceRenameResult> {
+    if (this.#closed || this.#explicitRefreshPromise)
+      return this.#renameFailure([workspaceIndexNotReady().error]);
+    const scan = await this.#current();
+    if (this.#closed || this.#explicitRefreshPromise)
+      return this.#renameFailure([workspaceIndexNotReady().error]);
+    if (scan.status === scanStatuses.failed)
+      return this.#renameFailure([scanFailure(scan).error]);
+    const watchFailure = this.#watchFailure();
+    if (watchFailure)
+      return this.#renameFailure([
+        this.#watchFailureResult(watchFailure).error,
+      ]);
+    if (
+      !this.#catalog ||
+      (scan.status === scanStatuses.complete &&
+        this.readiness.state !== workspaceLifecycleStates.ready)
+    )
+      return this.#renameFailure([
+        scan.failures[0]?.diagnostics[0] ??
+          scan.diagnostics[0] ??
+          workspaceIndexNotReady().error,
+      ]);
+    const applied = await applyWorkspaceRename(
+      input,
+      scan,
+      this.#catalog,
+      this.#options.storage,
+    );
+    const changedFiles = applied.files.filter(
+      (file) =>
+        file.state === workspaceRenameFileStates.changed ||
+        file.state === workspaceRenameFileStates.restoreFailed,
+    );
+    const indexFailure = changedFiles.length
+      ? await this.#publishSavedFiles(changedFiles)
+      : undefined;
+    const indexed = changedFiles.length ? { indexUpdated: !indexFailure } : {};
+    const diagnostics = indexFailure
+      ? [...applied.diagnostics, indexFailure]
+      : applied.diagnostics;
+    if (applied.success) return { ...applied, ...indexed, diagnostics };
+    return {
+      ...applied,
+      ...indexed,
+      diagnostics,
+      error: diagnostics[0] ?? workspaceIndexNotReady().error,
+    };
+  }
+
+  /** 이름 변경 요청을 시작하지 못한 실패를 파일 변경 없음으로 전달한다. */
+  #renameFailure(
+    diagnostics: readonly Diagnostic<string>[],
+  ): WorkspaceRenameResult {
+    return {
+      success: false,
+      saved: false,
+      changed: false,
+      files: [],
+      error: diagnostics[0] ?? workspaceIndexNotReady().error,
+      diagnostics,
     };
   }
 

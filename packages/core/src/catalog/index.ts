@@ -804,7 +804,8 @@ export function planRename(
     ),
   );
   const changes: RenameChange[] = [],
-    impacts: RenameImpact[] = [];
+    impacts: RenameImpact[] = [],
+    rejectedSelections: RenameSelection[] = [];
   const fieldPath = [documentFields.name];
   const parsed = target.observation.parsed;
   const offsetRange = getStringRange(parsed, fieldPath, {
@@ -865,8 +866,13 @@ export function planRename(
           reason,
         });
       }
-      if (selection && !selected) {
+      /** 사용자가 고른 선택이 잘못된 경우 선택 목록에 기록해 이름 변경을 차단한다. */
+      function reject(): void {
         impact(renameImpactReasons.invalidSelection);
+        if (selection) rejectedSelections.push(selection);
+      }
+      if (selection && !selected) {
+        reject();
         continue;
       }
       const affected =
@@ -885,13 +891,13 @@ export function planRename(
         continue;
       }
       if (selected.path === doc.path) {
-        if (affected) impact(renameImpactReasons.invalidSelection);
+        if (affected) reject();
         continue;
       }
       const name =
         selected.path === target.path ? request.newName : selected.name;
       if (name === undefined) {
-        impact(renameImpactReasons.invalidSelection);
+        reject();
         continue;
       }
       if (request.updateReferences === false) {
@@ -908,7 +914,7 @@ export function planRename(
           !selected.domains.includes(selection.domain) ||
           (domain !== undefined && domain !== selection.domain)
         ) {
-          impact(renameImpactReasons.invalidSelection);
+          reject();
           continue;
         }
         if (domain === undefined) domain = selection.domain;
@@ -923,7 +929,7 @@ export function planRename(
         proposed.target?.path !== selected.path
       ) {
         if (domain !== undefined) {
-          impact(renameImpactReasons.invalidSelection);
+          reject();
           continue;
         }
         if (selected.domains.length !== 1) {
@@ -940,7 +946,7 @@ export function planRename(
           qualified.status !== referenceResolutionStatuses.resolved ||
           qualified.target?.path !== selected.path
         ) {
-          impact(renameImpactReasons.invalidSelection);
+          reject();
           continue;
         }
       }
@@ -962,6 +968,13 @@ export function planRename(
           occurrenceIndex,
         });
     }
+  if (rejectedSelections.length)
+    return {
+      ...initial,
+      impacts,
+      invalidSelections: rejectedSelections,
+      blockingReason: renameBlockingReasons.invalidSelection,
+    };
   changes.sort(
     /** 경로와 실제 원문 offset 순서로 수정안을 정렬한다. */ (a, b) =>
       a.path < b.path

@@ -35,7 +35,7 @@ afterEach(async () => {
 
 describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작성', () => {
   describe('문서 변경 후보와 원본 보존', () => {
-    it('문서 이름 변경을 계획하면 새 이름을 가진 후보를 반환한다', async () => {
+    it('문서 설명 변경을 계획하면 새 설명을 가진 후보를 반환한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
         (item) => item.source.path === zonePath,
@@ -44,7 +44,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
         mode: 'update',
         id: 'zone',
         revision: source?.revision,
-        set: { name: '새 구역' },
+        set: { definition: '새 설명' },
       };
 
       const result = planWorkspaceChange(request, scan);
@@ -52,7 +52,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
       expect(result.status).toBe(changePlanStatuses.candidate);
       if (result.status !== changePlanStatuses.candidate) return;
       expect(result.path).toBe(source?.source.path);
-      expect(result.data.name).toBe(request.set.name);
+      expect(result.data.definition).toBe(request.set.definition);
     });
 
     it('기존 ID를 변경하면 주석·개행·이전 ID 이력을 포함한 후보를 반환한다', async () => {

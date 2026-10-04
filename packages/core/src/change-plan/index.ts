@@ -10,6 +10,7 @@ import {
   catalogConfirmations,
   scanStatuses,
   type Catalog,
+  type RenameChange,
 } from '../catalog/index.js';
 import {
   changePlanDiagnosticCodes,
@@ -561,6 +562,12 @@ function planDocumentChangeInternal(
       status: changePlanStatuses.failed,
       diagnostics: parsed.diagnostics,
     };
+  if (
+    set &&
+    Object.hasOwn(set, documentFields.name) &&
+    set[documentFields.name] !== parsed.data[documentFields.name]
+  )
+    return failure('nameChangeNotAllowed', source.path);
   const expected: Record<string, unknown> = { ...parsed.data, ...(set ?? {}) };
   for (const key of removals) delete expected[key];
   const oldId = parsed.data[documentFields.id],
@@ -644,4 +651,174 @@ function planDocumentChangeInternal(
     baseRevision: source.revision,
     diagnostics,
   };
+}
+
+/** 이름 변경 수정안을 원문에 적용한 결과다. 성공은 재파싱으로 의도한 값만 바뀐 것을 확인했다. */
+export type RenameEditResult =
+  { success: true; raw: string } | { success: false };
+
+/** 문자열 스칼라의 원문 표기 형식이다. */
+const scalarSourceTypes = {
+  plain: 'PLAIN',
+  doubleQuoted: 'QUOTE_DOUBLE',
+  singleQuoted: 'QUOTE_SINGLE',
+  blockLiteral: 'BLOCK_LITERAL',
+  blockFolded: 'BLOCK_FOLDED',
+} as const;
+
+/** 큰따옴표 스칼라 안에서 이름 그대로 쓰면 안 되는 문자인지 확인한다. */
+function needsEscape(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    char === '\\' ||
+    char === '"' ||
+    code < 0x20 ||
+    (code >= 0x7f && code <= 0x9f) ||
+    code === 0x2028 ||
+    code === 0x2029 ||
+    code === 0xfeff
+  );
+}
+
+/** 문자 하나를 YAML 큰따옴표 escape로 바꾼다. 이름 있는 escape가 없으면 유니코드 escape를 쓴다. */
+function escapeDoubleQuotedChar(char: string): string {
+  const named = new Map([
+    ['\\', '\\\\'],
+    ['"', '\\"'],
+    ['\n', '\\n'],
+    ['\t', '\\t'],
+    ['\r', '\\r'],
+  ]).get(char);
+  return named ?? `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
+}
+
+/** 큰따옴표 스칼라 안에서 그대로 쓸 수 없는 문자를 YAML escape로 바꾼다. */
+function escapeDoubleQuoted(value: string): string {
+  let result = '';
+  for (const char of value)
+    result += needsEscape(char) ? escapeDoubleQuotedChar(char) : char;
+  return result;
+}
+
+/** 스칼라 형식에 맞춰 새 텍스트를 원문에 쓸 표기로 바꾼다. 안전하게 쓸 수 없는 형식은 undefined다. */
+function escapeForScalar(
+  value: string,
+  type: string | undefined,
+): string | undefined {
+  if (type === scalarSourceTypes.doubleQuoted) return escapeDoubleQuoted(value);
+  if (type === scalarSourceTypes.singleQuoted)
+    return value.replace(/'/gu, "''");
+  if (
+    type === scalarSourceTypes.plain ||
+    type === scalarSourceTypes.blockLiteral ||
+    type === scalarSourceTypes.blockFolded
+  )
+    return value;
+  return undefined;
+}
+
+/** 해석 문자열의 어느 코드 단위 구간이 원문 범위 하나에 대응하는지 계산한다. */
+function decodedSpan(
+  ranges: readonly { start: number; end: number }[],
+  offset: { start: number; end: number },
+): { start: number; end: number } | undefined {
+  const indexes: number[] = [];
+  for (let index = 0; index < ranges.length; index++) {
+    const range = ranges[index];
+    if (
+      range &&
+      range.start < range.end &&
+      range.start >= offset.start &&
+      range.end <= offset.end
+    )
+      indexes.push(index);
+  }
+  const first = indexes[0];
+  const last = indexes[indexes.length - 1];
+  if (
+    first === undefined ||
+    last === undefined ||
+    last - first + 1 !== indexes.length
+  )
+    return undefined;
+  return { start: first, end: last + 1 };
+}
+
+/** 경로가 가리키는 중첩 값을 복제본에서 교체한다. */
+function setAtPath(
+  root: Record<string, unknown>,
+  fieldPath: readonly (string | number)[],
+  value: string,
+): boolean {
+  let current: unknown = root;
+  for (const key of fieldPath.slice(0, -1)) {
+    if (typeof current !== 'object' || current === null) return false;
+    current = Reflect.get(current, key);
+  }
+  const last = fieldPath[fieldPath.length - 1];
+  if (typeof current !== 'object' || current === null || last === undefined)
+    return false;
+  Reflect.set(current, last, value);
+  return true;
+}
+
+/**
+ * 이름 변경 수정안을 원문 offset으로만 적용한다. 바꾸는 위치 밖의 원문은 그대로 두고,
+ * 새 텍스트는 그 위치의 YAML 스칼라 형식(plain·작은따옴표·큰따옴표·block)에 맞게 escape한다.
+ * 적용 뒤 다시 파싱해 바꾼 위치만 의도한 값이고 나머지 데이터는 같을 때만 성공한다.
+ * @param parsed 수정안을 계산한 같은 원문의 파싱 결과다.
+ * @param changes 이 원문에 속한 수정안이다. 다른 파일의 수정안은 넘기지 않는다.
+ * @returns 성공하면 새 원문이다. 겹치거나 형식에 쓸 수 없거나 재파싱 검증에 실패하면 실패다.
+ */
+export function applyRenameChanges(
+  parsed: Extract<YamlParseResult, { success: true }>,
+  changes: readonly RenameChange[],
+): RenameEditResult {
+  const source = parsed.source;
+  const document = parseDocument(source, { keepSourceTokens: true });
+  const ordered = [...changes].sort(
+    (a, b) => b.offsetRange.start - a.offsetRange.start,
+  );
+  const expectedValues = new Map<string, string>();
+  let result = source;
+  let limit = source.length;
+  for (const change of ordered) {
+    const { start, end } = change.offsetRange;
+    if (start < 0 || end < start || end > limit) return { success: false };
+    const mapping = parsed.strings.find(
+      (item) =>
+        item.fieldPath.length === change.fieldPath.length &&
+        item.fieldPath.every((part, index) => part === change.fieldPath[index]),
+    );
+    const span =
+      mapping && decodedSpan(mapping.sourceRanges, change.offsetRange);
+    if (!mapping || !span) return { success: false };
+    if (mapping.value.slice(span.start, span.end) !== change.oldText)
+      return { success: false };
+    const node = document.getIn(change.fieldPath, true);
+    const type = isScalar(node) ? node.type : undefined;
+    const written = escapeForScalar(change.newText, type);
+    if (written === undefined) return { success: false };
+    result = result.slice(0, start) + written + result.slice(end);
+    limit = start;
+    const key = JSON.stringify(change.fieldPath);
+    const value = expectedValues.get(key) ?? mapping.value;
+    expectedValues.set(
+      key,
+      value.slice(0, span.start) + change.newText + value.slice(span.end),
+    );
+  }
+  const reparsed = parseYaml(result);
+  if (!reparsed.success) return { success: false };
+  const expectedData = JSON.parse(JSON.stringify(parsed.data)) as Record<
+    string,
+    unknown
+  >;
+  for (const [key, value] of expectedValues) {
+    const fieldPath = JSON.parse(key) as (string | number)[];
+    if (!setAtPath(expectedData, fieldPath, value)) return { success: false };
+  }
+  return same(reparsed.data, expectedData)
+    ? { success: true, raw: result }
+    : { success: false };
 }

@@ -58,7 +58,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { id: 'renamed', name: '새 이름' },
+      set: { id: 'renamed', definition: '새 설명' },
     });
     expect(result).toMatchObject({
       success: true,
@@ -90,6 +90,25 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       diagnostics.documents.find((item) => item.path.endsWith('first.yaml'))
         ?.text,
     ).toContain('id: renamed');
+  });
+
+  it('수정 요청의 name이 현재 이름과 다르면 저장하지 않고 이름 변경 도구를 안내한다', async () => {
+    const current = session();
+    const result = await current.write({
+      mode: 'update',
+      id: 'first',
+      revision: revision(original),
+      set: { name: '다른 이름' },
+    });
+    expect(result).toMatchObject({
+      success: false,
+      saved: false,
+      changed: false,
+      error: { code: 'name_change_not_allowed' },
+    });
+    if (!result.success)
+      expect(result.error.message).toContain('codocs_rename');
+    expect(await readFile(source, 'utf8')).toBe(original);
   });
 
   it('무변경과 저장 전 충돌은 바이트를 보존하며 무변경에 색인 결과를 붙이지 않는다', async () => {
@@ -125,7 +144,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: 'old',
-      set: { name: '다름' },
+      set: { definition: '다름' },
     });
     expect(stale).toMatchObject({ success: false, saved: false });
     expect(await readFile(source, 'utf8')).toBe(original);
@@ -146,7 +165,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '수정' },
+      set: { definition: '수정' },
     });
     expect(result).toMatchObject({
       success: false,
@@ -206,7 +225,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '수정' },
+      set: { definition: '수정' },
     });
     expect(result).toMatchObject({
       success: false,
@@ -287,7 +306,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '복구됨' },
+      set: { definition: '복구됨' },
     });
     expect(attempts).toEqual([1, 2]);
     expect(result).toMatchObject({
@@ -315,7 +334,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '저장됨' },
+      set: { definition: '저장됨' },
     });
     expect(attempts).toEqual([1, 2]);
     expect(result).toMatchObject({
@@ -347,7 +366,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
         mode: 'update',
         id: 'first',
         revision: revision(original),
-        set: { name: '느린 저장' },
+        set: { definition: '느린 저장' },
       })
       .then((value) => {
         settled = true;
@@ -380,7 +399,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
         mode: 'update',
         id: 'first',
         revision: revision(original),
-        set: { name: '복구 지연' },
+        set: { definition: '복구 지연' },
       })
       .then((value) => {
         settled = true;
@@ -423,7 +442,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       mode: 'update',
       id: 'first',
       revision: revision(original),
-      set: { name: '저장됨' },
+      set: { definition: '저장됨' },
     });
     await entered;
     await current.close();
