@@ -5,11 +5,12 @@ import {
   codocsJsonInputSchema,
   parseDuplicatesInput,
   parseGetInput,
+  parseRenameInput,
   parseValidateInput,
 } from './index.js';
 
-describe('MCP 일곱 입력 계약', () => {
-  it('일곱 스키마를 정의하고 알 수 없는 최상위 속성을 거부한다', () => {
+describe('MCP 여덟 입력 계약', () => {
+  it('여덟 스키마를 정의하고 알 수 없는 최상위 속성을 거부한다', () => {
     expect([...codocsInputSchemas.keys()]).toEqual([
       'codocs_list',
       'codocs_get',
@@ -17,6 +18,7 @@ describe('MCP 일곱 입력 계약', () => {
       'codocs_validate',
       'codocs_guide',
       'codocs_write',
+      'codocs_rename',
       'codocs_duplicates',
     ]);
     for (const name of codocsInputSchemas.keys())
@@ -101,5 +103,46 @@ describe('MCP 일곱 입력 계약', () => {
       parseValidateInput({ path: ['.codocs/a.yaml', '.codocs/b.yaml'] }),
     ).toBeUndefined();
     expect(parseValidateInput({ path: null })).toBeUndefined();
+  });
+
+  it.each([
+    ['알 수 없는 속성', { mode: 'preview', id: 'a', newName: 'b', extra: 1 }],
+    [
+      'updateReferences',
+      { mode: 'preview', id: 'a', newName: 'b', updateReferences: false },
+    ],
+    ['revisions가 없는 apply', { mode: 'apply', id: 'a', newName: 'b' }],
+    [
+      'preview의 revisions',
+      { mode: 'preview', id: 'a', newName: 'b', revisions: {} },
+    ],
+    [
+      '문자열이 아닌 revision',
+      { mode: 'apply', id: 'a', newName: 'b', revisions: { 'a.yaml': 1 } },
+    ],
+    [
+      '알 수 없는 선택 속성',
+      {
+        mode: 'preview',
+        id: 'a',
+        newName: 'b',
+        selections: [
+          { sourcePath: 's', occurrenceIndex: 0, targetPath: 't', extra: 1 },
+        ],
+      },
+    ],
+    ['알 수 없는 mode', { mode: 'other', id: 'a', newName: 'b' }],
+  ])('이름 변경 입력은 %s이면 거부한다', (_, input) => {
+    expect(parseRenameInput(input)).toBeUndefined();
+  });
+
+  it('이름 변경 입력은 preview와 apply의 선택·revisions를 그대로 보존한다', () => {
+    const selections = [
+      { sourcePath: 's.yaml', occurrenceIndex: 1, targetPath: 't.yaml' },
+    ];
+    const preview = { mode: 'preview', id: 'a', newName: 'b', selections };
+    const apply = { ...preview, mode: 'apply', revisions: { 's.yaml': 'r' } };
+    expect(parseRenameInput(preview)).toEqual(preview);
+    expect(parseRenameInput(apply)).toEqual(apply);
   });
 });

@@ -50,6 +50,7 @@ export type CodocsToolName =
   | 'codocs_validate'
   | 'codocs_guide'
   | 'codocs_write'
+  | 'codocs_rename'
   | 'codocs_duplicates';
 
 const listSchema = z.strictObject({
@@ -74,6 +75,29 @@ const writeSchema = z.discriminatedUnion('mode', [
   }),
 ]);
 
+const renameBase = {
+  id: z.string().min(1),
+  newName: z.string(),
+  selections: z
+    .array(
+      z.strictObject({
+        sourcePath: z.string(),
+        occurrenceIndex: z.number().int().nonnegative(),
+        targetPath: z.string(),
+        domain: z.string().optional(),
+      }),
+    )
+    .optional(),
+};
+const renameSchema = z.discriminatedUnion('mode', [
+  z.strictObject({ mode: z.literal('preview'), ...renameBase }),
+  z.strictObject({
+    mode: z.literal('apply'),
+    ...renameBase,
+    revisions: z.record(z.string(), z.string().min(1)),
+  }),
+]);
+
 const duplicatesSchema = z
   .strictObject({
     draft: writeSchema.optional(),
@@ -94,7 +118,16 @@ export function parseWriteInput(
   return result.success ? result.data : undefined;
 }
 
-/** 일곱 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다.
+/** 이름 변경 입력의 형식만 확인한다. 이름 충돌과 선택의 유효성은 workspace 계산에 맡긴다. */
+export function parseRenameInput(
+  input: unknown,
+): z.infer<typeof renameSchema> | undefined {
+  if (!dataOnly(input)) return undefined;
+  const result = renameSchema.safeParse(input);
+  return result.success ? result.data : undefined;
+}
+
+/** 여덟 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다.
  * */
 export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_list', listSchema],
@@ -103,6 +136,7 @@ export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_validate', validateSchema],
   ['codocs_guide', guideSchema],
   ['codocs_write', writeSchema],
+  ['codocs_rename', renameSchema],
   ['codocs_duplicates', duplicatesSchema],
 ]);
 
@@ -112,7 +146,9 @@ export function codocsJsonInputSchema(
   name: CodocsToolName,
 ): Record<string, unknown> {
   return {
-    ...(name === 'codocs_write' ? { type: 'object' } : {}),
+    ...(name === 'codocs_write' || name === 'codocs_rename'
+      ? { type: 'object' }
+      : {}),
     ...z.toJSONSchema(codocsInputSchemas.get(name)!),
   };
 }

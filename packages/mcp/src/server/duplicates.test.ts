@@ -41,7 +41,7 @@ function structured(response: unknown): Record<string, unknown> {
 }
 
 describe('codocs_duplicates stdio 도구', () => {
-  it('일곱 도구를 나열하고 전체·초안 검토와 만료 커서를 실제 stdio로 반환한다', async () => {
+  it('여덟 도구를 나열하고 전체·초안 검토와 만료 커서를 실제 stdio로 반환한다', async () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [sourceCli.entry],
@@ -52,7 +52,7 @@ describe('codocs_duplicates stdio 도구', () => {
     await client.connect(transport);
     try {
       const tools = (await client.listTools()).tools;
-      expect(tools).toHaveLength(7);
+      expect(tools).toHaveLength(8);
       const duplicates = tools.find(
         (tool) => tool.name === 'codocs_duplicates',
       );

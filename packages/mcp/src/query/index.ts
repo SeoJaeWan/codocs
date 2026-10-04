@@ -16,6 +16,8 @@ import {
   type WorkspaceQueryFailure,
   type WorkspaceQuerySession,
   type WorkspaceRefreshResult,
+  type WorkspaceRenamePreviewResult,
+  type WorkspaceRenameResult,
   type WorkspaceValidationResult,
   type WorkspaceWriteResult,
 } from '@codocs/workspace';
@@ -24,6 +26,7 @@ import {
   parseDuplicatesInput,
   parseGetInput,
   parseListInput,
+  parseRenameInput,
   parseValidateInput,
   parseWriteInput,
 } from '../tool-input/index.js';
@@ -63,6 +66,10 @@ export type CodocsValidationResponse = WorkspaceValidationResult;
  * */
 export type CodocsWriteResponse = WorkspaceWriteResult;
 
+/** codocs_rename의 mode별 결과다. preview는 계산 결과, apply는 저장 결과를 돌려준다. */
+export type CodocsRenameResponse =
+  WorkspaceRenamePreviewResult | WorkspaceRenameResult;
+
 /** codocs_duplicates의 공통 결과이며 부분·실패 결과도 중복 없음이 아니다.
  * */
 export type CodocsDuplicatesResponse = WorkspaceDuplicateResponse;
@@ -76,6 +83,7 @@ export interface CodocsQueryHandlers {
   codocsValidate(input?: unknown): Promise<CodocsValidationResponse>;
   codocsRefresh(input?: unknown): Promise<WorkspaceRefreshResult>;
   codocsWrite(input: unknown): Promise<CodocsWriteResponse>;
+  codocsRename(input: unknown): Promise<CodocsRenameResponse>;
   codocsDuplicates(
     input?: unknown,
     options?: { signal?: AbortSignal },
@@ -93,6 +101,20 @@ function invalidInput(): WorkspaceQueryFailure {
       severity: diagnosticSeverities.error,
       message: queryDiagnosticMessages.invalidInput,
     },
+  };
+}
+
+/** apply 요청을 시작하지 못한 실패를 파일 변경 없음으로 반환한다. */
+function renameApplyFailure(
+  error: WorkspaceQueryFailure['error'],
+): WorkspaceRenameResult {
+  return {
+    success: false,
+    saved: false,
+    changed: false,
+    files: [],
+    error,
+    diagnostics: [error],
   };
 }
 
@@ -186,6 +208,40 @@ export function createCodocsQueryHandlers(
         };
       }
       return session.write(parsed);
+    },
+    /** 현재 ID를 파일 경로로 바꾼 뒤 preview 또는 apply를 workspace에 전달한다. 결과는 가공하지 않는다.
+     * */
+    async codocsRename(input: unknown): Promise<CodocsRenameResponse> {
+      const parsed = parseRenameInput(input);
+      if (!parsed) {
+        const failure = invalidInput();
+        return (input as { mode?: unknown } | null)?.mode === 'apply'
+          ? renameApplyFailure(failure.error)
+          : failure;
+      }
+      const { id, mode, ...request } = parsed;
+      const apply = mode === 'apply';
+      const found = await session.get([id]);
+      const item = found.success ? found.results[0] : undefined;
+      const source = item?.found && !item.conflict ? item.source : undefined;
+      if (!found.success || !source) {
+        const failure: WorkspaceQueryFailure = found.success
+          ? {
+              success: false,
+              scanStatus: found.scanStatus,
+              error: {
+                code: queryDiagnosticCodes.notFound,
+                severity: diagnosticSeverities.error,
+                message: queryDiagnosticMessages.notFound,
+              },
+            }
+          : found;
+        return apply ? renameApplyFailure(failure.error) : failure;
+      }
+      const target = { ...request, targetPath: source.path };
+      return apply
+        ? session.applyRename(target)
+        : session.previewRename(target);
     },
     /** draft는 write 입력으로 풀어 전달하고 취소 신호는 세션 검사까지 잇는다.
      * */
