@@ -5,7 +5,8 @@
 ## 이름 충돌과 불완전한 탐색
 
 ID가 여러 발견 경로에 있으면 `duplicate_id`다. 같은 이름이 여러 발견 경로에 있으면 폴더가 달라도 `duplicate_name`이다. 이름은 프로젝트 전체에서 유일해야 한다.
-`_codocs.parent`에 적은 이름의 문서가 없으면 `parent_not_found`, `parent`를 따라가면 자기 자신으로 돌아오면 `parent_cycle`이다.
+`duplicate_id`·`duplicate_name`은 충돌한 모든 파일에 보고하며 진단의 위치는 `_codocs.id` 또는 `_codocs.name`이고 `relatedPaths`에 충돌한 파일 경로를 담는다.
+`_codocs.parent`에 적은 이름의 문서가 없으면 `parent_not_found`, `parent`를 따라가면 자기 자신으로 돌아오면 `parent_cycle`이다. 두 오류의 위치는 해당 `parent` 항목이며, `parent_cycle`은 순환에 속한 모든 문서에 보고한다. 탐색이 끝나지 않았으면 없는 이름을 `parent_not_found`로 확정하지 않는다.
 
 일부 파일이나 폴더를 읽지 못한 상태에서는 `scanStatus: partial`과 함께 확인한 결과를 성공으로 제공한다. 이전 색인에서 보존한 문서는 `confirmation: unconfirmed`와 마지막 원문 `revision`을 유지하고, `unconfirmed_reference` 진단으로 최신성·존재를 보장하지 않음을 알린다. 보이지 않은 후보가 있을 수 있으므로 색인에 없는 ID를 `not_found`로 확정하지 않으며, 전체 탐색이 완료된 `scanStatus: complete`에서만 부재·단일 대상·충돌을 다시 계산한다. 프로젝트나 `.codocs` 자체를 탐색하지 못한 `failed`는 `success: false`와 원인을 반환한다.
 

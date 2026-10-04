@@ -38,9 +38,9 @@ _codocs:
 - `name`은 필수이며 문서 간 참조에 쓰는 이름이다. 프로젝트 전체에서 유일해야 한다.
 - `parent`는 선택이며 상위 문서의 `name`을 담는 문자열 배열이다. 쓰면 비어 있지 않은 배열이어야 하고 항목은 모두 프로젝트에 있는 문서 이름이어야 한다.
 
-`parent`는 문서의 소속을 나타낼 뿐 참조가 아니다. 없는 이름을 쓰면 `parent_not_found`, 자기 자신이나 순환하는 `parent`는 `parent_cycle` 오류다.
+`parent`는 문서의 소속을 나타낼 뿐 참조가 아니다. 없는 이름을 쓰면 `parent_not_found`, 자기 자신이나 순환하는 `parent`는 `parent_cycle` 오류이며 순환에 속한 모든 문서에 보고한다. 오류의 위치는 해당 `parent` 항목이다.
 `parent`가 없는 문서는 최상위 문서다.
-`_codocs` 안에 다른 키를 쓰면 `invalid_field_value` 오류다.
+`_codocs` 안에 다른 키를 쓰면 그 키의 위치에 `invalid_field_value` 오류다.
 
 ## 공통 값 규칙
 
@@ -48,7 +48,8 @@ _codocs:
 - 문서의 문자열 값은 비거나 공백뿐일 수 없다.
 - 대소문자, 앞뒤 공백과 줄바꿈은 작성한 그대로 의미가 있다.
 - 섹션 값이 문자열이 아니면 `invalid_field_type`, 비어 있으면 `invalid_field_value` 오류다.
-- 섹션이 하나도 없으면 오류다.
+- 섹션이 하나도 없으면 최상위 위치에 `invalid_field_value` 오류다.
+- `_codocs` 외에 `_`로 시작하는 최상위 키는 그 키의 위치에 `invalid_field_value` 오류다.
 - `_codocs`가 없으면 `missing_required_field` 오류이고, `_codocs` 안의 `id`나 `name`이 없을 때도 같다.
 - 사용자 정의 속성은 없다. 설명은 모두 섹션에 쓴다.
 

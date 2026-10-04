@@ -36,7 +36,7 @@ preview: |
   - blockingReason: blocked인 이유. blocked가 아니면 없다.
   - changes: 고칠 위치별 path·fieldPath·range·oldText·newText. 대상 문서의 이름을 가리키는 다른 문서의 `_codocs.parent` 항목도 포함하며, 이 항목의 fieldPath는 `["_codocs", "parent", 0]`처럼 배열 순번까지 담는다.
   - impacts: 자동으로 고치지 않은 참조. path·occurrenceIndex·text·range·reason과 바꾸기 전후의 후보(before·after)를 가진다.
-  - conflicts: 새 이름과 같은 이름의 다른 문서. 이름은 프로젝트 전체에서 유일해야 하므로 어느 폴더에 있든 충돌이다.
+  - conflicts: 새 이름과 같은 이름의 다른 문서, 또는 이름 변경으로 parent 오류가 새로 생기는 문서. 이름은 프로젝트 전체에서 유일해야 하므로 어느 폴더에 있든 충돌이다.
   - invalidSelections: 잘못된 선택.
   - revisions: 영향받는 파일의 경로별 [[revision]].
 
