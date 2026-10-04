@@ -2,8 +2,6 @@ id: project-catalog
 name: '조회 투영'
 domains:
   - 'Core'
-deprecatedAliases:
-  - id: query-projection
 definition: |
   [[문서 색인]]의 관측·문서·연결을 목록과 상세 데이터로 계산하는 처리다.
   파일을 읽거나 커서를 발급하지 않으며 전달받은 색인과 조회 조건을 변경하지 않는다.

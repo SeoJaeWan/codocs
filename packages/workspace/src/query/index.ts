@@ -14,7 +14,6 @@ import {
   catalogDiagnosticCodes,
   catalogDiagnosticMessages,
   diagnosticSeverities,
-  matchCode,
   parseYaml,
   changePlanStatuses,
   projectCatalogGet,
@@ -39,9 +38,6 @@ import {
   type CatalogPathMissingResult,
   type CatalogPathResult,
   type CatalogQueryDiagnostic,
-  type CodeMatchCandidate,
-  type CodeMatchEvidence,
-  type CodeMatchResult,
   type Diagnostic,
   type RequestFailure,
   type RequestResult,
@@ -312,24 +308,6 @@ export type WorkspacePathDocumentResult =
 export type WorkspacePathGetItem =
   CatalogPathMissingResult | WorkspacePathDocumentResult;
 
-/** 현재 catalog snapshot으로 전체 문서 텍스트를 매칭한 결과다. */
-export interface WorkspaceMatchSuccess {
-  success: true;
-  scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
-  catalogVersion: number;
-  refreshing: boolean;
-  candidates: readonly CodeMatchCandidate[];
-  evidence: readonly CodeMatchEvidence[];
-  diagnostics: CodeMatchResult['diagnostics'];
-  partial: boolean;
-  status: CodeMatchResult['status'];
-  failures: CodeMatchResult['failures'];
-}
-
-/** 전체 텍스트 매칭 결과 또는 catalog를 확인할 수 없는 실패다. */
-export type WorkspaceMatchResult =
-  WorkspaceMatchSuccess | WorkspaceQueryFailure;
-
 /** 명시 refresh의 scan 결과다. */
 export type WorkspaceRefreshResult = RequestResult<
   {
@@ -377,14 +355,12 @@ export interface WorkspaceLiveReferenceSuccess extends Omit<
 export type WorkspaceLiveReferenceResponse =
   WorkspaceLiveReferenceSuccess | WorkspaceQueryFailure;
 
-/** 선택의 원래 의미를 보존하는 출처다. 이름 참조와 코드 매칭은 별도로 재확인한다. */
-export type WorkspaceCandidateOrigin =
-  | {
-      reference: { name: string; domain?: string };
-      sourcePath: string;
-      explicit?: boolean;
-    }
-  | { text: string; relationship?: { path: string; reverse: boolean } };
+/** 선택의 원래 의미를 보존하는 출처다. 이름 참조는 별도로 재확인한다. */
+export type WorkspaceCandidateOrigin = {
+  reference: { name: string; domain?: string };
+  sourcePath: string;
+  explicit?: boolean;
+};
 
 /** 세션 내부에 보존하는 선택 근거다. revision은 동일성 근거로 사용하지 않는다. */
 interface CandidateSelection {
@@ -1339,7 +1315,7 @@ export class WorkspaceQuerySession {
     return this.#generation;
   }
 
-  /** 매칭에 사용하는 catalog snapshot이 게시될 때마다 바뀌는 버전이다. */
+  /** 조회에 사용하는 catalog snapshot이 게시될 때마다 바뀌는 버전이다. */
   get catalogVersion(): number {
     return this.#catalogVersion;
   }
@@ -1937,40 +1913,6 @@ export class WorkspaceQuerySession {
     );
   }
 
-  /** 열린 문서의 전체 원문을 현재 프로젝트 catalog snapshot으로 매칭한다. */
-  async match(text: string): Promise<WorkspaceMatchResult> {
-    const scan = await this.#current();
-    const watchFailure = this.#watchFailure();
-    if (scan.status === scanStatuses.failed) return scanFailure(scan);
-    if (watchFailure && !this.#completed)
-      return this.#watchFailureResult(watchFailure);
-    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
-    if (!catalog) return scanFailure(scan);
-    const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
-    const result = matchCode(catalog, text);
-    const candidates = watchFailure
-      ? result.candidates.map((candidate) => ({
-          ...candidate,
-          confirmation: catalogConfirmations.unconfirmed,
-        }))
-      : result.candidates;
-    return {
-      ...result,
-      success: true,
-      scanStatus,
-      catalogVersion: watchFailure
-        ? this.#completed!.version
-        : this.#catalogVersion,
-      refreshing: !!this.#refreshPromise,
-      candidates,
-      partial: result.partial || !!watchFailure,
-      status: scanStatus,
-      ...(watchFailure
-        ? { diagnostics: [...result.diagnostics, watchFailure] }
-        : {}),
-    };
-  }
-
   /** 관측 게시 이후 알리고 반환한 함수로 구독을 해제한다. listener 오류는 게시를 되돌리지 않는다. */
   onDidChangeSnapshot(
     listener: (change: WorkspaceSnapshotChange) => void,
@@ -2146,45 +2088,26 @@ export class WorkspaceQuerySession {
     return token;
   }
 
-  /** 본문 단일 연결과 명시 후보 선택·코드 관계의 출처를 구분해 재계산한다. */
+  /** 본문 단일 연결과 명시 후보 선택의 출처에서 후보 경로를 재계산한다. */
   #candidatePaths(
     catalog: Catalog,
     origin: WorkspaceCandidateOrigin,
   ): readonly string[] {
-    if ('reference' in origin) {
-      const result = resolveReference(
-        catalog,
-        origin.reference,
-        origin.sourcePath,
-      );
-      if (
-        !origin.explicit &&
-        (catalog.status !== scanStatuses.complete ||
-          result.candidates.length !== 1)
-      )
-        return [];
-      return result.candidates
-        .filter(
-          (candidate) =>
-            candidate.path !== origin.sourcePath &&
-            candidate.confirmation === catalogConfirmations.confirmed,
-        )
-        .map((candidate) => candidate.path);
-    }
-    const paths = matchCode(catalog, origin.text)
-      .candidates.filter(
-        (candidate) =>
-          candidate.confirmation === catalogConfirmations.confirmed,
-      )
-      .map((candidate) => candidate.path);
-    if (!origin.relationship) return paths;
-    const anchor = catalog.documents.get(origin.relationship.path);
-    if (!anchor || !paths.includes(anchor.path)) return [];
-    return (
-      origin.relationship.reverse ? anchor.referencedBy : anchor.references
+    const result = resolveReference(
+      catalog,
+      origin.reference,
+      origin.sourcePath,
+    );
+    if (
+      !origin.explicit &&
+      (catalog.status !== scanStatuses.complete ||
+        result.candidates.length !== 1)
     )
+      return [];
+    return result.candidates
       .filter(
         (candidate) =>
+          candidate.path !== origin.sourcePath &&
           candidate.confirmation === catalogConfirmations.confirmed,
       )
       .map((candidate) => candidate.path);
@@ -2571,15 +2494,5 @@ export function createWorkspaceQuerySession(
 function discoveryOrigin(
   origin: WorkspaceCandidateOrigin,
 ): WorkspaceCandidateOrigin {
-  if ('sourcePath' in origin)
-    return { ...origin, sourcePath: discoveryPath(origin.sourcePath) };
-  return origin.relationship
-    ? {
-        ...origin,
-        relationship: {
-          ...origin.relationship,
-          path: discoveryPath(origin.relationship.path),
-        },
-      }
-    : origin;
+  return { ...origin, sourcePath: discoveryPath(origin.sourcePath) };
 }

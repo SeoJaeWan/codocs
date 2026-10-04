@@ -65,19 +65,12 @@ importers:
 
   packages/core:
     dependencies:
-      pluralize:
-        specifier: 8.0.0
-        version: 8.0.0
       yaml:
         specifier: 2.9.1
         version: 2.9.1
       zod:
         specifier: 4.6.5
         version: 4.6.5
-    devDependencies:
-      '@types/pluralize':
-        specifier: 0.0.33
-        version: 0.0.33
 
   packages/language-server:
     dependencies:
@@ -875,9 +868,6 @@ packages:
 
   '@types/normalize-package-data@2.4.4':
     resolution: {integrity: sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==}
-
-  '@types/pluralize@0.0.33':
-    resolution: {integrity: sha512-JOqsl+ZoCpP4e8TDke9W79FDcSgPAR0l6pixx2JHkhnRjvShyYiAYw2LVsnA7K08Y6DeOnaU6ujmENO4os/cYg==}
 
   '@types/sarif@2.1.7':
     resolution: {integrity: sha512-kRz0VEkJqWLf1LLVN4pT1cg1Z9wAuvI6L97V3m2f5B76Tg8d413ddvLBPTEHAZJlnn4XSvu0FkZtViCQGVyrXQ==}
@@ -3814,8 +3804,6 @@ snapshots:
       undici-types: 8.9.0
 
   '@types/normalize-package-data@2.4.4': {}
-
-  '@types/pluralize@0.0.33': {}
 
   '@types/sarif@2.1.7': {}
 

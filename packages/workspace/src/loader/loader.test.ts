@@ -31,7 +31,7 @@ let project: string;
 let codocs: string;
 let outside: string;
 const raw =
-  'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\ndeprecatedAliases: []\r\n';
+  'id: shared-term\r\nname: 용어\r\ndefinition: 정의\r\ndomains: [업무]\r\n';
 beforeEach(
   /** 고유한 실제 프로젝트와 외부 폴더를 준비한다. */ async () => {
     fixture = await mkdtemp(path.join(tmpdir(), 'codocs-loader-'));
@@ -299,28 +299,6 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       status: 'valid',
       data: { custom: '보존' },
       diagnostics: [],
-    });
-  });
-  it('스키마 경고만 있으면 유효 문서와 경고 좌표를 보존한다', /** 현재 ID와 같은 이전 ID 경고는 성공을 막지 않는다. */ async () => {
-    await document(
-      'warning.yaml',
-      raw.replace(
-        'deprecatedAliases: []',
-        'deprecatedAliases:\r\n  - id: shared-term',
-      ),
-    );
-    const result = await loadWorkspace({ cwd: project });
-    const item = result.documents[0];
-    expect(result.status).toBe('complete');
-    expect(item).toMatchObject({
-      status: 'valid',
-      diagnostics: [
-        {
-          code: 'invalid_field_value',
-          severity: 'warning',
-          range: { start: { line: 5, character: 8 } },
-        },
-      ],
     });
   });
   it('깨진 파일 연결도 부재로 바꾸지 않고 경고 후 제외한다', async () => {

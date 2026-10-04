@@ -53,7 +53,7 @@ const indexes: WorkspaceCodeReferenceIndex[] = [];
 const sessions: WorkspaceQuerySession[] = [];
 const targetPath = '.codocs/target.yaml';
 const targetText =
-  'id: target\nname: 대상\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: 본문\n';
+  'id: target\nname: 대상\ndomains: [업무]\ndefinition: 본문\n';
 beforeEach(async () => {
   resetCodeAccessCounts();
   await mkdir('.workbench/fixtures', { recursive: true });

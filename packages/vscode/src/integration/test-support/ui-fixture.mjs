@@ -1,13 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-/** 실제 행 번호 11·12를 가진 열다섯 행 문서를 만든다. 다섯째 행부터 본문이며 마지막은 줄바꿈 뒤 빈 행이다. */
+/** 실제 행 번호 11·12를 가진 열네 행 문서를 만든다. 다섯째 행부터 본문이며 마지막은 줄바꿈 뒤 빈 행이다. */
 function rowsDocument(id, name) {
   const rows = Array.from(
     { length: 10 },
     (_, index) => `  ${name} row ${String(index + 5).padStart(2, '0')}`,
   );
-  return `id: ${id}\nname: ${name}\ndomains: [test]\ndefinition: |\n${rows.join('\n')}\ndeprecatedAliases: []\n`;
+  return `id: ${id}\nname: ${name}\ndomains: [test]\ndefinition: |\n${rows.join('\n')}\n`;
 }
 
 /** 코드 파일의 둘째 행에 명시 표기를 둔 시험 원문을 만든다. */
@@ -17,37 +17,34 @@ function codeMarker(className, marker) {
 
 /** 셋째 행에 한 줄 정의를 둔 시험 문서를 만든다. */
 function inlineDocument(id, name, definition) {
-  return `id: ${id}\nname: ${name}\ndefinition: ${definition}\ndomains: [test]\ndeprecatedAliases: []\n`;
+  return `id: ${id}\nname: ${name}\ndefinition: ${definition}\ndomains: [test]\n`;
 }
 
 /** UI가 책임지는 대표 경로·관계·진단만 제공한다. */
 export function uiFiles() {
   return {
-    'source %20 한글#.java':
-      'class Probe {\n  zoneAuxiliary();\n  direct();\n}\n',
     '.codocs/zone %20 한글#.yaml':
-      'id: zone\nname: Zone\ndefinition: Zone body [[Direct]]\ndomains: [test]\ndeprecatedAliases: []\n',
+      'id: zone\nname: Zone\ndefinition: Zone body [[Direct]]\ndomains: [test]\n',
     '.codocs/direct.yaml':
-      'id: direct\nname: Direct\ndefinition: Direct body\ndomains: [test]\ndeprecatedAliases: []\n',
+      'id: direct\nname: Direct\ndefinition: Direct body\ndomains: [test]\n',
     '.codocs/auxiliary.yaml':
-      'id: auxiliary\nname: Auxiliary\ndefinition: Auxiliary body\ndomains: [test]\ndeprecatedAliases: []\n',
-    '.codocs/referrer.yaml':
-      'id: referrer\nname: Referrer\ndefinition: Backlink [[Zone]]\ndomains: [test]\ndeprecatedAliases: []\n',
+      'id: auxiliary\nname: Auxiliary\ndefinition: Auxiliary body\ndomains: [test]\n',
     '.codocs/source %20 한글#.yaml':
-      'id: source\nname: Source\ndefinition: Body [[Zone]]\ndomains: [test]\ndeprecatedAliases: []\n',
+      'id: source\nname: Source\ndefinition: Body [[Zone]]\ndomains: [test]\n',
     '.codocs/ambiguous.yaml':
-      'id: ambiguous\nname: Ambiguous\ndefinition: Body [[Twin]]\ndomains: [test]\ndeprecatedAliases: []\n',
+      'id: ambiguous\nname: Ambiguous\ndefinition: Body [[Twin]]\ndomains: [test]\n',
     '.codocs/twin-a.yaml':
-      'id: twin-a\nname: Twin\ndefinition: Twin A body\ndomains: [alpha]\ndeprecatedAliases: []\n',
+      'id: twin-a\nname: Twin\ndefinition: Twin A body\ndomains: [alpha]\n',
     '.codocs/twin-b.yaml':
-      'id: twin-b\nname: Twin\ndefinition: Twin B body\ndomains: [beta]\ndeprecatedAliases: []\n',
+      'id: twin-b\nname: Twin\ndefinition: Twin B body\ndomains: [beta]\n',
     '.codocs/old.yaml':
-      'id: old\nname: Old\ndefinition: Old body\ndomains: [test]\ndeprecatedAliases: []\n',
+      'id: old\nname: Old\ndefinition: Old body\ndomains: [test]\n',
     '.codocs/old-source.yaml':
-      'id: old-source\nname: Old Source\ndefinition: Body [[Old]]\ndomains: [test]\ndeprecatedAliases: []\n',
-    'nested/source.java': 'zone();\n',
+      'id: old-source\nname: Old Source\ndefinition: Body [[Old]]\ndomains: [test]\n',
+    'nested/.codocs/source.yaml':
+      'id: nested-source\nname: Nested Source\ndefinition: Body [[Zone]]\ndomains: [nested]\n',
     'nested/.codocs/zone.yaml':
-      'id: zone\nname: Nested Zone\ndefinition: Nested workspace body\ndomains: [nested]\ndeprecatedAliases: []\n',
+      'id: zone\nname: Zone\ndefinition: Nested workspace body\ndomains: [nested]\n',
     // 코드 참조 이동: 기존 ID·이름·경로와 겹치지 않는 별도 문서와 코드만 사용한다.
     '.codocs/navigation-target.yaml': rowsDocument(
       'navigation-target',
@@ -147,9 +144,9 @@ export function uiFiles() {
       'Rename ref body [[Rename Target]]',
     ),
     '.codocs/rename-twin-a.yaml':
-      'id: rename-twin-a\nname: Rename Twin\ndefinition: Rename twin A body\ndomains: [alpha]\ndeprecatedAliases: []\n',
+      'id: rename-twin-a\nname: Rename Twin\ndefinition: Rename twin A body\ndomains: [alpha]\n',
     '.codocs/rename-twin-b.yaml':
-      'id: rename-twin-b\nname: Rename Twin\ndefinition: Rename twin B body\ndomains: [beta]\ndeprecatedAliases: []\n',
+      'id: rename-twin-b\nname: Rename Twin\ndefinition: Rename twin B body\ndomains: [beta]\n',
     '.codocs/rename-twin-ref.yaml': inlineDocument(
       'rename-twin-ref',
       'Rename Twin Ref',

@@ -12,15 +12,11 @@ name: 가상 주문
 definition: 가상 고객의 구매 요청이다.
 domains:
   - sample-sales
-deprecatedAliases:
-  - id: previous-order
-    message: sample-order로 변경되었습니다.
 ```
 
-필수 필드는 `id`, `name`, `definition`, `domains`, `deprecatedAliases` 다섯 개다. `domains`에는 문자열이 하나 이상 있어야 한다.
-`deprecatedAliases`는 필수 `id`와 선택 `message`를 가진 객체 배열이다. 이전 ID가 없으면 `deprecatedAliases: []`로 쓴다. 필드를 빼면 `missing_required_field` 오류다.
-MCP로 새 문서를 만들면 `deprecatedAliases`는 호출자가 넘기지 않아도 `[]`로 저장된다.
-이전 ID는 현재 ID와 같은 형식을 사용하며 이전 코드 식별자의 매칭을 유지한다. 문서 간 참조와 ID 기반 조회·수정은 각각 현재 `name`과 현재 `id`를 사용한다.
+필수 필드는 `id`, `name`, `definition`, `domains` 네 개다. `domains`에는 문자열이 하나 이상 있어야 한다.
+`id`는 ID 기반 조회·수정의 기준이고, 문서 간 참조는 `name`을 사용한다. ID를 바꿔도 과거 ID는 남기지 않는다.
+예전 문서에 `deprecatedAliases` 속성이 남아 있으면 Codocs가 그 문서를 저장할 때 이 속성을 지운다. 바뀌는 내용이 없어 저장하지 않는 요청은 이 속성을 지우지 않는다.
 
 여러 도메인에 걸친 흐름도 같은 형식을 사용한다.
 
@@ -33,7 +29,6 @@ definition: |
 domains:
   - sample-sales
   - sample-delivery
-deprecatedAliases: []
 ```
 
 `kind`, `status`, `examples`는 제품 속성이 아니다. 이 이름의 필드를 쓰면 다른 알려지지 않은 필드처럼 경고 없이 사용자 속성으로 보존된다. 쓰지 않으면 삭제한다.
@@ -44,7 +39,7 @@ deprecatedAliases: []
 - 문서의 문자열 값은 비거나 공백뿐일 수 없다.
 - 대소문자, 앞뒤 공백과 줄바꿈은 작성한 그대로 의미가 있다.
 - 알려지지 않은 필드는 JSON 값이면 경고 없이 사용자 속성으로 보존된다.
-- `aliases`라는 사용자 필드는 이름 참조나 `deprecatedAliases`의 의미를 갖지 않는다.
+- `aliases`라는 사용자 필드는 이름 참조의 의미를 갖지 않는다.
 
 사용자 필드에는 문자열, 유한한 숫자, boolean, null, 배열과 문자열 키 객체를 사용할 수 있다. `NaN`, 무한대, undefined, 함수, 순환 객체처럼 JSON으로 표현할 수 없는 값은 API 입력에서 거부된다.
 

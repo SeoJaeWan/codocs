@@ -9,8 +9,7 @@ import { extractReferences } from './index.js';
 
 describe('extractReferences: 본문 문자열에서 참조 추출', () => {
   it('정의에 참조가 하나 있으면 이름과 실제 원문 위치를 반환한다', () => {
-    const source =
-      'definition: "[[대상]]"\nname: 출처\ndomains: [업무]\ndeprecatedAliases: []\n';
+    const source = 'definition: "[[대상]]"\nname: 출처\ndomains: [업무]\n';
     const parsed = {
       success: true as const,
       source,

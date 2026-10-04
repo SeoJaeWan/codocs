@@ -2,9 +2,6 @@ import {
   referenceResolutionStatuses,
   scanStatuses,
   type CatalogOccurrence,
-  type CodeMatchCandidate,
-  type CodeMatchEvidence,
-  type OffsetRange,
 } from '@codocs/core';
 import {
   createWorkspaceQuerySession,
@@ -12,7 +9,6 @@ import {
   type WorkspaceLiveReferenceSuccess,
   type WorkspacePathDocumentResult,
   type WorkspaceQueryDiagnostic,
-  type WorkspaceMatchResult,
   type WorkspacePathGetResponse,
   type WorkspaceRefreshResult,
   type WorkspaceReadiness,
@@ -51,11 +47,7 @@ import {
 } from '../document-sync/index.js';
 import {
   createEmptyHover,
-  createHover,
   createStatusHover,
-  hoverCandidatePaths,
-  hoverDetailPaths,
-  selectHover,
   detailLabel,
   escapeMarkdown,
 } from '../hover/index.js';
@@ -74,66 +66,8 @@ import {
   selectionTarget,
   type CandidateSession,
 } from '../navigation/index.js';
-export {
-  documentMatchErrorCodes,
-  type DocumentMatchErrorCode,
-} from './domain-values.js';
-import {
-  documentMatchErrorCodes,
-  type DocumentMatchErrorCode,
-} from './domain-values.js';
-
-/** 문서 매칭 요청의 메서드 이름이다. */
-export const documentMatchRequestMethod = 'codocs/match';
 /** 작업 공간 색인 수동 갱신 요청의 메서드 이름이다. */
 export const workspaceRefreshRequestMethod = 'codocs/refresh';
-
-/** 최신 열린 문서를 매칭하는 요청이다. */
-export interface DocumentMatchRequest {
-  textDocument: { uri: string };
-  version?: number;
-}
-
-/** 코어 offset과 편집기 Range를 함께 보존한 근거다. */
-export type LspMatchEvidence = Omit<CodeMatchEvidence, 'range'> & {
-  offsetRange: OffsetRange;
-  range: Range;
-};
-
-/** 모든 후보 정보와 변환된 근거를 함께 보존한다. */
-export type LspMatchCandidate = Omit<CodeMatchCandidate, 'evidence'> & {
-  evidence: readonly LspMatchEvidence[];
-};
-
-/** 최신 문서와 catalog snapshot이 일치할 때의 매칭 응답이다. */
-export type DocumentMatchSuccess = Omit<
-  Extract<WorkspaceMatchResult, { success: true }>,
-  'candidates' | 'evidence'
-> & {
-  success: true;
-  uri: string;
-  version: number;
-  workspaceUri: string;
-  workspaceState: WorkspaceReadiness;
-  candidates: readonly LspMatchCandidate[];
-  evidence: readonly LspMatchEvidence[];
-};
-
-/** 문서·작업 공간·색인의 현재 상태로 수행할 수 없는 매칭 응답이다. */
-export interface DocumentMatchFailure {
-  success: false;
-  code: DocumentMatchErrorCode;
-  uri: string;
-  requestedVersion?: number;
-  currentVersion?: number;
-  workspaceUri?: string;
-  workspaceState?: WorkspaceReadiness;
-  scanStatus?: WorkspaceMatchResult['scanStatus'];
-  error?: Extract<WorkspaceMatchResult, { success: false }>['error'];
-}
-
-/** 공개 문서 매칭 응답이다. */
-export type DocumentMatchResponse = DocumentMatchSuccess | DocumentMatchFailure;
 
 /** 색인을 명시적으로 다시 읽을 작업 공간 선택이다. */
 export interface WorkspaceRefreshRequest {
@@ -174,7 +108,6 @@ export interface WorkspaceSessionBoundary extends Partial<
 > {
   readonly readiness: WorkspaceReadiness;
   readonly catalogVersion: number;
-  match(text: string): Promise<WorkspaceMatchResult>;
   getByPaths(
     paths: readonly string[],
     expectedCatalogVersion: number,
@@ -356,8 +289,6 @@ export class LanguageServerSession {
     detail: WorkspacePathDocumentResult,
     catalogVersion: number,
     occurrence?: CatalogOccurrence,
-    codeCandidate = true,
-    relationship?: { path: string; reverse: boolean },
     explicit = false,
   ): string | undefined {
     const document = this.documents.get(uri);
@@ -382,14 +313,7 @@ export class LanguageServerSession {
             sourcePath: this.#sourcePath(uri, workspace),
             explicit,
           }
-        : occurrence
-          ? undefined
-          : codeCandidate || relationship
-            ? {
-                text: document.getText(),
-                ...(relationship ? { relationship } : {}),
-              }
-            : undefined;
+        : undefined;
     const selection = this.#selections.capture(
       uri,
       document.version,
@@ -852,57 +776,7 @@ export class LanguageServerSession {
     );
   }
 
-  /** 요청 시점의 원문을 매칭하고 완료 시점에도 같은 버전인지 확인한다. */
-  async matchDocument(
-    request: DocumentMatchRequest,
-  ): Promise<DocumentMatchResponse> {
-    const uri = request.textDocument.uri;
-    const snapshot = this.documents.get(uri);
-    if (!snapshot)
-      return {
-        success: false,
-        code: documentMatchErrorCodes.documentNotOpen,
-        uri,
-        ...(request.version === undefined
-          ? {}
-          : { requestedVersion: request.version }),
-      };
-    if (request.version !== undefined && request.version !== snapshot.version)
-      return staleResult(uri, request.version, snapshot.version);
-    const snapshotVersion = snapshot.version;
-    const snapshotText = snapshot.getText();
-    const workspace = this.#workspaceForDocument(uri);
-    if (!workspace)
-      return {
-        success: false,
-        code: documentMatchErrorCodes.workspaceNotFound,
-        uri,
-        currentVersion: snapshot.version,
-      };
-    const result = await workspace.session.match(snapshotText);
-    const current = this.documents.get(uri);
-    if (
-      !current ||
-      current !== snapshot ||
-      current.version !== snapshotVersion ||
-      current.getText() !== snapshotText
-    )
-      return staleResult(uri, snapshotVersion, current?.version);
-    if (!result.success)
-      return {
-        success: false,
-        code: documentMatchErrorCodes.workspaceQueryFailed,
-        uri,
-        currentVersion: snapshotVersion,
-        workspaceUri: workspace.uri,
-        workspaceState: workspace.session.readiness,
-        scanStatus: result.scanStatus,
-        error: result.error,
-      };
-    return mapMatchResult(current, workspace, result);
-  }
-
-  /** 같은 코드·catalog 관측의 커서 후보와 경로 상세로 표준 Hover를 만든다. */
+  /** 마커와 YAML 참조 위치의 표준 Hover를 만든다. 그 밖의 위치에는 Hover가 없다. */
   async hoverDocument(
     params: HoverParams,
     cancellation?: CancellationToken,
@@ -964,12 +838,9 @@ export class LanguageServerSession {
           occurrence.offsetRange.start <= offset &&
           offset < occurrence.offsetRange.end,
       );
-      const empty = createEmptyHover({
-        candidates: [],
-        catalogVersion: references.catalogVersion,
-        partial: references.scanStatus !== scanStatuses.complete,
-        workspaceState: workspace.session.readiness,
-      });
+      const empty = createEmptyHover(
+        references.scanStatus !== scanStatuses.complete,
+      );
       const reverse =
         owner && this.#isKnowledgeDocument(uri, workspace)
           ? await this.#code.reverseHover(owner, params.position.line)
@@ -1004,8 +875,6 @@ export class LanguageServerSession {
             detail,
             references.catalogVersion,
             item,
-            false,
-            undefined,
             true,
           );
           const label = escapeMarkdown(detailLabel(detail, targets));
@@ -1029,108 +898,7 @@ export class LanguageServerSession {
         range: item.occurrence.range,
       };
     }
-    const result = await workspace.session.match(snapshotText);
-    if (
-      cancellation?.isCancellationRequested ||
-      !this.#isCurrentSnapshot(
-        uri,
-        snapshotVersion,
-        snapshotText,
-        workspace,
-        snapshot,
-      )
-    )
-      return null;
-    if (!result.success)
-      return createStatusHover(workspace.session.readiness, result.error);
-    const match = mapMatchResult(snapshot, workspace, result);
-    const selection = selectHover(snapshot, match, params.position);
-    if (!selection) return createEmptyHover(match);
-    const candidatePaths = hoverCandidatePaths(selection);
-    const candidateQueryVersion = workspace.session.catalogVersion;
-    let details = await workspace.session.getByPaths(
-      candidatePaths,
-      match.catalogVersion,
-    );
-    if (
-      cancellation?.isCancellationRequested ||
-      !this.#isCurrentSnapshot(
-        uri,
-        snapshotVersion,
-        snapshotText,
-        workspace,
-        snapshot,
-      ) ||
-      workspace.session.catalogVersion !== candidateQueryVersion
-    )
-      return null;
-    if (!details.success)
-      return 'expectedCatalogVersion' in details
-        ? null
-        : createStatusHover(workspace.session.readiness, details.error);
-    const allPaths = hoverDetailPaths(candidatePaths, details);
-    if (allPaths.length !== candidatePaths.length) {
-      const detailQueryVersion = workspace.session.catalogVersion;
-      details = await workspace.session.getByPaths(
-        allPaths,
-        match.catalogVersion,
-      );
-      if (
-        cancellation?.isCancellationRequested ||
-        !this.#isCurrentSnapshot(
-          uri,
-          snapshotVersion,
-          snapshotText,
-          workspace,
-          snapshot,
-        ) ||
-        workspace.session.catalogVersion !== detailQueryVersion
-      )
-        return null;
-      if (!details.success)
-        return 'expectedCatalogVersion' in details
-          ? null
-          : createStatusHover(workspace.session.readiness, details.error);
-    }
-    const hover = createHover(selection, match, details);
-    if (
-      !Array.isArray(hover.contents) &&
-      typeof hover.contents === 'object' &&
-      'value' in hover.contents
-    ) {
-      hover.contents.value = hover.contents.value.replace(
-        /command:codocs\.openSource\?([^)]*)/gu,
-        /** 렌더러의 관측 링크를 불투명 서버 선택으로 바꾼다. */ (
-          _link,
-          query: string,
-        ) => {
-          const argument = (
-            JSON.parse(decodeURIComponent(query)) as {
-              uri: string;
-              relationship?: { path: string; reverse: boolean };
-            }[]
-          )[0];
-          const detail = details.success
-            ? details.results.find(
-                (item) => item.found && item.source.uri === argument?.uri,
-              )
-            : undefined;
-          const relationship = argument?.relationship;
-          return detail?.found
-            ? (this.#target(
-                uri,
-                workspace,
-                detail,
-                match.catalogVersion,
-                undefined,
-                !relationship && candidatePaths.includes(detail.path),
-                relationship,
-              ) ?? '')
-            : '';
-        },
-      );
-    }
-    return hover;
+    return null;
   }
 
   /** 서버가 발급하지 않은 외부 URI·명령의 resolve를 거부한다. */
@@ -1325,21 +1093,6 @@ function containsPath(rootPath: string, candidatePath: string): boolean {
   );
 }
 
-/** 비동기 결과가 현재 문서 버전과 달라졌음을 반환한다. */
-function staleResult(
-  uri: string,
-  requestedVersion: number,
-  currentVersion: number | undefined,
-): DocumentMatchFailure {
-  return {
-    success: false,
-    code: documentMatchErrorCodes.staleDocumentVersion,
-    uri,
-    requestedVersion,
-    ...(currentVersion === undefined ? {} : { currentVersion }),
-  };
-}
-
 /** 이름 변경 요청을 시작하지 못한 고정 실패를 만든다. */
 function renameFailure(
   code: RenameRequestFailure['error']['code'],
@@ -1353,44 +1106,6 @@ function renameFailure(
           ? '출처 문서의 작업 공간을 찾을 수 없습니다.'
           : '작업 공간 세션이 이름 변경을 지원하지 않습니다.',
     },
-  };
-}
-
-/** 코어 근거의 offset을 보존하며 LSP 범위를 추가한다. */
-function mapEvidence(
-  document: TextDocument,
-  evidence: CodeMatchEvidence,
-): LspMatchEvidence {
-  return {
-    ...evidence,
-    offsetRange: { ...evidence.range },
-    range: utf16OffsetsToRange(document, evidence.range),
-  };
-}
-
-/** 최신 snapshot에 workspace 매칭 결과와 LSP 좌표를 결합한다. */
-function mapMatchResult(
-  document: TextDocument,
-  workspace: WorkspaceBinding,
-  result: Extract<WorkspaceMatchResult, { success: true }>,
-): DocumentMatchSuccess {
-  /** 후보 하나에 LSP 좌표로 변환한 근거 목록을 연결한다. */
-  const mapCandidate = (candidate: CodeMatchCandidate): LspMatchCandidate => ({
-    ...candidate,
-    evidence: candidate.evidence.map((evidence) =>
-      mapEvidence(document, evidence),
-    ),
-  });
-  return {
-    ...result,
-    uri: document.uri,
-    version: document.version,
-    workspaceUri: workspace.uri,
-    workspaceState: workspace.session.readiness,
-    candidates: result.candidates.map(mapCandidate),
-    evidence: result.evidence.map((evidence) =>
-      mapEvidence(document, evidence),
-    ),
   };
 }
 

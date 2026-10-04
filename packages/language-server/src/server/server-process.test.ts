@@ -12,10 +12,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  documentMatchRequestMethod,
-  workspaceRefreshRequestMethod,
-} from '../server-session/index.js';
+import { workspaceRefreshRequestMethod } from '../server-session/index.js';
 
 const childClosures = new WeakMap<
   ChildProcessWithoutNullStreams,
@@ -258,7 +255,7 @@ describe('language server stdio 프로세스', () => {
           textDocument: { uri, version: 2 },
           contentChanges: [
             {
-              text: 'id: source\nname: 출처\ndefinition: 삭제\ndomains: [업무]\ndeprecatedAliases: []\n',
+              text: 'id: source\nname: 출처\ndefinition: 삭제\ndomains: [업무]\n',
             },
           ],
         });
@@ -295,7 +292,7 @@ describe('language server stdio 프로세스', () => {
     },
   );
 
-  it('initialize·전체 문서 변경·현재 매칭·shutdown을 실제 LSP 프레임으로 처리한다', async () => {
+  it('initialize·전체 문서 변경·코드 식별자 Hover 없음·shutdown을 실제 LSP 프레임으로 처리한다', async () => {
     const fixtureParent = path.resolve('.workbench/fixtures');
     await mkdir(fixtureParent, { recursive: true });
     const root = await mkdtemp(path.join(fixtureParent, 'server-process-'));
@@ -303,7 +300,7 @@ describe('language server stdio 프로세스', () => {
     await mkdir(path.join(root, '.codocs'));
     await writeFile(
       path.join(root, '.codocs/반납 구역.yaml'),
-      'id: return-zone\r\nname: Return Zone\r\ndefinition: 한글 본문\r\ndomains: [test]\r\ndeprecatedAliases: []\r\n',
+      'id: return-zone\r\nname: Return Zone\r\ndefinition: 한글 본문\r\ndomains: [test]\r\n',
       'utf8',
     );
     await build({
@@ -350,49 +347,23 @@ describe('language server stdio 프로세스', () => {
         },
       });
 
-      const first = await client.request(2, documentMatchRequestMethod, {
-        textDocument: { uri: documentUri },
-        version: 1,
-      });
-      expect(first.error).toBeUndefined();
-      expect(first.result).toMatchObject({
-        success: true,
-        version: 1,
-        candidates: [{ id: 'return-zone' }],
-      });
-      const hover = await client.request(20, 'textDocument/hover', {
+      const hover = await client.request(2, 'textDocument/hover', {
         textDocument: { uri: documentUri },
         position: { line: 0, character: 20 },
       });
       expect(hover.error).toBeUndefined();
-      expect(hover.result).toMatchObject({
-        contents: { kind: 'markdown' },
-        range: {
-          start: { line: 0, character: 15 },
-          end: { line: 0, character: 25 },
-        },
-      });
-      expect(
-        (hover.result as { contents: { value: string } }).contents.value,
-      ).toContain('Return Zone');
-      expect(
-        (hover.result as { contents: { value: string } }).contents.value,
-      ).toContain('command:codocs.openSource');
+      expect(hover.result).toBeNull();
 
       client.send('textDocument/didChange', {
         textDocument: { uri: documentUri, version: 2 },
         contentChanges: [{ text: 'no match here' }],
       });
-      const changed = await client.request(3, documentMatchRequestMethod, {
+      const changed = await client.request(3, 'textDocument/hover', {
         textDocument: { uri: documentUri },
-        version: 2,
+        position: { line: 0, character: 3 },
       });
       expect(changed.error).toBeUndefined();
-      expect(changed.result).toMatchObject({
-        success: true,
-        version: 2,
-        candidates: [],
-      });
+      expect(changed.result).toBeNull();
 
       const shutdown = await client.request(4, 'shutdown', null);
       expect(shutdown.error).toBeUndefined();
@@ -410,7 +381,7 @@ describe('language server stdio 프로세스', () => {
     }
   });
 
-  it('다중 루트·catalog 생명주기와 재시작 뒤 최신 원문을 실제 프로세스에서 처리한다', async () => {
+  it('다중 루트·catalog 생명주기와 재시작 뒤 최신 원문을 실제 프로세스의 YAML 참조 Hover로 처리한다', async () => {
     const fixtureParent = path.resolve('.workbench/fixtures');
     await mkdir(fixtureParent, { recursive: true });
     const root = await mkdtemp(
@@ -430,17 +401,17 @@ describe('language server stdio 프로세스', () => {
     await Promise.all([
       writeFile(
         path.join(parent, '.codocs/parent-zone.yaml'),
-        'id: parent-zone\nname: Parent Zone\ndefinition: parent\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: parent-zone\nname: Parent Zone\ndefinition: parent\ndomains: [test]\n',
         'utf8',
       ),
       writeFile(
         path.join(nested, '.codocs/nested-zone.yaml'),
-        'id: nested-zone\nname: Nested Zone\ndefinition: nested\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: nested-zone\nname: Nested Zone\ndefinition: nested\ndomains: [test]\n',
         'utf8',
       ),
       writeFile(
         path.join(sibling, '.codocs/sibling-zone.yaml'),
-        'id: sibling-zone\nname: Sibling Zone\ndefinition: sibling\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: sibling-zone\nname: Sibling Zone\ndefinition: sibling\ndomains: [test]\n',
         'utf8',
       ),
     ]);
@@ -463,9 +434,35 @@ describe('language server stdio 프로세스', () => {
         name: path.basename(workspaceRoot),
       }),
     );
-    const nestedUri = pathToFileURL(path.join(nested, 'source.java')).href;
-    const siblingUri = pathToFileURL(path.join(sibling, 'source.ts')).href;
-    const missingUri = pathToFileURL(path.join(missing, 'source.txt')).href;
+    const nestedUri = pathToFileURL(
+      path.join(nested, '.codocs/live.yaml'),
+    ).href;
+    const nestedParentUri = pathToFileURL(
+      path.join(nested, '.codocs/live-parent.yaml'),
+    ).href;
+    const siblingUri = pathToFileURL(
+      path.join(sibling, '.codocs/live.yaml'),
+    ).href;
+    const missingUri = pathToFileURL(
+      path.join(missing, '.codocs/live.yaml'),
+    ).href;
+    /** 이름 참조 한 개를 가진 YAML 원문을 만든다. */
+    const reference = (name: string): string =>
+      `id: live\nname: 출처\ndefinition: "[[${name}]]"\n`;
+    /** 참조 위치의 Hover 응답을 요청한다. */
+    const hoverAt = (
+      client: StdioProtocolClient,
+      id: number,
+      uri: string,
+    ): Promise<JsonRpcResponse> =>
+      client.request(id, 'textDocument/hover', {
+        textDocument: { uri },
+        position: { line: 2, character: 17 },
+      });
+    /** Hover 응답의 Markdown 본문을 꺼낸다. */
+    const hoverText = (response: JsonRpcResponse): string =>
+      (response.result as { contents: { value: string } } | null)?.contents
+        .value ?? '';
     const firstChild = spawn(process.execPath, [output, '--stdio'], {
       cwd: root,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -484,175 +481,93 @@ describe('language server stdio 프로세스', () => {
       firstClient.send('textDocument/didOpen', {
         textDocument: {
           uri: nestedUri,
-          languageId: 'java',
+          languageId: 'yaml',
           version: 5,
-          text: '// parentZone\nString value = "nestedZone";\n😀 nestedZone(',
+          text: reference('Nested Zone'),
+        },
+      });
+      firstClient.send('textDocument/didOpen', {
+        textDocument: {
+          uri: nestedParentUri,
+          languageId: 'yaml',
+          version: 1,
+          text: reference('Parent Zone'),
         },
       });
       firstClient.send('textDocument/didOpen', {
         textDocument: {
           uri: siblingUri,
-          languageId: 'typescript',
+          languageId: 'yaml',
           version: 1,
-          text: 'siblingZone',
+          text: reference('Sibling Zone'),
         },
       });
       firstClient.send('textDocument/didOpen', {
         textDocument: {
           uri: missingUri,
-          languageId: 'plaintext',
+          languageId: 'yaml',
           version: 1,
-          text: 'createdZone',
+          text: reference('Created Zone'),
         },
       });
 
-      const nestedResult = await firstClient.request(
-        2,
-        documentMatchRequestMethod,
-        { textDocument: { uri: nestedUri }, version: 5 },
-      );
-      expect(nestedResult.error).toBeUndefined();
-      expect(nestedResult.result).toMatchObject({
-        success: true,
-        version: 5,
-        workspaceUri: pathToFileURL(nested).href,
-        candidates: [{ id: 'nested-zone' }],
-        evidence: [
-          { token: 'nestedZone' },
-          {
-            token: 'nestedZone',
-            range: {
-              start: { line: 2, character: 3 },
-              end: { line: 2, character: 13 },
-            },
-          },
-        ],
-      });
+      // 가장 가까운 작업 공간의 catalog만 사용하므로 부모 문서는 연결하지 않는다.
+      const nestedHover = await hoverAt(firstClient, 2, nestedUri);
+      expect(nestedHover.error).toBeUndefined();
+      expect(hoverText(nestedHover)).toContain('Nested Zone');
+      expect(hoverText(nestedHover)).not.toContain('Parent Zone');
       expect(
-        (
-          nestedResult.result as { candidates: { id: string }[] }
-        ).candidates.map((candidate) => candidate.id),
-      ).toEqual(['nested-zone']);
-      const nestedHover = await firstClient.request(13, 'textDocument/hover', {
-        textDocument: { uri: nestedUri },
-        position: { line: 2, character: 5 },
-      });
-      expect(nestedHover.result).toMatchObject({
-        contents: { kind: 'markdown' },
-        range: {
-          start: { line: 2, character: 3 },
-          end: { line: 2, character: 13 },
-        },
-      });
-      expect(
-        (nestedHover.result as { contents: { value: string } }).contents.value,
-      ).toContain('Nested Zone');
-      expect(
-        (nestedHover.result as { contents: { value: string } }).contents.value,
+        hoverText(await hoverAt(firstClient, 3, nestedParentUri)),
       ).not.toContain('Parent Zone');
 
-      const siblingResult = await firstClient.request(
-        3,
-        documentMatchRequestMethod,
-        { textDocument: { uri: siblingUri }, version: 1 },
-      );
-      expect(siblingResult.result).toMatchObject({
-        success: false,
-        code: 'workspace_not_found',
-      });
-
-      const beforeCreation = await firstClient.request(
-        4,
-        documentMatchRequestMethod,
-        { textDocument: { uri: missingUri }, version: 1 },
-      );
-      expect(beforeCreation.result).toMatchObject({
-        success: false,
-        code: 'workspace_not_found',
-      });
+      // 작업 공간 밖 문서는 어떤 catalog와도 연결하지 않는다.
+      expect((await hoverAt(firstClient, 4, siblingUri)).result).toBeNull();
+      expect((await hoverAt(firstClient, 5, missingUri)).result).toBeNull();
       firstClient.send('workspace/didChangeWorkspaceFolders', {
         event: {
           added: [workspaceFolders[3]],
           removed: [workspaceFolders[1]],
         },
       });
-      // 제거되는 작업 공간은 진행 중인 최초 수집이 끝난 뒤 닫히므로 추가 반영을 기다린다.
-      await vi.waitFor(
-        async () => {
-          const afterFolderChange = await firstClient.request(
-            5,
-            documentMatchRequestMethod,
-            { textDocument: { uri: missingUri }, version: 1 },
-          );
-          expect(afterFolderChange.result).toMatchObject({
-            success: true,
-            candidates: [],
-          });
-        },
-        { timeout: 5000 },
-      );
+      await firstClient.request(6, workspaceRefreshRequestMethod, {
+        workspaceUri: pathToFileURL(missing).href,
+      });
+      expect((await hoverAt(firstClient, 7, missingUri)).result).toBeNull();
       await expect(access(path.join(missing, '.codocs'))).rejects.toThrow();
       await mkdir(path.join(missing, '.codocs'));
       await writeFile(
         path.join(missing, '.codocs/created-zone.yaml'),
-        'id: created-zone\nname: Created Zone\ndefinition: created\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: created-zone\nname: Created Zone\ndefinition: created\ndomains: [test]\n',
         'utf8',
       );
-      await firstClient.request(6, workspaceRefreshRequestMethod, {
+      await firstClient.request(8, workspaceRefreshRequestMethod, {
         workspaceUri: pathToFileURL(missing).href,
       });
       await vi.waitFor(
         async () => {
-          const created = await firstClient.request(
-            7,
-            documentMatchRequestMethod,
-            { textDocument: { uri: missingUri }, version: 1 },
-          );
-          expect(created.result).toMatchObject({
-            success: true,
-            candidates: [{ id: 'created-zone' }],
-          });
+          expect(
+            hoverText(await hoverAt(firstClient, 9, missingUri)),
+          ).toContain('Created Zone');
         },
         { timeout: 5_000, interval: 100 },
       );
 
       await writeFile(
         path.join(missing, '.codocs/created-zone.yaml'),
-        'id: changed-zone\nname: Changed Zone\ndefinition: changed\ndomains: [test]\ndeprecatedAliases: []\n',
+        'id: changed-zone\nname: Changed Zone\ndefinition: changed\ndomains: [test]\n',
         'utf8',
       );
       firstClient.send('textDocument/didChange', {
         textDocument: { uri: missingUri, version: 2 },
-        contentChanges: [{ text: '/* changedZone */' }],
+        contentChanges: [{ text: reference('Changed Zone') }],
       });
-      await firstClient.request(8, workspaceRefreshRequestMethod, {
+      await firstClient.request(10, workspaceRefreshRequestMethod, {
         workspaceUri: pathToFileURL(missing).href,
       });
-      const changed = await firstClient.request(9, documentMatchRequestMethod, {
-        textDocument: { uri: missingUri },
-        version: 2,
-      });
-      expect(changed.result).toMatchObject({
-        success: true,
-        version: 2,
-        candidates: [{ id: 'changed-zone' }],
-      });
-      const changedHover = await firstClient.request(14, 'textDocument/hover', {
-        textDocument: { uri: missingUri },
-        position: { line: 0, character: 5 },
-      });
-      expect(changedHover.result).toMatchObject({
-        contents: { kind: 'markdown' },
-        range: {
-          start: { line: 0, character: 3 },
-          end: { line: 0, character: 14 },
-        },
-      });
-      expect(
-        (changedHover.result as { contents: { value: string } }).contents.value,
-      ).toContain('Changed Zone');
+      const changedHover = await hoverAt(firstClient, 11, missingUri);
+      expect(hoverText(changedHover)).toContain('Changed Zone');
 
-      const shutdown = await firstClient.request(10, 'shutdown', null);
+      const shutdown = await firstClient.request(12, 'shutdown', null);
       expect(shutdown.error).toBeUndefined();
       firstClient.send('exit');
       firstChild.stdin.end();
@@ -681,30 +596,13 @@ describe('language server stdio 프로세스', () => {
         restartedClient.send('textDocument/didOpen', {
           textDocument: {
             uri: missingUri,
-            languageId: 'plaintext',
+            languageId: 'yaml',
             version: 7,
-            text: '// 😀 unsaved\n"changedZone"(',
+            text: reference('Changed Zone'),
           },
         });
-        const resynchronized = await restartedClient.request(
-          11,
-          documentMatchRequestMethod,
-          { textDocument: { uri: missingUri }, version: 7 },
-        );
-        expect(resynchronized.result).toMatchObject({
-          success: true,
-          version: 7,
-          candidates: [{ id: 'changed-zone' }],
-          evidence: [
-            {
-              token: 'changedZone',
-              range: {
-                start: { line: 1, character: 1 },
-                end: { line: 1, character: 12 },
-              },
-            },
-          ],
-        });
+        const resynchronized = await hoverAt(restartedClient, 11, missingUri);
+        expect(hoverText(resynchronized)).toContain('Changed Zone');
         await restartedClient.request(12, 'shutdown', null);
         restartedClient.send('exit');
         restartedChild.stdin.end();
@@ -730,12 +628,11 @@ describe('language server stdio 프로세스', () => {
     const root = await mkdtemp(path.join(fixtureParent, 'server-rename-'));
     const output = path.join(root, 'server.cjs');
     await mkdir(path.join(root, '.codocs'));
-    const order =
-      'id: order\nname: 주문\ndomains: [test]\ndefinition: 설명\ndeprecatedAliases: []\n';
+    const order = 'id: order\nname: 주문\ndomains: [test]\ndefinition: 설명\n';
     await writeFile(path.join(root, '.codocs/order.yaml'), order, 'utf8');
     await writeFile(
       path.join(root, '.codocs/ref.yaml'),
-      'id: ref\nname: 참조\ndomains: [test]\ndefinition: 본문 [[주문]]\ndeprecatedAliases: []\n',
+      'id: ref\nname: 참조\ndomains: [test]\ndefinition: 본문 [[주문]]\n',
       'utf8',
     );
     await build({

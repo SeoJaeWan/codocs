@@ -250,6 +250,16 @@ function adjacentCommentEdit(entry: FlowEntry): Edit | undefined {
   };
 }
 
+/** Codocs가 문서를 저장할 때 원문에서 지우는 폐기된 최상위 속성 이름이다. */
+const deprecatedAliasesKey = 'deprecatedAliases';
+
+/** 저장할 문서 데이터에서 폐기된 deprecatedAliases 속성만 뺀 복사본을 만든다. */
+function withoutDeprecatedAliases(data: object): Record<string, unknown> {
+  const copy: Record<string, unknown> = { ...data };
+  delete copy[deprecatedAliasesKey];
+  return copy;
+}
+
 /** 각 최상위 값·속성 범위만 수정한다. */
 function editYaml(
   parsed: Extract<YamlParseResult, { success: true }>,
@@ -480,7 +490,7 @@ function planDocumentChangeInternal(
         typeof input.document === 'object' &&
         input.document !== null &&
         !Array.isArray(input.document)
-          ? { ...input.document, [documentFields.deprecatedAliases]: [] }
+          ? withoutDeprecatedAliases(input.document)
           : input.document,
       path,
     });
@@ -527,8 +537,6 @@ function planDocumentChangeInternal(
     (!changes.length && !removals.length) ||
     new Set(removals).size !== removals.length ||
     changes.some((key) => removals.includes(key)) ||
-    changes.includes(documentFields.deprecatedAliases) ||
-    removals.includes(documentFields.deprecatedAliases) ||
     removals.some(
       /** 필수 필드는 unset할 수 없다. */
       (key) =>
@@ -570,40 +578,13 @@ function planDocumentChangeInternal(
     return failure('nameChangeNotAllowed', source.path);
   const expected: Record<string, unknown> = { ...parsed.data, ...(set ?? {}) };
   for (const key of removals) delete expected[key];
-  const oldId = parsed.data[documentFields.id],
-    newId = expected[documentFields.id];
+  delete expected[deprecatedAliasesKey];
   const preliminary = validateDocument({ data: expected, path: source.path });
   if (!preliminary.success && preliminary.errors.some(unsafeJson))
     return {
       status: changePlanStatuses.failed,
       diagnostics: preliminary.errors,
     };
-  if (
-    typeof oldId === 'string' &&
-    /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.exec(oldId)?.[0] === oldId &&
-    typeof newId === 'string' &&
-    oldId !== newId
-  ) {
-    const aliases = parsed.data[documentFields.deprecatedAliases];
-    if (aliases !== undefined && !Array.isArray(aliases))
-      return {
-        status: changePlanStatuses.failed,
-        diagnostics: validateDocument({
-          data: parsed.data,
-          path: source.path,
-          source: source.raw,
-          fields: parsed.fields,
-          ...(parsed.rootRange ? { rootRange: parsed.rootRange } : {}),
-        }).errors,
-      };
-    const previous = (aliases ?? []) as unknown[];
-    expected[documentFields.deprecatedAliases] = [
-      ...previous.filter((item) => !record(item) || item.id !== newId),
-      ...(previous.some((item) => record(item) && item.id === oldId)
-        ? []
-        : [{ id: oldId }]),
-    ];
-  }
   const completeExpected = validateDocument({
     data: expected,
     path: source.path,
@@ -634,7 +615,11 @@ function planDocumentChangeInternal(
       status: changePlanStatuses.failed,
       diagnostics: validation.errors,
     };
-  if (raw === source.raw)
+  /** 키 삭제만을 위해 저장하지 않는다. 키를 남겨 둔 기대값이 원본과 같으면 변경이 없는 요청이다. */
+  const keptKey = Object.hasOwn(parsed.data, deprecatedAliasesKey)
+    ? { [deprecatedAliasesKey]: parsed.data[deprecatedAliasesKey] }
+    : {};
+  if (raw === source.raw || same({ ...expected, ...keptKey }, parsed.data))
     return {
       status: changePlanStatuses.unchanged,
       path: source.path,
@@ -808,12 +793,19 @@ export function applyRenameChanges(
       value.slice(0, span.start) + change.newText + value.slice(span.end),
     );
   }
-  const reparsed = parseYaml(result);
+  let reparsed = parseYaml(result);
   if (!reparsed.success) return { success: false };
-  const expectedData = JSON.parse(JSON.stringify(parsed.data)) as Record<
-    string,
-    unknown
-  >;
+  /** 저장하는 문서에서 deprecatedAliases 속성만 원문 범위로 지운다. 참조 편집을 먼저 끝낸 원문에서 하므로 겹치지 않는다. */
+  if (Object.hasOwn(reparsed.data, deprecatedAliasesKey)) {
+    const removed = editYaml(reparsed, withoutDeprecatedAliases(reparsed.data));
+    if (removed === undefined) return { success: false };
+    result = removed;
+    reparsed = parseYaml(result);
+    if (!reparsed.success) return { success: false };
+  }
+  const expectedData = withoutDeprecatedAliases(
+    JSON.parse(JSON.stringify(parsed.data)) as Record<string, unknown>,
+  );
   for (const [key, value] of expectedValues) {
     const fieldPath = JSON.parse(key) as (string | number)[];
     if (!setAtPath(expectedData, fieldPath, value)) return { success: false };

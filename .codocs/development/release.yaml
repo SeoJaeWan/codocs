@@ -2,7 +2,6 @@ id: release
 name: '배포'
 domains:
   - '개발'
-deprecatedAliases: []
 definition: |
   사용자가 설치할 패키지를 만들어 게시하고, 지원하는 환경에서 동작을 확인하는 흐름이다.
   PR 검사와 병합 규칙은 [[검사와 병합]], 테스트 종류와 UI 테스트 방법은 [[테스트 컨벤션]]에서 정한다.

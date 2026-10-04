@@ -2,7 +2,6 @@ id: check-and-merge
 name: '검사와 병합'
 domains:
   - '개발'
-deprecatedAliases: []
 definition: |
   커밋부터 main 병합까지 어떤 검사가 언제·어디서 실행되고 병합을 어떻게 막는지 정한다.
   각 테스트가 무엇을 검증하는지는 [[테스트 컨벤션]], 병합 뒤 Version PR과 게시는 [[배포]]에서 정한다.

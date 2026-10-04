@@ -24,7 +24,7 @@ let root: string;
 let folder: string;
 let originalFile: string;
 const original =
-  '# 원문 주석\r\nid: first\r\nname: 첫 문서\r\ndefinition: 설명\r\ndomains: [업무]\r\ndeprecatedAliases: []\r\n';
+  '# 원문 주석\r\nid: first\r\nname: 첫 문서\r\ndefinition: 설명\r\ndomains: [업무]\r\n';
 const document = {
   id: 'created',
   name: '새 문서',
@@ -97,7 +97,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
       path.join(folder, 'new', 'nested', 'created.yaml'),
     );
     expect(bytes.toString()).toBe(
-      'id: created\nname: 새 문서\ndefinition: 설명\ndomains:\n  - 업무\ndeprecatedAliases: []\n',
+      'id: created\nname: 새 문서\ndefinition: 설명\ndomains:\n  - 업무\n',
     );
     expect(result.revision).toBe(sha256(bytes));
     expect(sawTemp).toBe(true);
@@ -119,7 +119,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     );
   });
 
-  it('update가 주석과 CRLF 및 이전 ID를 함께 보존해 반영한다', async () => {
+  it('update가 주석과 CRLF를 보존해 반영하며 이전 ID는 남기지 않는다', async () => {
     const { scan, input } = await updateRequest({ id: 'renamed' });
     const result = await saveWorkspaceChange(input, scan);
     expect(result).toMatchObject({
@@ -132,7 +132,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     const bytes = await readFile(originalFile);
     expect(bytes.toString()).toContain('# 원문 주석\r\n');
     expect(bytes.toString()).toContain('id: renamed\r\n');
-    expect(bytes.toString()).toContain('deprecatedAliases: \r\n  - id: first');
+    expect(bytes.toString()).not.toContain('deprecatedAliases');
     expect(result.revision).toBe(sha256(bytes));
   });
 
@@ -256,7 +256,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     const scan = await loadWorkspace({ cwd: root });
     const target = path.join(folder, 'created.yaml');
     const source =
-      'id: created\nname: 다른 생성\ndefinition: 설명\ndomains: [업무]\ndeprecatedAliases: []\n';
+      'id: created\nname: 다른 생성\ndefinition: 설명\ndomains: [업무]\n';
     const result = await saveWorkspaceChange(
       { mode: 'create', path: '.codocs/created.yaml', document },
       scan,
@@ -314,7 +314,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
       beforeApply: async () => {
         await writeFile(
           path.join(folder, 'other.yaml'),
-          'id: new-id\nname: 충돌\ndefinition: 설명\ndomains: [업무]\ndeprecatedAliases: []\n',
+          'id: new-id\nname: 충돌\ndefinition: 설명\ndomains: [업무]\n',
         );
       },
     });

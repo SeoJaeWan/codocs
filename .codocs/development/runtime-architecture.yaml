@@ -2,7 +2,6 @@ id: runtime-architecture
 name: '실행 구조'
 domains:
   - '개발'
-deprecatedAliases: []
 definition: |
   패키지와 실행 프로세스 사이의 책임 및 의존 방향을 정의한다.
   IDE와 AI가 같은 계산 규칙을 사용하면서 호스트·프로토콜·파일 IO를 분리해 재사용하기 위한 구조다.
@@ -11,7 +10,7 @@ definition: |
 
   vscode는 language-server를 실행하고 language-server와 mcp는 workspace를 통해 프로젝트 파일에 접근한다.
   workspace는 [[탐색]]의 관측을 [[문서 색인]]과 저장 요청으로 core의 순수 계산에 연결한다. language-server와 mcp도 core의 공개 계산을 사용할 수 있다.
-  language-server는 편집 중 코드의 최신 내용과 텍스트 위치를 관리하고, [[식별자 참조]]의 비교는 core의 공통 규칙을 사용한다. 언어별 파서를 두지 않는다.
+  language-server는 편집 중 문서·코드의 최신 내용과 텍스트 위치를 관리하고, 참조 해석은 core의 공통 규칙을 사용한다. 언어별 파서를 두지 않는다.
   다른 패키지의 내부 구현 접근을 제한하는 기준은 [[코드 컨벤션]]에서 확인한다.
 
   - [[편집기 기능]]·[[VS Code 확장]]: 편집 중 코드와 LSP 기능, 확장의 서버 연결과 원문 탭 동작을 찾는다.

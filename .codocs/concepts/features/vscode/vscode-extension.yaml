@@ -2,7 +2,6 @@ id: vscode-extension
 name: 'VS Code 확장'
 domains:
   - '제품 개념'
-deprecatedAliases: []
 definition: |
   VS Code 확장은 편집기에서 Codocs를 쓰게 하는 진입점이다.
   확장이 별도 프로세스로 언어 서버를 실행해 연결하고, 언어 서버가 .codocs 문서와 코드를 읽어 [[편집기 기능]]을 제공한다.

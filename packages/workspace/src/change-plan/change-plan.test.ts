@@ -21,11 +21,11 @@ beforeEach(async () => {
   await writeFile(file, original);
   await writeFile(
     path.join(folder, 'taken.yaml'),
-    'id: taken\nname: 다른 문서\ndefinition: 설명\ndomains: [운영]\ndeprecatedAliases: []\n',
+    'id: taken\nname: 다른 문서\ndefinition: 설명\ndomains: [운영]\n',
   );
   await writeFile(
     path.join(folder, 'unrelated.yaml'),
-    'id: unrelated\nname: 오류 문서\ndomains: [운영]\ndeprecatedAliases: []\n',
+    'id: unrelated\nname: 오류 문서\ndomains: [운영]\n',
   );
 });
 
@@ -55,7 +55,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
       expect(result.data.definition).toBe(request.set.definition);
     });
 
-    it('기존 ID를 변경하면 주석·개행·이전 ID 이력을 포함한 후보를 반환한다', async () => {
+    it('기존 ID를 변경하면 주석·개행을 보존하고 이전 ID 이력 없이 후보를 반환한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
         (item) => item.source.path === zonePath,
@@ -73,12 +73,10 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
       if (result.status !== changePlanStatuses.candidate) return;
       expect(result.baseRevision).toBe(request.revision);
       expect(result.raw).toContain('# 그대로 보존\r\n');
-      expect(result.raw).toContain('message: 기존 안내\r\n');
+      expect(result.raw).not.toContain('deprecatedAliases');
+      expect(result.raw).not.toContain('message: 기존 안내');
       expect(result.data.id).toBe(request.set.id);
-      expect(result.data.deprecatedAliases).toEqual([
-        { id: 'return-zone', message: '기존 안내' },
-        { id: 'zone' },
-      ]);
+      expect(result.data).not.toHaveProperty('deprecatedAliases');
       expect(result.revision).toMatch(/^[a-f0-9]{64}$/u);
       expect(result.diagnostics).not.toContainEqual(
         expect.objectContaining({ path: unrelatedPath }),
@@ -153,7 +151,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
         expect(result.revision).toBe(source?.revision);
     });
 
-    it('이전 ID 목록을 직접 지우도록 요청하면 실패하고 파일을 보존한다', async () => {
+    it('이전 ID 목록을 set으로 지정해도 거부하지 않고 키만 지우려는 저장 없이 무변경으로 응답한다', async () => {
       const scan = await loadWorkspace({ cwd: root });
       const source = scan.documents.find(
         (item) => item.source.path === zonePath,
@@ -167,7 +165,7 @@ describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작�
 
       const result = planWorkspaceChange(request, scan);
 
-      expect(result.status).toBe(changePlanStatuses.failed);
+      expect(result.status).toBe(changePlanStatuses.unchanged);
       expect(await readFile(file, 'utf8')).toBe(original);
     });
   });

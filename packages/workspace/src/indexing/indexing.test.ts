@@ -62,7 +62,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     it('검증된 문서를 변환하면 파싱 결과를 같은 관측으로 전달한다', async () => {
       await file(
         'valid.yaml',
-        "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\n",
       );
       const scan = await loadSuccessfulWorkspaceScan();
       const source = scan.documents[0];
@@ -77,8 +77,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     });
 
     it('필수 ID가 빠진 문서를 변환하면 확인된 파싱 데이터와 원문을 보존한다', async () => {
-      const raw =
-        "name: 오류\r\ndomains: [업무]\r\ndeprecatedAliases: []\r\ndefinition: '[[정상]]'\r\n";
+      const raw = "name: 오류\r\ndomains: [업무]\r\ndefinition: '[[정상]]'\r\n";
       await file('invalid.yaml', raw);
       const scan = await loadSuccessfulWorkspaceScan();
       const source = scan.documents[0];
@@ -116,7 +115,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
   describe('관측을 문서 참조로 색인', () => {
     it('문서 하나를 색인하면 발견 경로와 이름을 가진 문서를 반환한다', async () => {
       const raw =
-        "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n";
+        "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\n";
       await file('valid.yaml', raw);
       const scan = await loadSuccessfulWorkspaceScan();
 
@@ -132,10 +131,10 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     it('ID가 없는 문서가 다른 문서를 참조하면 definition의 이름과 참조 위치만 연결하고 examples는 제외한다', async () => {
       await file(
         'valid.yaml',
-        "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: valid\nname: 정상\ndefinition: '정의'\ndomains: [업무]\n",
       );
       const raw =
-        "name: 오류\r\ndomains: [업무]\r\ndeprecatedAliases: []\r\ndefinition: '[[정상]]'\r\nexamples: ['[[정상]]', 42, '[[정상]]']\r\n";
+        "name: 오류\r\ndomains: [업무]\r\ndefinition: '[[정상]]'\r\nexamples: ['[[정상]]', 42, '[[정상]]']\r\n";
       await file('invalid.yaml', raw);
       const scan = await loadSuccessfulWorkspaceScan();
 
@@ -172,16 +171,16 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
   it('잘못된 본문 자료형과 사용자 필드, examples는 제외하고 참조를 추출하지 않는다', /** 타입을 추측하거나 문자열로 변환하지 않는다. */ async () => {
     await file(
       'a.yaml',
-      'name: A\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: ["[[B]]"]\nexamples: [5, "[[B]]", { text: "[[B]]" }]\n',
+      'name: A\ndomains: [업무]\ndefinition: ["[[B]]"]\nexamples: [5, "[[B]]", { text: "[[B]]" }]\n',
     );
     await file(
       'b.yaml',
-      "id: B\nname: B\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+      "id: B\nname: B\ndefinition: '정의'\ndomains: [업무]\n",
     );
     await file('unknown.yaml', 'name: 추측\ncustom: "[[B]]"\n');
     await file(
       'knowledge.yaml',
-      'name: 지식\ndomains: [업무]\ndeprecatedAliases: []\ndefinition: ["[[B]]"]\n',
+      'name: 지식\ndomains: [업무]\ndefinition: ["[[B]]"]\n',
     );
     const catalog = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
     expect(catalog.documents.get(discovered('a.yaml'))?.occurrences).toEqual(
@@ -197,11 +196,11 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
   it('스키마 오류 대상도 확인한 이름과 경로로 직접 연결하고 대상 오류를 반환한다', /** 다중 도메인 대상의 경로는 후보 하나다. */ async () => {
     await file(
       'source.yaml',
-      "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\ndeprecatedAliases: []\n",
+      "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\n",
     );
     await file(
       'target.yaml',
-      'name: 대상\ndomains: [업무, 공통]\ndeprecatedAliases: []\ndefinition: 본문\n',
+      'name: 대상\ndomains: [업무, 공통]\ndefinition: 본문\n',
     );
     const catalog = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
     const resolution = catalog.documents.get(discovered('source.yaml'))
@@ -218,7 +217,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
   it('실제 hardlink의 ID가 같아도 발견 경로별 문서와 충돌 진단을 유지한다', /** 파일 ID와 실경로를 병합 키로 사용하지 않는다. */ async () => {
     const target = await file(
       'first.yaml',
-      "id: same\nname: 공유\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+      "id: same\nname: 공유\ndefinition: '정의'\ndomains: [업무]\n",
     );
     await link(target, path.join(project, discovered('second.yml')));
     const result = await loadSuccessfulWorkspaceScan();
@@ -247,19 +246,19 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
   it('모호한 후보에는 역참조가 없고 같은 발견 문서의 자기 참조는 제외하며 순환은 유지한다', /** 확정 직접 연결과 모든 등장 기록을 구분한다. */ async () => {
     await file(
       'a.yaml',
-      "id: A\nname: A\ndefinition: '[[B]] [[A]] [[중복]] [[B]]'\ndomains: [업무]\ndeprecatedAliases: []\n",
+      "id: A\nname: A\ndefinition: '[[B]] [[A]] [[중복]] [[B]]'\ndomains: [업무]\n",
     );
     await file(
       'b.yaml',
-      "id: B\nname: B\ndefinition: '[[A]]'\ndomains: [업무]\ndeprecatedAliases: []\n",
+      "id: B\nname: B\ndefinition: '[[A]]'\ndomains: [업무]\n",
     );
     await file(
       'c.yaml',
-      "id: c\nname: 중복\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+      "id: c\nname: 중복\ndefinition: '정의'\ndomains: [업무]\n",
     );
     await file(
       'd.yaml',
-      "id: d\nname: 중복\ndefinition: '정의'\ndomains: [공통]\ndeprecatedAliases: []\n",
+      "id: d\nname: 중복\ndefinition: '정의'\ndomains: [공통]\n",
     );
     const catalog = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
     expect(
@@ -287,7 +286,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
   it('다중 도메인 문서가 다른 소속 도메인으로 자신을 참조해도 직접 연결을 만들지 않는다', /** 자기 참조 여부는 도메인이 아니라 발견 경로로 판정한다. */ async () => {
     await file(
       'self.yaml',
-      'id: self\nname: 자신\ndomains: [업무, 공통]\ndeprecatedAliases: []\ndefinition: "[[공통:자신]]"\n',
+      'id: self\nname: 자신\ndomains: [업무, 공통]\ndefinition: "[[공통:자신]]"\n',
     );
     const catalog = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
     const document = catalog.documents.get(discovered('self.yaml'));
@@ -304,15 +303,15 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     it('이름 충돌 문서를 지우고 대상을 이동하면 이동한 경로로 참조를 연결한다', async () => {
       await file(
         'source.yaml',
-        "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\n",
       );
       const target = await file(
         'target.yaml',
-        "id: shared\nname: 대상\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: shared\nname: 대상\ndefinition: '정의'\ndomains: [업무]\n",
       );
       const duplicate = await file(
         'duplicate.yaml',
-        "id: shared\nname: 대상\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: shared\nname: 대상\ndefinition: '정의'\ndomains: [업무]\n",
       );
       const first = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
       expect(
@@ -341,20 +340,20 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     it('대상 이름과 ID를 수정하면 이전 ID를 버리고 수정된 이름으로 연결한다', async () => {
       await file(
         'source.yaml',
-        "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\n",
       );
       await file(
         'target.yaml',
-        "id: shared\nname: 대상\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: shared\nname: 대상\ndefinition: '정의'\ndomains: [업무]\n",
       );
       const first = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
       await file(
         'target.yaml',
-        "id: new-id\nname: 새이름\ndefinition: '정의'\ndomains: [공통]\ndeprecatedAliases: []\n",
+        "id: new-id\nname: 새이름\ndefinition: '정의'\ndomains: [공통]\n",
       );
       await file(
         'source.yaml',
-        "id: 출발\nname: 출발\ndefinition: '[[공통:새이름]]'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: 출발\nname: 출발\ndefinition: '[[공통:새이름]]'\ndomains: [업무]\n",
       );
 
       const result = buildWorkspaceCatalog(
@@ -371,11 +370,11 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     it('참조 대상을 삭제하면 이전 연결을 제거하고 대상 없음으로 판정한다', async () => {
       await file(
         'source.yaml',
-        "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: 출발\nname: 출발\ndefinition: '[[대상]]'\ndomains: [업무]\n",
       );
       const target = await file(
         'target.yaml',
-        "id: target\nname: 대상\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: target\nname: 대상\ndefinition: '정의'\ndomains: [업무]\n",
       );
       const first = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
       await rm(target);
@@ -436,11 +435,11 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
     it('부분·실패 스캔 뒤 복구하면 이전 자료를 미확인으로 보존한 뒤 연결을 다시 확인한다', async () => {
       await file(
         'a.yaml',
-        "id: A\nname: A\ndefinition: '[[B]]'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: A\nname: A\ndefinition: '[[B]]'\ndomains: [업무]\n",
       );
       await file(
         'b.yaml',
-        "id: B\nname: B\ndefinition: '정의'\ndomains: [업무]\ndeprecatedAliases: []\n",
+        "id: B\nname: B\ndefinition: '정의'\ndomains: [업무]\n",
       );
       const initial = await loadSuccessfulWorkspaceScan();
       const previous = buildWorkspaceCatalog(initial);

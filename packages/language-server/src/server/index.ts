@@ -5,11 +5,8 @@ import {
   type Connection,
 } from 'vscode-languageserver/node.js';
 import {
-  documentMatchRequestMethod,
   LanguageServerSession,
   workspaceRefreshRequestMethod,
-  type DocumentMatchRequest,
-  type DocumentMatchResponse,
   type WorkspaceRefreshRequest,
 } from '../server-session/index.js';
 import {
@@ -188,11 +185,6 @@ export function bindLanguageServer(
     connection.workspace.onDidChangeWorkspaceFolders(changeWorkspaceFolders);
   };
   connection.onInitialized(initialized);
-  connection.onRequest(
-    documentMatchRequestMethod,
-    async (request: DocumentMatchRequest): Promise<DocumentMatchResponse> =>
-      session.matchDocument(request),
-  );
   connection.onRequest(
     workspaceRefreshRequestMethod,
     async (request: WorkspaceRefreshRequest | undefined) =>

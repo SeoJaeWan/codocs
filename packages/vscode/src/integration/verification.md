@@ -12,7 +12,7 @@ pnpm test:vscode --version <exact-stable> --vsix <absolute-candidate.vsix> --out
 
 `installation.json`은 설치 확장 경로/버전·API 활성화·서버 응답을, `functional.json`은 renderer 입력을 사용하는 개별 사례 결과를 기록한다. `result.json`은 exact 버전·최종 VSIX SHA-256·OS·단계·통과/실패/취소/시간 초과·정리 상태를 기록한다. 성공은 exit 0과 passed/cleaned true로만 판정한다. 실패 때 screenshot, `process.log`, `vscode-logs/`를 보존하며 수집 오류가 원래 오류를 덮지 않는다. `worker.json`은 준비 단계 추적용이다.
 
-CI는 runner의 종료 코드로 성공을 판정한다. 설치 응답, 열아홉 대표 사례의 실제 마우스 입력·복원·정리 중 하나라도 실패하면 runner가 0이 아닌 코드로 끝나며, 양 OS job이 같은 pack artifact의 VSIX를 검증한다. ready PR의 `required-ci`는 모든 job이 성공해야 통과한다.
+CI는 runner의 종료 코드로 성공을 판정한다. 설치 응답, 스무 개 대표 사례의 실제 마우스 입력·복원·정리 중 하나라도 실패하면 runner가 0이 아닌 코드로 끝나며, 양 OS job이 같은 pack artifact의 VSIX를 검증한다. ready PR의 `required-ci`는 모든 job이 성공해야 통과한다.
 
 실제 실패·timeout·SIGINT/SIGTERM에서 소유 worker 트리를 공식 helper로 제한 시간 안에 정리한다. 정리 실패도 비정상 종료이며 임시 경로를 result에 남긴다. 각 UI 사례는 dirty fixture를 되돌리고 기준 파일을 복원하며 복원 실패도 검사 실패다. UI DOM·OS 입력·Output 로그 위치의 최종 수락은 정확한 후보의 양 OS GitHub 결과로만 확정한다.
 

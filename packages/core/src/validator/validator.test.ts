@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { diagnosticSeverities } from '../diagnostics/domain-values.js';
 import type { SourcePosition } from '../diagnostics/index.js';
 import { parseYaml } from '../parser/index.js';
 import {
@@ -13,14 +12,12 @@ const term = {
   name: ' 가상 주문 😀 ',
   definition: '정의 [[sample-fulfillment]]',
   domains: ['Sample Sales'],
-  deprecatedAliases: [],
 };
 const knowledge = {
   id: 'sample-fulfillment',
   name: '제목',
   definition: '본문 [[sample-order]]',
   domains: [' Sample Sales '],
-  deprecatedAliases: [],
 };
 
 /** JSON 직렬화가 잃는 undefined·비유한 수도 유지하는 검사 전 스냅샷이다. */
@@ -62,7 +59,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
       name: '주문',
       definition: '설명',
       domains: ['판매'],
-      deprecatedAliases: [],
     };
 
     const result = validateDocument({ data });
@@ -73,34 +69,29 @@ describe('validateDocument: 문서 스키마 검증', () => {
     if (result.success) expect(result.data).toEqual(data);
   });
 
-  it('deprecatedAliases가 없는 문서를 검증하면 해당 위치의 필수 필드 누락 오류를 반환한다', () => {
-    const { deprecatedAliases: omitted, ...data } = term;
-    expect(omitted).toEqual([]);
-
-    const result = validateDocument({ data });
-
-    expect(result.success).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.objectContaining({
-        fieldPath: ['deprecatedAliases'],
-        code: schemaDiagnosticCodes.missingRequiredField,
-      }),
-    );
-  });
-
-  it('deprecatedAliases가 빈 배열인 문서를 검증하면 오류 없이 성공한다', () => {
+  it('deprecatedAliases가 없는 문서를 검증하면 진단 0건이다', () => {
     const result = validateDocument({ data: term });
 
     expect(result.success).toBe(true);
     expect(result.errors).toEqual([]);
-    if (result.success) expect(result.data.deprecatedAliases).toEqual([]);
+    expect(result.warnings).toEqual([]);
   });
 
-  it('복수 도메인과 이전 ID를 함께 검사하면 종류 구분 없이 원문을 보존한다', /** 단일 문서에 복수 도메인과 이전 명칭을 함께 허용한다. */ () => {
+  it('deprecatedAliases 값이 이상한 문서를 검증하면 경고 없이 값을 그대로 보존해 성공한다', () => {
+    const data = { ...term, deprecatedAliases: 3 };
+
+    const result = validateDocument({ data });
+
+    expect(result.success).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    if (result.success) expect(result.data).toEqual(data);
+  });
+
+  it('복수 도메인을 검사하면 종류 구분 없이 원문을 보존한다', /** 단일 문서에 복수 도메인을 허용한다. */ () => {
     const data = {
       ...term,
       domains: ['판매', '배송'],
-      deprecatedAliases: [{ id: 'previous-order' }],
     };
     const result = validateDocument({ data });
     expect(result.success).toBe(true);
@@ -141,7 +132,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
       ['name'],
       ['definition'],
       ['domains'],
-      ['deprecatedAliases'],
     ]);
     expect(result.warnings).toEqual([]);
     const valid = { ...legacy, ...term };
@@ -150,17 +140,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
     if (accepted.success) expect(accepted.data).toEqual(valid);
   });
 
-  it.each([
-    term,
-    {
-      ...term,
-      deprecatedAliases: [
-        { id: 'previous-name' },
-        { id: 'previous-title', message: ' 안내 ' },
-      ],
-    },
-    knowledge,
-  ])(
+  it.each([term, knowledge])(
     '정상 문서와 선택 속성을 검사하면 원래 값으로 성공한다: %j',
     /** 선택 누락과 빈 선택 배열에 기본값을 넣지 않는다. */ (data) => {
       const result = validateDocument({ data });
@@ -170,39 +150,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
       if (result.success) expect(result.data).toEqual(data);
     },
   );
-
-  it('이전 ID 중복은 작성 순서와 값을 유지한 채 정상 문서로 반환한다', /** 변경 이력 항목을 검증 과정에서 임의로 합치지 않는다. */ () => {
-    const data = {
-      ...term,
-      deprecatedAliases: [
-        { id: 'previous-order', message: '첫 변경' },
-        { id: 'previous-order', message: '두 번째 변경' },
-      ],
-    };
-    const result = validateDocument({ data });
-    expect(result.success).toBe(true);
-    expect(result.warnings).toEqual([]);
-    if (result.success) expect(result.data).toEqual(data);
-  });
-
-  it('현재 ID와 같은 이전 ID는 값을 삭제하지 않고 해당 id 경로에 경고한다', /** 직접 YAML 편집으로 생긴 중복의 자동 정리를 수행하지 않는다. */ () => {
-    const data = {
-      ...term,
-      deprecatedAliases: [{ id: term.id, message: '기존 안내' }],
-    };
-    const result = validateDocument({ data });
-    expect(result.success).toBe(true);
-    expect(result.errors).toEqual([]);
-    expect(result.warnings).toEqual([
-      expect.objectContaining({
-        code: schemaDiagnosticCodes.invalidFieldValue,
-        severity: diagnosticSeverities.warning,
-        message: schemaDiagnosticMessages.deprecatedAliasMatchesCurrentId,
-        fieldPath: ['deprecatedAliases', 0, 'id'],
-      }),
-    ]);
-    if (result.success) expect(result.data).toEqual(data);
-  });
 
   it.each([
     [
@@ -237,12 +184,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
       schemaDiagnosticMessages.invalidId,
     ],
     ['id', 7, schemaDiagnosticCodes.invalidFieldType, undefined],
-    [
-      'deprecatedAliases',
-      null,
-      schemaDiagnosticCodes.invalidFieldType,
-      undefined,
-    ],
   ])(
     '알려진 %s 속성에 %j를 넣으면 약속한 오류로 실패한다',
     /** 빈 문자열·null·ID·자료형을 구분한다. */ (key, value, code, message) => {
@@ -275,26 +216,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
     [
       { ...knowledge, domains: [null] },
       ['domains', 0],
-      schemaDiagnosticCodes.invalidFieldType,
-    ],
-    [
-      { ...term, deprecatedAliases: [{ id: 'old', message: '' }] },
-      ['deprecatedAliases', 0, 'message'],
-      schemaDiagnosticCodes.invalidFieldValue,
-    ],
-    [
-      { ...term, deprecatedAliases: [{ id: 'Bad-ID' }] },
-      ['deprecatedAliases', 0, 'id'],
-      schemaDiagnosticCodes.invalidFieldValue,
-    ],
-    [
-      { ...term, deprecatedAliases: [{}] },
-      ['deprecatedAliases', 0, 'id'],
-      schemaDiagnosticCodes.missingRequiredField,
-    ],
-    [
-      { ...term, deprecatedAliases: [null] },
-      ['deprecatedAliases', 0],
       schemaDiagnosticCodes.invalidFieldType,
     ],
   ] as const)(
@@ -368,7 +289,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
     expect(result.warnings).toEqual([]);
   });
 
-  it('사용자 JSON 값과 업무 별칭의 사용자 속성을 검사하면 모든 값과 키를 보존한다', /** 사용자 객체 내부의 name·status는 업무 스키마로 해석하지 않는다. */ () => {
+  it('사용자 JSON 값과 사용자 속성을 검사하면 모든 값과 키를 보존한다', /** 사용자 객체 내부의 name·status는 업무 스키마로 해석하지 않는다. */ () => {
     const shared = {
       name: null,
       status: '',
@@ -378,7 +299,6 @@ describe('validateDocument: 문서 스키마 검증', () => {
       ...term,
       aliases: ['old'],
       custom: { a: shared, b: shared },
-      deprecatedAliases: [{ id: 'old', custom: shared }],
     };
     const result = validateDocument({ data });
     expect(result.success).toBe(true);
@@ -406,7 +326,7 @@ describe('validateDocument: 문서 스키마 검증', () => {
   it.each(['.nan', '.inf', '-.inf'])(
     '실제 YAML %s를 파싱해 검사하면 비유한 수의 원문을 지목한다',
     /** 파서 성공은 스키마 성공을 보장하지 않는다. */ (value) => {
-      const source = `id: order\nname: 이름\ndefinition: 정의\ndomains: [영역]\ndeprecatedAliases: []\ncustom:\n  nested: [${value}]\n`;
+      const source = `id: order\nname: 이름\ndefinition: 정의\ndomains: [영역]\ncustom:\n  nested: [${value}]\n`;
       const parsed = parseYaml(source, 'terms.yaml');
       if (!parsed.success) throw new Error('파싱이 실패했습니다.');
       const result = validateDocument({
@@ -570,14 +490,6 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
             section: 'errors',
             expected: 'false',
           },
-          {
-            newlineName,
-            newline,
-            name: '누락된 중첩 ID의 부모',
-            fieldPath: ['deprecatedAliases', 0, 'id'],
-            section: 'errors',
-            expected: '{message: "안내"}',
-          },
         ] as const,
     ),
   )(
@@ -590,7 +502,6 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
         'name: 이름',
         'definition: 정의',
         'domains: ["😀", false]',
-        'deprecatedAliases: [{message: "안내"}]',
         '# 뒤 주석',
         '',
       ].join(newline);
@@ -643,7 +554,7 @@ describe('검증 진단의 확인된 원문 위치', /** 값·원소·키·직�
       );
   });
 
-  const invalidRangeData = { ...term, id: 'BAD', deprecatedAliases: [{}] };
+  const invalidRangeData = { ...term, id: 'BAD' };
   const invalidFields = [
     {
       fieldPath: ['id'],
