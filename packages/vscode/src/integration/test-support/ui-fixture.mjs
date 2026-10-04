@@ -44,7 +44,7 @@ export function uiFiles() {
     'nested/.codocs/source.yaml':
       'id: nested-source\nname: Nested Source\ndefinition: Body [[Zone]]\ndomains: [nested]\n',
     'nested/.codocs/zone.yaml':
-      'id: zone\nname: Nested Zone\ndefinition: Nested workspace body\ndomains: [nested]\n',
+      'id: zone\nname: Zone\ndefinition: Nested workspace body\ndomains: [nested]\n',
     // 코드 참조 이동: 기존 ID·이름·경로와 겹치지 않는 별도 문서와 코드만 사용한다.
     '.codocs/navigation-target.yaml': rowsDocument(
       'navigation-target',

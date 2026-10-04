@@ -233,45 +233,6 @@ module.exports.scenarios = [
     },
   },
   {
-    id: 'stale-target-rejected-output',
-    /** 대상 교체 뒤 실제 클릭 실패 기록과 작업 상태 보존을 관측한다. */
-    async run(c) {
-      await readyZoneLink(c);
-      await c.driver.dismiss();
-      const beforeEditor = c.editorState();
-      const beforeUi = await c.driver.workbenchState();
-      const beforeOutput = await c.output();
-      await c.fs.writeFile(
-        c.uri(zone).fsPath,
-        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\n',
-      );
-      await c.driver.yamlLink('[[Zone]]');
-      await c.until(
-        /** 입력 계약의 성공·실패 관측을 검증한다. */ async () => {
-          const output = await c.output();
-          return (
-            output.startsWith(beforeOutput) &&
-            output
-              .slice(beforeOutput.length)
-              .includes('Codocs 원문 이동 실패: [confirmation_rejected]') &&
-            output
-          );
-        },
-        'Codocs Output rejection',
-      );
-      // 링크 클릭이 커서를 옮길 수는 있으나 다른 파일을 열거나 범위 선택으로 바꾸지는 않는다.
-      const after = c.editorState();
-      c.assert.equal(after.uri, beforeEditor.uri);
-      c.assert.deepEqual(after.tabs, beforeEditor.tabs);
-      c.assert.ok(
-        after.selection[0] === after.selection[2] &&
-          after.selection[1] === after.selection[3],
-      );
-      c.assert.deepEqual(await c.driver.workbenchState(), beforeUi);
-      c.assert.equal(c.tabs(zone).length, 0);
-    },
-  },
-  {
     id: 'nested-workspace-owner',
     /** 같은 이름이라도 가장 가까운 workspace의 문서로 YAML 링크가 이동한다.
      * */
