@@ -8,9 +8,21 @@
 원문을 갱신한 뒤 그 내용을 사용하는 문서의 설명과 참조도 확인한다.
 코드에서 특정 문서 행을 참조하는 경우, 변경한 뒤 코드 링크가 의도한 문서 행을 여는지 확인한다.
 
-이름 변경 계산은 대상 이름 필드와 연결된 참조의 변경 후보를 보여준다.
-모호한 참조나 여러 도메인은 사용자의 후보·도메인 선택이 필요할 수 있고, 같은 도메인의 새 이름 충돌은 변경을 차단한다.
-미리보기의 `ready` 상태는 파일 저장 허용을 의미하지 않는다. 저장 기능은 최신 원문, 각 대상의 쓰기 가능 여부와 YAML 따옴표·escape를 다시 확인해야 한다.
+문서의 `name`은 `codocs_write`의 update로 바꾸지 않는다. 다른 이름이면 `name_change_not_allowed`로 저장하지 않고 `codocs_rename`을 안내한다.
+이름 변경은 미리보기와 반영 두 단계다. MCP에서는 `codocs_rename`을 쓰고, VS Code에서는 문서의 `name` 값이나 참조에서 이름 바꾸기(F2)를 쓴다.
+
+1. 먼저 `codocs_rename({"mode":"preview","id":"sample-order","newName":"새 주문"})`로 미리본다. 파일은 바뀌지 않는다.
+2. 응답의 `status`를 확인한다. `ready`는 고칠 내용을 모두 계산했다는 뜻이며 저장해도 된다는 허가가 아니다.
+3. `unresolved`이면 `impacts`에서 `reason`이 `selection_required`나 `domain_required`인 참조의 후보(`before.candidates`)를 사용자에게 보여주고 대상을 고르게 한다.
+   고른 결과는 `selections`에 담아 preview를 다시 요청한다. 항목은 `sourcePath`, `occurrenceIndex`, 고른 후보의 `targetPath`(필요하면 `domain`)이며 preview 응답의 값을 그대로 쓴다.
+   고르지 않은 모호한 참조는 고치지 않고 미해결로 남는다.
+4. `blocked`이면 `blockingReason`을 확인한다. 같은 도메인에 새 이름의 문서가 있거나 프로젝트 탐색이 끝나지 않았거나 선택이 잘못된 경우 등이며, 이 상태에서는 반영할 수 없다.
+5. 반영은 같은 `id`·`newName`·`selections`에 preview 응답의 `revisions`를 고치지 않고 더해 `{"mode":"apply", ...}`로 보낸다. `revisions`가 없으면 `invalid_input`이다.
+
+반영은 미리보기 결과를 보관하지 않고 다시 계산한다. 미리본 뒤 영향받는 파일이 바뀌어 `revision_conflict`가 오거나 영향받는 파일이 달라져 `rename_affected_files_changed`가 오면 아무 파일도 바뀌지 않았으므로 preview부터 다시 한다.
+결과는 파일마다 `files[].state`(`changed`·`restored`·`restore_failed`·`unchanged`)로 알린다. 여러 파일을 한 번에 바꾸는 원자성은 보장하지 않으며, `rename_restore_failed`가 오면 알려준 파일을 직접 확인한다.
+`indexUpdated: false`이면 `codocs_write`와 같이 파일을 다시 저장하지 않고 [색인 복구](validation.md#저장-후-색인-복구)를 따른다.
+VS Code에서는 영향받는 파일에 저장하지 않은 수정이 있으면 시작 전에 중단한다.
 
 명시적인 ID 변경 기능은 직전 ID를 `deprecatedAliases`에 보존하고 새 현재 ID가 이전 목록에 있으면 제거한다.
 같은 이전 ID를 중복 추가하지 않고 작성한 변경 안내를 유지한다. YAML을 직접 편집할 때는 필요한 이전 ID 목록도 직접 관리한다.

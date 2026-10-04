@@ -48,6 +48,24 @@ function codeAnchors(hover, name = '') {
   );
 }
 
+/** 화면의 name 값을 실제 마우스로 눌러 커서를 두고 F2로 새 이름을 입력해 확정한다. */
+async function startRename(c, name, newName) {
+  await c.driver.clickText(name);
+  // 실제 클릭이 반영된 편집기 커서가 name 행에 놓일 때까지 기다린다.
+  await c.until(
+    () => c.vscode.window.activeTextEditor?.selection.start.line === 1,
+    'cursor placed on the name value',
+  );
+  await c.driver.key('F2', 'F2', 113);
+  // 시작 위치 확인이 끝나 입력 창이 포커스를 받은 뒤에만 입력한다.
+  await c.until(
+    () => c.driver.isFocused('.rename-box'),
+    'rename input focused',
+  );
+  await c.driver.insertText(newName);
+  await c.driver.key('Enter', 'Enter', 13);
+}
+
 module.exports.scenarios = [
   {
     id: 'hover-content-and-relations',
@@ -602,6 +620,58 @@ module.exports.scenarios = [
         await markerSelection(c, code, '@codocs [[Whole Multiple]]'),
         'whole multiple marker selected',
       );
+    },
+  },
+  {
+    id: 'rename-ambiguous-reference-picker',
+    /** name 값에서 F2로 새 이름을 입력하고 선택 목록에서 모호한 참조의 대상을 골라 디스크에 반영한다. */
+    async run(c) {
+      const target = '.codocs/rename-twin-a.yaml';
+      const reference = '.codocs/rename-twin-ref.yaml';
+      const other = '.codocs/rename-twin-b.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const otherBefore = await read(other);
+      await c.open(target);
+      await startRename(c, 'Rename Twin', 'Rename Twin Renamed');
+      await c.driver.chooseQuickInput('alpha');
+      await c.until(
+        async () =>
+          (await read(reference)).includes('[[Rename Twin Renamed]]') &&
+          (await read(target)).includes('name: Rename Twin Renamed'),
+        'rename written to disk',
+      );
+      c.assert.equal(await read(other), otherBefore);
+      await c.until(
+        async () =>
+          (await c.driver.workbenchState()).notifications.some((text) =>
+            text.includes('바꿨습니다'),
+          ),
+        'rename result notification',
+      );
+    },
+  },
+  {
+    id: 'rename-dirty-file-abort',
+    /** 영향받는 파일에 미저장 수정이 있으면 F2 이름 입력 뒤 중단 안내가 보이고 어느 파일도 바뀌지 않는다. */
+    async run(c) {
+      const target = '.codocs/rename-target.yaml';
+      const reference = '.codocs/rename-ref.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const targetBefore = await read(target);
+      const referenceBefore = await read(reference);
+      const dirty = await c.open(reference);
+      await c.replace(dirty, referenceBefore + '# unsaved\n');
+      await c.open(target);
+      await startRename(c, 'Rename Target', 'Rename Target Renamed');
+      await c.until(
+        () => c.driver.hasText('저장하지 않은 수정이 있는 파일'),
+        'dirty file abort message',
+      );
+      c.assert.equal(await read(target), targetBefore);
+      c.assert.equal(await read(reference), referenceBefore);
+      c.assert.ok(dirty.isDirty);
     },
   },
 ];

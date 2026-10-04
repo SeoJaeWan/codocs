@@ -44,7 +44,7 @@ function ioError(code: string): Error {
 
 /** 실제 프로젝트의 현재 관측에서 update 요청을 만든다. */
 async function updateRequest(
-  set: Record<string, unknown> = { name: '바뀐 문서' },
+  set: Record<string, unknown> = { definition: '바뀐 설명' },
 ) {
   const scan = await loadWorkspace({ cwd: root });
   const source = scan.documents.find(

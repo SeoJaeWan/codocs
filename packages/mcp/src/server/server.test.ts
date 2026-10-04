@@ -91,6 +91,7 @@ describe('소스 MCP stdio 서버', () => {
         'codocs_refresh',
         'codocs_validate',
         'codocs_write',
+        'codocs_rename',
         'codocs_duplicates',
         'codocs_guide',
       ]);

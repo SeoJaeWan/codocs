@@ -1578,6 +1578,25 @@ describe('planRename: 이름 변경 계획', () => {
       ).toEqual([]);
     });
 
+    it('모호한 참조를 선택하지 않으면 그 참조의 수정안을 만들지 않고 미해결로 보고한다', () => {
+      const scan = {
+        status: scanStatuses.complete,
+        observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
+      } satisfies CatalogScan;
+      const catalog = buildCatalog(scan);
+      const request = {
+        targetPath: orderDocument.path,
+        newName: '새주문',
+      } satisfies RenameRequest;
+      const plan = planRename(catalog, request);
+      expect(plan.status).toBe(renamePlanStatuses.unresolved);
+      expect(
+        plan.changes.filter(
+          (change) => change.path === sourceRefersToOrder.path,
+        ),
+      ).toEqual([]);
+    });
+
     it('다중 도메인 대상의 새 이름이 모호해지면 선택 전까지 영향을 미해결로 둔다', () => {
       const observationA = {
         path: 'a.yaml',
@@ -1853,7 +1872,7 @@ describe('planRename: 이름 변경 계획', () => {
 });
 
 describe('planRename: 참조 선택과 영향', () => {
-  it('명시된 도메인과 다른 도메인을 선택하면 잘못된 선택으로 보고한다', () => {
+  it('명시된 도메인과 다른 도메인을 선택하면 잘못된 선택으로 보고하고 이름 변경을 차단한다', () => {
     const observationA = {
       path: 'a.yaml',
       parsed: {
@@ -1921,9 +1940,15 @@ describe('planRename: 참조 선택과 영향', () => {
     } satisfies RenameRequest;
     const plan = planRename(catalog, request);
     expect(plan.impacts[0]?.reason).toBe(renameImpactReasons.invalidSelection);
+    expect(plan).toMatchObject({
+      status: renamePlanStatuses.blocked,
+      blockingReason: renameBlockingReasons.invalidSelection,
+      changes: [],
+      invalidSelections: request.selections,
+    });
   });
 
-  it('참조 후보에 없는 경로를 선택하면 잘못된 선택으로 보고한다', () => {
+  it('참조 후보에 없는 경로를 선택하면 잘못된 선택으로 보고하고 이름 변경을 차단한다', () => {
     const scan = {
       status: scanStatuses.complete,
       observations: [orderDocument, sourceRefersToOrder],
@@ -1942,9 +1967,15 @@ describe('planRename: 참조 선택과 영향', () => {
     } satisfies RenameRequest;
     const plan = planRename(catalog, request);
     expect(plan.impacts[0]?.reason).toBe(renameImpactReasons.invalidSelection);
+    expect(plan).toMatchObject({
+      status: renamePlanStatuses.blocked,
+      blockingReason: renameBlockingReasons.invalidSelection,
+      changes: [],
+      invalidSelections: request.selections,
+    });
   });
 
-  it('대상에 없는 도메인을 선택하면 잘못된 선택으로 보고한다', () => {
+  it('대상에 없는 도메인을 선택하면 잘못된 선택으로 보고하고 이름 변경을 차단한다', () => {
     const scan = {
       status: scanStatuses.complete,
       observations: [orderDocument, sourceRefersToOrder],
@@ -1964,6 +1995,12 @@ describe('planRename: 참조 선택과 영향', () => {
     } satisfies RenameRequest;
     const plan = planRename(catalog, request);
     expect(plan.impacts[0]?.reason).toBe(renameImpactReasons.invalidSelection);
+    expect(plan).toMatchObject({
+      status: renamePlanStatuses.blocked,
+      blockingReason: renameBlockingReasons.invalidSelection,
+      changes: [],
+      invalidSelections: request.selections,
+    });
   });
 
   it('모호한 참조를 선택하지 않고 후보 구성을 바꾸면 해결 결과 변화를 보고한다', () => {

@@ -1,29 +1,31 @@
 # 실제 VS Code UI 검사와 이전 assertion 소유권
 
-`extension.test.cjs`의 20개 대표 사례는 설치된 VSIX의 실제 renderer에서 포인터 Hover, 표시된 앵커 press/release, Windows Ctrl-click 또는 macOS Cmd-click을 사용한다. API는 활성화, 게시된 진단, fixture 편집 준비, 실제 editor/선택/탭 관측에만 사용한다. provider 응답이나 제품 command를 직접 호출하지 않는다. 설치 smoke는 활성화와 서버가 게시한 진단 응답만 확인한다.
+`extension.test.cjs`의 22개 대표 사례는 설치된 VSIX의 실제 renderer에서 포인터 Hover, 표시된 앵커 press/release, Windows Ctrl-click 또는 macOS Cmd-click, 이름 바꾸기(F2) 키 입력과 선택 목록 클릭을 사용한다. API는 활성화, 게시된 진단, fixture 편집 준비, 실제 editor/선택/탭 관측에만 사용한다. provider 응답이나 제품 command를 직접 호출하지 않는다. 설치 smoke는 활성화와 서버가 게시한 진단 응답만 확인한다.
 
-| UI 사례                      | 고유한 화면/Host 관측                                                                       |
-| ---------------------------- | ------------------------------------------------------------------------------------------- |
-| hover-content-and-relations  | 본문·현재 ID·도메인·세 관계 및 네 종류 앵커 클릭                                            |
-| yaml-single-special-path     | 공백·한글·%20·# 출처와 대상의 실제 OS 링크 제스처                                           |
-| yaml-multiple-candidates     | 도메인/경로가 다른 두 후보의 렌더링과 개별 선택                                             |
-| dirty-target-tab             | 기존 탭 객체·미저장 내용·디스크 보존, (0,0) 빈 선택                                         |
-| changed-reference-and-save   | 미저장 참조 변경, 폐기 경고 제거, 새 링크 클릭, 저장 후 새 Hover                            |
-| saved-and-external-refresh   | 저장·외부 변경 뒤 새 Hover의 최신 본문·참조와 클릭 대상                                     |
-| stale-target-latest-content  | 화면에 남은 동일 href 앵커의 실제 클릭과 최신 대상 원문                                     |
-| stale-target-rejected-output | 다른 문서로 대체된 대상 거부, Codocs Output 이유, editor/탭·패널·알림 보존                  |
-| nested-workspace-owner       | 같은 ID의 가장 가까운 workspace 설명과 대상                                                 |
-| explicit-link-open           | 코드의 명시 링크 셋(문서 전체·#L11·#L11-L12)을 OS 링크 제스처로 열어 상단·행·범위 선택 관측 |
-| explicit-link-dirty-target   | 미저장 행이 삽입된 대상에서 현재 원문의 11·12행 선택, 같은 탭 객체·미저장·디스크 내용 보존  |
-| explicit-link-invalid        | 무효 표기의 게시 진단과 이유 Hover(ID 설명 없음), 수정 키 클릭의 편집기·알림·패널 무변화    |
-| explicit-link-recover        | 대상 생성·저장 뒤 진단 제거와 새 링크 클릭으로 대상 열기                                    |
-| explicit-link-rejected       | 미저장 대상의 끝 행 삭제 뒤 클릭 거부: Output의 destination_unavailable, 선택·탭 보존       |
-| reverse-single-direct        | 단일 코드 연결 YAML 행의 수정 키 클릭이 코드의 @codocs 표기를 선택                          |
-| reverse-folder-recreate      | 폴더 삭제·재생성 뒤 `연결된 코드 · 1곳` Hover 복귀와 재생성 파일 편집(2곳)의 반영           |
-| reverse-multiple-hover       | 구현·테스트 두 연결의 `연결된 코드 · 2곳` Hover와 앵커별 표기 선택                          |
-| reverse-overlap-yaml-link    | 이름 링크와 겹친 행: YAML 링크는 문서 상단, Hover의 코드 앵커는 표기 선택                   |
-| whole-single-gesture         | 문서 전체 단일 연결의 Inlay label 수정 키 클릭이 표기를 선택                                |
-| whole-multiple-hover         | 문서 전체 복수 연결의 Inlay label Hover 앵커 두 개와 선택한 표기 이동                       |
+| UI 사례                           | 고유한 화면/Host 관측                                                                        |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| hover-content-and-relations       | 본문·현재 ID·도메인·세 관계 및 네 종류 앵커 클릭                                             |
+| yaml-single-special-path          | 공백·한글·%20·# 출처와 대상의 실제 OS 링크 제스처                                            |
+| yaml-multiple-candidates          | 도메인/경로가 다른 두 후보의 렌더링과 개별 선택                                              |
+| dirty-target-tab                  | 기존 탭 객체·미저장 내용·디스크 보존, (0,0) 빈 선택                                          |
+| changed-reference-and-save        | 미저장 참조 변경, 폐기 경고 제거, 새 링크 클릭, 저장 후 새 Hover                             |
+| saved-and-external-refresh        | 저장·외부 변경 뒤 새 Hover의 최신 본문·참조와 클릭 대상                                      |
+| stale-target-latest-content       | 화면에 남은 동일 href 앵커의 실제 클릭과 최신 대상 원문                                      |
+| stale-target-rejected-output      | 다른 문서로 대체된 대상 거부, Codocs Output 이유, editor/탭·패널·알림 보존                   |
+| nested-workspace-owner            | 같은 ID의 가장 가까운 workspace 설명과 대상                                                  |
+| explicit-link-open                | 코드의 명시 링크 셋(문서 전체·#L11·#L11-L12)을 OS 링크 제스처로 열어 상단·행·범위 선택 관측  |
+| explicit-link-dirty-target        | 미저장 행이 삽입된 대상에서 현재 원문의 11·12행 선택, 같은 탭 객체·미저장·디스크 내용 보존   |
+| explicit-link-invalid             | 무효 표기의 게시 진단과 이유 Hover(ID 설명 없음), 수정 키 클릭의 편집기·알림·패널 무변화     |
+| explicit-link-recover             | 대상 생성·저장 뒤 진단 제거와 새 링크 클릭으로 대상 열기                                     |
+| explicit-link-rejected            | 미저장 대상의 끝 행 삭제 뒤 클릭 거부: Output의 destination_unavailable, 선택·탭 보존        |
+| reverse-single-direct             | 단일 코드 연결 YAML 행의 수정 키 클릭이 코드의 @codocs 표기를 선택                           |
+| reverse-folder-recreate           | 폴더 삭제·재생성 뒤 `연결된 코드 · 1곳` Hover 복귀와 재생성 파일 편집(2곳)의 반영            |
+| reverse-multiple-hover            | 구현·테스트 두 연결의 `연결된 코드 · 2곳` Hover와 앵커별 표기 선택                           |
+| reverse-overlap-yaml-link         | 이름 링크와 겹친 행: YAML 링크는 문서 상단, Hover의 코드 앵커는 표기 선택                    |
+| whole-single-gesture              | 문서 전체 단일 연결의 Inlay label 수정 키 클릭이 표기를 선택                                 |
+| whole-multiple-hover              | 문서 전체 복수 연결의 Inlay label Hover 앵커 두 개와 선택한 표기 이동                        |
+| rename-ambiguous-reference-picker | name 값 F2 입력, 모호한 참조의 선택 목록 클릭, 선택한 문서 기준의 디스크 반영과 완료 알림    |
+| rename-dirty-file-abort           | 영향 파일의 미저장 수정 때문에 F2 이름 변경이 중단되고 안내가 보이며 디스크·미저장 내용 보존 |
 
 아래 표는 제거한 API 기능 묶음의 assertion을 현재 책임에 연결한다. 파일명은 repository 기준이며 인접 검사는 기본 `pnpm test`에 포함된다. 화면 조합 전체를 인접 검사로 대체했다고 주장하지 않는다. 상세 조건은 기존 책임 검사에 남고 UI 대표 경계는 위 사례로 확인한다. 실제 Windows/macOS UI 실행 전에는 화면 수락 결과가 미검증이다.
 

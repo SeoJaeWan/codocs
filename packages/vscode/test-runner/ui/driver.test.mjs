@@ -431,3 +431,72 @@ for (const platform of ['win32', 'darwin']) {
     assert.equal(calls.at(-1).params.modifiers, 0);
   });
 }
+
+test('text input is delivered as real renderer input', /** 입력 문자의 전송을 검증한다. */ async () => {
+  const calls = [];
+  const driver = new RendererDriver(
+    /** 전송 내용을 수집한다. */ async (method, params) => {
+      calls.push({ method, params });
+    },
+    'win32',
+  );
+  await driver.insertText('새 이름');
+  assert.deepEqual(calls, [
+    { method: 'Input.insertText', params: { text: '새 이름' } },
+  ]);
+});
+
+test('quick input choice clicks the single row containing the text with real mouse events', /** 선택 목록 항목 클릭 입력을 검증한다. */ async () => {
+  const calls = [];
+  const driver = new RendererDriver(
+    /** 클릭 입력을 수집한다. */ async (method, params) => {
+      calls.push({ method, params });
+    },
+    'win32',
+  );
+  driver.evaluate = /** 표시된 선택 목록 항목을 공급한다. */ async () => [
+    { text: 'Twin alpha', x: 10, y: 20, visible: true },
+    { text: 'Twin beta', x: 10, y: 40, visible: true },
+  ];
+  assert.equal((await driver.chooseQuickInput('beta')).y, 40);
+  assert.deepEqual(
+    calls.map((call) => call.params.type),
+    ['mouseMoved', 'mousePressed', 'mouseReleased'],
+  );
+  assert.ok(calls.every((call) => call.params.y === 40));
+});
+
+test('quick input choice refuses a text that matches several rows', /** 모호한 항목 선택 거부를 검증한다. */ async () => {
+  const driver = new RendererDriver(
+    /** 입력 전송은 사용하지 않는다. */ async () => {},
+    'win32',
+  );
+  driver.evaluate = /** 같은 문구를 가진 두 항목을 공급한다. */ async () => [
+    { text: 'Twin alpha', x: 10, y: 20, visible: true },
+    { text: 'Twin alpha', x: 10, y: 40, visible: true },
+  ];
+  await assert.rejects(driver.chooseQuickInput('Twin'), /got 2/u);
+});
+
+test('text click moves the pointer to the rendered text and presses with real mouse events', /** 문자 범위 클릭 입력을 검증한다. */ async () => {
+  const calls = [];
+  const driver = new RendererDriver(
+    /** 클릭 입력을 수집한다. */ async (method, params) => {
+      calls.push({ method, params });
+    },
+    'win32',
+  );
+  driver.dismiss = /** 이전 화면 상태를 준비한다. */ async () => {};
+  driver.evaluate = /** 표시된 문자 좌표를 공급한다. */ async () => ({
+    x: 70,
+    y: 80,
+  });
+  await driver.clickText('Rename Twin');
+  assert.deepEqual(
+    calls.map((call) => call.params.type),
+    ['mouseMoved', 'mousePressed', 'mouseReleased'],
+  );
+  assert.ok(
+    calls.every((call) => call.params.x === 70 && call.params.y === 80),
+  );
+});

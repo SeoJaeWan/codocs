@@ -135,6 +135,26 @@ export function uiFiles() {
       'WholeSingle',
       '@codocs [[Whole Single]]',
     ),
+    // 이름 변경: 기존 ID·이름·참조와 겹치지 않는 별도 문서만 사용한다.
+    '.codocs/rename-target.yaml': inlineDocument(
+      'rename-target',
+      'Rename Target',
+      'Rename target body',
+    ),
+    '.codocs/rename-ref.yaml': inlineDocument(
+      'rename-ref',
+      'Rename Ref',
+      'Rename ref body [[Rename Target]]',
+    ),
+    '.codocs/rename-twin-a.yaml':
+      'id: rename-twin-a\nname: Rename Twin\ndefinition: Rename twin A body\ndomains: [alpha]\ndeprecatedAliases: []\n',
+    '.codocs/rename-twin-b.yaml':
+      'id: rename-twin-b\nname: Rename Twin\ndefinition: Rename twin B body\ndomains: [beta]\ndeprecatedAliases: []\n',
+    '.codocs/rename-twin-ref.yaml': inlineDocument(
+      'rename-twin-ref',
+      'Rename Twin Ref',
+      'Rename twin body [[Rename Twin]]',
+    ),
     '.codocs/whole-multiple.yaml': inlineDocument(
       'whole-multiple',
       'Whole Multiple',
