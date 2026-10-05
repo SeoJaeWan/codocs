@@ -372,6 +372,50 @@ describe('planRename 미리보기 요청', () => {
   });
 });
 
+describe('코드 파일 표기를 포함한 이름 변경 요청', () => {
+  /** 코드 파일 하나가 있는 프로젝트에서 order 문서의 미리보기를 요청한다. */
+  async function planWithCode() {
+    await mkdir(path.join(root, 'src'));
+    await writeFile(path.join(root, 'src/code.ts'), '// @codocs [[주문]]#L2\n');
+    await open('.codocs/order.yaml');
+    const request = {
+      textDocument: { uri: uriOf('.codocs/order.yaml') },
+      targetPath: path.join('.codocs', 'order.yaml'),
+      newName: '새주문',
+    };
+    const preview = await session.planRename(request);
+    if (!preview.success || !('revisions' in preview)) throw new Error('plan');
+    return { request, preview };
+  }
+
+  it('미리보기는 코드 파일을 revisions와 fileUris에 포함해 클라이언트가 저장하지 않은 수정을 확인하게 한다', async () => {
+    const { preview } = await planWithCode();
+
+    expect(Object.keys(preview.revisions)).toContain('src/code.ts');
+    expect(preview.fileUris['src/code.ts']).toBe(uriOf('src/code.ts'));
+    expect(preview.changes).toContainEqual(
+      expect.objectContaining({ path: 'src/code.ts', fileKind: 'code' }),
+    );
+  });
+
+  it('반영하면 코드 파일의 이름 부분만 고치고 fileUris에 코드 파일 결과를 포함한다', async () => {
+    const { request, preview } = await planWithCode();
+    const result = await session.applyRename({
+      ...request,
+      revisions: preview.revisions,
+    });
+
+    if (!result.success || !('files' in result)) throw new Error('apply');
+    expect(result.files).toContainEqual(
+      expect.objectContaining({ path: 'src/code.ts', state: 'changed' }),
+    );
+    expect(result.fileUris['src/code.ts']).toBe(uriOf('src/code.ts'));
+    expect(await readFile(path.join(root, 'src/code.ts'), 'utf8')).toBe(
+      '// @codocs [[새주문]]#L2\n',
+    );
+  });
+});
+
 describe('applyRename 반영 요청', () => {
   it('미리보기의 revision으로 요청하면 영향 파일에 새 이름과 참조를 쓴다', async () => {
     await open('.codocs/order.yaml');

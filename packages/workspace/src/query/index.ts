@@ -8,6 +8,8 @@ import {
   type WorkspaceCodeReferenceCaptureInput,
   type WorkspaceCodeReferenceOccurrence,
   type WorkspaceCodeBufferInput,
+  type WorkspaceCodeReferenceIndexOptions,
+  type WorkspaceCodeRenameSources,
 } from '../code-reference/index.js';
 import {
   catalogConfirmations,
@@ -88,7 +90,10 @@ import {
   type WorkspaceStorageOptions,
   type WorkspaceStorageResult,
 } from '../storage/index.js';
-import { workspaceRenameFileStates } from '../rename/domain-values.js';
+import {
+  workspaceRenameFileKinds,
+  workspaceRenameFileStates,
+} from '../rename/domain-values.js';
 import {
   parseRenameRequest,
   prepareWorkspaceRename,
@@ -239,6 +244,8 @@ export interface WorkspaceQuerySessionOptions {
   beforeIndexUpdate?: (attempt: 1 | 2) => Promise<void>;
   /** 중복 검사의 시간 제한·조각 시간과 테스트용 관측 지점을 주입한다. */
   duplicateCheck?: WorkspaceDuplicateCheckOptions;
+  /** 코드 수집의 실제 IO 경합·지연 지점을 주입한다. */
+  codeReference?: WorkspaceCodeReferenceIndexOptions;
 }
 
 /** 상세 조회 결과다. */
@@ -1113,6 +1120,30 @@ export class WorkspaceQuerySession {
    * @returns 상태·변경 목록·선택이 필요한 참조와 후보·영향·충돌·차단 사유·영향 파일별 revision이다.
    */
   async previewRename(input: unknown): Promise<WorkspaceRenamePreviewResult> {
+    const base = await this.#renameScan();
+    if ('success' in base) return base;
+    if (base.status === scanStatuses.failed) return scanFailure(base);
+    const request = parseRenameRequest(input);
+    if (!request) return invalidInput(base.status);
+    const code = await this.#renameCodeSources();
+    if (!code) return workspaceIndexNotReady();
+    // 코드 수집을 기다린 사이 게시된 색인으로 계산하도록 문서 색인을 다시 확인한다.
+    const scan = await this.#renameScan();
+    if ('success' in scan) return scan;
+    if (!this.#catalog) return scanFailure(scan);
+    const { preview } = prepareWorkspaceRename(
+      request,
+      scan,
+      this.#catalog,
+      code,
+    );
+    return { success: true, scanStatus: scan.status, ...preview };
+  }
+
+  /**
+   * 이름 변경 계산이 쓸 문서 스캔을 돌려준다. 닫힘·명시 refresh 중·실패한 스캔·감시 실패는 요청 실패다.
+   */
+  async #renameScan(): Promise<WorkspaceScanResult | WorkspaceQueryFailure> {
     if (this.#closed || this.#explicitRefreshPromise)
       return workspaceIndexNotReady();
     const scan = await this.#current();
@@ -1121,11 +1152,20 @@ export class WorkspaceQuerySession {
     if (scan.status === scanStatuses.failed) return scanFailure(scan);
     const watchFailure = this.#watchFailure();
     if (watchFailure) return this.#watchFailureResult(watchFailure);
-    const request = parseRenameRequest(input);
-    if (!request) return invalidInput(scan.status);
-    if (!this.#catalog) return scanFailure(scan);
-    const { preview } = prepareWorkspaceRename(request, scan, this.#catalog);
-    return { success: true, scanStatus: scan.status, ...preview };
+    return scan;
+  }
+
+  /**
+   * 이름 변경이 쓰는 코드 수집의 저장 관측을 돌려준다. 코드 색인이 아직 없으면 이 요청이 만들어
+   * 최초 수집이 끝나기를 기다린다. 이미 시작된 수집이 진행 중이면 기다리지 않고 collecting으로 돌려준다.
+   * @returns 세션이 닫혔거나 프로젝트 root를 확인하지 못하면 undefined다.
+   */
+  async #renameCodeSources(): Promise<WorkspaceCodeRenameSources | undefined> {
+    const existing = this.#codeIndex !== undefined;
+    const index = await this.#codeReferences();
+    if (!index) return undefined;
+    if (!existing) await index.ready();
+    return index.renameSources();
   }
 
   /**
@@ -1134,18 +1174,13 @@ export class WorkspaceQuerySession {
    * 저장 뒤 바꾼 파일의 색인 반영은 write와 같은 규칙이다(indexUpdated).
    */
   async applyRename(input: unknown): Promise<WorkspaceRenameResult> {
-    if (this.#closed || this.#explicitRefreshPromise)
-      return this.#renameFailure([workspaceIndexNotReady().error]);
-    const scan = await this.#current();
-    if (this.#closed || this.#explicitRefreshPromise)
-      return this.#renameFailure([workspaceIndexNotReady().error]);
-    if (scan.status === scanStatuses.failed)
-      return this.#renameFailure([scanFailure(scan).error]);
-    const watchFailure = this.#watchFailure();
-    if (watchFailure)
-      return this.#renameFailure([
-        this.#watchFailureResult(watchFailure).error,
-      ]);
+    const base = await this.#renameScan();
+    if ('success' in base) return this.#renameFailure([base.error]);
+    const code = await this.#renameCodeSources();
+    if (!code) return this.#renameFailure([workspaceIndexNotReady().error]);
+    // 코드 수집을 기다린 사이 게시된 색인으로 반영하도록 문서 색인을 다시 확인한다.
+    const scan = await this.#renameScan();
+    if ('success' in scan) return this.#renameFailure([scan.error]);
     if (
       !this.#catalog ||
       (scan.status === scanStatuses.complete &&
@@ -1161,15 +1196,26 @@ export class WorkspaceQuerySession {
       scan,
       this.#catalog,
       this.#options.storage,
+      code,
     );
     const changedFiles = applied.files.filter(
       (file) =>
         file.state === workspaceRenameFileStates.changed ||
         file.state === workspaceRenameFileStates.restoreFailed,
     );
-    const indexFailure = changedFiles.length
-      ? await this.#publishSavedFiles(changedFiles)
+    const changedDocuments = changedFiles.filter(
+      (file) => file.fileKind !== workspaceRenameFileKinds.code,
+    );
+    const changedCode = changedFiles.filter(
+      (file) => file.fileKind === workspaceRenameFileKinds.code,
+    );
+    const documentFailure = changedDocuments.length
+      ? await this.#publishSavedFiles(changedDocuments)
       : undefined;
+    const codeFailure = changedCode.length
+      ? await this.#publishSavedCodeFiles(changedCode)
+      : undefined;
+    const indexFailure = documentFailure ?? codeFailure;
     const indexed = changedFiles.length ? { indexUpdated: !indexFailure } : {};
     const diagnostics = indexFailure
       ? [...applied.diagnostics, indexFailure]
@@ -1181,6 +1227,27 @@ export class WorkspaceQuerySession {
       diagnostics,
       error: diagnostics[0] ?? workspaceIndexNotReady().error,
     };
+  }
+
+  /**
+   * 이름 변경이 저장한 코드 파일을 코드 색인에 즉시 다시 수집시킨다. 감시 신호를 기다리지 않는다.
+   * @returns 모두 반영되면 undefined, 아니면 codocs_refresh를 안내하는 색인 갱신 실패 진단이다.
+   */
+  async #publishSavedCodeFiles(
+    files: readonly { path: string }[],
+  ): Promise<Diagnostic<string> | undefined> {
+    try {
+      await this.#codeIndex?.refresh(files.map((file) => file.path));
+      return undefined;
+    } catch (error: unknown) {
+      return {
+        code: storageDiagnosticCodes.indexUpdateFailed,
+        severity: diagnosticSeverities.error,
+        message: storageDiagnosticMessages.indexUpdateFailed,
+        ...(files[0] ? { path: files[0].path } : {}),
+        suggestion: `${error instanceof Error ? error.message : String(error)} codocs_refresh로 색인을 다시 구성하세요.`,
+      };
+    }
   }
 
   /** 이름 변경 요청을 시작하지 못한 실패를 파일 변경 없음으로 전달한다. */
@@ -2333,7 +2400,10 @@ export class WorkspaceQuerySession {
     await this.#current();
     if (this.#closed || !this.#root) return undefined;
     if (!this.#codeIndex) {
-      this.#codeIndex = new WorkspaceCodeReferenceIndex(this.#root.projectRoot);
+      this.#codeIndex = new WorkspaceCodeReferenceIndex(
+        this.#root.projectRoot,
+        this.#options.codeReference,
+      );
       this.#codeIndex.setCatalog(
         this.#scan?.status === scanStatuses.failed ? undefined : this.#catalog,
         this.#catalogVersion,
@@ -2400,16 +2470,13 @@ export class WorkspaceQuerySession {
     await this.#codeIndex?.closeBuffer(sourcePath);
   }
 
-  /** 겹친 저장 행 구간의 정확한 코드 출현 합집합이다. */
-  async codeReferencesForRows(
+  /** 지정한 섹션을 가리키는 코드 출현 목록이다. */
+  async codeReferencesForSection(
     targetPath: string,
-    startLine: number,
-    endLine = startLine,
+    section: string,
   ): Promise<WorkspaceCodeReferenceQuery> {
     return (
-      (await (
-        await this.#codeReferences()
-      )?.reverse(targetPath, { startLine, endLine })) ?? {
+      (await (await this.#codeReferences())?.reverse(targetPath, section)) ?? {
         ...this.#unavailableCodeSnapshot(),
         unique: false,
         absent: false,
@@ -2417,7 +2484,7 @@ export class WorkspaceQuerySession {
     );
   }
 
-  /** 행 연결을 제외한 문서 전체 코드 출현만 제공한다. */
+  /** 섹션 없는 문서 전체 표기의 코드 출현만 제공한다. */
   async codeReferencesForDocument(
     targetPath: string,
   ): Promise<WorkspaceCodeReferenceQuery> {

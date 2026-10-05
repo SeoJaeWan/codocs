@@ -125,7 +125,7 @@ const blockedMessages: Readonly<Record<string, string>> = {
   [renameBlockingReasons.nameConflict]:
     '프로젝트에 새 이름과 같은 문서가 있습니다.',
   [renameBlockingReasons.unconfirmed]:
-    '프로젝트 탐색이 끝나지 않아 이름을 바꿀 수 없습니다.',
+    '프로젝트 탐색이 끝나지 않아 이름을 바꿀 수 없습니다. 코드 수집 중이면 잠시 뒤 다시 시도하세요.',
   [renameBlockingReasons.invalidSelection]: '선택한 참조가 올바르지 않습니다.',
   [renameBlockingReasons.sourceNotLossless]:
     '바꿀 파일의 원본을 UTF-8 손실 없이 보존할 수 없습니다.',

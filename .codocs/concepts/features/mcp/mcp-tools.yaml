@@ -10,7 +10,7 @@ _codocs:
   - [[codocs_list]]: 최상위 문서나 한 문서의 직속 자식을 섹션 이름과 함께 조회한다.
   - [[codocs_get]]: `이름`이나 `이름:섹션` 주소로 문서 전체나 섹션 하나의 내용·참조·revision을 읽는다.
   - [[codocs_write]]: 문서를 새로 만들거나 읽은 revision을 기준으로 수정한다.
-  - [[codocs_rename]]: 문서의 name을 바꾸고 그 문서를 가리키던 참조를 함께 고친다. 미리보기 뒤에 반영한다.
+  - [[codocs_rename]]: 문서의 name을 바꾸고 그 문서를 가리키던 문서 참조와 코드 파일의 `@codocs` 표기를 함께 고친다. 미리보기 뒤에 반영한다.
   - [[codocs_validate]]: 프로젝트 전체나 YAML 파일 하나의 오류·경고를 확인한다.
   - [[codocs_duplicates]]: 문서 본문에서 같은 설명이 반복되는 곳을 찾는다.
   - [[codocs_refresh]]: 문서 색인 전체를 다시 구성한다.

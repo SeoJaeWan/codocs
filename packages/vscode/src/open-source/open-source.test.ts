@@ -157,7 +157,7 @@ describe('openSource', () => {
 
   it.each([
     {
-      name: '확인된 끝 행이 없으면',
+      name: '행 번호 목적지처럼 지원하지 않는 종류이면',
       destination: { kind: 'rows', startLine: 2, endLine: 8 },
       text: '첫 행\n끝',
     },
@@ -253,22 +253,38 @@ describe('trustGeneratedOpenSourceHoverContents', () => {
 });
 
 describe('명시 목적지와 실제 buffer 선택', () => {
-  it('앞부분이 변경된 dirty buffer도 실제 번호의 두 행을 선택한다', async () => {
+  it('섹션 키 위치를 현재 buffer의 같은 텍스트 위치로 선택한다', async () => {
     const { sourceSelection } = await import('./index.js');
-    const text = '삽입\n원래 첫 행\n원래 두 번째\n끝';
+    const range = {
+      start: { line: 2, character: 0 },
+      end: { line: 2, character: 4 },
+    };
     expect(
-      sourceSelection(text, { kind: 'rows', startLine: 2, endLine: 3 }),
-    ).toEqual({
-      start: { line: 1, character: 0 },
-      end: { line: 2, character: 7 },
-    });
+      sourceSelection('_codocs:\n  name: 대상\n환불정책:\n  본문: 값', {
+        kind: 'occurrence',
+        range,
+        markerText: '환불정책',
+      }),
+    ).toEqual(range);
+  });
+  it('저장 이후 편집으로 섹션 키 위치의 텍스트가 달라지면 선택하지 않는다', async () => {
+    const { sourceSelection } = await import('./index.js');
+    expect(
+      sourceSelection('_codocs:\n  name: 대상\n삽입한 줄\n환불정책:\n', {
+        kind: 'occurrence',
+        range: {
+          start: { line: 2, character: 0 },
+          end: { line: 2, character: 4 },
+        },
+        markerText: '환불정책',
+      }),
+    ).toBeUndefined();
   });
   it.each([
-    { kind: 'rows', startLine: 2, endLine: 8 },
+    { kind: 'rows', startLine: 2, endLine: 3 },
     { kind: 'rows', startLine: 0, endLine: 1 },
-    { kind: 'rows', startLine: 3, endLine: 2 },
   ])(
-    '실제 두 끝이 없는 범위 $startLine~$endLine은 보정하지 않는다',
+    '행 번호 목적지 $startLine~$endLine은 지원하지 않아 선택하지 않는다',
     async (destination) => {
       const { sourceSelection } = await import('./index.js');
       expect(sourceSelection('첫 행\n끝', destination)).toBeUndefined();
