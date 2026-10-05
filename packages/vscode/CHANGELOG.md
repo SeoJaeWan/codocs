@@ -1,5 +1,13 @@
 # codocs
 
+## Unreleased
+
+### Patch Changes
+
+- Code references now point to a document or one of its sections with `@codocs [[Document]]` or `@codocs [[Document:Section]]`. The line notation (`#L11`, `#L11-L12`) is removed: text after the closing `]]` is ordinary text and the document is linked as a whole. A section reference opens the section key, a whole-document reference opens the top of the document, and a missing section is reported without a link. In documents, hovering a section key or the `_codocs.name` value lists the referencing code locations, and `코드 N곳` next to the section key or on the first row shows the count only. Renaming a document or a section in VS Code (F2) or with `codocs_rename` also fixes the `@codocs` references in code files; it is blocked while code files are being collected, and when some code files cannot be read it fixes the files that were read and reports the rest as `unconfirmed`.
+
+  코드 참조는 `@codocs [[문서]]`나 `@codocs [[문서:섹션]]`으로 문서 또는 문서의 섹션을 가리킨다. 행 표기(`#L11`, `#L11-L12`)는 없어졌으며 닫는 `]]` 뒤의 글자는 일반 글자로 두고 문서 전체를 연결한다. 섹션 참조는 섹션 키로, 문서 전체 참조는 문서 맨 위로 이동하고 섹션이 없으면 링크 없이 알린다. 문서에서는 섹션 키나 `_codocs.name` 값에 커서를 두면 참조하는 코드 위치 목록을 보여주고, 섹션 키 옆과 첫 행의 `코드 N곳`은 개수만 표시한다. VS Code(F2)와 `codocs_rename`으로 문서나 섹션의 이름을 바꾸면 코드 파일의 `@codocs` 표기도 함께 고치며, 코드 파일을 수집하는 중에는 blocked이고 일부 코드 파일을 읽지 못하면 읽은 파일만 고치고 나머지는 `unconfirmed`로 알린다.
+
 ## 0.0.4
 
 ### Patch Changes
