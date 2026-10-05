@@ -69,9 +69,9 @@ Open the project folder containing `.codocs` to start using the extension.
 
 - **Document diagnostics:** Check YAML syntax, the `_codocs` metadata and sections, duplicate IDs and names, parent links, and reference errors in `.codocs` documents.
 - **Document links:** Navigate to resolved `[[Document name]]` references, or `[[Document name:Section]]` references to a section of a document, in any section of a document.
-- **Document and section rename:** Rename a document or a section (F2 on a name, a section key, or a reference) and update the references that point to it.
-- **Explicit code links:** Write `@codocs [[Document name]]`, `@codocs [[Document name]]#L11`, or `@codocs [[Document name]]#L11-L12` in project text to link to a document, line, or inclusive line range.
-- **Reverse code references:** Navigate from a referenced document line to the matching code occurrence. Multiple occurrences have separate hover links. Whole-document references appear in an Inlay Hint before the first row; a single occurrence uses the IDE navigation gesture.
+- **Document and section rename:** Rename a document or a section (F2 on a name, a section key, or a reference) and update the references that point to it, including `@codocs` references in code files.
+- **Explicit code links:** Write `@codocs [[Document name]]` or `@codocs [[Document name:Section]]` in project text to link to a document or to one of its sections. Text after the closing `]]`, such as `#L11`, is not part of the reference.
+- **Reverse code references:** Hover a section key to list the code that references that section, or hover the `_codocs.name` value to list the code that references the whole document. Each item opens that code location, and `코드 N곳` next to the section key or on the first row shows only the count.
 - **Workspace support:** Use separate project knowledge for each folder in a multi-folder workspace. Document changes are reflected automatically.
 
 If you need to reconnect after resolving a server problem, run **Codocs: Restart Language Servers** from the Command Palette.
