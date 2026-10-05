@@ -1,0 +1,44 @@
+_codocs:
+  id: list-tool
+  name: codocs_list
+  parent:
+    - MCP 도구
+개요: |
+  문서의 parent 구조를 한 단계씩 따라가며 문서를 고르는 [[MCP 도구]]다.
+  본문 없이 문서와 섹션을 고를 수 있는 정보만 돌려주며, 고른 문서나 섹션의 내용은 [[codocs_get]]으로 읽는다.
+입력: |
+  parent는 선택이며 문서 이름 하나를 받는다.
+  - parent를 생략하면 `_codocs.parent`를 쓰지 않은 최상위 문서를 돌려준다.
+  - parent를 주면 `_codocs.parent`에 그 이름을 적은 문서, 곧 그 문서의 직속 자식을 돌려준다.
+  parent를 여럿 적은 문서는 각 parent의 결과에 모두 나온다.
+  알 수 없는 입력 속성은 invalid_input이다.
+결과: |
+  items에 해당하는 문서를 모두 담으며 페이지로 나누지 않는다.
+  items는 이름 순서이며 같은 이름의 문서는 경로 순서다.
+  항목마다 다음 값을 담는다.
+  - name·id: 문서의 이름과 ID.
+  - hasErrors: 검증 오류가 있는지.
+  - sections: 섹션 이름 목록. 문서에 적은 순서이며 섹션 내용은 담지 않는다.
+  - childCount: 이 문서의 이름을 parent로 적은 문서의 수.
+  - source.path: 문서 파일 위치.
+  - confirmation: 이전 색인에서 보존한 문서인지 확인한 문서인지.
+
+  섹션 이름을 확인하면 [[codocs_get]]에 `이름:섹션` 주소를 주어 그 섹션만 읽을 수 있다.
+  childCount가 0보다 크면 그 이름을 parent로 다시 조회해 아래 단계를 본다.
+  검증 오류가 있는 문서도 ID와 이름을 확인할 수 있으면 목록에 나온다.
+  같은 이름이나 같은 ID의 문서가 여럿이면 대표를 고르지 않고 문서마다 항목을 두며, 각 항목에 conflict와 충돌한 모든 파일 paths를 담는다.
+없는 parent: |
+  parent에 준 이름의 문서가 없으면 success:false와 not_found로 실패한다.
+  그 문서가 있고 자식이 없으면 success:true와 빈 items를 돌려준다.
+  같은 이름의 문서가 여럿이어도 그 이름을 parent로 적은 문서를 모두 돌려준다.
+  탐색이 끝나지 않아 그 이름을 확인하지 못했으면 not_found로 확정하지 않고 가진 결과와 미확인 진단을 돌려준다.
+찾아갈 수 없는 문서: |
+  parent를 생략한 결과에는 unreachable도 담는다.
+  unreachable은 최상위 문서에서 직속 자식을 따라 내려가도 닿을 수 없는 문서 가운데 다음 문서를 items와 같은 항목 형식과 순서로 모은 것이다.
+  - parent에 적은 이름의 문서가 하나도 없는 문서(parent_not_found)
+  - parent를 따라가면 자기 자신으로 돌아오는 순환에 속한 문서(parent_cycle)
+  - parent 값이 이름을 하나 이상 담은 배열이 아닌 문서
+
+  parent 중 하나로라도 최상위 문서에서 닿을 수 있으면 그 parent의 결과에 나오므로 unreachable에 넣지 않는다.
+  unreachable에 있는 문서의 자식은 그 문서의 이름을 parent로 조회해 볼 수 있다.
+  parent 오류 때문에 list로 찾지 못하는 문서가 없도록 따로 모은 것이며, 이 문서들을 최상위 문서로 취급하지 않는다.

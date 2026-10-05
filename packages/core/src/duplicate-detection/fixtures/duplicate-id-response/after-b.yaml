@@ -1,7 +1,6 @@
-id: query
-name: '조회'
-domains:
-  - 'MCP'
+_codocs:
+  id: query
+  name: '조회'
 definition: |
   MCP 도구의 입력과 외부 응답 필드를 정의한다.
   공통 성공·실패와 scanStatus의 해석은 [[도구 결과]], 목록·상세의 계산 규칙은 [[조회 투영]]에서 확인한다.

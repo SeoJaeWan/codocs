@@ -15,7 +15,7 @@ const target: WorkspacePathDocumentResult = {
     uri: 'file:///root/.codocs/target.yaml',
   },
   confirmation: catalogConfirmations.confirmed,
-  document: { id: 'target', name: '대상' },
+  document: { _codocs: { id: 'target', name: '대상' } },
   diagnostics: [],
 };
 const sourceUri = 'file:///root/source.ts';
@@ -32,7 +32,7 @@ describe('SourceSelections', () => {
       'file:///c%3A/space%20/source.ts',
       1,
       session,
-      { text: 'target' },
+      { reference: { name: 'target' }, sourcePath: '.codocs/source.yaml' },
       target,
       1,
     )!;
@@ -53,7 +53,10 @@ describe('SourceSelections', () => {
       releaseCandidate: vi.fn(),
     };
     const selections = new SourceSelections();
-    const origin = { text: 'target' };
+    const origin = {
+      reference: { name: 'target' },
+      sourcePath: '.codocs/source.yaml',
+    };
     const selected = selections.capture(
       sourceUri,
       1,
@@ -93,7 +96,7 @@ describe('SourceSelections', () => {
       sourceUri,
       1,
       session,
-      { text: 'target' },
+      { reference: { name: 'target' }, sourcePath: '.codocs/source.yaml' },
       target,
       1,
     );

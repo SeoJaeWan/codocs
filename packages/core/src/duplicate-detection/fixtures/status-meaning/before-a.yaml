@@ -1,7 +1,6 @@
-id: document
-name: '문서'
-domains:
-  - '문서 모델'
+_codocs:
+  id: document
+  name: '문서'
 definition: |
   문서는 이름을 붙여 찾아보고 참조할 수 있는 설명의 단위다.
   개념의 정의뿐 아니라 규칙·조건·예외·판단 근거·작업 흐름을 담을 수 있다.

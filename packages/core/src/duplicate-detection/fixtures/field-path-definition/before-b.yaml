@@ -1,7 +1,6 @@
-id: diagnostics
-name: '진단'
-domains:
-  - 'Core'
+_codocs:
+  id: diagnostics
+  name: '진단'
 definition: |
   문제의 원인과 확인된 위치를 사용자가 조치할 수 있는 정보로 전달하는 영역이다.
   오류 종류와 실제 문서·탐색·저장 상태를 구분한다.

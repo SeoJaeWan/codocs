@@ -46,6 +46,24 @@ afterEach(async () => {
 });
 
 describe('discoverCodeFiles: 프로젝트 코드 읽기 적격성', () => {
+  it('저장·이름 변경이 남기는 .codocs-write 임시 파일은 새 원문을 담고 있어도 수집하지 않는다', async () => {
+    await mkdir(path.join(project, 'src'));
+    await writeFile(path.join(project, 'src', 'a.ts'), '@codocs [[대상]]');
+    await writeFile(
+      path.join(project, 'src', '.codocs-write-1234-abcd.tmp'),
+      '@codocs [[대상]]',
+    );
+    const result = await discoverCodeFiles(project);
+
+    expect(result.files.map((file) => file.path)).toEqual(['src/a.ts']);
+    expect(
+      await readEligibleCodeFile(
+        result.policy,
+        'src/.codocs-write-1234-abcd.tmp',
+      ),
+    ).toBeUndefined();
+  });
+
   it('알 수 없는 확장자와 확장자 없는 UTF-8 파일이면 모두 수집한다', async () => {
     await writeFile(path.join(project, 'memo'), '@codocs [[대상]]');
     await writeFile(path.join(project, 'code.weird'), '@codocs [[대상]]');
@@ -56,7 +74,6 @@ describe('discoverCodeFiles: 프로젝트 코드 읽기 적격성', () => {
       'memo',
     ]);
   });
-  /** @codocs [[작업 공간:코드 참조 색인]]#L15 */
   it('Git 추적 파일이 ignore와 일치하면 수집한다', async () => {
     await execute('git', ['init', project]);
     await writeFile(path.join(project, 'tracked'), '@codocs [[대상]]');
@@ -165,7 +182,6 @@ describe('discoverCodeFiles: 프로젝트 코드 읽기 적격성', () => {
       (await discoverCodeFiles(project)).files.map((file) => file.path),
     ).toContain('hidden');
   });
-  /** @codocs [[작업 공간:코드 참조 색인]]#L25 */
   it('NUL 및 UTF-16 디스크 바이트면 텍스트로 수집하지 않는다', async () => {
     await writeFile(path.join(project, 'binary'), Buffer.from([65, 0, 66]));
     await writeFile(
@@ -364,7 +380,6 @@ const gitIn = (...args: string[]): Promise<unknown> =>
   execute('git', ['-C', project, ...args]);
 
 describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같다', () => {
-  /** @codocs [[작업 공간:코드 참조 색인]]#L14-L18 */
   it('.gitignore를 편집하면 그 폴더 이하의 적격성만 다시 확인해 전체 탐색과 같다', async () => {
     await mkdir(path.join(project, 'child', 'deep'), { recursive: true });
     await writeFile(path.join(project, 'child', 'a.txt'), 'a');

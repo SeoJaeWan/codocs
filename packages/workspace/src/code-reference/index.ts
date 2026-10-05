@@ -3,7 +3,6 @@ import { calculateRevision } from '../revision/index.js';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  codeReferenceDestinationKinds,
   codeReferenceStatuses,
   scanStatuses,
   extractCodeReferences,
@@ -75,6 +74,26 @@ export interface WorkspaceCodeReferenceQuery extends WorkspaceCodeReferenceSnaps
   unique: boolean;
   absent: boolean;
 }
+/** 이름 변경 계산에 쓰는 코드 파일 하나의 저장 관측이다. 편집 중 buffer는 포함하지 않는다. */
+export interface WorkspaceCodeRenameFile {
+  /** 프로젝트 상대 경로다. */
+  path: string;
+  /** 디스크에서 읽은 UTF-8 원문이다. */
+  text: string;
+  /** 디스크 바이트의 revision이며 이름 변경의 파일별 revision 확인에 그대로 쓴다. */
+  revision: string;
+  /** 원문에서 찾은 모든 표기이며 순서가 선택 키의 occurrenceIndex다. */
+  markers: readonly CodeReferenceMarker[];
+}
+/** 이름 변경 계산이 쓰는 코드 수집의 저장 관측과 수집 상태다. */
+export interface WorkspaceCodeRenameSources {
+  /** 게시된 수집 상태다. collecting이면 이름 변경을 진행하지 않는다. */
+  status: (typeof codeCollectionStatuses)[keyof typeof codeCollectionStatuses];
+  /** 확인한 적격 코드 파일이며 경로 순서다. */
+  files: readonly WorkspaceCodeRenameFile[];
+  /** 읽지 못했거나 감시가 깨져 확인하지 못한 범위다. path가 없으면 특정 파일로 좁힐 수 없는 실패다. */
+  failures: readonly CodeCollectionFailure[];
+}
 /** 열린 source의 버전은 호출자가 단조 증가시키며 closeBuffer로 해제한다. */
 export interface WorkspaceCodeBufferInput {
   sourcePath: string;
@@ -142,7 +161,6 @@ interface WatchRegistrationFailure {
 }
 /**
  * 코드 수집·overlay·재해석·안전한 클릭을 저장 catalog와 분리한다.
- * @codocs [[작업 공간:코드 참조 색인]]
  */
 export class WorkspaceCodeReferenceIndex {
   #catalog: Catalog | undefined;
@@ -187,7 +205,10 @@ export class WorkspaceCodeReferenceIndex {
   ) {
     this.#published = this.#signature();
   }
-  /** 저장 document snapshot만 교체하고 원문 코드 관측을 재사용한다. 바뀐 경우에만 알린다. */
+  /**
+   * 대상 문서를 저장해 색인이 바뀌면 코드 참조를 다시 판단하도록 알린다.
+   * 코드 쪽 관측은 다시 읽지 않고 재사용한다.
+   */
   setCatalog(catalog: Catalog | undefined, documentGeneration: number): void {
     if (this.#closed) return;
     const changed =
@@ -211,7 +232,10 @@ export class WorkspaceCodeReferenceIndex {
     this.#owners.set(relative, documentVersion);
     return true;
   }
-  /** 동일 버전의 원문까지 확인한 후 적격 저장 파일만 편집 관측으로 대체한다. */
+  /**
+   * 코드의 저장하지 않은 편집 내용으로 코드 참조를 다시 찾는다.
+   * 같은 버전의 저장 파일이 수집 대상일 때만 편집 내용으로 대체한다.
+   */
   async updateBuffer(input: WorkspaceCodeBufferInput): Promise<boolean> {
     const relative = codeFileRelativePath(this.projectRoot, input.sourcePath);
     if (!relative || !this.setOwner(relative, input.documentVersion))
@@ -302,9 +326,6 @@ export class WorkspaceCodeReferenceIndex {
             start: { ...cachedMarker.range.start },
             end: { ...cachedMarker.range.end },
           },
-          ...(cachedMarker.destination
-            ? { destination: { ...cachedMarker.destination } }
-            : {}),
         };
         const resolution: CodeReferenceResolution = this.#catalog
           ? resolveCodeReference(this.#catalog, marker)
@@ -343,23 +364,21 @@ export class WorkspaceCodeReferenceIndex {
       ],
     };
   }
-  /** 1부터 시작하는 행 또는 문서 전체에 연결된 정확한 출현 합집합이다. */
+  /** 대상 문서의 지정한 섹션 또는 섹션 없는 문서 전체 표기에 연결된 정확한 출현 목록이다. */
   async reverse(
     targetPath: string,
-    rows?: { startLine: number; endLine: number },
+    section?: string,
   ): Promise<WorkspaceCodeReferenceQuery> {
     const relative = codeFileRelativePath(this.projectRoot, targetPath);
     const snapshot = await this.snapshot();
     const occurrences = snapshot.occurrences.filter(
-      /** 저장 대상과 요청한 실제 행의 교집합만 고른다. */ (item) =>
+      /** 저장 대상과 요청한 섹션(미지정이면 문서 전체)이 같은 출현만 고른다. */ (
+        item,
+      ) =>
         item.status === codeReferenceStatuses.resolved &&
         codeFileRelativePath(this.projectRoot, item.target?.path ?? '') ===
           relative &&
-        (rows
-          ? item.destination?.kind === codeReferenceDestinationKinds.rows &&
-            item.destination.startLine <= rows.endLine &&
-            item.destination.endLine >= rows.startLine
-          : item.destination?.kind === codeReferenceDestinationKinds.document),
+        item.section === section,
     );
     const displayable =
       snapshot.hasCompletedCollection !== false &&
@@ -370,6 +389,32 @@ export class WorkspaceCodeReferenceIndex {
       confirmedCount: occurrences.length,
       unique: displayable && occurrences.length === 1,
       absent: displayable && occurrences.length === 0,
+    };
+  }
+  /**
+   * 이름 변경 계산에 쓰는 저장 관측을 돌려준다. 파일 IO 없이 보유한 관측만 쓰며 buffer overlay는 무시한다.
+   * 최초 수집이 끝나기 전에는 status가 collecting이다.
+   */
+  renameSources(): WorkspaceCodeRenameSources {
+    return {
+      status: this.#visibleStatus(),
+      files: [...this.#disk.keys()]
+        .sort()
+        .map((filePath) => this.#renameFile(filePath)),
+      failures: [
+        ...this.#failures,
+        ...(this.#watchFailure ? [this.#watchFailure] : []),
+      ],
+    };
+  }
+  /** 보유한 디스크 관측 하나를 이름 변경 계산용 값으로 옮긴다. */
+  #renameFile(filePath: string): WorkspaceCodeRenameFile {
+    const file = this.#disk.get(filePath)!;
+    return {
+      path: filePath,
+      text: file.text,
+      revision: file.revision,
+      markers: this.#markers.get(filePath) ?? [],
     };
   }
   /** 모든 출처의 현재 버전과 양쪽 파일 정체를 저장한 opaque 클릭 토큰이다. */

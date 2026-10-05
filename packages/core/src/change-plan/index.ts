@@ -8,14 +8,15 @@ import {
 import {
   buildCatalog,
   catalogConfirmations,
+  renameChangeKinds,
   scanStatuses,
   type Catalog,
+  type RenameChange,
 } from '../catalog/index.js';
 import {
   changePlanDiagnosticCodes,
   changePlanDiagnosticMessages,
   diagnosticSeverities,
-  schemaDiagnosticMessages,
   type Diagnostic,
 } from '../diagnostics/index.js';
 import {
@@ -25,7 +26,8 @@ import {
   type YamlParseResult,
 } from '../parser/index.js';
 import {
-  documentFields,
+  codocsKey,
+  metadataFields,
   validateDocument,
   type Document,
 } from '../validator/index.js';
@@ -114,16 +116,23 @@ function stringList(value: unknown): value is string[] {
   }
 }
 
-/** JSON 자체의 안전성 오류를 YAML 직렬화 전에 걸러낸다. */
-function unsafeJson(diagnostic: Diagnostic<string>): boolean {
-  return new Set<string>([
-    schemaDiagnosticMessages.nonFiniteNumber,
-    schemaDiagnosticMessages.jsonValueRequired,
-    schemaDiagnosticMessages.cyclicReference,
-    schemaDiagnosticMessages.jsonObjectRequired,
-    schemaDiagnosticMessages.jsonDataPropertyRequired,
-    schemaDiagnosticMessages.missingArrayElement,
-  ]).has(diagnostic.message);
+/** 접근자·특수 객체·순환 없이 데이터 속성만으로 이루어진 값인지 확인한다. 깊이는 제한한다. */
+function plainData(value: unknown, depth = 0): boolean {
+  if (depth > 8) return false;
+  if (typeof value !== 'object' || value === null) return true;
+  if (Array.isArray(value))
+    return Array.from({ length: value.length }, (_, index) =>
+      Object.getOwnPropertyDescriptor(value, index),
+    ).every(
+      (descriptor) =>
+        descriptor !== undefined &&
+        'value' in descriptor &&
+        plainData(descriptor.value, depth + 1),
+    );
+  return (
+    record(value) &&
+    Object.keys(value).every((key) => plainData(value[key], depth + 1))
+  );
 }
 
 /** 요청 오류를 코드와 함께 반환한다. */
@@ -249,7 +258,7 @@ function adjacentCommentEdit(entry: FlowEntry): Edit | undefined {
   };
 }
 
-/** 각 최상위 값·속성 범위만 수정한다. @codocs [[문서 변경 계획]]#L67-L82 */
+/** 각 최상위 값·속성 범위만 수정한다. */
 function editYaml(
   parsed: Extract<YamlParseResult, { success: true }>,
   expected: Record<string, unknown>,
@@ -270,6 +279,18 @@ function editYaml(
     if (Object.hasOwn(expected, key)) {
       const range = getValueRange(parsed, [key]);
       if (!range) return undefined;
+      const blockText = nestedBlockText(
+        expected[key],
+        source,
+        range,
+        field.key,
+        flow,
+        eol,
+      );
+      if (blockText !== undefined) {
+        edits.push({ ...range, text: blockText });
+        continue;
+      }
       edits.push({
         ...range,
         text: valueText(
@@ -418,6 +439,30 @@ function editYaml(
   return result;
 }
 
+/**
+ * 값이 다음 줄에서 시작하는 블록 매핑을 새 매핑으로 바꿀 텍스트를 만든다.
+ * 첫 줄은 원래 값이 시작하던 자리에 이어지고 나머지 줄은 같은 들여쓰기를 따른다.
+ * @returns 블록 매핑 교체가 아니면 undefined다.
+ */
+function nestedBlockText(
+  value: unknown,
+  source: string,
+  range: { start: number; end: number },
+  key: { start: number; end: number } | undefined,
+  flow: boolean,
+  eol: string,
+): string | undefined {
+  if (flow || !key || !record(value) || !Object.keys(value).length)
+    return undefined;
+  if (!source.slice(key.end, range.start).includes('\n')) return undefined;
+  const column = range.start - (source.lastIndexOf('\n', range.start - 1) + 1);
+  const output = stringify(value, { lineWidth: 0 }).replace(/\n$/u, '');
+  const text = output
+    .replace(/\n/gu, `\n${' '.repeat(column)}`)
+    .replace(/\n/gu, eol);
+  return source[range.end - 1] === '\n' ? text + eol : text;
+}
+
 /** 기존 확인 상태를 유지한 임시 색인에서 후보 경로의 진단만 추출한다. */
 function candidateDiagnostics(
   catalog: Catalog,
@@ -443,7 +488,7 @@ function candidateDiagnostics(
   return temporary.documents.get(path)?.diagnostics ?? parsed.diagnostics;
 }
 
-/** create/update 요청을 파일 IO 없이 검증하고 YAML 후보를 계산한다. @codocs [[문서 변경 계획]] */
+/** create/update 요청을 파일 IO 없이 검증하고 YAML 후보를 계산한다. */
 export function planDocumentChange(
   input: unknown,
   context: ChangePlanContext,
@@ -474,7 +519,11 @@ function planDocumentChangeInternal(
     )
       return failure('invalidRequest');
     if (context.catalog.documents.has(path)) return failure('pathExists', path);
-    const validation = validateDocument({ data: input.document, path });
+    if (!plainData(input.document)) return failure('invalidRequest');
+    const validation = validateDocument({
+      data: input.document,
+      path,
+    });
     if (!validation.success)
       return {
         status: changePlanStatuses.failed,
@@ -492,7 +541,7 @@ function planDocumentChangeInternal(
     return {
       status: changePlanStatuses.candidate,
       path,
-      id: validation.data.id,
+      id: validation.data._codocs.id,
       raw,
       data: validation.data,
       diagnostics,
@@ -518,17 +567,12 @@ function planDocumentChangeInternal(
     (!changes.length && !removals.length) ||
     new Set(removals).size !== removals.length ||
     changes.some((key) => removals.includes(key)) ||
-    changes.includes(documentFields.deprecatedAliases) ||
-    removals.includes(documentFields.deprecatedAliases) ||
     removals.some(
-      /** 필수 필드는 unset할 수 없다. */
-      (key) =>
-        !key ||
-        key === documentFields.id ||
-        key === documentFields.name ||
-        key === documentFields.definition ||
-        key === documentFields.domains,
-    )
+      /** 메타데이터 `_codocs`는 unset할 수 없다. */
+      (key) => !key || key === codocsKey,
+    ) ||
+    (set !== undefined &&
+      !Object.values(set).every((value) => plainData(value)))
   )
     return failure('invalidRequest');
   const paths = context.catalog.idPaths.get(id);
@@ -553,51 +597,19 @@ function planDocumentChangeInternal(
       status: changePlanStatuses.failed,
       diagnostics: parsed.diagnostics,
     };
+  const requestedMetadata = set?.[codocsKey];
+  const currentMetadata = parsed.data[codocsKey];
+  if (
+    record(requestedMetadata) &&
+    Object.hasOwn(requestedMetadata, metadataFields.name) &&
+    requestedMetadata[metadataFields.name] !==
+      (record(currentMetadata)
+        ? currentMetadata[metadataFields.name]
+        : undefined)
+  )
+    return failure('nameChangeNotAllowed', source.path);
   const expected: Record<string, unknown> = { ...parsed.data, ...(set ?? {}) };
   for (const key of removals) delete expected[key];
-  const oldId = parsed.data[documentFields.id],
-    newId = expected[documentFields.id];
-  const preliminary = validateDocument({ data: expected, path: source.path });
-  if (!preliminary.success && preliminary.errors.some(unsafeJson))
-    return {
-      status: changePlanStatuses.failed,
-      diagnostics: preliminary.errors,
-    };
-  if (
-    typeof oldId === 'string' &&
-    /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.exec(oldId)?.[0] === oldId &&
-    typeof newId === 'string' &&
-    oldId !== newId
-  ) {
-    const aliases = parsed.data[documentFields.deprecatedAliases];
-    if (aliases !== undefined && !Array.isArray(aliases))
-      return {
-        status: changePlanStatuses.failed,
-        diagnostics: validateDocument({
-          data: parsed.data,
-          path: source.path,
-          source: source.raw,
-          fields: parsed.fields,
-          ...(parsed.rootRange ? { rootRange: parsed.rootRange } : {}),
-        }).errors,
-      };
-    const previous = (aliases ?? []) as unknown[];
-    expected[documentFields.deprecatedAliases] = [
-      ...previous.filter((item) => !record(item) || item.id !== newId),
-      ...(previous.some((item) => record(item) && item.id === oldId)
-        ? []
-        : [{ id: oldId }]),
-    ];
-  }
-  const completeExpected = validateDocument({
-    data: expected,
-    path: source.path,
-  });
-  if (!completeExpected.success && completeExpected.errors.some(unsafeJson))
-    return {
-      status: changePlanStatuses.failed,
-      diagnostics: completeExpected.errors,
-    };
   const raw = editYaml(parsed, expected);
   if (raw === undefined) return failure('candidateMismatch', source.path);
   const candidate = parseYaml(raw, source.path);
@@ -619,21 +631,259 @@ function planDocumentChangeInternal(
       status: changePlanStatuses.failed,
       diagnostics: validation.errors,
     };
-  if (raw === source.raw)
+  if (raw === source.raw || same(expected, parsed.data))
     return {
       status: changePlanStatuses.unchanged,
       path: source.path,
-      id: validation.data.id,
+      id: validation.data._codocs.id,
       revision: source.revision,
       diagnostics,
     };
   return {
     status: changePlanStatuses.candidate,
     path: source.path,
-    id: validation.data.id,
+    id: validation.data._codocs.id,
     raw,
     data: validation.data,
     baseRevision: source.revision,
     diagnostics,
   };
+}
+
+/** 이름 변경 수정안을 원문에 적용한 결과다. 성공은 재파싱으로 의도한 값만 바뀐 것을 확인했다. */
+export type RenameEditResult =
+  { success: true; raw: string } | { success: false };
+
+/** 문자열 스칼라의 원문 표기 형식이다. */
+const scalarSourceTypes = {
+  plain: 'PLAIN',
+  doubleQuoted: 'QUOTE_DOUBLE',
+  singleQuoted: 'QUOTE_SINGLE',
+  blockLiteral: 'BLOCK_LITERAL',
+  blockFolded: 'BLOCK_FOLDED',
+} as const;
+
+/** 큰따옴표 스칼라 안에서 이름 그대로 쓰면 안 되는 문자인지 확인한다. */
+function needsEscape(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    char === '\\' ||
+    char === '"' ||
+    code < 0x20 ||
+    (code >= 0x7f && code <= 0x9f) ||
+    code === 0x2028 ||
+    code === 0x2029 ||
+    code === 0xfeff
+  );
+}
+
+/** 문자 하나를 YAML 큰따옴표 escape로 바꾼다. 이름 있는 escape가 없으면 유니코드 escape를 쓴다. */
+function escapeDoubleQuotedChar(char: string): string {
+  const named = new Map([
+    ['\\', '\\\\'],
+    ['"', '\\"'],
+    ['\n', '\\n'],
+    ['\t', '\\t'],
+    ['\r', '\\r'],
+  ]).get(char);
+  return named ?? `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
+}
+
+/** 큰따옴표 스칼라 안에서 그대로 쓸 수 없는 문자를 YAML escape로 바꾼다. */
+function escapeDoubleQuoted(value: string): string {
+  let result = '';
+  for (const char of value)
+    result += needsEscape(char) ? escapeDoubleQuotedChar(char) : char;
+  return result;
+}
+
+/** 스칼라 형식에 맞춰 새 텍스트를 원문에 쓸 표기로 바꾼다. 안전하게 쓸 수 없는 형식은 undefined다. */
+function escapeForScalar(
+  value: string,
+  type: string | undefined,
+): string | undefined {
+  if (type === scalarSourceTypes.doubleQuoted) return escapeDoubleQuoted(value);
+  if (type === scalarSourceTypes.singleQuoted)
+    return value.replace(/'/gu, "''");
+  if (
+    type === scalarSourceTypes.plain ||
+    type === scalarSourceTypes.blockLiteral ||
+    type === scalarSourceTypes.blockFolded
+  )
+    return value;
+  return undefined;
+}
+
+/** 해석 문자열의 어느 코드 단위 구간이 원문 범위 하나에 대응하는지 계산한다. */
+function decodedSpan(
+  ranges: readonly { start: number; end: number }[],
+  offset: { start: number; end: number },
+): { start: number; end: number } | undefined {
+  const indexes: number[] = [];
+  for (let index = 0; index < ranges.length; index++) {
+    const range = ranges[index];
+    if (
+      range &&
+      range.start < range.end &&
+      range.start >= offset.start &&
+      range.end <= offset.end
+    )
+      indexes.push(index);
+  }
+  const first = indexes[0];
+  const last = indexes[indexes.length - 1];
+  if (
+    first === undefined ||
+    last === undefined ||
+    last - first + 1 !== indexes.length
+  )
+    return undefined;
+  return { start: first, end: last + 1 };
+}
+
+/** 경로가 가리키는 중첩 값을 복제본에서 교체한다. */
+function setAtPath(
+  root: Record<string, unknown>,
+  fieldPath: readonly (string | number)[],
+  value: string,
+): boolean {
+  let current: unknown = root;
+  for (const key of fieldPath.slice(0, -1)) {
+    if (typeof current !== 'object' || current === null) return false;
+    current = Reflect.get(current, key);
+  }
+  const last = fieldPath[fieldPath.length - 1];
+  if (typeof current !== 'object' || current === null || last === undefined)
+    return false;
+  Reflect.set(current, last, value);
+  return true;
+}
+
+/** 키의 원문 표기 형식에 맞춰 새 키 이름을 쓴다. 따옴표는 유지하고 plain은 따옴표로 승격하지 않는다. */
+function keyText(value: string, type: string | undefined): string | undefined {
+  const quote =
+    type === scalarSourceTypes.doubleQuoted
+      ? '"'
+      : type === scalarSourceTypes.singleQuoted
+        ? "'"
+        : type === scalarSourceTypes.plain
+          ? ''
+          : undefined;
+  const escaped =
+    quote === undefined ? undefined : escapeForScalar(value, type);
+  return quote === undefined || escaped === undefined
+    ? undefined
+    : quote + escaped + quote;
+}
+
+/**
+ * 이름 변경 수정안을 원문 offset으로만 적용한다. 바꾸는 위치 밖의 원문은 그대로 두고,
+ * 새 텍스트는 그 위치의 YAML 스칼라 형식(plain·작은따옴표·큰따옴표·block)에 맞게 escape한다.
+ * 적용 뒤 다시 파싱해 바꾼 위치만 의도한 값이고 나머지 데이터는 같을 때만 성공한다.
+ * @param parsed 수정안을 계산한 같은 원문의 파싱 결과다.
+ * @param changes 이 원문에 속한 수정안이다. 다른 파일의 수정안은 넘기지 않는다.
+ * @returns 성공하면 새 원문이다. 겹치거나 형식에 쓸 수 없거나 재파싱 검증에 실패하면 실패다.
+ */
+export function applyRenameChanges(
+  parsed: Extract<YamlParseResult, { success: true }>,
+  changes: readonly RenameChange[],
+): RenameEditResult {
+  const source = parsed.source;
+  const document = parseDocument(source, { keepSourceTokens: true });
+  const ordered = [...changes].sort(
+    (a, b) => b.offsetRange.start - a.offsetRange.start,
+  );
+  const expectedValues = new Map<string, string>();
+  let keyRename: { oldText: string; newText: string; type: string } | undefined;
+  let result = source;
+  let limit = source.length;
+  for (const change of ordered) {
+    const { start, end } = change.offsetRange;
+    if (start < 0 || end < start || end > limit) return { success: false };
+    if (change.kind === renameChangeKinds.key) {
+      const pair =
+        keyRename === undefined && isMap(document.contents)
+          ? document.contents.items.find(
+              (item) => isScalar(item.key) && item.key.value === change.oldText,
+            )
+          : undefined;
+      const key = pair?.key;
+      if (
+        !isScalar(key) ||
+        change.fieldPath.length !== 1 ||
+        change.fieldPath[0] !== change.oldText ||
+        key.range?.[0] !== start ||
+        key.range[1] !== end ||
+        key.type === undefined
+      )
+        return { success: false };
+      const written = keyText(change.newText, key.type);
+      if (written === undefined) return { success: false };
+      result = result.slice(0, start) + written + result.slice(end);
+      limit = start;
+      keyRename = {
+        oldText: change.oldText,
+        newText: change.newText,
+        type: key.type,
+      };
+      continue;
+    }
+    const mapping = parsed.strings.find(
+      (item) =>
+        item.fieldPath.length === change.fieldPath.length &&
+        item.fieldPath.every((part, index) => part === change.fieldPath[index]),
+    );
+    const span =
+      mapping && decodedSpan(mapping.sourceRanges, change.offsetRange);
+    if (!mapping || !span) return { success: false };
+    if (mapping.value.slice(span.start, span.end) !== change.oldText)
+      return { success: false };
+    const node = document.getIn(change.fieldPath, true);
+    const type = isScalar(node) ? node.type : undefined;
+    const written = escapeForScalar(change.newText, type);
+    if (written === undefined) return { success: false };
+    result = result.slice(0, start) + written + result.slice(end);
+    limit = start;
+    const key = JSON.stringify(change.fieldPath);
+    const value = expectedValues.get(key) ?? mapping.value;
+    expectedValues.set(
+      key,
+      value.slice(0, span.start) + change.newText + value.slice(span.end),
+    );
+  }
+  const reparsed = parseYaml(result);
+  if (!reparsed.success) return { success: false };
+  let expectedData = JSON.parse(JSON.stringify(parsed.data)) as Record<
+    string,
+    unknown
+  >;
+  for (const [key, value] of expectedValues) {
+    const fieldPath = JSON.parse(key) as (string | number)[];
+    if (!setAtPath(expectedData, fieldPath, value)) return { success: false };
+  }
+  if (keyRename) {
+    const { oldText, newText, type } = keyRename;
+    expectedData = Object.fromEntries(
+      Object.entries(expectedData).map(([name, value]) => [
+        name === oldText ? newText : name,
+        value,
+      ]),
+    );
+    const root = parseDocument(result).contents;
+    const renamed = isMap(root)
+      ? root.items.find(
+          (item) => isScalar(item.key) && item.key.value === newText,
+        )?.key
+      : undefined;
+    /** 키가 문자열 그대로 읽히고 형식이 같으며 순서가 유지되어야 한다. */
+    if (
+      !isScalar(renamed) ||
+      renamed.type !== type ||
+      !same(Object.keys(reparsed.data), Object.keys(expectedData))
+    )
+      return { success: false };
+  }
+  return same(reparsed.data, expectedData)
+    ? { success: true, raw: result }
+    : { success: false };
 }

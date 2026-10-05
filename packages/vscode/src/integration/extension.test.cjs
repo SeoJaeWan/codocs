@@ -1,4 +1,3 @@
-const code = 'source %20 한글#.java';
 const zone = '.codocs/zone %20 한글#.yaml';
 const source = '.codocs/source %20 한글#.yaml';
 
@@ -19,10 +18,42 @@ async function markerSelection(c, relative, text) {
   return [line, character, line, character + text.length];
 }
 
-/** 1부터 시작하는 행 범위를 현재 원문의 0부터 시작하는 선택 좌표로 바꾼다. */
-function rowSelection(text, startLine, endLine) {
-  const rows = text.split(/\r\n|\r|\n/u);
-  return [startLine - 1, 0, endLine - 1, rows[endLine - 1].length];
+/** 대상 문서 `Refund Policy` 섹션 키(넷째 행)가 선택된 좌표다. */
+const refundKey = [3, 0, 3, 'Refund Policy'.length];
+
+/** 해석되지 않는 표기의 게시 진단·이유 Hover를 확인하고 수정 키 클릭이 이동을 만들지 않음을 관측한다. */
+async function invalidMarker(c, invalid, marker, status, message) {
+  const code = `codocs.codeReference.${status}`;
+  await c.open(invalid);
+  await c.until(
+    () => c.diagnostics(invalid, code).length === 1,
+    `${status} explicit reference diagnostic`,
+  );
+  const hover = await c.driver.hover(marker, message);
+  for (const text of ['현재 ID', '도메인:', '함께 매칭된 용어'])
+    c.assert.ok(!hover.body.includes(text), text);
+  c.assert.equal(codeAnchors(hover).length, 0);
+  const [line] = await markerSelection(c, invalid, marker);
+  const before = c.editorState();
+  const beforeUi = await c.driver.workbenchState();
+  await c.driver.modifierClick(marker);
+  // 클릭이 편집기에 도달한 것은 표기 행의 빈 커서 이동으로 관측한다.
+  const after = await c.until(
+    /** 클릭한 표기 행의 빈 커서를 관측한다. */ () => {
+      const state = c.editorState();
+      return (
+        state.selection?.[0] === line &&
+        state.selection[0] === state.selection[2] &&
+        state.selection[1] === state.selection[3] &&
+        state
+      );
+    },
+    'modifier click reached the invalid marker',
+  );
+  c.assert.equal(after.uri, before.uri);
+  c.assert.deepEqual(after.tabs, before.tabs);
+  c.assert.deepEqual(await c.driver.workbenchState(), beforeUi);
+  c.assert.equal(c.diagnostics(invalid, code).length, 1);
 }
 
 /** 클릭 뒤 실제 editor가 기대한 파일·선택을 표시할 때까지 기다린다. */
@@ -48,39 +79,91 @@ function codeAnchors(hover, name = '') {
   );
 }
 
-// @codocs [[VS Code:VS Code]]
+/** 이전 사례의 fixture 복원 뒤 문서 색인 재구성이 끝날 때까지 다른 문서의 링크 Hover로 기다린다. */
+async function workspaceReady(c) {
+  await c.open('.codocs/old-source.yaml');
+  await c.driver.hover('[[Old]]', 'Old', 0, { providerLabel: 'Old' });
+}
+
+/** 이름 변경 반영이 색인 갱신과 겹쳐 거부될 때 workspace가 보여주는 안내다. */
+const indexNotReadyNotice = '문서 색인을 구성하는 중입니다';
+
+/**
+ * 이름 변경을 시작하고 디스크에 반영될 때까지 기다린다.
+ * fixture 복원 뒤 감시자의 색인 갱신이 아직 진행 중이면 반영이 index_not_ready로 거부되므로,
+ * 그 안내가 보이고 아무것도 쓰이지 않았을 때만 안내를 지우고 다시 시도한다.
+ */
+async function renameWhenIndexed(c, start, written, label, attempts = 5) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    await c.vscode.commands.executeCommand('notifications.clearAll');
+    await workspaceReady(c);
+    await start();
+    const outcome = await c.until(
+      /** 반영 완료 또는 색인 준비 전 거부 중 먼저 관측된 결과를 돌려준다. */ async () => {
+        if (await written()) return 'written';
+        const { notifications } = await c.driver.workbenchState();
+        return (
+          notifications.some((text) => text.includes(indexNotReadyNotice)) &&
+          'index-not-ready'
+        );
+      },
+      label,
+    );
+    if (outcome === 'written') return;
+  }
+  c.assert.fail(
+    `${label}: ${attempts}번 모두 색인 갱신 중이라 반영되지 않았습니다.`,
+  );
+}
+
+/** 화면의 name 값을 실제 마우스로 눌러 커서를 두고 F2로 새 이름을 입력해 확정한다. */
+async function startRename(c, name, newName) {
+  await c.driver.clickText(name);
+  // 실제 클릭이 반영된 편집기 커서가 name 행에 놓일 때까지 기다린다.
+  await c.until(
+    () => c.vscode.window.activeTextEditor?.selection.start.line === 2,
+    'cursor placed on the name value',
+  );
+  await c.driver.key('F2', 'F2', 113);
+  // 시작 위치 확인이 끝나 입력 창이 포커스를 받은 뒤에만 입력한다.
+  await c.until(
+    () => c.driver.isFocused('.rename-box'),
+    'rename input focused',
+  );
+  await c.driver.insertText(newName);
+  await c.driver.key('Enter', 'Enter', 13);
+}
+
+/** 화면의 텍스트를 실제 마우스로 눌러 커서를 두고 F2로 새 이름을 입력해 확정한다. 커서가 놓인 행을 먼저 확인한다. */
+async function startRenameAt(c, text, line, newName) {
+  await c.driver.clickText(text);
+  await c.until(
+    () => c.vscode.window.activeTextEditor?.selection.start.line === line,
+    `cursor placed on ${text}`,
+  );
+  await c.driver.key('F2', 'F2', 113);
+  await c.until(
+    () => c.driver.isFocused('.rename-box'),
+    'rename input focused',
+  );
+  await c.driver.insertText(newName);
+  await c.driver.key('Enter', 'Enter', 13);
+}
+
+/** 출처 YAML의 [[Zone]] 링크가 표시되고 서버 준비가 끝날 때까지 Hover로 기다린다. */
+async function readyZoneLink(c) {
+  await c.open(source);
+  return c.driver.hover('[[Zone]]', 'Zone', 0, {
+    providerLabel: 'Zone',
+    nativeLabel: '원문 열기: Zone (.codocs/zone %20 한글#.yaml)',
+  });
+}
+
 module.exports.scenarios = [
-  {
-    id: 'hover-content-and-relations',
-    /** 실제 코드 Hover의 본문·관계 앵커를 관측하고 각각 클릭한다.
-     * @codocs [[VS Code:원문 열기]]#L11 */
-    async run(c) {
-      for (const [label, target] of [
-        ['원문 열기', zone],
-        ['Auxiliary', '.codocs/auxiliary.yaml'],
-        ['Direct', '.codocs/direct.yaml'],
-        ['Referrer', '.codocs/referrer.yaml'],
-      ]) {
-        await c.open(code);
-        const hover = await c.driver.hover('zone', 'Zone body');
-        for (const text of [
-          '현재 ID: zone',
-          '도메인: test',
-          '함께 매칭된 용어',
-          '이 문서가 참조',
-          '이 문서를 참조',
-        ])
-          c.assert.ok(hover.body.includes(text), text);
-        c.assert.ok(!hover.body.includes('Auxiliary body'));
-        await c.driver.clickAnchor(label);
-        await c.atTop(target);
-      }
-    },
-  },
   {
     id: 'yaml-single-special-path',
     /** 특수 출처·대상 경로의 YAML 링크를 OS 수정 키 클릭으로 연다.
-     * @codocs [[VS Code:원문 열기]]#L18 */
+     * */
     async run(c) {
       await c.open(source);
       const hover = await c.driver.hover('[[Zone]]', 'Zone', 0, {
@@ -102,23 +185,62 @@ module.exports.scenarios = [
   {
     id: 'yaml-multiple-candidates',
     /** 복수 후보를 모두 표시하고 선택한 앵커의 파일만 연다.
-     * @codocs [[VS Code:원문 열기]]#L20 */
+     * */
     async run(c) {
       for (const candidate of ['a', 'b']) {
         await c.open('.codocs/ambiguous.yaml');
         const hover = await c.driver.hover('[[Twin]]', 'twin-a.yaml');
-        for (const text of ['twin-b.yaml', 'alpha', 'beta'])
-          c.assert.ok(hover.body.includes(text), text);
+        // 같은 이름의 두 문서는 도메인 없이 경로로만 구분된다.
+        c.assert.ok(hover.body.includes('twin-b.yaml'));
+        for (const text of ['도메인', 'alpha', 'beta'])
+          c.assert.ok(!hover.body.includes(text), text);
         await c.driver.clickAnchor(`twin-${candidate}.yaml`);
         await c.atTop(`.codocs/twin-${candidate}.yaml`);
       }
     },
   },
   {
+    id: 'section-reference-diagnostics',
+    /** 첫 섹션이 아닌 섹션의 참조도 링크가 되고, 문서는 있으나 섹션이 없는 표기는 섹션 없음 진단이 된다. */
+    async run(c) {
+      const file = '.codocs/section-refs.yaml';
+      await c.open(file);
+      await c.until(
+        () => c.diagnostics(file, 'section_reference_not_found').length === 1,
+        'missing section reference diagnostic',
+      );
+      c.assert.equal(c.diagnostics(file, 'reference_not_found').length, 0);
+      await c.driver.hover('[[Direct]]', 'Direct', 0, {
+        providerLabel: 'Direct',
+      });
+      await c.driver.yamlLink('[[Direct]]');
+      await c.atTop('.codocs/direct.yaml');
+    },
+  },
+  {
+    id: 'section-link-opens-key',
+    /** [[문서:섹션]] 링크 클릭이 대상 파일의 섹션 키를 선택해 연다. */
+    async run(c) {
+      const file = '.codocs/section-link-source.yaml';
+      const target = '.codocs/section-link-target.yaml';
+      await c.open(file);
+      const hover = await c.driver.hover(
+        '[[Section Link Target:Link Policy]]',
+        'Section Link Target:Link Policy',
+      );
+      c.assert.ok(
+        hover.body.includes('.codocs/section-link-target.yaml'),
+        'tooltip names the target path',
+      );
+      await c.driver.yamlLink('[[Section Link Target:Link Policy]]');
+      // 대상 파일의 'Link Policy:' 키(넷째 행)가 선택된다.
+      await selected(c, target, [3, 0, 3, 'Link Policy'.length], 'key opened');
+    },
+  },
+  {
     id: 'dirty-target-tab',
     /** 기존 미저장 대상의 내용·탭을 보존하며 상단으로 이동한다.
-     * @codocs [[VS Code:원문 열기]]#L25-L26
-     * @codocs [[VS Code:원문 열기]]#L29-L30 */
+     * */
     async run(c) {
       const document = await c.open(zone);
       const disk = await c.fs.readFile(document.uri.fsPath, 'utf8');
@@ -131,9 +253,8 @@ module.exports.scenarios = [
         5,
       );
       const before = c.tabs(zone)[0];
-      await c.open(code);
-      await c.driver.hover('zone', 'Zone body');
-      await c.driver.clickAnchor('원문 열기');
+      await readyZoneLink(c);
+      await c.driver.yamlLink('[[Zone]]');
       await c.atTop(zone);
       c.assert.equal(c.tabs(zone).length, 1);
       c.assert.equal(c.tabs(zone)[0], before);
@@ -147,12 +268,6 @@ module.exports.scenarios = [
     /** 참조 편집과 저장 뒤 새 Hover·링크·진단을 관측한다. */
     async run(c) {
       const document = await c.open('.codocs/old-source.yaml');
-      await c.until(
-        () =>
-          c.diagnostics('.codocs/old-source.yaml', 'deprecated_reference')
-            .length === 1,
-        'deprecated warning',
-      );
       await c.driver.hover('[[Old]]', 'Old', 0, {
         providerLabel: 'Old',
         nativeLabel: '원문 열기: Old (.codocs/old.yaml)',
@@ -160,12 +275,6 @@ module.exports.scenarios = [
       await c.replace(
         document,
         document.getText().replace('[[Old]]', '[[Direct]]'),
-      );
-      await c.until(
-        () =>
-          c.diagnostics('.codocs/old-source.yaml', 'deprecated_reference')
-            .length === 0,
-        'changed-reference warning cleared',
       );
       await c.driver.hover('[[Direct]]', 'Direct', 0, {
         providerLabel: 'Direct',
@@ -188,7 +297,7 @@ module.exports.scenarios = [
   },
   {
     id: 'saved-and-external-refresh',
-    /** 저장·외부 변경 뒤 새 포인터 조회에 최신 본문과 연결만 표시한다. */
+    /** 저장·외부 변경 뒤 YAML 참조 링크가 최신 대상 내용을 연다. */
     async run(c) {
       const document = await c.open(zone);
       await c.replace(
@@ -198,19 +307,27 @@ module.exports.scenarios = [
           .replace('Zone body [[Direct]]', 'Saved body [[Auxiliary]]'),
       );
       c.assert.equal(await document.save(), true);
-      await c.open(code);
-      const saved = await c.driver.hover('zone', 'Saved body');
-      c.assert.ok(saved.anchors.some((anchor) => anchor.label === 'Auxiliary'));
-      c.assert.ok(!saved.anchors.some((anchor) => anchor.label === 'Direct'));
-      await c.driver.dismiss();
+      await readyZoneLink(c);
+      await c.driver.yamlLink('[[Zone]]');
+      const saved = await c.atTop(zone);
+      await c.until(
+        () => saved.document.getText().includes('Saved body [[Auxiliary]]'),
+        'opened saved text settled',
+      );
+      c.assert.ok(!saved.document.getText().includes('Zone body'));
       c.assert.equal(await c.vscode.window.tabGroups.close(c.tabs(zone)), true);
       await c.until(() => c.tabs(zone).length === 0, 'saved target tab closed');
       await c.fs.writeFile(
         document.uri.fsPath,
-        'id: zone\nname: Zone\ndefinition: External body [[Direct]]\ndomains: [test]\n',
+        '_codocs:\n  id: zone\n  name: Zone\nbody: External body [[Unknown Target]]\n',
       );
-      await c.driver.hover('zone', 'External body');
-      await c.driver.clickAnchor('원문 열기');
+      // 외부 변경의 실제 진단 게시로 완료 snapshot을 관측한다.
+      await c.until(
+        () => c.diagnostics(zone, 'reference_not_found').length === 1,
+        'external target completed snapshot',
+      );
+      await readyZoneLink(c);
+      await c.driver.yamlLink('[[Zone]]');
       const editor = await c.atTop(zone);
       await c.until(
         () => editor.document.getText().includes('External body'),
@@ -222,116 +339,65 @@ module.exports.scenarios = [
   },
   {
     id: 'stale-target-latest-content',
-    /** 표시된 같은 앵커를 클릭해 재확인한 최신 대상 내용만 연다. */
+    /** 화면에 남은 같은 YAML 링크를 클릭해 재확인한 최신 대상 내용만 연다. */
     async run(c) {
-      await c.open(code);
-      const hover = await c.driver.hover('zone', 'Zone body');
-      const href = hover.anchors.find(
-        (anchor) => anchor.label === '원문 열기',
-      ).href;
+      await readyZoneLink(c);
       await c.fs.writeFile(
         c.uri(zone).fsPath,
-        'id: zone\nname: Zone\ndefinition: Changed after display [[Old]]\ndomains: [test]\n',
+        '_codocs:\n  id: zone\n  name: Zone\nbody: Changed after display [[Unknown Target]]\n',
       );
       // 새 저장 원문의 실제 진단 게시로 완료 snapshot을 관측한다.
-      // 기존 Hover와 href는 유지하며 제품 조회·명시 refresh는 호출하지 않는다.
+      // 출처 편집기의 기존 링크는 유지하며 제품 조회·명시 refresh는 호출하지 않는다.
       await c.until(
-        () => c.diagnostics(zone, 'deprecated_reference').length === 1,
+        () => c.diagnostics(zone, 'reference_not_found').length === 1,
         'changed target completed snapshot',
       );
-      await c.driver.clickAnchor('원문 열기', href);
+      await c.driver.yamlLink('[[Zone]]');
       const editor = await c.atTop(zone);
       c.assert.ok(editor.document.getText().includes('Changed after display'));
     },
   },
   {
-    id: 'stale-target-rejected-output',
-    /** 대상 교체 뒤 실제 클릭 실패 기록과 작업 상태 보존을 관측한다. */
-    async run(c) {
-      await c.open(code);
-      const hover = await c.driver.hover('zone', 'Zone body');
-      const href = hover.anchors.find(
-        (anchor) => anchor.label === '원문 열기',
-      ).href;
-      const beforeEditor = c.editorState();
-      const beforeUi = await c.driver.workbenchState();
-      const beforeOutput = await c.output();
-      await c.fs.writeFile(
-        c.uri(zone).fsPath,
-        'id: replacement\nname: Replacement\ndefinition: Different document\ndomains: [test]\n',
-      );
-      await c.driver.clickAnchor('원문 열기', href);
-      await c.until(
-        /** 입력 계약의 성공·실패 관측을 검증한다. */ async () => {
-          const output = await c.output();
-          return (
-            output.startsWith(beforeOutput) &&
-            output
-              .slice(beforeOutput.length)
-              .includes('Codocs 원문 이동 실패: [confirmation_rejected]') &&
-            output
-          );
-        },
-        'Codocs Output rejection',
-      );
-      c.assert.deepEqual(c.editorState(), beforeEditor);
-      c.assert.deepEqual(await c.driver.workbenchState(), beforeUi);
-      c.assert.equal(c.tabs(zone).length, 0);
-      c.assert.deepEqual(c.editorState(), beforeEditor);
-      c.assert.deepEqual(await c.driver.workbenchState(), beforeUi);
-    },
-  },
-  {
     id: 'nested-workspace-owner',
-    /** 같은 ID라도 가장 가까운 workspace의 표시 내용·링크만 사용한다.
-     * @codocs [[VS Code:언어 서버 연결]]#L20 */
+    /** 같은 이름이라도 가장 가까운 workspace의 문서로 YAML 링크가 이동한다.
+     * */
     async run(c) {
-      await c.open('nested/source.java');
-      const hover = await c.driver.hover('zone', 'Nested workspace body');
-      c.assert.ok(!hover.body.includes('Zone body'));
-      await c.driver.clickAnchor('원문 열기');
+      await c.open('nested/.codocs/source.yaml');
+      const hover = await c.driver.hover('[[Zone]]', 'Zone', 0, {
+        providerLabel: 'Zone',
+      });
+      c.assert.ok(!hover.body.includes('zone %20 한글#.yaml'));
+      await c.driver.yamlLink('[[Zone]]');
       await c.atTop('nested/.codocs/zone.yaml');
       c.assert.equal(c.tabs(zone).length, 0);
     },
   },
   {
     id: 'explicit-link-open',
-    /** 코드의 명시 링크 셋을 OS 수정 키 클릭으로 열어 상단·행·범위 선택을 관측한다.
-     * @codocs [[VS Code:원문 열기]]#L25-L27 */
+    /** 코드의 명시 링크 셋(문서 전체·섹션·#L11 접미사)을 OS 링크 제스처로 열어 상단과 섹션 키 선택을 관측한다.
+     * */
     async run(c) {
-      const text = await c.fs.readFile(c.uri(navigation).fsPath, 'utf8');
       await c.open('navigation/explicit-whole.java');
       await c.driver.yamlLink('@codocs [[Navigation Target]]');
       await c.atTop(navigation);
-      await c.open('navigation/explicit-row.java');
-      await c.driver.yamlLink('@codocs [[Navigation Target]]#L11');
-      await selected(
-        c,
-        navigation,
-        rowSelection(text, 11, 11),
-        'row 11 selected',
-      );
-      await c.open('navigation/explicit-range.java');
-      await c.driver.yamlLink('@codocs [[Navigation Target]]#L11-L12');
-      await selected(
-        c,
-        navigation,
-        rowSelection(text, 11, 12),
-        'rows 11-12 selected',
-      );
+      await c.open('navigation/explicit-section.java');
+      await c.driver.yamlLink('@codocs [[Navigation Target:Refund Policy]]');
+      await selected(c, navigation, refundKey, 'section key selected');
+      // 닫는 대괄호 뒤 #L11은 일반 글자이므로 [[...]]만 문서 전체 링크가 된다.
+      await c.open('navigation/explicit-suffix.java');
+      await c.driver.yamlLink('@codocs [[Navigation Target]]');
+      await c.atTop(navigation);
       c.assert.equal(c.tabs(navigation).length, 1);
     },
   },
   {
     id: 'explicit-link-dirty-target',
-    /** 미저장 행이 삽입된 대상에서 저장 행 번호가 아닌 현재 원문의 11·12행을 선택한다.
-     * @codocs [[VS Code:원문 열기]]#L35-L38 */
+    /** 미저장 키가 추가된 대상에서도 섹션 키를 선택하고 같은 탭 객체·미저장·디스크 내용을 보존한다.
+     * */
     async run(c) {
       const document = await c.open(dirtyNavigation);
       const disk = await c.fs.readFile(document.uri.fsPath, 'utf8');
-      const rows = disk.split('\n');
-      rows.splice(4, 0, '  Inserted unsaved row');
-      const edited = rows.join('\n');
+      const edited = disk + 'Inserted Policy: unsaved\n';
       await c.replace(document, edited);
       c.vscode.window.activeTextEditor.selection = new c.vscode.Selection(
         1,
@@ -340,14 +406,9 @@ module.exports.scenarios = [
         3,
       );
       const before = c.tabs(dirtyNavigation)[0];
-      await c.open('navigation/dirty-range.java');
-      await c.driver.yamlLink('@codocs [[Dirty Nav Target]]#L11-L12');
-      await selected(
-        c,
-        dirtyNavigation,
-        rowSelection(edited, 11, 12),
-        'actual buffer rows 11-12 selected',
-      );
+      await c.open('navigation/dirty-section.java');
+      await c.driver.yamlLink('@codocs [[Dirty Nav Target:Refund Policy]]');
+      await selected(c, dirtyNavigation, refundKey, 'section key selected');
       c.assert.equal(c.tabs(dirtyNavigation).length, 1);
       c.assert.equal(c.tabs(dirtyNavigation)[0], before);
       c.assert.equal(document.getText(), edited);
@@ -359,44 +420,25 @@ module.exports.scenarios = [
     id: 'explicit-link-invalid',
     /** 대상 없는 표기의 진단·이유 Hover를 확인하고 수정 키 클릭이 이동을 만들지 않음을 관측한다. */
     async run(c) {
-      const invalid = 'navigation/invalid.java';
-      const marker = '@codocs [[Absent]]';
-      await c.open(invalid);
-      await c.until(
-        () =>
-          c.diagnostics(invalid, 'codocs.codeReference.missing').length === 1,
-        'missing explicit reference diagnostic',
-      );
-      const hover = await c.driver.hover(
-        marker,
+      await invalidMarker(
+        c,
+        'navigation/invalid.java',
+        '@codocs [[Absent]]',
+        'missing',
         '선택한 프로젝트에 대상 문서가 없습니다.',
       );
-      for (const text of ['현재 ID', '도메인:', '함께 매칭된 용어'])
-        c.assert.ok(!hover.body.includes(text), text);
-      c.assert.equal(codeAnchors(hover).length, 0);
-      const [line] = await markerSelection(c, invalid, marker);
-      const before = c.editorState();
-      const beforeUi = await c.driver.workbenchState();
-      await c.driver.modifierClick(marker);
-      // 클릭이 편집기에 도달한 것은 표기 행의 빈 커서 이동으로 관측한다.
-      const after = await c.until(
-        /** 클릭한 표기 행의 빈 커서를 관측한다. */ () => {
-          const state = c.editorState();
-          return (
-            state.selection?.[0] === line &&
-            state.selection[0] === state.selection[2] &&
-            state.selection[1] === state.selection[3] &&
-            state
-          );
-        },
-        'modifier click reached the invalid marker',
-      );
-      c.assert.equal(after.uri, before.uri);
-      c.assert.deepEqual(after.tabs, before.tabs);
-      c.assert.deepEqual(await c.driver.workbenchState(), beforeUi);
-      c.assert.equal(
-        c.diagnostics(invalid, 'codocs.codeReference.missing').length,
-        1,
+    },
+  },
+  {
+    id: 'explicit-link-missing-section',
+    /** 문서는 있으나 섹션이 없는 표기의 섹션 부재 진단·이유 Hover와 이동 없는 수정 키 클릭을 관측한다. */
+    async run(c) {
+      await invalidMarker(
+        c,
+        'navigation/missing-section.java',
+        '@codocs [[Navigation Target:Absent Section]]',
+        'missing_section',
+        '대상 문서에 해당 섹션이 없습니다.',
       );
     },
   },
@@ -414,7 +456,7 @@ module.exports.scenarios = [
       );
       await c.create(
         recoveredNavigation,
-        'id: recovered-nav-target\nname: Recovered Nav Target\ndefinition: Recovered body\ndomains: [test]\n',
+        '_codocs:\n  id: recovered-nav-target\n  name: Recovered Nav Target\nbody: Recovered body\n',
       );
       await c.until(
         () =>
@@ -439,20 +481,20 @@ module.exports.scenarios = [
   },
   {
     id: 'explicit-link-rejected',
-    /** 미저장 대상에서 끝 행을 지운 뒤 클릭하면 Output에 실패만 남고 편집기·탭이 유지된다.
-     * @codocs [[VS Code:원문 열기]]#L37
-     * @codocs [[VS Code:원문 열기]]#L21 */
+    /** 미저장 대상에서 섹션 키를 바꾼 뒤 클릭하면 Output에 실패만 남고 편집기·탭이 유지된다.
+     * */
     async run(c) {
       const document = await c.open(rejectedNavigation);
       const disk = await c.fs.readFile(document.uri.fsPath, 'utf8');
-      const shortened = disk.split('\n').slice(0, 11).join('\n');
-      await c.replace(document, shortened);
+      const renamed = disk.replace('Refund Policy:', 'Renamed Policy:');
+      c.assert.notEqual(renamed, disk);
+      await c.replace(document, renamed);
       const targetTab = c.tabs(rejectedNavigation)[0];
-      await c.open('navigation/rejected-range.java');
+      await c.open('navigation/rejected-section.java');
       const beforeEditor = c.editorState();
       const beforeUi = await c.driver.workbenchState();
       const beforeOutput = await c.output();
-      await c.driver.yamlLink('@codocs [[Rejected Nav Target]]#L11-L12');
+      await c.driver.yamlLink('@codocs [[Rejected Nav Target:Refund Policy]]');
       await c.until(
         /** 입력 계약의 성공·실패 관측을 검증한다. */ async () => {
           const output = await c.output();
@@ -477,30 +519,31 @@ module.exports.scenarios = [
       c.assert.deepEqual(await c.driver.workbenchState(), beforeUi);
       c.assert.equal(c.tabs(rejectedNavigation).length, 1);
       c.assert.equal(c.tabs(rejectedNavigation)[0], targetTab);
-      c.assert.equal(document.getText(), shortened);
+      c.assert.equal(document.getText(), renamed);
       c.assert.ok(document.isDirty);
       c.assert.equal(await c.fs.readFile(document.uri.fsPath, 'utf8'), disk);
     },
   },
   {
-    id: 'reverse-single-direct',
-    /** 코드 하나가 연결한 YAML 행을 수정 키로 클릭하면 코드의 @codocs 표기가 선택된다.
-     * @codocs [[VS Code:원문 열기]]#L40 */
+    id: 'reverse-single-hover',
+    /** 코드 하나가 연결한 섹션 키의 Hover 목록 앵커와 키 옆 Hint로 코드의 @codocs 표기를 선택한다.
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-single.yaml';
       const code = 'navigation/reverse-single.java';
       await c.open(yaml);
       // Hover의 완료 표시로 코드 수집이 끝난 뒤의 단일 연결을 확인한다.
-      const hover = await c.driver.hover(
-        'Reverse single row',
-        '연결된 코드 · 1곳',
-      );
+      const hover = await c.driver.hover('Single Policy', '연결된 코드 · 1곳');
       c.assert.equal(codeAnchors(hover, 'reverse-single.java').length, 1);
-      await c.driver.yamlLink('Reverse single row');
+      await c.driver.clickAnchor('reverse-single.java');
       await selected(
         c,
         code,
-        await markerSelection(c, code, '@codocs [[Reverse Single]]#L3'),
+        await markerSelection(
+          c,
+          code,
+          '@codocs [[Reverse Single:Single Policy]]',
+        ),
         'reverse single marker selected',
       );
     },
@@ -508,29 +551,29 @@ module.exports.scenarios = [
   {
     id: 'reverse-folder-recreate',
     /** 범위 안 폴더를 지웠다 다시 만들어도 연결된 코드 수집이 완료로 돌아오고 이후 편집이 반영된다.
-     * @codocs [[VS Code:원문 열기]]#L40 */
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-recreate.yaml';
       const folder = 'navigation/recreate';
       const code = folder + '/reverse-recreate.java';
-      const marker = '@codocs [[Reverse Recreate]]#L3';
+      const marker = '@codocs [[Reverse Recreate:Recreate Policy]]';
       const text = `class ReverseRecreate {\n  // ${marker}\n}\n`;
       await c.open(yaml);
-      await c.driver.hover('Reverse recreate row', '연결된 코드 · 1곳');
+      await c.driver.hover('Recreate Policy', '연결된 코드 · 1곳');
       // 폴더를 재귀 삭제하고 곧바로 같은 내용으로 다시 만든다.
       await c.fs.rm(c.uri(folder).fsPath, { recursive: true, force: true });
       await c.create(code, text);
       // 감시가 끊겼다 복구된 뒤에도 완료 표시(N곳)로 돌아온다.
-      await c.driver.hover('Reverse recreate row', '연결된 코드 · 1곳');
+      await c.driver.hover('Recreate Policy', '연결된 코드 · 1곳');
       // 다시 만든 파일의 편집이 이후 Hover에 반영된다.
       await c.create(code, text.replace('}\n', `  // ${marker}\n}\n`));
-      await c.driver.hover('Reverse recreate row', '연결된 코드 · 2곳');
+      await c.driver.hover('Recreate Policy', '연결된 코드 · 2곳');
     },
   },
   {
     id: 'reverse-multiple-hover',
-    /** 구현·테스트 두 연결을 Hover의 위치별 앵커로 각각 클릭해 해당 표기를 선택한다.
-     * @codocs [[Language Server:IDE 지원]]#L29 */
+    /** 구현·테스트 두 연결을 섹션 키 Hover의 위치별 앵커로 각각 클릭해 해당 표기를 선택한다.
+     * */
     async run(c) {
       const yaml = '.codocs/reverse-multiple.yaml';
       for (const [label, code] of [
@@ -539,7 +582,7 @@ module.exports.scenarios = [
       ]) {
         await c.open(yaml);
         const hover = await c.driver.hover(
-          'Reverse multiple row',
+          'Multiple Policy',
           '연결된 코드 · 2곳',
         );
         c.assert.equal(codeAnchors(hover, 'reverse-multiple-').length, 2);
@@ -549,48 +592,53 @@ module.exports.scenarios = [
         await selected(
           c,
           code,
-          await markerSelection(c, code, '@codocs [[Reverse Multiple]]#L3'),
+          await markerSelection(
+            c,
+            code,
+            '@codocs [[Reverse Multiple:Multiple Policy]]',
+          ),
           `reverse marker selected: ${label}`,
         );
       }
     },
   },
   {
-    id: 'reverse-overlap-yaml-link',
-    /** 이름 링크와 겹친 행은 YAML 링크가 문서를 열고 코드 연결은 Hover 앵커로만 연다.
-     * @codocs [[Language Server:IDE 지원]]#L35 */
+    id: 'reverse-name-value-hover',
+    /** _codocs.name 값 Hover는 섹션 없는 표기만 목록에 보이고 그 앵커가 표기를 선택한다.
+     * */
     async run(c) {
-      const yaml = '.codocs/reverse-overlap.yaml';
-      const code = 'navigation/reverse-overlap.java';
-      await c.open(yaml);
-      const hover = await c.driver.hover('[[Direct]]', '연결된 코드 · 1곳', 0, {
-        providerLabel: 'Direct',
-      });
-      c.assert.equal(codeAnchors(hover, 'reverse-overlap.java').length, 1);
-      await c.driver.yamlLink('[[Direct]]');
-      await c.atTop('.codocs/direct.yaml');
-      await c.open(yaml);
-      await c.driver.hover('[[Direct]]', '연결된 코드 · 1곳', 0, {
-        providerLabel: 'Direct',
-      });
-      await c.driver.clickAnchor('reverse-overlap.java');
+      const code = 'navigation/reverse-name.java';
+      await c.open('.codocs/reverse-name.yaml');
+      const hover = await c.driver.hover('Reverse Name', '연결된 코드 · 1곳');
+      c.assert.equal(codeAnchors(hover, 'reverse-name.java').length, 1);
+      c.assert.equal(codeAnchors(hover, 'reverse-name-section.java').length, 0);
+      await c.driver.clickAnchor('reverse-name.java');
       await selected(
         c,
         code,
-        await markerSelection(c, code, '@codocs [[Reverse Overlap]]#L3'),
-        'overlap code marker selected',
+        await markerSelection(c, code, '@codocs [[Reverse Name]]'),
+        'reverse name marker selected',
       );
     },
   },
   {
-    id: 'whole-single-gesture',
-    /** 문서 전체 코드 하나는 상단 Inlay label을 수정 키로 클릭해 표기를 선택한다.
-     * @codocs [[Language Server:IDE 지원]]#L43
-     * @codocs [[Language Server:IDE 지원]]#L46 */
+    id: 'whole-single-hint',
+    /** 문서 전체 코드 하나는 첫 행 `코드 1곳` Hint의 Hover 앵커로 표기를 선택하고 Hint 클릭은 이동하지 않는다.
+     * */
     async run(c) {
       const code = 'navigation/whole-single.java';
-      await c.open('.codocs/whole-single.yaml');
-      await c.driver.inlayLink('문서 전체에 연결된 코드 · 1곳');
+      const yaml = '.codocs/whole-single.yaml';
+      await c.open(yaml);
+      const hover = await c.driver.hover('코드 1곳', '연결된 코드 · 1곳');
+      c.assert.equal(codeAnchors(hover, 'whole-single.java').length, 1);
+      // Hint는 표시만 하므로 수정 키 클릭이 다른 파일을 열지 않는다.
+      const before = c.editorState();
+      await c.driver.inlayLink('코드 1곳');
+      const after = c.editorState();
+      c.assert.equal(after.uri, before.uri);
+      c.assert.deepEqual(after.tabs, before.tabs);
+      await c.driver.hover('코드 1곳', '연결된 코드 · 1곳');
+      await c.driver.clickAnchor('whole-single.java');
       await selected(
         c,
         code,
@@ -601,15 +649,12 @@ module.exports.scenarios = [
   },
   {
     id: 'whole-multiple-hover',
-    /** 문서 전체 코드 둘은 Inlay label Hover의 앵커로 고른 표기를 선택한다.
-     * @codocs [[Language Server:IDE 지원]]#L43 */
+    /** 문서 전체 코드 둘은 `코드 2곳` Hint Hover의 앵커로 고른 표기를 선택한다.
+     * */
     async run(c) {
       const code = 'navigation/whole-multiple-test.java';
       await c.open('.codocs/whole-multiple.yaml');
-      const hover = await c.driver.hover(
-        '문서 전체에 연결된 코드 · 2곳',
-        '연결된 코드 · 2곳',
-      );
+      const hover = await c.driver.hover('코드 2곳', '연결된 코드 · 2곳');
       c.assert.equal(codeAnchors(hover, 'whole-multiple-').length, 2);
       await c.driver.clickAnchor('whole-multiple-test.java');
       await selected(
@@ -618,6 +663,203 @@ module.exports.scenarios = [
         await markerSelection(c, code, '@codocs [[Whole Multiple]]'),
         'whole multiple marker selected',
       );
+    },
+  },
+  {
+    id: 'rename-ambiguous-reference-picker',
+    /** name 값에서 F2로 새 이름을 입력하고 선택 목록에서 모호한 참조의 대상을 골라 디스크에 반영한다. */
+    async run(c) {
+      const target = '.codocs/rename-twin-a.yaml';
+      const reference = '.codocs/rename-twin-ref.yaml';
+      const other = '.codocs/rename-twin-b.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const otherBefore = await read(other);
+      await renameWhenIndexed(
+        c,
+        /** 대상 name에서 F2로 새 이름을 넣고 모호한 참조의 대상 파일을 고른다. */ async () => {
+          await c.open(target);
+          await startRename(c, 'Rename Twin', 'Rename Twin Renamed');
+          // 같은 이름의 후보는 도메인 없이 경로로 구분되고 도메인 선택 단계가 없다.
+          const picked = await c.driver.chooseQuickInput('rename-twin-a.yaml');
+          c.assert.ok(!picked.text.includes('alpha'));
+        },
+        async () =>
+          (await read(reference)).includes('[[Rename Twin Renamed]]') &&
+          (await read(target)).includes('name: Rename Twin Renamed'),
+        'rename written to disk',
+      );
+      c.assert.equal(await read(other), otherBefore);
+      await c.until(
+        async () =>
+          (await c.driver.workbenchState()).notifications.some((text) =>
+            text.includes('바꿨습니다'),
+          ),
+        'rename result notification',
+      );
+    },
+  },
+  {
+    id: 'rename-updates-parent',
+    /** 부모 문서의 name 값에서 F2로 이름을 바꾸면 자식의 _codocs.parent 항목이 디스크에 함께 바뀐다. */
+    async run(c) {
+      const target = '.codocs/rename-parent-target.yaml';
+      const child = '.codocs/rename-parent-child.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      await renameWhenIndexed(
+        c,
+        /** 부모 문서 name에서 F2로 새 이름을 넣는다. */ async () => {
+          await c.open(target);
+          await startRename(c, 'Rename Parent Target', 'Rename Parent Renamed');
+        },
+        async () =>
+          (await read(child)).includes('- Rename Parent Renamed') &&
+          (await read(target)).includes('name: Rename Parent Renamed'),
+        'parent rename written to disk',
+      );
+      c.assert.ok(!(await read(child)).includes('Rename Parent Target'));
+    },
+  },
+  {
+    id: 'rename-dirty-file-abort',
+    /** 영향받는 파일에 미저장 수정이 있으면 F2 이름 입력 뒤 중단 안내가 보이고 어느 파일도 바뀌지 않는다. */
+    async run(c) {
+      const target = '.codocs/rename-target.yaml';
+      const reference = '.codocs/rename-ref.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const targetBefore = await read(target);
+      const referenceBefore = await read(reference);
+      const dirty = await c.open(reference);
+      await c.replace(dirty, referenceBefore + '# unsaved\n');
+      await c.open(target);
+      await startRename(c, 'Rename Target', 'Rename Target Renamed');
+      await c.until(
+        () => c.driver.hasText('저장하지 않은 수정이 있는 파일'),
+        'dirty file abort message',
+      );
+      c.assert.equal(await read(target), targetBefore);
+      c.assert.equal(await read(reference), referenceBefore);
+      c.assert.ok(dirty.isDirty);
+    },
+  },
+  {
+    id: 'section-rename-updates-key-and-references',
+    /** 참조의 섹션 부분에서 F2로 섹션 이름을 바꾸면 대상 키와 참조가 디스크에서 함께 바뀌고 문서 name은 그대로다. */
+    async run(c) {
+      const target = '.codocs/section-rename-target.yaml';
+      const reference = '.codocs/section-rename-ref.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      await renameWhenIndexed(
+        c,
+        /** 참조의 섹션 부분에서 F2로 새 섹션 이름을 넣는다. */ async () => {
+          await c.open(reference);
+          await startRenameAt(c, 'Refund Policy', 3, 'Refund Rules');
+        },
+        /** 참조와 대상 키가 디스크에 반영되었는지 확인한다. */ async () =>
+          (await read(reference)).includes(
+            '[[Section Rename Target:Refund Rules]]',
+          ) &&
+          (await read(target)).includes('Refund Rules: Refund policy body'),
+        'section rename written to disk',
+      );
+      const after = await read(target);
+      c.assert.ok(!after.includes('Refund Policy:'));
+      c.assert.ok(after.includes('name: Section Rename Target'));
+      await c.until(
+        async () =>
+          (await c.driver.workbenchState()).notifications.some((text) =>
+            text.includes('섹션 이름을'),
+          ),
+        'section rename result notification',
+      );
+    },
+  },
+  {
+    id: 'section-rename-dirty-file-abort',
+    /** 섹션 키에서 시작한 F2가 참조 파일의 미저장 수정 때문에 중단되고 어느 파일도 바뀌지 않는다. */
+    async run(c) {
+      const target = '.codocs/section-abort-target.yaml';
+      const reference = '.codocs/section-abort-ref.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const targetBefore = await read(target);
+      const referenceBefore = await read(reference);
+      const dirty = await c.open(reference);
+      await c.replace(dirty, referenceBefore + '# unsaved\n');
+      await c.open(target);
+      await startRenameAt(c, 'Abort Policy', 3, 'Abort Rules');
+      await c.until(
+        () => c.driver.hasText('섹션 이름을 바꾸지 않았습니다'),
+        'section dirty file abort message',
+      );
+      c.assert.equal(await read(target), targetBefore);
+      c.assert.equal(await read(reference), referenceBefore);
+      c.assert.ok(dirty.isDirty);
+    },
+  },
+  {
+    id: 'section-rename-updates-code-file-markers',
+    /** 섹션 키 F2 이름 변경이 코드 파일의 그 문서 섹션 표기만 디스크에서 함께 바꾸고 다른 문서의 같은 이름 섹션 표기는 그대로 둔다. */
+    async run(c) {
+      const target = '.codocs/code-rename-target.yaml';
+      const other = '.codocs/code-rename-other.yaml';
+      const code = 'navigation/code-rename.java';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const otherBefore = await read(other);
+      await renameWhenIndexed(
+        c,
+        /** 코드 수집이 끝나 키 Hover에 연결된 코드가 보인 뒤 섹션 키에서 F2로 새 섹션 이름을 넣는다. */ async () => {
+          await c.open(target);
+          await c.driver.hover('Code Policy', '연결된 코드 · 1곳');
+          await c.driver.key('Escape', 'Escape', 27);
+          await startRenameAt(c, 'Code Policy', 3, 'Code Rules');
+        },
+        /** 코드 파일과 대상 키가 디스크에 반영되었는지 확인한다. */ async () =>
+          (await read(code)).includes('[[Code Rename Target:Code Rules]]#L9') &&
+          (await read(target)).includes('Code Rules: Policy body'),
+        'code file rename written to disk',
+      );
+      const after = await read(code);
+      c.assert.ok(after.includes('@codocs [[Code Rename Other:Code Policy]]'));
+      c.assert.ok(!after.includes('Target:Code Policy'));
+      c.assert.equal(await read(other), otherBefore);
+      await c.until(
+        async () =>
+          (await c.driver.workbenchState()).notifications.some((text) =>
+            text.includes('섹션 이름을'),
+          ),
+        'code file rename result notification',
+      );
+    },
+  },
+  {
+    id: 'section-rename-dirty-code-file-abort',
+    /** 섹션 키 F2가 코드 파일의 미저장 수정 때문에 중단되고 어느 파일도 바뀌지 않는다. */
+    async run(c) {
+      const target = '.codocs/code-abort-target.yaml';
+      const code = 'navigation/code-abort.java';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const targetBefore = await read(target);
+      const codeBefore = await read(code);
+      const dirty = await c.open(code);
+      await c.replace(dirty, codeBefore + '// unsaved\n');
+      await c.open(target);
+      // 코드 수집이 끝나 연결된 코드가 Hover에 보이기 전에는 이름 변경이 진행 중 수집으로 막힌다.
+      await c.driver.hover('Code Abort Policy', '연결된 코드 · 1곳');
+      await c.driver.key('Escape', 'Escape', 27);
+      await startRenameAt(c, 'Code Abort Policy', 3, 'Code Abort Rules');
+      await c.until(
+        () => c.driver.hasText('섹션 이름을 바꾸지 않았습니다'),
+        'dirty code file abort message',
+      );
+      c.assert.equal(await read(target), targetBefore);
+      c.assert.equal(await read(code), codeBefore);
+      c.assert.ok(dirty.isDirty);
     },
   },
 ];

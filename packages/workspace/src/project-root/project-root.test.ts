@@ -40,7 +40,7 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
         },
       });
     });
-    it('상대 project를 지정하면 시작 cwd 기준 디렉터리를 선택한다', /** 상대 project를 지정하면 시작 cwd 기준 디렉터리를 선택한다.  @codocs [[작업 공간:프로젝트 루트]]#L13 */ async () => {
+    it('상대 project를 지정하면 시작 cwd 기준 디렉터리를 선택한다', /** 상대 project를 지정하면 시작 cwd 기준 디렉터리를 선택한다. */ async () => {
       await mkdir(path.join(fixture, '선택 폴더'));
       const input = { cwd: fixture, project: './선택 폴더' };
       expect(await resolveProjectRoot(input)).toMatchObject({
@@ -57,7 +57,7 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
         root: { projectRoot: selected },
       });
     });
-    it('상위에 .codocs와 .git이 있으면 하위 cwd를 루트로 유지한다', /** 상위에 .codocs와 .git이 있으면 하위 cwd를 루트로 유지한다.  @codocs [[작업 공간:프로젝트 루트]]#L12 */ async () => {
+    it('상위에 .codocs와 .git이 있으면 하위 cwd를 루트로 유지한다', /** 상위에 .codocs와 .git이 있으면 하위 cwd를 루트로 유지한다. */ async () => {
       await mkdir(path.join(fixture, '.codocs'));
       await mkdir(path.join(fixture, '.git'));
       const child = path.join(fixture, 'child');
@@ -95,7 +95,7 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
         });
       },
     );
-    it('없는 루트를 선택하면 실제 ENOENT 코드와 선택 경로만 반환한다', /** 없는 루트를 선택하면 실제 ENOENT 코드와 선택 경로만 반환한다.  @codocs [[작업 공간:작업 공간 진단]]#L11-L12 */ async () => {
+    it('없는 루트를 선택하면 실제 ENOENT 코드와 선택 경로만 반환한다', /** 없는 루트를 선택하면 실제 ENOENT 코드와 선택 경로만 반환한다. */ async () => {
       const selected = path.join(fixture, 'missing');
       const input = {
         cwd: fixture,

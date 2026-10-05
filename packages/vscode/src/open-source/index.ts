@@ -89,7 +89,7 @@ export class OpenSourceFailure extends Error {
 }
 
 /** 현재 확장 실행의 최근 실패만 기억하여 반복 클릭 로그를 억제한다.
- * @codocs [[VS Code:원문 열기]]#L21 */
+ * */
 export class OpenSourceFailureReporter {
   readonly #appendLine: (message: string) => void;
   readonly #reported = new Set<string>();
@@ -116,7 +116,7 @@ export class OpenSourceFailureReporter {
 }
 
 /** 외부 입력에서 source URI와 서버 토큰의 형태를 확인한다.
- * @codocs [[VS Code:원문 열기]] */
+ * */
 export function validSourceArgument(
   value: unknown,
 ): value is OpenSourceCommandArgument {
@@ -154,9 +154,8 @@ export function trustGeneratedOpenSourceHoverContents(contents: unknown): void {
   }
 }
 
-/** 최신 선택 확인 후 기존 dirty buffer를 보존하며 연다. 전체 문서 대상은 (0,0) 빈 선택을 적용하고, 행·위치 대상은 현재 원문에서 그 범위를 선택한다. 확인된 행·위치가 현재 원문에 없으면 선택하지 않고 destination_unavailable 실패를 기록한다.
- * @codocs [[VS Code:원문 열기]]
- * @codocs [[VS Code:원문 열기]]#L25-L30 */
+/** 최신 선택 확인 후 기존 dirty buffer를 보존하며 연다. 전체 문서 대상은 (0,0) 빈 선택을 적용하고, 위치 대상은 현재 원문에서 그 범위를 선택한다. 확인된 위치가 현재 원문에 없으면 선택하지 않고 destination_unavailable 실패를 기록한다.
+ * */
 export async function openSource<Document extends OpenSourceDocument>(
   argument: unknown,
   host: OpenSourceHost<Document>,
@@ -221,8 +220,7 @@ export async function openSource<Document extends OpenSourceDocument>(
 }
 
 /** 실제 현재 buffer의 두 끝이 존재할 때만 선택하며 범위를 보정하지 않는다.
- * @codocs [[VS Code:원문 열기]]#L35-L38
- * @codocs [[VS Code:원문 열기]]#L44 */
+ * */
 export function sourceSelection(
   text: string,
   destination: unknown,
@@ -235,29 +233,7 @@ export function sourceSelection(
     return undefined;
   if (destination.kind === 'top')
     return { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } };
-  const rows = text.split(/\r\n|\r|\n/u);
-  if (
-    destination.kind === 'rows' &&
-    'startLine' in destination &&
-    'endLine' in destination
-  ) {
-    const start = destination.startLine,
-      end = destination.endLine;
-    if (
-      typeof start !== 'number' ||
-      typeof end !== 'number' ||
-      !Number.isSafeInteger(start) ||
-      !Number.isSafeInteger(end) ||
-      start < 1 ||
-      end < start ||
-      end > rows.length
-    )
-      return undefined;
-    return {
-      start: { line: start - 1, character: 0 },
-      end: { line: end - 1, character: rows[end - 1]!.length },
-    };
-  }
+  const lines = text.split(/\r\n|\r|\n/u);
   if (destination.kind === 'occurrence' && 'range' in destination) {
     const range = destination.range as Partial<OpenSourceRange> | null;
     /** 현재 buffer에 존재하는 실제 UTF-16 끝인지 확인한다. */
@@ -268,9 +244,9 @@ export function sourceSelection(
       Number.isSafeInteger(position.line) &&
       Number.isSafeInteger(position.character) &&
       position.line >= 0 &&
-      position.line < rows.length &&
+      position.line < lines.length &&
       position.character >= 0 &&
-      position.character <= rows[position.line]!.length;
+      position.character <= lines[position.line]!.length;
     if (
       !range ||
       !valid(range.start) ||
@@ -287,14 +263,14 @@ export function sourceSelection(
       return undefined;
     const selected =
       range.start.line === range.end.line
-        ? rows[range.start.line]!.slice(
+        ? lines[range.start.line]!.slice(
             range.start.character,
             range.end.character,
           )
         : [
-            rows[range.start.line]!.slice(range.start.character),
-            ...rows.slice(range.start.line + 1, range.end.line),
-            rows[range.end.line]!.slice(0, range.end.character),
+            lines[range.start.line]!.slice(range.start.character),
+            ...lines.slice(range.start.line + 1, range.end.line),
+            lines[range.end.line]!.slice(0, range.end.character),
           ].join('\n');
     if (selected !== destination.markerText) return undefined;
     return { start: { ...range.start }, end: { ...range.end } };
