@@ -20,7 +20,10 @@ import {
 } from '../parser/index.js';
 import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import type { ReferenceOccurrence } from '../references/index.js';
-import { extractReferences } from '../references/index.js';
+import {
+  extractReferences,
+  getReferencePartRanges,
+} from '../references/index.js';
 import {
   codocsKey,
   documentFields,
@@ -32,6 +35,7 @@ import {
   catalogFailureKinds,
   referenceResolutionStatuses,
   renameBlockingReasons,
+  renameChangeKinds,
   renameImpactReasons,
   renamePlanStatuses,
   scanStatuses,
@@ -39,6 +43,7 @@ import {
   type CatalogFailureKind,
   type ReferenceResolutionStatus,
   type RenameBlockingReason,
+  type RenameChangeKind,
   type RenameImpactReason,
   type RenamePlanStatus,
   type ScanStatus,
@@ -907,6 +912,8 @@ export interface RenameChange {
   candidates: readonly ReferenceCandidate[];
   /** 본문 참조 등장의 순번이다. 이름 필드와 parent 항목 수정에는 없다. */
   occurrenceIndex?: number;
+  /** 값이 아니라 섹션 키 이름을 바꾸는 수정이면 key다. 이때 offsetRange는 따옴표를 포함한 키 범위다. */
+  kind?: RenameChangeKind;
 }
 /** 자동 확정하지 않은 영향 및 변경 후 다른 후보가 되는 영향도 보고한다. */
 export interface RenameImpact {
@@ -932,6 +939,17 @@ export interface RenamePlan {
   impacts: readonly RenameImpact[];
   invalidSelections: readonly RenameSelection[];
   blockingReason?: RenameBlockingReason;
+  /** 섹션 이름 변경 계획이면 바꾸기 전 섹션 이름이다. 이때 oldName·newName도 섹션 이름이다. */
+  targetSection?: string;
+}
+/** 문서 하나의 최상위 섹션 이름을 바꾸는 계산 요청이다. */
+export interface SectionRenameRequest {
+  targetPath: string;
+  /** 바꾸기 전 섹션 이름이다. */
+  section: string;
+  /** 새 섹션 이름이다. */
+  newName: string;
+  selections?: readonly RenameSelection[];
 }
 /** 새 표기를 공개 문법 추출로 round trip 검증한다. 표현 불가능한 구성은 추측하지 않는다. */
 function referenceText(name: string, section?: string): string | undefined {
@@ -1295,6 +1313,222 @@ export function planRename(
       invalidSelections: rejectedSelections,
       blockingReason: renameBlockingReasons.invalidSelection,
     };
+  changes.sort(
+    /** 경로와 실제 원문 offset 순서로 수정안을 정렬한다. */ (a, b) =>
+      a.path < b.path
+        ? -1
+        : a.path > b.path
+          ? 1
+          : a.offsetRange.start - b.offsetRange.start,
+  );
+  return {
+    ...initial,
+    status: impacts.length
+      ? renamePlanStatuses.unresolved
+      : renamePlanStatuses.ready,
+    changes,
+    impacts,
+  };
+}
+
+/** 참조 구성 안의 콜론을 구분자와 구분되도록 `\:`로 쓴다. */
+function encodeColon(value: string): string {
+  return value.replace(/:/gu, '\\:');
+}
+/**
+ * 섹션 이름 변경의 새 이름이 쓸 수 없는 이름인지 확인한다.
+ * 비어 있거나 `_`로 시작하거나 대괄호를 포함하면 쓸 수 없다.
+ */
+function invalidSectionName(name: string): boolean {
+  return !nonblank(name) || name.startsWith('_') || /[\[\]]/u.test(name);
+}
+/**
+ * 섹션 이름 변경 선택이 가리키는 등장이 있고 그 후보 안의 대상인지 검사해 잘못된 선택을 모은다.
+ */
+function invalidSectionSelections(
+  catalog: Catalog,
+  selections: readonly RenameSelection[],
+): RenameSelection[] {
+  return selections.filter(
+    /** 존재하지 않는 등장·리터럴·후보 밖 대상·중복 선택을 임의로 무시하지 않는다. */ (
+      selection,
+      index,
+    ) => {
+      const item = catalog.documents.get(selection.sourcePath)?.occurrences[
+        selection.occurrenceIndex
+      ];
+      return (
+        !Number.isInteger(selection.occurrenceIndex) ||
+        selection.occurrenceIndex < 0 ||
+        !item ||
+        item.occurrence.syntax !== referenceSyntaxStatuses.valid ||
+        !item.resolution.candidates.some(
+          (c) => c.path === selection.targetPath,
+        ) ||
+        selections.some(
+          (other, otherIndex) =>
+            index !== otherIndex &&
+            other.sourcePath === selection.sourcePath &&
+            other.occurrenceIndex === selection.occurrenceIndex,
+        )
+      );
+    },
+  );
+}
+/**
+ * 문서 하나의 최상위 섹션 이름을 바꾸는 수정안을 계산한다. 파일·입력·원문은 변경하지 않는다.
+ * 섹션 키를 새 이름으로 바꾸고 그 문서의 그 섹션으로 확정된 모든 `[[문서:섹션]]`의 섹션 부분을 함께 고친다.
+ * 섹션 부분만 고치므로 문서 이름 부분과 `:`는 원문 그대로다. 후보가 여럿이라 모호했던 참조는 선택을 따른다.
+ * @param catalog 같은 스캔에서 만든 색인이다.
+ * @param request 대상 문서 경로·바꿀 섹션·새 섹션 이름·선택이다.
+ * @returns 문서 이름 변경과 같은 형태의 계획이다. oldName·newName은 섹션 이름이고 targetSection에 현재 섹션 이름이 담긴다.
+ */
+export function planSectionRename(
+  catalog: Catalog,
+  request: SectionRenameRequest,
+): RenamePlan {
+  const target = catalog.documents.get(request.targetPath);
+  const initial: RenamePlan = {
+    targetPath: request.targetPath,
+    oldName: request.section,
+    targetSection: request.section,
+    newName: request.newName,
+    status: renamePlanStatuses.blocked,
+    changes: [],
+    conflicts: [],
+    impacts: [],
+    invalidSelections: [],
+  };
+  const parsed = target?.observation.parsed;
+  if (!target || target.name === undefined || !parsed?.success)
+    return {
+      ...initial,
+      blockingReason: renameBlockingReasons.targetUnavailable,
+    };
+  if (invalidSectionName(request.newName))
+    return { ...initial, blockingReason: renameBlockingReasons.invalidName };
+  if (
+    catalog.status !== scanStatuses.complete ||
+    target.confirmation !== catalogConfirmations.confirmed
+  )
+    return { ...initial, blockingReason: renameBlockingReasons.unconfirmed };
+  const sections = getSectionNames(parsed);
+  if (!sections.includes(request.section))
+    return {
+      ...initial,
+      blockingReason: renameBlockingReasons.sectionNotFound,
+    };
+  if (request.newName === request.section)
+    return { ...initial, blockingReason: renameBlockingReasons.invalidName };
+  if (sections.includes(request.newName))
+    return {
+      ...initial,
+      conflicts: [{ candidates: [candidate(target)] }],
+      blockingReason: renameBlockingReasons.sectionConflict,
+    };
+  const selections = request.selections ?? [];
+  const invalidSelections = invalidSectionSelections(catalog, selections);
+  if (invalidSelections.length)
+    return {
+      ...initial,
+      invalidSelections,
+      blockingReason: renameBlockingReasons.invalidSelection,
+    };
+  const keyRange = getSectionKeyRange(target, request.section);
+  if (!keyRange)
+    return {
+      ...initial,
+      blockingReason: renameBlockingReasons.targetUnavailable,
+    };
+  const unrepresentable: RenamePlan = {
+    ...initial,
+    blockingReason: renameBlockingReasons.unrepresentable,
+  };
+  if (referenceText(target.name, request.newName) === undefined)
+    return unrepresentable;
+  const changes: RenameChange[] = [
+    {
+      path: target.path,
+      fieldPath: [request.section],
+      offsetRange: keyRange.offsetRange,
+      range: keyRange.range,
+      oldText: request.section,
+      newText: request.newName,
+      targetPath: target.path,
+      candidates: [candidate(target)],
+      kind: renameChangeKinds.key,
+    },
+  ];
+  const impacts: RenameImpact[] = [];
+  const oldText = encodeColon(request.section);
+  const newText = encodeColon(request.newName);
+  for (const doc of catalog.documents.values())
+    for (
+      let occurrenceIndex = 0;
+      occurrenceIndex < doc.occurrences.length;
+      occurrenceIndex++
+    ) {
+      const item = doc.occurrences[occurrenceIndex];
+      if (
+        !item ||
+        item.occurrence.syntax !== referenceSyntaxStatuses.valid ||
+        item.occurrence.section !== request.section
+      )
+        continue;
+      const occurrence = item.occurrence,
+        before = item.resolution;
+      const ambiguous = before.status === referenceResolutionStatuses.ambiguous;
+      const confirmed =
+        (before.status === referenceResolutionStatuses.resolved ||
+          before.status === referenceResolutionStatuses.self) &&
+        before.target?.path === target.path &&
+        before.section === request.section;
+      if (
+        !confirmed &&
+        !(ambiguous && before.candidates.some((c) => c.path === target.path))
+      )
+        continue;
+      if (ambiguous) {
+        const selection = selections.find(
+          (s) =>
+            s.sourcePath === doc.path && s.occurrenceIndex === occurrenceIndex,
+        );
+        if (!selection) {
+          impacts.push({
+            path: doc.path,
+            occurrenceIndex,
+            occurrence,
+            before,
+            after: before,
+            reason: renameImpactReasons.selectionRequired,
+          });
+          continue;
+        }
+        if (selection.targetPath !== target.path) continue;
+      }
+      const docParsed = doc.observation.parsed;
+      if (!docParsed.success) return unrepresentable;
+      const part = getReferencePartRanges(docParsed, occurrence)?.section;
+      const start = part
+        ? offsetToPosition(docParsed.source, part.start)
+        : undefined;
+      const end = part
+        ? offsetToPosition(docParsed.source, part.end)
+        : undefined;
+      if (!part || !start || !end || !occurrence.text.endsWith(`:${oldText}]]`))
+        return unrepresentable;
+      changes.push({
+        path: doc.path,
+        fieldPath: [...occurrence.fieldPath],
+        offsetRange: part,
+        range: { start, end },
+        oldText,
+        newText,
+        targetPath: target.path,
+        candidates: before.candidates,
+        occurrenceIndex,
+      });
+    }
   changes.sort(
     /** 경로와 실제 원문 offset 순서로 수정안을 정렬한다. */ (a, b) =>
       a.path < b.path

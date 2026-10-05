@@ -8,6 +8,7 @@ import {
 import {
   buildCatalog,
   catalogConfirmations,
+  renameChangeKinds,
   scanStatuses,
   type Catalog,
   type RenameChange,
@@ -758,6 +759,23 @@ function setAtPath(
   return true;
 }
 
+/** 키의 원문 표기 형식에 맞춰 새 키 이름을 쓴다. 따옴표는 유지하고 plain은 따옴표로 승격하지 않는다. */
+function keyText(value: string, type: string | undefined): string | undefined {
+  const quote =
+    type === scalarSourceTypes.doubleQuoted
+      ? '"'
+      : type === scalarSourceTypes.singleQuoted
+        ? "'"
+        : type === scalarSourceTypes.plain
+          ? ''
+          : undefined;
+  const escaped =
+    quote === undefined ? undefined : escapeForScalar(value, type);
+  return quote === undefined || escaped === undefined
+    ? undefined
+    : quote + escaped + quote;
+}
+
 /**
  * 이름 변경 수정안을 원문 offset으로만 적용한다. 바꾸는 위치 밖의 원문은 그대로 두고,
  * 새 텍스트는 그 위치의 YAML 스칼라 형식(plain·작은따옴표·큰따옴표·block)에 맞게 escape한다.
@@ -776,11 +794,40 @@ export function applyRenameChanges(
     (a, b) => b.offsetRange.start - a.offsetRange.start,
   );
   const expectedValues = new Map<string, string>();
+  let keyRename: { oldText: string; newText: string; type: string } | undefined;
   let result = source;
   let limit = source.length;
   for (const change of ordered) {
     const { start, end } = change.offsetRange;
     if (start < 0 || end < start || end > limit) return { success: false };
+    if (change.kind === renameChangeKinds.key) {
+      const pair =
+        keyRename === undefined && isMap(document.contents)
+          ? document.contents.items.find(
+              (item) => isScalar(item.key) && item.key.value === change.oldText,
+            )
+          : undefined;
+      const key = pair?.key;
+      if (
+        !isScalar(key) ||
+        change.fieldPath.length !== 1 ||
+        change.fieldPath[0] !== change.oldText ||
+        key.range?.[0] !== start ||
+        key.range[1] !== end ||
+        key.type === undefined
+      )
+        return { success: false };
+      const written = keyText(change.newText, key.type);
+      if (written === undefined) return { success: false };
+      result = result.slice(0, start) + written + result.slice(end);
+      limit = start;
+      keyRename = {
+        oldText: change.oldText,
+        newText: change.newText,
+        type: key.type,
+      };
+      continue;
+    }
     const mapping = parsed.strings.find(
       (item) =>
         item.fieldPath.length === change.fieldPath.length &&
@@ -806,13 +853,35 @@ export function applyRenameChanges(
   }
   const reparsed = parseYaml(result);
   if (!reparsed.success) return { success: false };
-  const expectedData = JSON.parse(JSON.stringify(parsed.data)) as Record<
+  let expectedData = JSON.parse(JSON.stringify(parsed.data)) as Record<
     string,
     unknown
   >;
   for (const [key, value] of expectedValues) {
     const fieldPath = JSON.parse(key) as (string | number)[];
     if (!setAtPath(expectedData, fieldPath, value)) return { success: false };
+  }
+  if (keyRename) {
+    const { oldText, newText, type } = keyRename;
+    expectedData = Object.fromEntries(
+      Object.entries(expectedData).map(([name, value]) => [
+        name === oldText ? newText : name,
+        value,
+      ]),
+    );
+    const root = parseDocument(result).contents;
+    const renamed = isMap(root)
+      ? root.items.find(
+          (item) => isScalar(item.key) && item.key.value === newText,
+        )?.key
+      : undefined;
+    /** 키가 문자열 그대로 읽히고 형식이 같으며 순서가 유지되어야 한다. */
+    if (
+      !isScalar(renamed) ||
+      renamed.type !== type ||
+      !same(Object.keys(reparsed.data), Object.keys(expectedData))
+    )
+      return { success: false };
   }
   return same(reparsed.data, expectedData)
     ? { success: true, raw: result }

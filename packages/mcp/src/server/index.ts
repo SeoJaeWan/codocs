@@ -104,7 +104,7 @@ export function createCodocsServer(
       'codocs_rename',
       {
         description:
-          '문서 이름을 바꾸고 그 문서를 가리키던 참조를 함께 고칩니다. mode preview는 파일과 색인을 바꾸지 않고 상태(ready·unresolved·blocked), 변경 목록, 선택이 필요한 모호 참조의 후보, 충돌, 영향받는 파일별 revisions를 반환합니다. mode apply는 같은 id·newName·selections와 preview가 돌려준 revisions를 그대로 받아 다시 계산한 뒤 저장하며, blocked이거나 revision·영향 파일이 달라졌으면 파일을 바꾸지 않고 거절합니다. selections의 sourcePath·occurrenceIndex·targetPath는 preview 결과의 값을 그대로 사용합니다.',
+          '문서 이름을 바꾸고 그 문서를 가리키던 참조를 함께 고칩니다. section(현재 섹션 이름)을 주면 그 문서의 최상위 섹션 이름을 바꾸고 그 섹션을 가리키던 [[문서:섹션]] 참조를 함께 고치며, 이때 newName은 새 섹션 이름이고 결과에 targetSection이 추가됩니다(section_conflict·section_not_found 등으로 blocked일 수 있음). section이 없으면 문서 이름 변경입니다. mode preview는 파일과 색인을 바꾸지 않고 상태(ready·unresolved·blocked), 변경 목록, 선택이 필요한 모호 참조의 후보, 충돌, 영향받는 파일별 revisions를 반환합니다. mode apply는 같은 id·newName·selections와 preview가 돌려준 revisions를 그대로 받아 다시 계산한 뒤 저장하며, blocked이거나 revision·영향 파일이 달라졌으면 파일을 바꾸지 않고 거절합니다. selections의 sourcePath·occurrenceIndex·targetPath는 preview 결과의 값을 그대로 사용합니다.',
         execute: handlers.codocsRename.bind(handlers),
       },
     ],

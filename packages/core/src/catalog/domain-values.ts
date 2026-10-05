@@ -90,6 +90,10 @@ export const renameBlockingReasons = {
   sourceNotLossless: 'source_not_lossless',
   /** 바꿀 위치의 YAML 표기 형식으로 새 값을 안전하게 쓸 수 없다. */
   unrepresentable: 'unrepresentable',
+  /** 섹션 이름 변경에서 같은 이름의 섹션이 대상 문서에 이미 있다. */
+  sectionConflict: 'section_conflict',
+  /** 섹션 이름 변경의 대상 섹션이 문서에 없다. */
+  sectionNotFound: 'section_not_found',
 } as const;
 /** 원본 상수에서 도출한 RenameBlockingReason 타입이다. */
 export type RenameBlockingReason =
@@ -107,3 +111,12 @@ export const catalogFailureKinds = {
 /** 원본 상수에서 도출한 CatalogFailureKind 타입이다. */
 export type CatalogFailureKind =
   (typeof catalogFailureKinds)[keyof typeof catalogFailureKinds];
+
+/** RenameChangeKind의 원본 값과 의미다. 본문 값 수정에는 kind를 적지 않는다. @domainValues */
+export const renameChangeKinds = {
+  /** 문서 최상위 섹션 키 이름을 바꾸는 수정이다. 따옴표 형식은 유지한다. */
+  key: 'key',
+} as const;
+/** 원본 상수에서 도출한 RenameChangeKind 타입이다. */
+export type RenameChangeKind =
+  (typeof renameChangeKinds)[keyof typeof renameChangeKinds];

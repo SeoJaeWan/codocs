@@ -355,6 +355,150 @@ describe('codocs_rename apply', () => {
   });
 });
 
+const refund =
+  '_codocs:\n  id: refund\n  name: 환불\n환불정책: 환불 규정 본문\n예외: "[[환불:환불정책]]"\n';
+const payment =
+  '_codocs:\n  id: payment\n  name: 결제\n취소: "[[환불:환불정책]] [[환불:없는섹션]] [[환불]]"\n';
+
+describe('codocs_rename section', () => {
+  const input = { id: 'refund', section: '환불정책', newName: '환불 규정' };
+
+  it('section preview는 섹션 이름을 oldName·newName으로 돌려주고 targetSection을 더하며 파일을 바꾸지 않는다', async () => {
+    await start({ 'refund.yaml': refund, 'payment.yaml': payment });
+    const result = await call('codocs_rename', { mode: 'preview', ...input });
+    expect(result).toMatchObject({
+      success: true,
+      status: 'ready',
+      oldName: '환불정책',
+      newName: '환불 규정',
+      targetSection: '환불정책',
+      impacts: [],
+      conflicts: [],
+    });
+    expect(result.changes).toHaveLength(3);
+    expect(Object.keys(result.revisions).sort()).toEqual([
+      path.join('.codocs', 'payment.yaml'),
+      path.join('.codocs', 'refund.yaml'),
+    ]);
+    expect(await read('refund.yaml')).toBe(refund);
+    expect(await read('payment.yaml')).toBe(payment);
+  });
+
+  it('section apply는 키와 확정 참조를 고치고 나머지 원문은 그대로 둔다', async () => {
+    await start({ 'refund.yaml': refund, 'payment.yaml': payment });
+    const preview = await call('codocs_rename', { mode: 'preview', ...input });
+    const result = await call('codocs_rename', {
+      mode: 'apply',
+      ...input,
+      revisions: preview.revisions,
+    });
+    expect(result).toMatchObject({
+      success: true,
+      saved: true,
+      changed: true,
+      indexUpdated: true,
+    });
+    expect(await read('refund.yaml')).toBe(
+      '_codocs:\n  id: refund\n  name: 환불\n환불 규정: 환불 규정 본문\n예외: "[[환불:환불 규정]]"\n',
+    );
+    expect(await read('payment.yaml')).toBe(
+      '_codocs:\n  id: payment\n  name: 결제\n취소: "[[환불:환불 규정]] [[환불:없는섹션]] [[환불]]"\n',
+    );
+  });
+
+  it('같은 이름의 섹션이 있으면 section_conflict로 blocked이고 apply는 파일을 바꾸지 않는다', async () => {
+    const taken = `${refund}환불 규정: 이미 있음\n`;
+    await start({ 'refund.yaml': taken, 'payment.yaml': payment });
+    const preview = await call('codocs_rename', { mode: 'preview', ...input });
+    expect(preview).toMatchObject({
+      success: true,
+      status: 'blocked',
+      blockingReason: 'section_conflict',
+      changes: [],
+    });
+    const result = await call('codocs_rename', {
+      mode: 'apply',
+      ...input,
+      revisions: preview.revisions,
+    });
+    expect(result).toMatchObject({
+      success: false,
+      saved: false,
+      changed: false,
+      error: { code: 'rename_blocked' },
+      preview: { blockingReason: 'section_conflict' },
+    });
+    expect(await read('refund.yaml')).toBe(taken);
+    expect(await read('payment.yaml')).toBe(payment);
+  });
+
+  it('없는 섹션은 section_not_found로 blocked다', async () => {
+    await start({ 'refund.yaml': refund });
+    expect(
+      await call('codocs_rename', {
+        mode: 'preview',
+        ...input,
+        section: '없는섹션',
+      }),
+    ).toMatchObject({
+      status: 'blocked',
+      blockingReason: 'section_not_found',
+    });
+  });
+
+  it('preview 뒤 영향 파일을 바꾸면 revision_conflict로 거절하고 아무 파일도 바꾸지 않는다', async () => {
+    await start({ 'refund.yaml': refund, 'payment.yaml': payment });
+    const preview = await call('codocs_rename', { mode: 'preview', ...input });
+    const edited = `${payment}# 사람이 고침\n`;
+    await writeFile(path.join(project, '.codocs', 'payment.yaml'), edited);
+    const result = await call('codocs_rename', {
+      mode: 'apply',
+      ...input,
+      revisions: preview.revisions,
+    });
+    expect(result).toMatchObject({
+      success: false,
+      saved: false,
+      changed: false,
+      error: { code: 'revision_conflict' },
+    });
+    expect(await read('payment.yaml')).toBe(edited);
+    expect(await read('refund.yaml')).toBe(refund);
+  });
+
+  it('section이 비어 있으면 invalid_input이다', async () => {
+    await start({ 'refund.yaml': refund });
+    expect(
+      await call('codocs_rename', { mode: 'preview', ...input, section: '' }),
+    ).toMatchObject({ success: false, error: { code: 'invalid_input' } });
+    expect(await read('refund.yaml')).toBe(refund);
+  });
+
+  it('section 없는 기존 요청은 문서 이름 변경이며 알 수 없는 속성은 계속 invalid_input이다', async () => {
+    await start({ 'refund.yaml': refund, 'payment.yaml': payment });
+    const result = await call('codocs_rename', {
+      mode: 'preview',
+      id: 'refund',
+      newName: '새환불',
+    });
+    expect(result).toMatchObject({
+      success: true,
+      status: 'ready',
+      oldName: '환불',
+      newName: '새환불',
+    });
+    expect(result).not.toHaveProperty('targetSection');
+    expect(
+      await call('codocs_rename', {
+        mode: 'preview',
+        id: 'refund',
+        newName: '새환불',
+        target: '환불정책',
+      }),
+    ).toMatchObject({ success: false, error: { code: 'invalid_input' } });
+  });
+});
+
 describe('codocs_write의 이름 변경 거부', () => {
   it('update의 set.name이 현재 이름과 다르면 저장하지 않고 codocs_rename을 안내한다', async () => {
     await start({ 'order.yaml': order });
