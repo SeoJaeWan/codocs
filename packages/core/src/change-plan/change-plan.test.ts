@@ -46,6 +46,7 @@ const baseDocument: CatalogDocument = {
   occurrences: [],
   references: [],
   referencedBy: [],
+  sectionReferencedBy: [],
 };
 const baseCatalog: Catalog = {
   status: scanStatuses.complete,

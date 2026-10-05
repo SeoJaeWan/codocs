@@ -1590,3 +1590,55 @@ describe('live 참조와 선택 최신 확인', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe('문서 이름과 섹션 참조의 조회와 검증', () => {
+  /** 환불 문서와 섹션 참조를 쓴 결제 문서를 만든다. */
+  async function writeRefundProject(): Promise<void> {
+    await file(
+      'refund.yaml',
+      '_codocs:\n  id: refund\n  name: 환불\n환불정책: 정책\n',
+    );
+    await file(
+      'payment.yaml',
+      '_codocs:\n  id: payment\n  name: 결제\n취소: "[[환불:환불정책]] [[환불:없는섹션]]"\n',
+    );
+  }
+
+  it('validate는 섹션이 없는 참조를 section_reference_not_found 오류로 반환한다', async () => {
+    await writeRefundProject();
+    const session = createWorkspaceQuerySession({ cwd: project });
+
+    const result = await session.validate();
+
+    expect(result).toMatchObject({ success: true });
+    if (!result.success) return;
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        code: queryDiagnosticCodes.sectionReferenceNotFound,
+        severity: diagnosticSeverities.error,
+        path: path.join('.codocs', 'payment.yaml'),
+      }),
+    ]);
+  });
+
+  it('get은 섹션 진단을 보이고 references와 referencedBy는 문서 ID 목록으로 유지한다', async () => {
+    await writeRefundProject();
+    const session = createWorkspaceQuerySession({ cwd: project });
+
+    const result = await session.get(['payment', 'refund']);
+
+    expect(result).toMatchObject({ success: true });
+    if (!result.success) return;
+    expect(result.results[0]).toMatchObject({
+      found: true,
+      references: ['refund'],
+      referencedBy: [],
+      diagnostics: [{ code: queryDiagnosticCodes.sectionReferenceNotFound }],
+    });
+    expect(result.results[1]).toMatchObject({
+      found: true,
+      references: [],
+      referencedBy: ['payment'],
+    });
+  });
+});

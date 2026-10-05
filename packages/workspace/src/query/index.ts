@@ -356,7 +356,7 @@ export type WorkspaceLiveReferenceResponse =
 
 /** 선택의 원래 의미를 보존하는 출처다. 이름 참조는 별도로 재확인한다. */
 export type WorkspaceCandidateOrigin = {
-  reference: { name: string; domain?: string };
+  reference: { name: string; section?: string };
   sourcePath: string;
   explicit?: boolean;
 };

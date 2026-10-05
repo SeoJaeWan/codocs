@@ -135,7 +135,7 @@ describe('applyWorkspaceRename: 이름 변경 반영', () => {
   });
 
   describe('진행할 수 없는 이름 변경과 오래된 미리보기의 거절', () => {
-    it('같은 도메인에 새 이름과 같은 문서가 있으면 blocked로 거절하고 파일을 바꾸지 않는다', async () => {
+    it('새 이름과 같은 문서가 있으면 blocked로 거절하고 파일을 바꾸지 않는다', async () => {
       await writeDocuments({
         'other.yaml':
           '_codocs:\n  id: other\n  name: 새주문\ndefinition: 설명\n',

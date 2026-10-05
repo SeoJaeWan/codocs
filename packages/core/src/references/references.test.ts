@@ -5,7 +5,7 @@ import {
 } from '../diagnostics/index.js';
 import { parseYaml } from '../parser/index.js';
 import { referenceSyntaxStatuses } from './domain-values.js';
-import { extractReferences } from './index.js';
+import { extractReferences, getReferencePartRanges } from './index.js';
 
 describe('extractReferences: 본문 문자열에서 참조 추출', () => {
   it('정의에 참조가 하나 있으면 이름과 실제 원문 위치를 반환한다', () => {
@@ -134,42 +134,42 @@ describe('extractReferences: 본문 문자열에서 참조 추출', () => {
   });
 });
 
-describe('표기: 참조 이름과 도메인', () => {
-  it('이름 앞에 도메인과 콜론을 적으면 도메인과 이름으로 나눈다', () => {
+describe('표기: 문서 이름과 섹션', () => {
+  it('이름 뒤에 콜론과 섹션을 적으면 문서 이름과 섹션으로 나눈다', () => {
     const result = extractReferences(
-      parseYaml("definition: '[[도메인:이름]] [[이름]]'\n"),
+      parseYaml("definition: '[[이름:섹션]] [[이름]]'\n"),
     );
     expect(
       result.occurrences.map((item) =>
         item.syntax === referenceSyntaxStatuses.valid
-          ? [item.name, item.domain]
+          ? [item.name, item.section]
           : null,
       ),
     ).toEqual([
-      ['이름', '도메인'],
+      ['이름', '섹션'],
       ['이름', undefined],
     ]);
   });
-  it('이름과 도메인에 `\\:`로 쓴 콜론은 콜론 글자로 읽는다', () => {
+  it('문서 이름과 섹션에 `\\:`로 쓴 콜론은 콜론 글자로 읽는다', () => {
     const result = extractReferences(
-      parseYaml(String.raw`definition: '[[a\:b]] [[도\:메인:이\:름]]'` + '\n'),
+      parseYaml(String.raw`definition: '[[a\:b]] [[이\:름:섹\:션]]'` + '\n'),
     );
     expect(
       result.occurrences.map((item) =>
         item.syntax === referenceSyntaxStatuses.valid
-          ? [item.name, item.domain]
+          ? [item.name, item.section]
           : null,
       ),
     ).toEqual([
       ['a:b', undefined],
-      ['이:름', '도:메인'],
+      ['이:름', '섹:션'],
     ]);
   });
   it.each([
     ['대괄호 앞 1개', String.raw`'\[[글자]]'`, []],
     ['대괄호 앞 2개', String.raw`'\\[[이름]]'`, [['이름', undefined]]],
     ['대괄호 앞 3개', String.raw`'\\\[[글자]]'`, []],
-    ['콜론 앞 2개', String.raw`'[[a\\:b]]'`, [['b', String.raw`a\\`]]],
+    ['콜론 앞 2개', String.raw`'[[a\\:b]]'`, [[String.raw`a\\`, 'b']]],
     ['콜론 앞 3개', String.raw`'[[a\\\:b]]'`, [[String.raw`a\\:b`, undefined]]],
   ])(
     '백슬래시가 %s이면 홀수 개는 글자로, 짝수 개는 원래 표기로 읽는다',
@@ -180,7 +180,7 @@ describe('표기: 참조 이름과 도메인', () => {
       expect(
         result.occurrences.map((item) =>
           item.syntax === referenceSyntaxStatuses.valid
-            ? [item.name, item.domain]
+            ? [item.name, item.section]
             : null,
         ),
       ).toEqual(expected);
@@ -200,8 +200,8 @@ describe('표기: 참조 이름과 도메인', () => {
 describe('표기: 문법 오류', () => {
   it.each([
     ['빈 이름', '[[]]'],
-    ['도메인 뒤 빈 이름', '[[도메인:]]'],
-    ['빈 도메인', '[[:이름]]'],
+    ['콜론 뒤 빈 섹션', '[[이름:]]'],
+    ['빈 문서 이름', '[[:섹션]]'],
     ['남은 여는 대괄호', '[[a[b]]'],
     ['남은 닫는 대괄호', '[[a]b]]'],
     ['두 번째 콜론', '[[a:b:c]]'],
@@ -305,5 +305,59 @@ describe('참조 구문 오류의 공개 코드와 문구', () => {
     expect(referenceDiagnosticMessages.invalidReference).toBe(
       '참조 구문이 올바르지 않습니다.',
     );
+  });
+});
+
+describe('getReferencePartRanges: 이름과 섹션 부분의 원문 범위', () => {
+  /** 첫 참조의 이름·섹션 부분을 원문 조각으로 돌려준다. */
+  function parts(source: string): { name?: string; section?: string } {
+    const parsed = parseYaml(source);
+    const occurrence = extractReferences(parsed).occurrences[0];
+    if (!occurrence || !parsed.success) throw new Error('참조가 없습니다.');
+    const ranges = getReferencePartRanges(parsed, occurrence);
+    if (!ranges) return {};
+    return {
+      name: parsed.source.slice(ranges.name.start, ranges.name.end),
+      ...(ranges.section
+        ? {
+            section: parsed.source.slice(
+              ranges.section.start,
+              ranges.section.end,
+            ),
+          }
+        : {}),
+    };
+  }
+
+  it('섹션이 없으면 이름 부분만 대괄호를 제외하고 돌려준다', () => {
+    expect(parts("definition: '앞 [[환불]] 뒤'\n")).toEqual({ name: '환불' });
+  });
+
+  it('첫 콜론을 경계로 이름과 섹션을 나눈다', () => {
+    expect(parts("definition: '[[환불:환불정책]]'\n")).toEqual({
+      name: '환불',
+      section: '환불정책',
+    });
+  });
+
+  it('`\\:` escape는 원문 그대로 해당 부분에 포함한다', () => {
+    expect(parts(String.raw`definition: '[[a\:b:c\:d]]'` + '\n')).toEqual({
+      name: String.raw`a\:b`,
+      section: String.raw`c\:d`,
+    });
+  });
+
+  it('YAML 큰따옴표 escape가 앞에 있어도 원문 offset으로 계산한다', () => {
+    expect(parts(String.raw`definition: "é [[이\\:름:섹션]]"` + '\n')).toEqual({
+      name: String.raw`이\\:름`,
+      section: '섹션',
+    });
+  });
+
+  it('문법 오류인 등장에는 범위가 없다', () => {
+    const parsed = parseYaml("definition: '[[a:b:c]]'\n");
+    const occurrence = extractReferences(parsed).occurrences[0];
+    if (!occurrence) throw new Error('참조가 없습니다.');
+    expect(getReferencePartRanges(parsed, occurrence)).toBeUndefined();
   });
 });

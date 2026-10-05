@@ -34,6 +34,7 @@ const target: CatalogDocument = {
   occurrences: [],
   references: [],
   referencedBy: [],
+  sectionReferencedBy: [],
 };
 const catalog: Catalog = {
   status: scanStatuses.complete,
@@ -59,11 +60,11 @@ describe('extractCodeReferences: 일반 텍스트의 명시 참조', () => {
       }),
     ]);
   });
-  it('도메인과 escaped 콜론이 있으면 기존 이름 문법으로 해석한다', () => {
-    const markers = extractCodeReferences('@codocs [[업무:이름\\:설명]]#L2-L4');
+  it('섹션과 escaped 콜론이 있으면 이름과 섹션으로 나눈다', () => {
+    const markers = extractCodeReferences('@codocs [[이름\\:설명:업무]]#L2-L4');
     expect(markers[0]).toMatchObject({
       name: '이름:설명',
-      domain: '업무',
+      section: '업무',
       destination: {
         kind: codeReferenceDestinationKinds.rows,
         startLine: 2,
@@ -145,10 +146,23 @@ describe('resolveCodeReference: 저장 문서 후보와 실제 행', () => {
       },
     });
   });
-  it('도메인을 적은 코드 참조는 도메인이 없으므로 대상을 찾지 않는다', () => {
-    const marker = extractCodeReferences('@codocs [[업무:대상]]#L4')[0]!;
+  it('섹션을 적은 코드 참조는 문서가 있어도 후보를 찾지 않는다', () => {
+    const marker = extractCodeReferences('@codocs [[대상:업무]]#L4')[0]!;
     expect(resolveCodeReference(catalog, marker)).toMatchObject({
       status: codeReferenceStatuses.missing,
+      candidates: [],
+    });
+  });
+  it('섹션을 적은 코드 참조는 탐색이 불완전하면 미확인으로 둔다', () => {
+    const marker = extractCodeReferences('@codocs [[대상:업무]]')[0]!;
+    expect(
+      resolveCodeReference(
+        { ...catalog, status: scanStatuses.partial },
+        marker,
+      ),
+    ).toMatchObject({
+      status: codeReferenceStatuses.unconfirmed,
+      candidates: [],
     });
   });
   it('ID만 같은 이름을 참조하면 이름 대상으로 확정하지 않는다', () => {

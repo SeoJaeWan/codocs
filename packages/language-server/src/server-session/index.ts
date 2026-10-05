@@ -306,8 +306,8 @@ export class LanguageServerSession {
         ? {
             reference: {
               name: reference.name,
-              ...('domain' in reference && reference.domain !== undefined
-                ? { domain: reference.domain }
+              ...('section' in reference && reference.section !== undefined
+                ? { section: reference.section }
                 : {}),
             },
             sourcePath: this.#sourcePath(uri, workspace),
