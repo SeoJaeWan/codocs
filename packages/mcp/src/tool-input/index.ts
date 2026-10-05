@@ -74,6 +74,8 @@ const writeSchema = z.discriminatedUnion('mode', [
 
 const renameBase = {
   id: z.string().min(1),
+  /** 있으면 이 문서의 최상위 섹션 이름 변경이며 newName은 새 섹션 이름이다. */
+  section: z.string().min(1).optional(),
   newName: z.string(),
   selections: z
     .array(

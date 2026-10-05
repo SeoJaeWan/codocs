@@ -1,6 +1,7 @@
 import {
   applyRenameChanges,
   planRename,
+  planSectionRename,
   renameBlockingReasons,
   renamePlanStatuses,
   type Catalog,
@@ -11,12 +12,14 @@ import {
   type ReferenceResolutionStatus,
   type RenameBlockingReason,
   type RenameChange,
+  type RenameChangeKind,
   type RenameConflict,
   type RenameImpact,
   type RenamePlan,
   type RenamePlanStatus,
   type RenameRequest,
   type RenameSelection,
+  type SectionRenameRequest,
   type SourceRange,
 } from '@codocs/core';
 import { workspaceDocumentStatuses } from '../loader/domain-values.js';
@@ -45,6 +48,8 @@ export interface WorkspaceRenameChange {
   newText: string;
   targetPath: string;
   occurrenceIndex?: number;
+  /** 섹션 키 이름을 바꾸는 수정이면 key다. 이때 range는 따옴표를 포함한 키 위치이고 newText는 따옴표 없는 새 이름이다. */
+  kind?: RenameChangeKind;
 }
 
 /** 자동으로 고치지 않은 참조와 그 후보다. 선택이 필요한 참조는 reason으로 구분한다. */
@@ -69,6 +74,8 @@ export interface WorkspaceRenamePreview {
   targetPath: string;
   oldName?: string;
   newName: string;
+  /** 섹션 이름 변경이면 바꾸기 전 섹션 이름이다. 이때 oldName·newName은 섹션 이름이다. */
+  targetSection?: string;
   blockingReason?: RenameBlockingReason;
   changes: readonly WorkspaceRenameChange[];
   impacts: readonly WorkspaceRenameImpact[];
@@ -126,6 +133,9 @@ export interface WorkspaceRenamePreparation {
   edits: readonly WorkspaceRenameEdit[];
 }
 
+/** 문서 이름 변경 요청 또는 문서 안의 섹션 이름 변경 요청이다. section이 있으면 섹션 요청이다. */
+export type WorkspaceRenameRequest = RenameRequest | SectionRenameRequest;
+
 /** 입력 객체의 자체 데이터 속성만 읽는다. */
 function ownValue(value: unknown, key: string): unknown {
   if (typeof value !== 'object' || value === null) return undefined;
@@ -148,15 +158,23 @@ function selection(value: unknown): RenameSelection | undefined {
 }
 
 /**
- * 외부 이름 변경 입력의 대상·새 이름·선택을 검사한다.
- * @param input 미리보기와 반영이 공유하는 입력이다.
+ * 외부 이름 변경 입력의 대상·섹션·새 이름·선택을 검사한다.
+ * @param input 미리보기와 반영이 공유하는 입력이다. section이 있으면 비어 있지 않은 문자열이어야 하며 섹션 이름 변경이다.
  * @returns 형식이 맞지 않으면 undefined다.
  */
-export function parseRenameRequest(input: unknown): RenameRequest | undefined {
+export function parseRenameRequest(
+  input: unknown,
+): WorkspaceRenameRequest | undefined {
   const targetPath = ownValue(input, 'targetPath');
   const newName = ownValue(input, 'newName');
+  const section = ownValue(input, 'section');
   const rawSelections = ownValue(input, 'selections');
   if (typeof targetPath !== 'string' || typeof newName !== 'string')
+    return undefined;
+  if (
+    section !== undefined &&
+    (typeof section !== 'string' || section.length === 0)
+  )
     return undefined;
   const selections: RenameSelection[] = [];
   if (rawSelections !== undefined) {
@@ -169,7 +187,12 @@ export function parseRenameRequest(input: unknown): RenameRequest | undefined {
       selections.push(item);
     }
   }
-  return { targetPath, newName, ...(selections.length ? { selections } : {}) };
+  return {
+    targetPath,
+    ...(section === undefined ? {} : { section }),
+    newName,
+    ...(selections.length ? { selections } : {}),
+  };
 }
 
 /**
@@ -230,6 +253,7 @@ function changeReport(change: RenameChange): WorkspaceRenameChange {
     ...(change.occurrenceIndex === undefined
       ? {}
       : { occurrenceIndex: change.occurrenceIndex }),
+    ...(change.kind === undefined ? {} : { kind: change.kind }),
   };
 }
 
@@ -250,6 +274,9 @@ function blocked(
       targetPath: plan.targetPath,
       ...(plan.oldName === undefined ? {} : { oldName: plan.oldName }),
       newName: plan.newName,
+      ...(plan.targetSection === undefined
+        ? {}
+        : { targetSection: plan.targetSection }),
       blockingReason: reason,
       changes: [],
       impacts: plan.impacts.map(impact),
@@ -264,17 +291,20 @@ function blocked(
 /**
  * 같은 스캔의 색인으로 이름 변경을 계산하고 파일별 새 원문까지 만든다. 디스크와 색인은 바꾸지 않는다.
  * 새 원문을 안전하게 만들 수 없는 파일이 하나라도 있으면 전체를 blocked로 돌려준다.
- * @param request 대상·새 이름·선택이다.
+ * @param request 대상·새 이름·선택이다. section이 있으면 그 섹션의 이름 변경이다.
  * @param scan 색인을 만든 같은 스캔이며 파일별 원문과 revision을 제공한다.
  * @param catalog 같은 스캔에서 만든 색인이다.
  * @returns 미리보기와 반영에 쓸 파일별 새 원문이다.
  */
 export function prepareWorkspaceRename(
-  request: RenameRequest,
+  request: WorkspaceRenameRequest,
   scan: WorkspaceScanResult,
   catalog: Catalog,
 ): WorkspaceRenamePreparation {
-  const plan = planRename(catalog, request);
+  const plan =
+    'section' in request
+      ? planSectionRename(catalog, request)
+      : planRename(catalog, request);
   if (plan.status === renamePlanStatuses.blocked)
     return blocked(
       plan,
@@ -316,6 +346,9 @@ export function prepareWorkspaceRename(
       targetPath: plan.targetPath,
       ...(plan.oldName === undefined ? {} : { oldName: plan.oldName }),
       newName: plan.newName,
+      ...(plan.targetSection === undefined
+        ? {}
+        : { targetSection: plan.targetSection }),
       changes: plan.changes.map(changeReport),
       impacts: plan.impacts.map(impact),
       conflicts: [],
