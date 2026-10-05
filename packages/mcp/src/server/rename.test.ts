@@ -198,7 +198,7 @@ describe('codocs_rename apply', () => {
     expect(await read('ref.yaml')).toContain('[[새주문]]을 쓰고 [[새주문]]을');
     expect(await read('order.yaml')).toContain("name: '새주문'");
     expect(
-      (await call('codocs_get', { ids: ['order'] })).results[0]!.document
+      (await call('codocs_get', { addresses: ['새주문'] })).results[0]!.document
         ._codocs.name,
     ).toBe('새주문');
   });
@@ -303,7 +303,7 @@ describe('codocs_rename apply', () => {
     await writeFile(path.join(project, '.codocs', 'late.yaml'), added);
     // 감시가 새 파일을 색인에 반영할 때까지 최신 상태를 조회로 확인한다.
     for (let attempt = 0; attempt < 100; attempt++) {
-      const seen = await call('codocs_get', { ids: ['late'] });
+      const seen = await call('codocs_get', { addresses: ['늦은 문서'] });
       if (seen.results[0]!.found) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
@@ -502,7 +502,7 @@ describe('codocs_rename section', () => {
 describe('codocs_write의 이름 변경 거부', () => {
   it('update의 set.name이 현재 이름과 다르면 저장하지 않고 codocs_rename을 안내한다', async () => {
     await start({ 'order.yaml': order });
-    const fetched = await call('codocs_get', { ids: ['order'] });
+    const fetched = await call('codocs_get', { addresses: ['주문'] });
     const result = await call('codocs_write', {
       mode: 'update',
       id: 'order',
@@ -520,7 +520,7 @@ describe('codocs_write의 이름 변경 거부', () => {
 
   it('update의 set.name이 현재 이름과 같으면 변경 없음으로 처리한다', async () => {
     await start({ 'order.yaml': order });
-    const fetched = await call('codocs_get', { ids: ['order'] });
+    const fetched = await call('codocs_get', { addresses: ['주문'] });
     expect(
       await call('codocs_write', {
         mode: 'update',

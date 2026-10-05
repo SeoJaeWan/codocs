@@ -280,7 +280,7 @@ describe('WorkspaceQuerySession.applyRename: 섹션 이름 변경 반영', () =>
     expect(await read('payment.yaml')).toBe(
       '_codocs:\n  id: payment\n  name: 결제\n취소: "[[환불:환불 규정]] [[환불:없는섹션]]"\n메모: \'[[환불:환불 규정]] [[환불]]\'\n',
     );
-    expect(await session.get(['refund'])).toMatchObject({
+    expect(await session.get(['환불'])).toMatchObject({
       success: true,
       results: [{ found: true, document: { '환불 규정': '환불 규정 본문' } }],
     });

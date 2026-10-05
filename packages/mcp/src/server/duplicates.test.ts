@@ -191,7 +191,7 @@ describe('codocs_duplicates stdio 도구', () => {
         jsonrpc: '2.0',
         id: 3,
         method: 'tools/call',
-        params: { name: 'codocs_get', arguments: { ids: ['a'] } },
+        params: { name: 'codocs_get', arguments: { addresses: ['a'] } },
       });
       await until(() => lines.some((line) => line.id === 3));
       expect(lines.some((line) => line.id === 2)).toBe(false);

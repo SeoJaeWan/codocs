@@ -67,7 +67,10 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
       arguments: { mode: 'create', path: '.codocs/a.yaml', document },
     });
     const fetched = payload(
-      await client.callTool({ name: 'codocs_get', arguments: { ids: ['a'] } }),
+      await client.callTool({
+        name: 'codocs_get',
+        arguments: { addresses: ['가상 A'] },
+      }),
     );
     const before = (fetched.results as { revision: string }[])[0]!;
     const result = payload(
@@ -90,7 +93,10 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
     });
     expect(bytes.toString()).not.toContain('예시:');
     const after = payload(
-      await client.callTool({ name: 'codocs_get', arguments: { ids: ['a'] } }),
+      await client.callTool({
+        name: 'codocs_get',
+        arguments: { addresses: ['가상 A'] },
+      }),
     );
     expect(after.results).toMatchObject([
       {
@@ -131,7 +137,10 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
       },
     });
     const fetched = payload(
-      await client.callTool({ name: 'codocs_get', arguments: { ids: ['a'] } }),
+      await client.callTool({
+        name: 'codocs_get',
+        arguments: { addresses: ['가상 A'] },
+      }),
     );
     const revision = (fetched.results as { revision: string }[])[0]!.revision;
     const result = payload(
@@ -160,12 +169,20 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
       payload(
         await client.callTool({
           name: 'codocs_get',
-          arguments: { ids: ['a', 'b'] },
+          arguments: { addresses: ['가상 A', '가상 B'] },
         }),
       ).results,
     ).toMatchObject([
-      { id: 'a', references: ['b'], referencedBy: ['b'] },
-      { id: 'b', references: ['a'], referencedBy: ['a'] },
+      {
+        id: 'a',
+        references: ['가상 B'],
+        referencedBy: ['가상 B'],
+      },
+      {
+        id: 'b',
+        references: ['가상 A'],
+        referencedBy: ['가상 A'],
+      },
     ]);
     expect(
       payload(
@@ -217,7 +234,10 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
     });
     expect(await readFile(file)).toEqual(before);
     const fetched = payload(
-      await client.callTool({ name: 'codocs_get', arguments: { ids: ['a'] } }),
+      await client.callTool({
+        name: 'codocs_get',
+        arguments: { addresses: ['가상 A'] },
+      }),
     );
     const latest = (
       fetched.results as {

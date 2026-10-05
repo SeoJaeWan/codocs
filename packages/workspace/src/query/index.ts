@@ -21,6 +21,7 @@ import {
   projectCatalogGet,
   projectCatalogDiagnostics,
   projectCatalogList,
+  countCatalogListItems,
   projectCatalogPaths,
   projectLiveReferences,
   resolveReference,
@@ -45,7 +46,7 @@ import {
   type ScanStatus,
   type SourceRange,
 } from '@codocs/core';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { open, readFile } from 'node:fs/promises';
 import {
@@ -119,16 +120,12 @@ import {
   type WorkspaceDuplicateExpiryReason,
 } from '../duplicate-check/index.js';
 import { QueryObservations } from './observations.js';
-import { decodeSignedCursor, encodeSignedCursor } from './signed-cursor.js';
 import {
   workspaceLifecycleStates,
   type WorkspaceReadiness,
 } from '../lifecycle/index.js';
 
-const pageSize = 50;
-const cursorVersion = 2;
-
-/** 목록 커서가 현재 process 또는 snapshot에서 더 이상 유효하지 않을 때 사용하는 코드다. @domainValues */
+/** 중복 검사 커서가 현재 process 또는 snapshot에서 더 이상 유효하지 않을 때 사용하는 코드다. @domainValues */
 export const workspaceQueryDiagnosticCodes = {
   cursorExpired: 'cursor_expired',
   /** 닫기·취소·새 문서 버전 때문에 결과를 적용할 수 없다. */
@@ -137,12 +134,12 @@ export const workspaceQueryDiagnosticCodes = {
   catalogVersionMismatch: 'catalog_version_mismatch',
 } as const;
 
-/** 커서 오류의 고정 문구다. */
+/** 중복 검사 커서와 요청 대체 오류의 고정 문구다. */
 export const workspaceQueryDiagnosticMessages = {
   requestSuperseded:
     '닫히거나 취소되었거나 최신 문서 버전으로 대체된 요청입니다.',
   cursorExpired:
-    '목록 커서가 만료되었습니다. 커서 없이 첫 페이지를 다시 조회하세요.',
+    '중복 검사 커서가 만료되었습니다. 커서 없이 처음부터 다시 조회하세요.',
   catalogVersionMismatch:
     '코드 매칭에 사용한 문서 색인이 변경되었습니다. 최신 코드 매칭 결과로 다시 조회하세요.',
 } as const;
@@ -160,9 +157,9 @@ export type WorkspaceQueryDiagnostic =
       (typeof workspaceQueryDiagnosticCodes)[keyof typeof workspaceQueryDiagnosticCodes]
     >;
 
-/** 목록 입력은 고정 페이지의 이전 페이지 커서만 제공한다. */
+/** 목록 입력은 parent 이름 하나만 받으며 생략하면 최상위 문서를 조회한다. */
 export interface WorkspaceListInput {
-  cursor?: string;
+  parent?: string;
 }
 
 /** partial 관측의 미확인 진단을 함께 담을 수 있는 목록 항목이다. */
@@ -170,30 +167,29 @@ export type WorkspaceListItem = CatalogListItem & {
   diagnostics?: readonly WorkspaceQueryDiagnostic[];
 };
 
-/** 성공한 목록은 현재 scan 상태와 고정 페이지 계수를 함께 반환한다. */
+/** 성공한 목록은 현재 scan 상태와 페이지 없는 전체 항목을 함께 반환한다. */
 export interface WorkspaceListSuccess {
   success: true;
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
   items: readonly WorkspaceListItem[];
-  totalCount: number;
-  returnedCount: number;
-  nextCursor: string | null;
+  /** parent를 생략한 조회에서만 최상위 문서에서 닿을 수 없는 문서를 담는다. */
+  unreachable?: readonly WorkspaceListItem[];
   diagnostics?: readonly WorkspaceQueryDiagnostic[];
 }
 
-/** 부분 scan에서 색인 밖 ID는 부재로 확정하지 않는다. */
+/** 부분 scan에서 색인 밖 이름 주소는 부재로 확정하지 않는다. */
 export interface WorkspaceGetUnconfirmedResult {
-  id: string;
+  address: string;
   found: false;
   confirmation: typeof catalogConfirmations.unconfirmed;
   diagnostics: readonly WorkspaceQueryDiagnostic[];
 }
 
-/** workspace 확실성을 반영한 ID별 상세 결과다. */
+/** workspace 확실성을 반영한 주소별 상세 결과다. */
 export type WorkspaceGetResult =
   CatalogGetResult | WorkspaceGetUnconfirmedResult;
 
-/** 성공한 상세 조회는 모든 ID별 결과를 입력 순서로 유지한다. */
+/** 성공한 상세 조회는 모든 주소별 결과를 입력 순서로 유지한다. */
 export interface WorkspaceGetSuccess {
   success: true;
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
@@ -248,6 +244,12 @@ export interface WorkspaceQuerySessionOptions {
 /** 상세 조회 결과다. */
 export type WorkspaceGetResponse = RequestResult<
   WorkspaceGetSuccess,
+  WorkspaceQueryFailure
+>;
+
+/** 이름 변경 도구가 ID로 대상 파일을 정한 결과다. path가 없으면 그 ID의 문서가 없거나 ID가 중복이다. */
+export type WorkspaceIdPathResponse = RequestResult<
+  { success: true; scanStatus: ScanStatus; path?: string },
   WorkspaceQueryFailure
 >;
 
@@ -454,22 +456,6 @@ function superseded(): WorkspaceQueryFailure {
   };
 }
 
-interface CursorPayload {
-  version: typeof cursorVersion;
-  position: number;
-  fingerprint: string;
-  generation: number;
-}
-
-/** 객체의 own data property만 읽고 getter나 prototype 값을 실행하지 않는다. */
-function ownValue(value: unknown, key: string): unknown {
-  if (typeof value !== 'object' || value === null) return undefined;
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return descriptor && 'value' in descriptor
-    ? (descriptor.value as unknown)
-    : undefined;
-}
-
 /** 공개 unknown 입력에서 own data path 선택값만 복사한다. */
 function sessionInput(input: unknown): unknown {
   if (typeof input !== 'object' || input === null || Array.isArray(input))
@@ -490,71 +476,15 @@ function sessionInput(input: unknown): unknown {
   }
 }
 
-/** 커서 외의 자체 속성(제거된 필터 포함)이 제공되었는지 판별한다. */
+/** parent 외의 자체 속성이나 문자열이 아닌 parent가 제공되었는지 판별한다. */
 function hasUnsupportedInput(input: WorkspaceListInput): boolean {
-  return Object.keys(input).some((key) => key !== 'cursor');
+  return (
+    Object.keys(input).some((key) => key !== 'parent') ||
+    (input.parent !== undefined && typeof input.parent !== 'string')
+  );
 }
 
-/** 목록에 보이는 모든 값만 canonical snapshot으로 해시한다. */
-function fingerprint(items: readonly CatalogListItem[]): string {
-  return createHash('sha256')
-    .update(JSON.stringify(items), 'utf8')
-    .digest('hex');
-}
-
-/**
- * HMAC 입력과 payload를 분리할 수 있는 URL-safe 토큰으로 만든다.
- */
-function encodeCursor(payload: CursorPayload): string {
-  return encodeSignedCursor(payload);
-}
-
-/** JSON payload를 own data property 확인 뒤 계약 타입으로 좁힌다. */
-function cursorPayload(value: unknown): CursorPayload | undefined {
-  const version = ownValue(value, 'version');
-  const position = ownValue(value, 'position');
-  const listFingerprint = ownValue(value, 'fingerprint');
-  const generation = ownValue(value, 'generation');
-  if (
-    version !== cursorVersion ||
-    !Number.isSafeInteger(position) ||
-    (position as number) < 0 ||
-    typeof listFingerprint !== 'string' ||
-    !Number.isSafeInteger(generation) ||
-    (generation as number) < 0
-  )
-    return undefined;
-  return {
-    version,
-    position: position as number,
-    fingerprint: listFingerprint,
-    generation: generation as number,
-  };
-}
-
-/** 서명과 payload 구조를 검증하며 실패 이유를 외부에 구분해 노출하지 않는다. */
-function decodeCursor(token: string): CursorPayload | undefined {
-  return cursorPayload(decodeSignedCursor(token));
-}
-
-/**
- * 커서가 만료되었음을 첫 페이지 대체 없이 반환한다.
- */
-function cursorExpired(
-  scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>,
-): WorkspaceQueryFailure {
-  return {
-    success: false,
-    scanStatus,
-    error: {
-      code: workspaceQueryDiagnosticCodes.cursorExpired,
-      severity: diagnosticSeverities.error,
-      message: workspaceQueryDiagnosticMessages.cursorExpired,
-    },
-  };
-}
-
-/** cursor와 함께 제공한 조건이 원래 조건과 다를 때 입력 오류를 반환한다. */
+/** 목록 입력이 계약과 다를 때 입력 오류를 반환한다. */
 function invalidInput(
   scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>,
 ): WorkspaceQueryFailure {
@@ -743,7 +673,6 @@ export class WorkspaceQuerySession {
   #completed:
     | { catalog: Catalog; revisions: Map<string, string>; version: number }
     | undefined;
-  #generation = 0;
   #catalogVersion = 0;
   #refreshPromise: Promise<WorkspaceScanResult> | undefined;
   #explicitRefreshPromise: Promise<WorkspaceRefreshResult> | undefined;
@@ -854,9 +783,6 @@ export class WorkspaceQuerySession {
   #publish(scan: WorkspaceScanResult): void {
     if (this.#closed) return;
     const initial = !this.#scan;
-    const previousFingerprint = this.#catalog
-      ? fingerprint(projectCatalogList(this.#catalog).items)
-      : undefined;
     if (scan.status !== scanStatuses.failed) {
       const next = buildWorkspaceCatalog(scan, this.#catalog);
       const revisions =
@@ -868,11 +794,6 @@ export class WorkspaceQuerySession {
       this.#catalog = next;
       this.#revisions = revisions;
       this.#catalogVersion++;
-      if (
-        previousFingerprint !== undefined &&
-        previousFingerprint !== fingerprint(projectCatalogList(next).items)
-      )
-        this.#generation++;
       if (scan.status === scanStatuses.complete) {
         this.#completed = {
           catalog: next,
@@ -1301,11 +1222,6 @@ export class WorkspaceQuerySession {
     };
   }
 
-  /** 반영된 complete 또는 partial refresh의 세대다. */
-  get generation(): number {
-    return this.#generation;
-  }
-
   /** 조회에 사용하는 catalog snapshot이 게시될 때마다 바뀌는 버전이다. */
   get catalogVersion(): number {
     return this.#catalogVersion;
@@ -1345,7 +1261,7 @@ export class WorkspaceQuerySession {
   }
 
   /**
-   * 최신 실제 scan에서 필터 snapshot을 50개씩 반환한다.
+   * 최신 실제 scan에서 parent 기준의 최상위 문서 또는 직속 자식을 반환한다.
    */
   async list(input: WorkspaceListInput = {}): Promise<WorkspaceListResult> {
     if (this.#scan && this.#explicitRefreshPromise)
@@ -1359,69 +1275,70 @@ export class WorkspaceQuerySession {
     if (!catalog) return scanFailure(scan);
     const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
 
-    const decoded =
-      input.cursor === undefined ? undefined : decodeCursor(input.cursor);
-    if (input.cursor !== undefined && !decoded)
-      return cursorExpired(scanStatus);
     if (hasUnsupportedInput(input)) return invalidInput(scanStatus);
-    const projection = projectCatalogList(catalog);
-    const currentFingerprint = fingerprint(projection.items);
-    if (
-      decoded &&
-      (decoded.generation !== this.#generation ||
-        decoded.fingerprint !== currentFingerprint ||
-        decoded.position > projection.totalCount)
-    )
-      return cursorExpired(scanStatus);
-    const position = decoded?.position ?? 0;
-    const items = projection.items
-      .slice(position, position + pageSize)
-      .map((item) =>
-        watchFailure && !item.conflict
-          ? { ...item, confirmation: catalogConfirmations.unconfirmed }
-          : item,
-      )
-      .map(
-        /** 부분 목록의 미확인 문서에 공통 진단을 붙인다. */ (item) =>
-          scanStatus === scanStatuses.partial &&
-          !item.conflict &&
-          item.confirmation === catalogConfirmations.unconfirmed
-            ? {
-                ...item,
-                diagnostics: [
-                  {
-                    code: catalogDiagnosticCodes.unconfirmedReference,
-                    severity: diagnosticSeverities.warning,
-                    message: catalogDiagnosticMessages.unconfirmedReference,
-                    path: item.source.path,
-                  },
-                ],
-              }
-            : item,
-      );
-    const nextPosition = position + items.length;
-    const nextCursor =
-      nextPosition < projection.totalCount
-        ? encodeCursor({
-            version: cursorVersion,
-            position: nextPosition,
-            fingerprint: currentFingerprint,
-            generation: this.#generation,
-          })
-        : null;
+    const projection = projectCatalogList(catalog, input);
+    const partial = scanStatus === scanStatuses.partial;
+    if (!projection.parentFound && !partial)
+      return {
+        success: false,
+        scanStatus,
+        error: {
+          code: queryDiagnosticCodes.notFound,
+          severity: diagnosticSeverities.error,
+          message: queryDiagnosticMessages.notFound,
+        },
+      };
+    /** 이전 기록이거나 부분 목록의 미확인 문서에 확인 상태와 공통 진단을 붙인다. */
+    const annotate = (
+      item: CatalogListItem,
+      forceUnconfirmed: boolean,
+    ): WorkspaceListItem => {
+      const confirmation =
+        watchFailure || forceUnconfirmed
+          ? catalogConfirmations.unconfirmed
+          : item.confirmation;
+      const next = { ...item, confirmation };
+      return partial && confirmation === catalogConfirmations.unconfirmed
+        ? {
+            ...next,
+            diagnostics: [
+              {
+                code: catalogDiagnosticCodes.unconfirmedReference,
+                severity: diagnosticSeverities.warning,
+                message: catalogDiagnosticMessages.unconfirmedReference,
+                path: item.source.path,
+              },
+            ],
+          }
+        : next;
+    };
+    const items = projection.items.map((item) => annotate(item, false));
+    const unreachable = projection.unreachable?.map((item) =>
+      annotate(item, partial),
+    );
+    const diagnostics: WorkspaceQueryDiagnostic[] = [
+      ...(!projection.parentFound
+        ? [
+            {
+              code: catalogDiagnosticCodes.unconfirmedReference,
+              severity: diagnosticSeverities.warning,
+              message: catalogDiagnosticMessages.unconfirmedReference,
+            },
+          ]
+        : []),
+      ...(watchFailure ? [watchFailure] : []),
+    ];
     return {
       success: true,
       scanStatus,
       items,
-      totalCount: projection.totalCount,
-      returnedCount: items.length,
-      nextCursor,
-      ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
+      ...(unreachable ? { unreachable } : {}),
+      ...(diagnostics.length ? { diagnostics } : {}),
     };
   }
 
-  /** 최신 실제 scan에서 1~20개 ID를 독립 결과로 반환한다. */
-  async get(ids: readonly string[]): Promise<WorkspaceGetResponse> {
+  /** 최신 실제 scan에서 1~20개 이름 주소를 독립 결과로 반환한다. */
+  async get(addresses: readonly string[]): Promise<WorkspaceGetResponse> {
     if (this.#scan && this.#explicitRefreshPromise)
       return workspaceIndexNotReady();
     const scan = await this.#current();
@@ -1432,7 +1349,7 @@ export class WorkspaceQuerySession {
     const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
     if (!catalog) return scanFailure(scan);
     const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
-    const projection = projectCatalogGet(catalog, ids, {
+    const projection = projectCatalogGet(catalog, addresses, {
       revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
     });
     if (!projection.success)
@@ -1445,9 +1362,16 @@ export class WorkspaceQuerySession {
       /** partial의 부재와 이전 기록을 확정 결과와 구분한다. */ (
         result,
       ): WorkspaceGetResult => {
-        if (scanStatus === scanStatuses.partial && !result.found)
+        const code = result.found ? undefined : result.diagnostics[0]?.code;
+        if (
+          (code === queryDiagnosticCodes.notFound &&
+            scanStatus === scanStatuses.partial) ||
+          (code === queryDiagnosticCodes.sectionNotFound &&
+            !result.found &&
+            result.confirmation === catalogConfirmations.unconfirmed)
+        )
           return {
-            id: result.id,
+            address: result.address,
             found: false,
             confirmation: catalogConfirmations.unconfirmed,
             diagnostics: [
@@ -1470,6 +1394,30 @@ export class WorkspaceQuerySession {
       scanStatus,
       results,
       ...(watchFailure ? { diagnostics: [watchFailure] } : {}),
+    };
+  }
+
+  /**
+   * 현재 ID를 파일 경로로 바꾼다. 이름 변경 도구가 대상 파일을 정하는 내부용이며 조회 도구로 노출하지 않는다.
+   * @param id 이름을 바꿀 문서의 현재 ID다.
+   */
+  async resolveIdPath(id: string): Promise<WorkspaceIdPathResponse> {
+    if (this.#scan && this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
+    const scan = await this.#current();
+    const watchFailure = this.#watchFailure();
+    if (scan.status === scanStatuses.failed) return scanFailure(scan);
+    if (watchFailure && !this.#completed)
+      return this.#watchFailureResult(watchFailure);
+    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
+    if (!catalog) return scanFailure(scan);
+    const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
+    const paths = [...(catalog.idPaths.get(id) ?? [])];
+    const path = paths.length === 1 ? paths[0] : undefined;
+    return {
+      success: true,
+      scanStatus,
+      ...(path === undefined ? {} : { path }),
     };
   }
 
@@ -2318,7 +2266,7 @@ export class WorkspaceQuerySession {
   }
 
   /**
-   * 명시 refresh는 결과 변화와 무관하게 기존 커서 generation을 만료한다.
+   * 명시 refresh는 색인을 다시 구성하고 결과 수를 반환한다.
    */
   refresh(): Promise<WorkspaceRefreshResult> {
     if (this.#closed) return Promise.resolve(superseded());
@@ -2329,14 +2277,11 @@ export class WorkspaceQuerySession {
       if (this.#closed) return scanFailure(this.#closedScan());
       if (this.#watcher) await this.#watcher.refresh();
       while (this.#refreshPromise) await this.#refreshPromise;
-      const generation = this.#generation;
       const scan = await this.#synchronize();
       await this.#codeIndex?.refresh();
       if (this.#closed) return superseded();
       const watchFailure = this.#watchFailure();
       if (watchFailure) return this.#watchFailureResult(watchFailure);
-      if (scan.status !== scanStatuses.failed)
-        this.#generation = Math.max(this.#generation, generation + 1);
       return scan.status === scanStatuses.failed
         ? scanFailure(scan)
         : {
@@ -2347,7 +2292,7 @@ export class WorkspaceQuerySession {
               scan.failures.filter(
                 (failure) => failure.kind === workspaceTargetKinds.file,
               ).length,
-            itemCount: projectCatalogList(this.#catalog!).totalCount,
+            itemCount: countCatalogListItems(this.#catalog!),
             errorCount: scan.diagnostics.filter(
               (diagnostic) =>
                 diagnostic.severity === diagnosticSeverities.error,

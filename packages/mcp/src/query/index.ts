@@ -46,7 +46,7 @@ export type CodocsListInput = WorkspaceListInput;
 
 /** codocs_get이 허용하는 전송 독립 입력이다. */
 export interface CodocsGetInput {
-  ids: readonly string[];
+  addresses: readonly string[];
 }
 
 /** 미확인 목록 항목에는 현재 상태를 확정하지 않는 진단을 함께 제공한다. */
@@ -182,7 +182,7 @@ export function createCodocsQueryHandlers(
     async codocsGet(input: unknown): Promise<CodocsGetResponse> {
       const parsed = parseGetInput(input);
       if (!parsed) return invalidInput();
-      return session.get(parsed.ids);
+      return session.get(parsed.addresses);
     },
     /** 같은 세션의 완료 색인과 경로 검사로 검증 범위를 결정한다.
      * */
@@ -191,7 +191,7 @@ export function createCodocsQueryHandlers(
       if (!parsed) return invalidInput();
       return session.validate(parsed.path);
     },
-    /** 같은 세션의 명시 refresh로 기존 목록 cursor를 만료한다. */
+    /** 같은 세션의 명시 refresh로 색인을 다시 구성한다. */
     codocsRefresh: refresh,
     /** 형식 오류만 여기서 거부하고 문서 진단은 workspace 변경 계획에서 보존한다.
      * */
@@ -221,10 +221,8 @@ export function createCodocsQueryHandlers(
       }
       const { id, mode, ...request } = parsed;
       const apply = mode === 'apply';
-      const found = await session.get([id]);
-      const item = found.success ? found.results[0] : undefined;
-      const source = item?.found && !item.conflict ? item.source : undefined;
-      if (!found.success || !source) {
+      const found = await session.resolveIdPath(id);
+      if (!found.success || found.path === undefined) {
         const failure: WorkspaceQueryFailure = found.success
           ? {
               success: false,
@@ -238,7 +236,7 @@ export function createCodocsQueryHandlers(
           : found;
         return apply ? renameApplyFailure(failure.error) : failure;
       }
-      const target = { ...request, targetPath: source.path };
+      const target = { ...request, targetPath: found.path };
       return apply
         ? session.applyRename(target)
         : session.previewRename(target);

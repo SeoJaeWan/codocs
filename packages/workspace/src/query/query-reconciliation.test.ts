@@ -157,7 +157,7 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
       session.list(),
       session.get(['alpha']),
     ]);
-    expect(list).toMatchObject({ success: true, totalCount: 1 });
+    expect(list).toMatchObject({ success: true, items: [{ id: 'alpha' }] });
     expect(get).toMatchObject({
       success: true,
       results: [{ found: true, document: { definition: '본문' } }],
@@ -228,7 +228,6 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
     const result = await session.list();
     expect(result).toMatchObject({
       success: true,
-      totalCount: 2,
       items: [{ id: 'added' }, { id: 'old' }],
     });
     expect(boundary.reads.get(old)).toBe(1);
@@ -304,7 +303,6 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
       expect(result).toMatchObject({
         success: true,
         scanStatus: 'complete',
-        totalCount: 1,
         items: [{ id: operation === '이동' ? 'old' : 'new' }],
       });
     },
@@ -324,7 +322,6 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     expect(await session.list()).toMatchObject({
       success: true,
       scanStatus: 'complete',
-      totalCount: 1,
     });
     const version = session.catalogVersion;
     boundary.emit([path.join(folder, '.codocs-write-deadbeef.tmp')]);
@@ -340,7 +337,6 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
       expect(await session!.list()).toMatchObject({
         success: true,
         scanStatus: 'complete',
-        totalCount: 2,
       }),
     );
     await rm(beta);
@@ -349,7 +345,6 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
       expect(await session!.list()).toMatchObject({
         success: true,
         scanStatus: 'complete',
-        totalCount: 1,
       }),
     );
   });
@@ -379,7 +374,7 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
           );
           boundary.emit([beta]);
           await vi.waitFor(async () =>
-            expect(await session!.get(['beta'])).toMatchObject({
+            expect(await session!.get(['베타 최신'])).toMatchObject({
               results: [
                 { found: true, document: { _codocs: { name: '베타 최신' } } },
               ],
@@ -392,7 +387,6 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     expect(await session.list()).toMatchObject({
       success: true,
       scanStatus: 'complete',
-      totalCount: 2,
     });
     expect(boundary.fullLoads).toBe(1);
     const result = await session.write({
@@ -413,7 +407,7 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
       2,
     );
     expect(boundary.reads.get(beta)).toBe(3);
-    expect(await session.get(['alpha', 'beta'])).toMatchObject({
+    expect(await session.get(['알파', '베타 최신'])).toMatchObject({
       results: [
         { found: true, document: { definition: '알파 저장' } },
         { found: true, document: { _codocs: { name: '베타 최신' } } },

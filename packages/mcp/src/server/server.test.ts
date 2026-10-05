@@ -105,13 +105,38 @@ describe('소스 MCP stdio 서버', () => {
       const fetched = payload(
         await client.callTool({
           name: 'codocs_get',
-          arguments: { ids: ['alpha', 'missing'] },
+          arguments: { addresses: ['alpha', 'missing', 'alpha:definition'] },
         }),
       );
       expect(fetched.success).toBe(true);
       expect(
         (fetched.results as { found: boolean }[]).map((item) => item.found),
-      ).toEqual([true, false]);
+      ).toEqual([true, false, true]);
+      expect(fetched.results).toMatchObject([
+        { address: 'alpha', document: { definition: '본문' } },
+        { address: 'missing', diagnostics: [{ code: 'not_found' }] },
+        {
+          address: 'alpha:definition',
+          name: 'alpha',
+          section: { name: 'definition', content: '본문' },
+        },
+      ]);
+      expect(
+        payload(
+          await client.callTool({
+            name: 'codocs_list',
+            arguments: { parent: 'missing' },
+          }),
+        ),
+      ).toMatchObject({ success: false, error: { code: 'not_found' } });
+      expect(
+        payload(
+          await client.callTool({
+            name: 'codocs_list',
+            arguments: { cursor: 'x' },
+          }),
+        ),
+      ).toMatchObject({ success: false, error: { code: 'invalid_input' } });
       const refreshed = payload(
         await client.callTool({ name: 'codocs_refresh', arguments: {} }),
       );
@@ -121,7 +146,10 @@ describe('소스 MCP stdio 서버', () => {
         itemCount: 1,
       });
       const errors = payload(
-        await client.callTool({ name: 'codocs_get', arguments: { ids: [] } }),
+        await client.callTool({
+          name: 'codocs_get',
+          arguments: { addresses: [] },
+        }),
       );
       expect(errors).toMatchObject({
         success: false,
@@ -175,7 +203,9 @@ describe('소스 MCP stdio 서버', () => {
       const response = payload(
         await client.callTool({
           name: 'codocs_get',
-          arguments: { ids: ['normal', 'invalid', 'shared', 'missing'] },
+          arguments: {
+            addresses: ['Normal', 'Invalid', 'Conflict A', 'Missing'],
+          },
         }),
       );
       const results = response.results as Record<string, unknown>[];
@@ -184,7 +214,9 @@ describe('소스 MCP stdio 서버', () => {
         found: true,
         document: { definition },
         source: { path: path.join('.codocs', 'normal.yaml') },
-        references: targets,
+        references: targets.map(
+          (_, index) => `Target ${String(index).padStart(2, '0')}`,
+        ),
       });
       expect(results[1]).toMatchObject({
         found: true,

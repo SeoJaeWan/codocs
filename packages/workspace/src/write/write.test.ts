@@ -74,13 +74,16 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
     expect(result.revision).toBe(revision(bytes));
     expect(bytes.toString()).toContain('id: renamed');
     expect(bytes.toString()).not.toContain('id: first');
-    const fetched = await current.get(['renamed', 'first']);
+    const fetched = await current.get(['첫 문서', '없는 문서']);
     expect(fetched).toMatchObject({
       success: true,
       results: [{ found: true, revision: result.revision }, { found: false }],
     });
     const listed = await current.list();
-    expect(listed).toMatchObject({ success: true, totalCount: 2 });
+    expect(listed).toMatchObject({
+      success: true,
+      items: [{ id: 'second' }, { id: 'renamed' }],
+    });
     const diagnostics = await current.diagnostics();
     expect(diagnostics.scanStatus).toBe('complete');
     expect(
@@ -270,7 +273,7 @@ describe('WorkspaceQuerySession.write 실제 IO', () => {
       saved: true,
       indexUpdated: true,
     });
-    expect(await current.get(['first'])).toMatchObject({
+    expect(await current.get(['첫 문서'])).toMatchObject({
       success: true,
       results: [
         { found: true, revision: result.success ? result.revision : '' },

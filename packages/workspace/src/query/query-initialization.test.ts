@@ -221,7 +221,6 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
     session = createWorkspaceQuerySession({ cwd: project });
     expect(await session.list()).toMatchObject({
       success: true,
-      totalCount: 0,
     });
     await mkdir(codocs);
     await writeFile(
@@ -252,7 +251,6 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
     expect(await session.list()).toMatchObject({
       success: true,
       scanStatus: 'complete',
-      totalCount: 0,
     });
     await writeFile(
       path.join(external, 'ignored.yaml'),

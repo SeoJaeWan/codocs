@@ -194,7 +194,7 @@ describe('MCP 저장 후 색인 복구', () => {
       payload(
         await client.callTool({
           name: 'codocs_get',
-          arguments: { ids: ['a'] },
+          arguments: { addresses: ['A'] },
         }),
       ).results,
     ).toMatchObject([
@@ -287,7 +287,7 @@ describe('MCP refresh 집계·중복·커서', () => {
       payload(
         await client.callTool({
           name: 'codocs_get',
-          arguments: { ids: ['a'] },
+          arguments: { addresses: ['A'] },
         }),
       ).results,
     ).toMatchObject([{ found: true, document: { definition: '복구 원문' } }]);
@@ -323,14 +323,17 @@ describe('MCP refresh 집계·중복·커서', () => {
       diagnostics.filter((d) => d.severity === 'error').length,
     );
     expect(result.errorCount).toBeGreaterThan(1);
+    // 같은 ID의 두 문서는 목록에 각각 나오지만 itemCount는 ID 하나로 센다.
     expect(
-      payload(await client.callTool({ name: 'codocs_list', arguments: {} }))
-        .totalCount,
-    ).toBe(1);
+      (
+        payload(await client.callTool({ name: 'codocs_list', arguments: {} }))
+          .items as unknown[]
+      ).length,
+    ).toBe(2);
   });
 
   it.each(['complete', 'partial'])(
-    '%s refresh는 동시 요청의 작업을 공유하고 이전 커서를 만료한다',
+    '%s refresh는 동시 요청의 작업을 공유하고 목록 항목 수를 유지한다',
     async (state) => {
       for (let n = 0; n < 51; n++)
         await writeFile(
@@ -341,7 +344,7 @@ describe('MCP refresh 집계·중복·커서', () => {
       const first = payload(
         await client.callTool({ name: 'codocs_list', arguments: {} }),
       );
-      expect(first.nextCursor).toBeTypeOf('string');
+      expect(first.items as unknown[]).toHaveLength(51);
       if (state === 'partial') io.denied = path.join(project, '.codocs/1.yaml');
       const gate = deferred();
       const entered = deferred();
@@ -364,14 +367,12 @@ describe('MCP refresh 집계·중복·커서', () => {
         countsComplete: state === 'complete',
         itemCount: 51,
       });
-      expect(
-        payload(
-          await client.callTool({
-            name: 'codocs_list',
-            arguments: { cursor: first.nextCursor },
-          }),
-        ),
-      ).toMatchObject({ success: false, error: { code: 'cursor_expired' } });
+      const after = payload(
+        await client.callTool({ name: 'codocs_list', arguments: {} }),
+      );
+      expect(after).toMatchObject({ success: true, scanStatus: state });
+      expect(after.items as unknown[]).toHaveLength(51);
+      expect(after).not.toHaveProperty('nextCursor');
       if (state === 'partial') {
         expect(
           payload(
