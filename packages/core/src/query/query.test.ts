@@ -1,20 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCatalog,
   catalogConfirmations,
   referenceResolutionStatuses,
   scanStatuses,
   type Catalog,
   type CatalogDocument,
+  type CatalogObservation,
   type CatalogOccurrence,
 } from '../catalog/index.js';
+import { parseYaml } from '../parser/index.js';
 import {
   catalogDiagnosticCodes,
   diagnosticSeverities,
   queryDiagnosticCodes,
+  queryDiagnosticMessages,
   schemaDiagnosticCodes,
 } from '../diagnostics/index.js';
 import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import {
+  projectCatalogDiagnostics,
   projectLiveReferences,
   projectCatalogGet,
   projectCatalogList,
@@ -35,6 +40,7 @@ const documentBase = {
   occurrences: [],
   references: [],
   referencedBy: [],
+  sectionReferencedBy: [],
 } satisfies Pick<
   CatalogDocument,
   | 'confirmation'
@@ -43,6 +49,7 @@ const documentBase = {
   | 'occurrences'
   | 'references'
   | 'referencedBy'
+  | 'sectionReferencedBy'
 >;
 const catalogBase: Catalog = {
   status: scanStatuses.complete,
@@ -1234,5 +1241,68 @@ describe('projectLiveReferences: live YAML와 디스크 색인의 결합', () =>
           item.resolution.status === referenceResolutionStatuses.resolved,
       ),
     ).toBe(true);
+  });
+});
+
+describe('섹션 참조의 조회 투영', () => {
+  /** 실제 파서로 만든 문서 관측이다. */
+  const observe = (path: string, source: string): CatalogObservation => ({
+    path,
+    parsed: parseYaml(source, path),
+  });
+  const refund = observe(
+    'refund.yaml',
+    '_codocs:\n  id: refund\n  name: 환불\n환불정책: 설명\n자기: "[[환불:환불정책]] [[환불:없음]]"\n',
+  );
+  const payment = observe(
+    'payment.yaml',
+    '_codocs:\n  id: payment\n  name: 결제\n취소: "[[환불:환불정책]] [[환불:없는섹션]] [[없는문서:x]]"\n',
+  );
+  const catalog = buildCatalog({
+    status: scanStatuses.complete,
+    observations: [refund, payment],
+  });
+
+  it('섹션이 없는 참조는 section_reference_not_found를 원문 범위와 함께 반환한다', () => {
+    const occurrences = catalog.documents.get('payment.yaml')?.occurrences;
+    const missingSection = occurrences?.[1]?.occurrence;
+    const diagnostics = projectCatalogDiagnostics(catalog, 'payment.yaml');
+    expect(diagnostics.map((item) => item.code)).toEqual([
+      queryDiagnosticCodes.sectionReferenceNotFound,
+      queryDiagnosticCodes.referenceNotFound,
+    ]);
+    expect(diagnostics[0]).toMatchObject({
+      severity: diagnosticSeverities.error,
+      message: queryDiagnosticMessages.sectionReferenceNotFound,
+      path: 'payment.yaml',
+      offsetRange: missingSection?.offsetRange,
+      range: missingSection?.range,
+    });
+    expect(diagnostics.map((item) => item.code)).not.toContain(
+      catalogDiagnosticCodes.missingSectionReference,
+    );
+  });
+
+  it('같은 문서의 없는 섹션도 같은 코드로 투영하고 있는 섹션은 진단하지 않는다', () => {
+    expect(
+      projectCatalogDiagnostics(catalog, 'refund.yaml').map(
+        (item) => item.code,
+      ),
+    ).toEqual([queryDiagnosticCodes.sectionReferenceNotFound]);
+  });
+
+  it('codocs_get의 references와 referencedBy는 문서 ID 목록 그대로이고 섹션 정보가 없다', () => {
+    const result = projectCatalogGet(catalog, ['refund', 'payment']);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.results[0]).toMatchObject({
+      references: [],
+      referencedBy: ['payment'],
+    });
+    expect(result.results[1]).toMatchObject({
+      references: ['refund'],
+      referencedBy: [],
+    });
+    expect(JSON.stringify(result.results)).not.toContain('sectionReferencedBy');
   });
 });

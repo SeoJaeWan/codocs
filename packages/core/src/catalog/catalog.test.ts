@@ -11,7 +11,14 @@ import type {
   CatalogScan,
   RenameRequest,
 } from './index.js';
-import { buildCatalog, planRename, resolveReference } from './index.js';
+import {
+  buildCatalog,
+  getSectionKeyRange,
+  getSectionNames,
+  planRename,
+  resolveLiveDocument,
+  resolveReference,
+} from './index.js';
 import {
   catalogConfirmations,
   catalogFailureKinds,
@@ -432,7 +439,7 @@ describe('buildCatalog: 문서 색인', () => {
   });
 
   describe('연결할 수 없는 참조의 후보와 진단 반환', () => {
-    it('같은 이름의 후보가 여러 도메인에 있으면 모든 후보를 반환하고 대상을 확정하지 않는다', () => {
+    it('같은 이름의 후보가 여러 개 있으면 모든 후보를 반환하고 대상을 확정하지 않는다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
@@ -1007,7 +1014,7 @@ describe('buildCatalog: 관측 갱신', () => {
 });
 
 describe('resolveReference: 참조 대상 조회', () => {
-  describe('이름과 도메인으로 참조 대상 조회', () => {
+  describe('이름과 섹션으로 참조 대상 조회', () => {
     it.each<
       [string, CatalogObservation[], string, string[], string | undefined]
     >([
@@ -1045,15 +1052,15 @@ describe('resolveReference: 참조 대상 조회', () => {
       expect(result.target?.path).toBe(target);
     });
 
-    it('도메인을 적은 참조는 도메인이 없으므로 후보를 찾지 않고 부재로 판정한다', () => {
+    it('문서 이름 부분이 없는 문서를 가리키면 섹션과 관계없이 부재로 판정한다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [orderDocument],
       } satisfies CatalogScan;
       const catalog = buildCatalog(scan);
       const result = resolveReference(catalog, {
-        name: '주문',
-        domain: '판매',
+        name: '판매',
+        section: '주문',
       });
       expect(result.status).toBe(referenceResolutionStatuses.missing);
       expect(result.candidates).toEqual([]);
@@ -1072,7 +1079,7 @@ describe('resolveReference: 참조 대상 조회', () => {
       ).toEqual([orderDocument.path]);
     });
 
-    it('도메인을 생략하면 참조한 문서의 도메인과 관계없이 모든 도메인에서 후보를 찾는다', () => {
+    it('같은 이름의 문서가 여러 개면 모든 후보를 찾는다', () => {
       const scan = {
         status: scanStatuses.complete,
         observations: [orderDocument, purchaseOrder, sourceRefersToOrder],
@@ -1206,7 +1213,7 @@ describe('planRename: 이름 변경 계획', () => {
       ]);
     });
 
-    it('도메인을 적은 참조는 대상이 아니므로 이름을 변경해도 수정하지 않는다', () => {
+    it('다른 문서 이름에 섹션을 붙인 참조는 대상이 아니므로 이름을 변경해도 수정하지 않는다', () => {
       const observationB = {
         path: 's.yaml',
         parsed: {
@@ -1973,5 +1980,324 @@ describe('planRename: parent 항목 수정', () => {
       status: renamePlanStatuses.blocked,
       blockingReason: renameBlockingReasons.nameConflict,
     });
+  });
+});
+
+describe('buildCatalog: 문서 이름과 섹션 참조', () => {
+  const refund = observe(
+    'refund.yaml',
+    [
+      '_codocs:',
+      '  id: refund',
+      '  name: 환불',
+      '환불정책: 정책 설명',
+      '"예외": 예외 설명',
+      '자기참조: "[[환불:예외]] [[환불:없는섹션]] [[환불]]"',
+      '',
+    ].join('\n'),
+  );
+  /** 출처 섹션 취소에 주어진 본문을 적은 결제 문서를 만든다. */
+  const payment = (body: string): CatalogObservation =>
+    observe(
+      'payment.yaml',
+      `_codocs:\n  id: payment\n  name: 결제\n취소: ${JSON.stringify(body)}\n`,
+    );
+  /** 결제 문서의 첫 참조 해석을 돌려준다. */
+  const firstResolution = (
+    body: string,
+    extra: readonly CatalogObservation[] = [refund],
+  ): ReturnType<typeof resolveReference> => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [...extra, payment(body)],
+    });
+    const resolution =
+      catalog.documents.get('payment.yaml')?.occurrences[0]?.resolution;
+    if (!resolution) throw new Error('참조 해석이 없습니다.');
+    return resolution;
+  };
+
+  it('문서가 확정되고 섹션이 루트 키와 정확히 같으면 섹션까지 확정한다', () => {
+    expect(firstResolution('[[환불:환불정책]]')).toMatchObject({
+      status: referenceResolutionStatuses.resolved,
+      section: '환불정책',
+      target: { path: 'refund.yaml' },
+    });
+    expect(firstResolution('[[환불:예외]]').status).toBe(
+      referenceResolutionStatuses.resolved,
+    );
+  });
+
+  it.each([
+    ['없는 섹션', '[[환불:없는섹션]]'],
+    ['공백이 다른 섹션', '[[환불:환불정책 ]]'],
+    ['대소문자가 다른 섹션', '[[환불:ABC]]'],
+    ['_codocs 섹션', '[[환불:_codocs]]'],
+    ['_codocs 하위 키', '[[환불:name]]'],
+  ])(
+    '섹션이 없으면 문서를 확정하고 missingSection으로 판단한다: %s',
+    (_case, body) => {
+      const resolution = firstResolution(body);
+      expect(resolution.status).toBe(
+        referenceResolutionStatuses.missingSection,
+      );
+      expect(resolution.target?.path).toBe('refund.yaml');
+    },
+  );
+
+  it('섹션이 없으면 오류를 만들고 연결과 역참조를 만들지 않는다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [refund, payment('[[환불:없는섹션]] 끝')],
+    });
+    const source = catalog.documents.get('payment.yaml');
+    const occurrence = source?.occurrences[0]?.occurrence;
+    expect(source?.diagnostics).toEqual([
+      expect.objectContaining({
+        code: catalogDiagnosticCodes.missingSectionReference,
+        severity: diagnosticSeverities.error,
+        message: catalogDiagnosticMessages.missingSectionReference,
+        fieldPath: ['취소'],
+        offsetRange: occurrence?.offsetRange,
+        range: occurrence?.range,
+      }),
+    ]);
+    expect(source?.references).toEqual([]);
+    expect(catalog.documents.get('refund.yaml')?.referencedBy).toEqual([]);
+    expect(catalog.documents.get('refund.yaml')?.sectionReferencedBy).toEqual(
+      [],
+    );
+  });
+
+  it('없는 문서에 섹션을 붙이면 문서 부재로 판단하고 섹션을 확인하지 않는다', () => {
+    expect(firstResolution('[[없는문서:x]]').status).toBe(
+      referenceResolutionStatuses.missing,
+    );
+  });
+
+  it('후보가 여러 개이거나 탐색이 불완전하면 섹션을 확인하지 않는다', () => {
+    const twin = observe(
+      'twin.yaml',
+      '_codocs:\n  id: twin\n  name: 환불\n다른: 설명\n',
+    );
+    expect(firstResolution('[[환불:없는섹션]]', [refund, twin]).status).toBe(
+      referenceResolutionStatuses.ambiguous,
+    );
+    const partial = buildCatalog({
+      status: scanStatuses.partial,
+      observations: [refund, payment('[[환불:없는섹션]]')],
+    });
+    expect(
+      partial.documents.get('payment.yaml')?.occurrences[0]?.resolution.status,
+    ).toBe(referenceResolutionStatuses.unconfirmed);
+  });
+
+  it.each(['[[a:b:c]]', '[[a:]]', '[[:b]]'])(
+    '%s 는 문법 오류로 후보를 찾지 않는다',
+    (body) => {
+      expect(firstResolution(body).status).toBe(
+        referenceResolutionStatuses.invalid,
+      );
+    },
+  );
+
+  it('섹션 단위 역참조에 출처 문서와 섹션, 대상 섹션을 위치마다 기록한다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [
+        refund,
+        payment('[[환불:환불정책]] [[환불]] [[환불:환불정책]]'),
+      ],
+    });
+    const target = catalog.documents.get('refund.yaml');
+    expect(target?.sectionReferencedBy).toEqual([
+      { sourcePath: 'payment.yaml', sourceSection: '취소' },
+      {
+        sourcePath: 'payment.yaml',
+        sourceSection: '취소',
+        targetSection: '환불정책',
+      },
+      {
+        sourcePath: 'payment.yaml',
+        sourceSection: '취소',
+        targetSection: '환불정책',
+      },
+    ]);
+    expect(target?.referencedBy.map((item) => item.id)).toEqual(['payment']);
+    expect(
+      catalog.documents.get('payment.yaml')?.references.map((item) => item.id),
+    ).toEqual(['refund']);
+  });
+
+  it('섹션 단위 역참조는 출처 경로와 섹션 순으로 정렬한다', () => {
+    const second = observe(
+      'a-second.yaml',
+      '_codocs:\n  id: second\n  name: 둘째\n나: "[[환불:예외]]"\n가: "[[환불:환불정책]]"\n',
+    );
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [refund, payment('[[환불:예외]]'), second],
+    });
+    expect(
+      catalog.documents
+        .get('refund.yaml')
+        ?.sectionReferencedBy.map((item) => [
+          item.sourcePath,
+          item.sourceSection,
+          item.targetSection,
+        ]),
+    ).toEqual([
+      ['a-second.yaml', '가', '환불정책'],
+      ['a-second.yaml', '나', '예외'],
+      ['payment.yaml', '취소', '예외'],
+    ]);
+  });
+
+  it('같은 문서의 섹션 참조는 진단과 연결 없이 두고 없는 섹션은 오류로 둔다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [refund],
+    });
+    const document = catalog.documents.get('refund.yaml');
+    expect(
+      document?.occurrences.map((item) => [
+        item.occurrence.text,
+        item.resolution.status,
+        item.resolution.section,
+      ]),
+    ).toEqual([
+      ['[[환불:예외]]', referenceResolutionStatuses.self, '예외'],
+      [
+        '[[환불:없는섹션]]',
+        referenceResolutionStatuses.missingSection,
+        undefined,
+      ],
+      ['[[환불]]', referenceResolutionStatuses.self, undefined],
+    ]);
+    expect(document?.diagnostics.map((item) => item.code)).toEqual([
+      catalogDiagnosticCodes.missingSectionReference,
+      catalogDiagnosticCodes.selfReference,
+    ]);
+    expect(document?.references).toEqual([]);
+    expect(document?.referencedBy).toEqual([]);
+    expect(document?.sectionReferencedBy).toEqual([]);
+  });
+
+  it('편집 중인 문서의 같은 문서 섹션은 저장본이 아닌 현재 내용으로 판단한다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [refund],
+    });
+    const live = resolveLiveDocument(
+      catalog,
+      observe(
+        'refund.yaml',
+        '_codocs:\n  id: refund\n  name: 환불\n새섹션: 설명\n본문: "[[환불:새섹션]] [[환불:예외]]"\n',
+      ),
+    );
+    expect(live.occurrences.map((item) => item.resolution.status)).toEqual([
+      referenceResolutionStatuses.self,
+      referenceResolutionStatuses.missingSection,
+    ]);
+  });
+
+  it('섹션 키의 원문 범위와 이름 목록을 계산한다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [refund],
+    });
+    const document = catalog.documents.get('refund.yaml');
+    if (!document || !refund.parsed.success)
+      throw new Error('문서를 읽지 못했습니다.');
+    const keyStart = refund.parsed.source.indexOf('"예외"');
+    const quoted = getSectionKeyRange(document, '예외');
+    expect(quoted?.offsetRange).toEqual({ start: keyStart, end: keyStart + 4 });
+    expect(quoted?.range.start.character).toBe(0);
+    expect(getSectionKeyRange(document, '없는섹션')).toBeUndefined();
+    expect(getSectionKeyRange(document, '_codocs')).toBeUndefined();
+    expect(getSectionNames(document.observation.parsed)).toEqual([
+      '환불정책',
+      '예외',
+      '자기참조',
+    ]);
+  });
+});
+
+describe('planRename: 섹션 참조의 이름 부분 변경', () => {
+  const refund = observe(
+    'refund.yaml',
+    [
+      '_codocs:',
+      '  id: refund',
+      '  name: 환불',
+      '환불정책: 정책 설명',
+      '예외: 예외 설명',
+      '자기참조: "[[환불:예외]] [[환불:없는섹션]]"',
+      '',
+    ].join('\n'),
+  );
+  const payment = observe(
+    'payment.yaml',
+    [
+      '_codocs:',
+      '  id: payment',
+      '  name: 결제',
+      '취소: "[[환불:환불정책]] [[환불:없는섹션]] [[환불]] [[환불:a\\\\:b]]"',
+      '',
+    ].join('\n'),
+  );
+
+  it('문서 부분이 확정된 참조는 섹션 존재와 관계없이 이름 부분만 바꾼다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [refund, payment],
+    });
+    const plan = planRename(catalog, {
+      targetPath: 'refund.yaml',
+      newName: '새환불',
+    });
+    expect(plan.status).toBe(renamePlanStatuses.ready);
+    expect(
+      plan.changes
+        .filter((change) => change.occurrenceIndex !== undefined)
+        .map((change) => [change.path, change.oldText, change.newText]),
+    ).toEqual([
+      ['payment.yaml', '[[환불:환불정책]]', '[[새환불:환불정책]]'],
+      ['payment.yaml', '[[환불:없는섹션]]', '[[새환불:없는섹션]]'],
+      ['payment.yaml', '[[환불]]', '[[새환불]]'],
+      ['payment.yaml', '[[환불:a\\:b]]', '[[새환불:a\\:b]]'],
+      ['refund.yaml', '[[환불:예외]]', '[[새환불:예외]]'],
+      ['refund.yaml', '[[환불:없는섹션]]', '[[새환불:없는섹션]]'],
+    ]);
+  });
+
+  it('새 이름에 콜론이 있으면 이름 부분만 escape하고 섹션 부분은 유지한다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [refund, payment],
+    });
+    const plan = planRename(catalog, {
+      targetPath: 'refund.yaml',
+      newName: '새:환불',
+    });
+    expect(plan.changes.map((change) => change.newText)).toContain(
+      '[[새\\:환불:환불정책]]',
+    );
+  });
+
+  it('참조 변경을 끄면 섹션 참조는 영향으로만 보고한다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [refund, payment],
+    });
+    const plan = planRename(catalog, {
+      targetPath: 'refund.yaml',
+      newName: '새환불',
+      updateReferences: false,
+    });
+    expect(plan.changes.map((change) => change.path)).toEqual(['refund.yaml']);
+    expect(plan.impacts.map((impact) => impact.reason)).toContain(
+      renameImpactReasons.referencesDisabled,
+    );
   });
 });

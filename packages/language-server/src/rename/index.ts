@@ -1,10 +1,14 @@
 import {
   codocsKey,
   documentFields,
+  getKeyRange,
+  getReferencePartRanges,
+  getSectionNames,
   getStringRange,
   metadataFields,
   parseYaml,
   type OffsetRange,
+  type ReferenceOccurrence,
   type RenameSelection,
 } from '@codocs/core';
 import type {
@@ -31,20 +35,26 @@ export interface PrepareRenameRequest {
   position: Position;
 }
 
-/** 이름을 바꿀 수 있는 위치의 범위와 바꿀 문서의 현재 이름이다. */
+/** 이름을 바꿀 수 있는 위치의 범위와 바꿀 문서 또는 섹션의 현재 이름이다. */
 export interface PrepareRenameResponse {
-  /** 입력 창이 선택할 편집기 범위다. */
+  /** 문서 이름 변경인지 섹션 이름 변경인지 나타낸다. */
+  kind: 'document' | 'section';
+  /** 입력 창이 선택할 편집기 범위다. 따옴표와 대괄호는 포함하지 않는다. */
   range: Range;
-  /** 바꿀 문서의 현재 이름이다. */
+  /** 바꿀 문서 또는 섹션의 현재 이름이다. */
   placeholder: string;
-  /** 이름을 바꿀 문서의 프로젝트 상대 발견 경로다. */
+  /** 이름을 바꿀 문서(섹션은 그 섹션을 가진 문서)의 프로젝트 상대 발견 경로다. */
   targetPath: string;
+  /** 섹션 이름 변경일 때 현재 섹션 이름이다. */
+  section?: string;
 }
 
 /** 이름 변경 미리보기를 요청하는 출처 문서와 입력이다. */
 export interface PlanRenameRequest {
   textDocument: { uri: string };
   targetPath: string;
+  /** 섹션 이름 변경일 때 현재 섹션 이름이며 없으면 문서 이름 변경이다. */
+  section?: string;
   newName: string;
   selections?: readonly RenameSelection[];
 }
@@ -96,4 +106,60 @@ export function nameValueRange(
     end: name.length,
   });
   return range ? { range, name } : undefined;
+}
+
+/** 따옴표로 감싼 키 범위에서 따옴표를 제외한다. */
+function unquoted(source: string, range: OffsetRange): OffsetRange {
+  const first = source[range.start];
+  return (first === '"' || first === "'") &&
+    range.end - range.start >= 2 &&
+    source[range.end - 1] === first
+    ? { start: range.start + 1, end: range.end - 1 }
+    : range;
+}
+
+/**
+ * 커서 offset이 놓인 루트 섹션 키를 찾는다. `_codocs`는 섹션이 아니다.
+ * @param text 편집 중인 문서 원문이다.
+ * @param offset 커서의 UTF-16 offset이다.
+ * @returns 키 위이면 섹션 이름과 따옴표를 제외한 키 범위이며 아니면 undefined다.
+ */
+export function sectionKeyAt(
+  text: string,
+  offset: number,
+): { section: string; range: OffsetRange } | undefined {
+  const parsed = parseYaml(text);
+  if (!parsed.success) return undefined;
+  for (const section of getSectionNames(parsed)) {
+    const keyRange = getKeyRange(parsed, [section]);
+    if (!keyRange) continue;
+    const range = unquoted(parsed.source, keyRange);
+    if (range.start <= offset && offset <= range.end) return { section, range };
+  }
+  return undefined;
+}
+
+/**
+ * 참조 등장 안에서 커서가 문서 이름 부분과 섹션 부분 중 어디에 있는지 판단한다.
+ * @param text 참조를 쓴 문서의 편집 중인 원문이다.
+ * @param occurrence 커서가 놓인 참조 등장이다.
+ * @param offset 커서의 UTF-16 offset이다.
+ * @returns 대괄호와 구분 콜론을 제외한 부분 범위이며 어느 부분도 아니면 undefined다.
+ */
+export function referencePartAt(
+  text: string,
+  occurrence: ReferenceOccurrence,
+  offset: number,
+): { part: 'name' | 'section'; range: OffsetRange } | undefined {
+  const parts = getReferencePartRanges(parseYaml(text), occurrence);
+  if (!parts) return undefined;
+  if (
+    parts.section &&
+    parts.section.start <= offset &&
+    offset <= parts.section.end
+  )
+    return { part: 'section', range: parts.section };
+  if (parts.name.start <= offset && offset <= parts.name.end)
+    return { part: 'name', range: parts.name };
+  return undefined;
 }

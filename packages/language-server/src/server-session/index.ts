@@ -7,6 +7,7 @@ import {
   createWorkspaceQuerySession,
   type WorkspaceQuerySession,
   type WorkspaceLiveReferenceSuccess,
+  type WorkspaceSectionDestination,
   type WorkspacePathDocumentResult,
   type WorkspaceQueryDiagnostic,
   type WorkspacePathGetResponse,
@@ -53,6 +54,8 @@ import {
 } from '../hover/index.js';
 import {
   nameValueRange,
+  referencePartAt,
+  sectionKeyAt,
   renameRequestFailureCodes,
   type ApplyRenameResponse,
   type PlanRenameResponse,
@@ -306,8 +309,8 @@ export class LanguageServerSession {
         ? {
             reference: {
               name: reference.name,
-              ...('domain' in reference && reference.domain !== undefined
-                ? { domain: reference.domain }
+              ...('section' in reference && reference.section !== undefined
+                ? { section: reference.section }
                 : {}),
             },
             sourcePath: this.#sourcePath(uri, workspace),
@@ -342,7 +345,15 @@ export class LanguageServerSession {
       return [];
     return result.occurrences.flatMap(
       /** 단일 확정 출현의 command 링크를 만든다. */ (item) => {
-        if (item.resolution.status !== referenceResolutionStatuses.resolved)
+        const section = item.resolution.section;
+        // 다른 문서는 resolved, 같은 문서의 섹션 참조는 self + section일 때만 링크가 된다.
+        if (
+          item.resolution.status !== referenceResolutionStatuses.resolved &&
+          !(
+            item.resolution.status === referenceResolutionStatuses.self &&
+            section !== undefined
+          )
+        )
           return [];
         const detail = result.targets.find(
           (target) => target.path === item.resolution.target?.path,
@@ -362,7 +373,9 @@ export class LanguageServerSession {
                 target,
                 // Host가 만드는 native 링크의 표시 이름에서도 메타데이터를 서식으로 해석하지 않는다.
                 tooltip: escapeMarkdown(
-                  `원문 열기: ${detailLabel(detail)} (${detail.path.replaceAll('\\', '/')})`,
+                  section === undefined
+                    ? `원문 열기: ${detailLabel(detail)} (${detail.path.replaceAll('\\', '/')})`
+                    : `${'name' in item.occurrence ? item.occurrence.name : detailLabel(detail)}:${section} · ${detail.path.replaceAll('\\', '/')}`,
                 ),
               },
             ]
@@ -654,7 +667,11 @@ export class LanguageServerSession {
   /** 최신 출처 소유권·버전·선택 근거를 확인하고 file URI만 반환한다. */
   async confirmSource(
     input: unknown,
-  ): Promise<{ uri: string } | ConfirmedCodeSource | null> {
+  ): Promise<
+    | { uri: string; destination?: WorkspaceSectionDestination }
+    | ConfirmedCodeSource
+    | null
+  > {
     if (this.#code.has(input))
       return this.#code.confirm(input, (owner) =>
         this.#currentCodeOwner(owner),
@@ -669,7 +686,8 @@ export class LanguageServerSession {
 
   /**
    * 이름 바꾸기를 시작할 수 있는 위치인지 확인하고 바꿀 문서와 현재 이름을 돌려준다.
-   * 문서의 name 값이나 하나의 문서로 확정되는 참조에서만 시작할 수 있다.
+   * 문서의 name 값, 섹션 키, 하나의 문서(와 섹션)로 확정되는 참조에서만 시작할 수 있다.
+   * 참조의 섹션 부분과 섹션 키는 섹션 이름 변경이고 참조의 이름 부분과 name 값은 문서 이름 변경이다.
    * @param request 편집 중인 문서와 커서 위치다.
    * @returns 시작할 수 없는 위치이면 null이다.
    */
@@ -682,12 +700,24 @@ export class LanguageServerSession {
     if (!document || !workspace || !this.#isKnowledgeDocument(uri, workspace))
       return null;
     const offset = document.offsetAt(request.position);
-    const name = nameValueRange(document.getText());
+    const text = document.getText();
+    const ownPath = path.relative(workspace.rootPath, fileURLToPath(uri));
+    const name = nameValueRange(text);
     if (name && name.range.start <= offset && offset <= name.range.end)
       return {
+        kind: 'document',
         range: utf16OffsetsToRange(document, name.range),
         placeholder: name.name,
-        targetPath: path.relative(workspace.rootPath, fileURLToPath(uri)),
+        targetPath: ownPath,
+      };
+    const key = sectionKeyAt(text, offset);
+    if (key)
+      return {
+        kind: 'section',
+        range: utf16OffsetsToRange(document, key.range),
+        placeholder: key.section,
+        targetPath: ownPath,
+        section: key.section,
       };
     const version = document.version;
     const references = await this.#references(uri);
@@ -703,14 +733,36 @@ export class LanguageServerSession {
         offset < occurrence.offsetRange.end,
     );
     const target = item?.resolution.target;
+    if (!item) return null;
+    const { status, section } = item.resolution;
+    const part = referencePartAt(text, item.occurrence, offset);
+    if (!part) return null;
+    if (part.part === 'section') {
+      if (
+        section === undefined ||
+        !target ||
+        (status !== referenceResolutionStatuses.resolved &&
+          status !== referenceResolutionStatuses.self)
+      )
+        return null;
+      return {
+        kind: 'section',
+        range: utf16OffsetsToRange(document, part.range),
+        placeholder: section,
+        targetPath: target.path,
+        section,
+      };
+    }
+    // 같은 문서의 섹션 참조(self + section)는 이름 부분에서 그 문서의 이름 변경을 시작한다.
     if (
-      !item ||
-      item.resolution.status !== referenceResolutionStatuses.resolved ||
-      target?.name === undefined
+      target?.name === undefined ||
+      (status !== referenceResolutionStatuses.resolved &&
+        !(status === referenceResolutionStatuses.self && section !== undefined))
     )
       return null;
     return {
-      range: item.occurrence.range,
+      kind: 'document',
+      range: utf16OffsetsToRange(document, part.range),
       placeholder: target.name,
       targetPath: target.path,
     };

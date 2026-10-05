@@ -132,6 +132,15 @@ describe('MCP 여덟 입력 계약', () => {
       },
     ],
     ['알 수 없는 mode', { mode: 'other', id: 'a', newName: 'b' }],
+    ['빈 section', { mode: 'preview', id: 'a', section: '', newName: 'b' }],
+    [
+      '문자열이 아닌 section',
+      { mode: 'preview', id: 'a', section: 1, newName: 'b' },
+    ],
+    [
+      'section이 있어도 알 수 없는 속성',
+      { mode: 'preview', id: 'a', section: 's', newName: 'b', extra: 1 },
+    ],
   ])('이름 변경 입력은 %s이면 거부한다', (_, input) => {
     expect(parseRenameInput(input)).toBeUndefined();
   });
@@ -144,5 +153,15 @@ describe('MCP 여덟 입력 계약', () => {
     const apply = { ...preview, mode: 'apply', revisions: { 's.yaml': 'r' } };
     expect(parseRenameInput(preview)).toEqual(preview);
     expect(parseRenameInput(apply)).toEqual(apply);
+  });
+
+  it('이름 변경 입력은 선택 필드 section을 preview와 apply에서 그대로 보존한다', () => {
+    const preview = { mode: 'preview', id: 'a', section: 's', newName: 'b' };
+    const apply = { ...preview, mode: 'apply', revisions: { 's.yaml': 'r' } };
+    expect(parseRenameInput(preview)).toEqual(preview);
+    expect(parseRenameInput(apply)).toEqual(apply);
+    expect(
+      parseRenameInput({ mode: 'preview', id: 'a', newName: 'b' }),
+    ).not.toHaveProperty('section');
   });
 });

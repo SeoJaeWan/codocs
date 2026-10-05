@@ -390,6 +390,7 @@ function queryDiagnostics(
   const replaced = new Set<string>([
     catalogDiagnosticCodes.missingReference,
     catalogDiagnosticCodes.ambiguousReference,
+    catalogDiagnosticCodes.missingSectionReference,
     catalogDiagnosticCodes.selfReference,
     catalogDiagnosticCodes.unconfirmedReference,
     catalogDiagnosticCodes.referenceTargetError,
@@ -417,7 +418,17 @@ function queryDiagnostics(
           .sort(),
         ...metadata,
       });
-    else if (resolution.status === referenceResolutionStatuses.self)
+    else if (resolution.status === referenceResolutionStatuses.missingSection)
+      diagnostics.push({
+        code: queryDiagnosticCodes.sectionReferenceNotFound,
+        severity: diagnosticSeverities.error,
+        message: queryDiagnosticMessages.sectionReferenceNotFound,
+        ...metadata,
+      });
+    else if (
+      resolution.status === referenceResolutionStatuses.self &&
+      resolution.section === undefined
+    )
       diagnostics.push({
         code: referenceDiagnosticCodes.invalidReference,
         severity: diagnosticSeverities.error,

@@ -66,7 +66,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       });
     });
 
-    it('이 문서를 가리키는 참조는 새 이름으로 고치고 도메인을 적은 참조는 대상이 아니므로 고치지 않는다', async () => {
+    it('이 문서를 가리키는 참조는 새 이름으로 고치고 다른 문서 이름에 섹션을 붙인 참조는 대상이 아니므로 고치지 않는다', async () => {
       await writeDocuments({
         'order.yaml': order,
         'a.yaml':
@@ -94,7 +94,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
       ]);
     });
 
-    it('도메인 없이 적은 참조 세 곳은 도메인 없이 새 이름으로 고친다', async () => {
+    it('섹션 없이 적은 참조 세 곳은 섹션 없이 새 이름으로 고친다', async () => {
       await writeDocuments({
         'order.yaml': order,
         'a.yaml':
@@ -483,5 +483,40 @@ describe('WorkspaceQuerySession.applyRename: 이름 변경 반영과 색인', ()
     expect(
       await readFile(path.join(root, '.codocs', 'order.yaml'), 'utf8'),
     ).toBe(order);
+  });
+});
+
+describe('WorkspaceQuerySession.applyRename: 섹션을 적은 참조', () => {
+  const refund =
+    '_codocs:\n  id: refund\n  name: 환불\n환불정책: 설명\n예외: 설명\n자기: "[[환불:예외]] [[환불:없는섹션]]"\n';
+  const payment =
+    '_codocs:\n  id: payment\n  name: 결제\n취소: "[[환불:환불정책]] [[환불:a\\\\:b]]"\n메모: \'[[환불:환불정책]] [[환불]]\'\n';
+
+  it('문서 이름을 바꾸면 섹션 존재와 관계없이 이름 부분만 고치고 섹션과 따옴표 형식을 유지한다', async () => {
+    await writeDocuments({ 'refund.yaml': refund, 'payment.yaml': payment });
+    const target = path.join('.codocs', 'refund.yaml');
+    const preview = await session.previewRename({
+      targetPath: target,
+      newName: '새:환불',
+    });
+    if (!preview.success) throw new Error('미리보기가 실패했다');
+    expect(preview.status).toBe('ready');
+    const result = await session.applyRename({
+      targetPath: target,
+      newName: '새:환불',
+      revisions: preview.revisions,
+    });
+
+    expect(result).toMatchObject({ success: true, saved: true, changed: true });
+    expect(
+      await readFile(path.join(root, '.codocs', 'refund.yaml'), 'utf8'),
+    ).toBe(
+      '_codocs:\n  id: refund\n  name: 새:환불\n환불정책: 설명\n예외: 설명\n자기: "[[새\\\\:환불:예외]] [[새\\\\:환불:없는섹션]]"\n',
+    );
+    expect(
+      await readFile(path.join(root, '.codocs', 'payment.yaml'), 'utf8'),
+    ).toBe(
+      '_codocs:\n  id: payment\n  name: 결제\n취소: "[[새\\\\:환불:환불정책]] [[새\\\\:환불:a\\\\:b]]"\n메모: \'[[새\\:환불:환불정책]] [[새\\:환불]]\'\n',
+    );
   });
 });

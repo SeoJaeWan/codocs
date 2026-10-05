@@ -9,7 +9,8 @@
 코드에서 특정 문서 행을 참조하는 경우, 변경한 뒤 코드 링크가 의도한 문서 행을 여는지 확인한다.
 
 문서의 `name`은 `codocs_write`의 update로 바꾸지 않는다. `set._codocs`의 `name`이 현재 이름과 다르면 `name_change_not_allowed`로 저장하지 않고 `codocs_rename`을 안내한다.
-이름 변경은 미리보기와 반영 두 단계이며, 다른 문서의 `_codocs.parent`에 적힌 이전 이름도 함께 새 이름으로 고친다. 이전 이름의 문서가 둘 이상이면 `parent`는 고치지 않는다. MCP에서는 `codocs_rename`을 쓰고, VS Code에서는 문서의 `_codocs.name` 값이나 참조에서 이름 바꾸기(F2)를 쓴다.
+이름 변경은 미리보기와 반영 두 단계이며, 다른 문서의 `_codocs.parent`에 적힌 이전 이름도 함께 새 이름으로 고친다. 이전 이름의 문서가 둘 이상이면 `parent`는 고치지 않는다. MCP에서는 `codocs_rename`을 쓰고, VS Code에서는 문서의 `_codocs.name` 값이나 참조의 이름 부분에서 이름 바꾸기(F2)를 쓴다.
+`[[환불:환불정책]]`처럼 섹션이 붙은 참조도 이름 부분만 고치며 `:환불정책`은 그대로 둔다. 문서 안의 자기 섹션 참조와 섹션이 없는 참조도 이름 부분은 고친다.
 
 1. 먼저 `codocs_rename({"mode":"preview","id":"sample-order","newName":"새 주문"})`로 미리본다. 파일은 바뀌지 않는다.
 2. 응답의 `status`를 확인한다. `ready`는 고칠 내용을 모두 계산했다는 뜻이며 저장해도 된다는 허가가 아니다.
@@ -25,6 +26,18 @@
 VS Code에서는 영향받는 파일에 저장하지 않은 수정이 있으면 시작 전에 중단한다.
 
 ID를 바꿔도 과거 ID는 남기지 않는다. 이후 조회·수정은 새 ID로 하며, 다른 문서의 참조나 사용자 코드는 자동으로 고쳐지지 않는다.
+
+## 섹션 이름 변경
+
+문서의 섹션 이름도 같은 미리보기·반영 흐름으로 바꾼다. `codocs_rename`에 현재 섹션 이름을 `section`으로 더하면 `newName`은 새 섹션 이름이 된다.
+
+`codocs_rename({"mode":"preview","id":"refund","section":"환불정책","newName":"환불 규정"})`
+
+- 응답에 바꿀 섹션을 나타내는 `targetSection`이 더해지며 `oldName`·`newName`은 섹션 이름이다.
+- 그 문서의 섹션 키와, 그 섹션으로 확정된 모든 `[[환불:환불정책]]`의 섹션 부분을 함께 고친다. 같은 문서 안의 참조도 포함한다.
+- `blockingReason`이 `section_conflict`이면 같은 이름의 섹션이 이미 있고, `section_not_found`이면 바꿀 섹션이 문서에 없다. 새 이름이 비었거나 `_`로 시작하거나 대괄호를 포함하거나 현재 섹션 이름과 같으면 `invalid_name`, 키의 현재 형식이나 참조로 안전하게 적을 수 없으면 `unrepresentable`이다.
+- 선택·반영·`revisions`·복구는 문서 이름 변경과 같다.
+- VS Code에서는 섹션 키나 참조의 섹션 부분에서 이름 바꾸기(F2)를 시작하며 입력 상자에 현재 섹션 이름이 채워진다.
 
 ## get에서 set/unset과 validate까지
 

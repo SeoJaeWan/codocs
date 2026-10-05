@@ -15,6 +15,8 @@ import {
   catalogDiagnosticMessages,
   diagnosticSeverities,
   parseYaml,
+  getSectionKeyRange,
+  referenceResolutionStatuses,
   changePlanStatuses,
   projectCatalogGet,
   projectCatalogDiagnostics,
@@ -41,6 +43,7 @@ import {
   type RequestFailure,
   type RequestResult,
   type ScanStatus,
+  type SourceRange,
 } from '@codocs/core';
 import { createHash, randomBytes } from 'node:crypto';
 import path from 'node:path';
@@ -356,7 +359,7 @@ export type WorkspaceLiveReferenceResponse =
 
 /** 선택의 원래 의미를 보존하는 출처다. 이름 참조는 별도로 재확인한다. */
 export type WorkspaceCandidateOrigin = {
-  reference: { name: string; domain?: string };
+  reference: { name: string; section?: string };
   sourcePath: string;
   explicit?: boolean;
 };
@@ -427,6 +430,15 @@ function supportedCandidateFile(
 export interface WorkspaceConfirmedCandidate {
   catalogVersion: number;
   result: WorkspacePathDocumentResult;
+  /** 섹션 링크에서 최신 관측으로 확인한 섹션 키 위치다. 없으면 문서 맨 위를 연다. */
+  destination?: WorkspaceSectionDestination;
+}
+
+/** 확인한 섹션 키의 현재 원문 범위와 그 범위의 원문 텍스트다. */
+export interface WorkspaceSectionDestination {
+  kind: 'occurrence';
+  range: SourceRange;
+  markerText: string;
 }
 
 /** 적용할 수 없는 비동기 요청의 공통 결과다. */
@@ -2068,6 +2080,18 @@ export class WorkspaceQuerySession {
       origin.reference,
       origin.sourcePath,
     );
+    // 같은 문서의 섹션 링크만 출처 문서를 후보로 허용한다. 섹션은 클릭할 때 현재 편집 내용에서 확인한다.
+    const selfSection =
+      origin.reference.section !== undefined &&
+      result.target?.path === origin.sourcePath &&
+      (result.status === referenceResolutionStatuses.self ||
+        result.status === referenceResolutionStatuses.missingSection);
+    // 문서는 확정되었지만 다른 문서에 섹션이 없으면 열 곳이 없다.
+    if (
+      !selfSection &&
+      result.status === referenceResolutionStatuses.missingSection
+    )
+      return [];
     if (
       !origin.explicit &&
       (catalog.status !== scanStatuses.complete ||
@@ -2077,10 +2101,45 @@ export class WorkspaceQuerySession {
     return result.candidates
       .filter(
         (candidate) =>
-          candidate.path !== origin.sourcePath &&
+          (selfSection || candidate.path !== origin.sourcePath) &&
           candidate.confirmation === catalogConfirmations.confirmed,
       )
       .map((candidate) => candidate.path);
+  }
+
+  /**
+   * 섹션 링크의 목적지를 최신 관측에서 계산한다.
+   * 다른 문서는 저장된 색인에서, 같은 문서는 편집 중인 내용에서 섹션 키를 확인한다.
+   * 섹션이 없는 참조는 목적지 없이 성공하고, 확인하지 못하면 failed를 반환한다.
+   */
+  #sectionDestination(
+    catalog: Catalog,
+    origin: WorkspaceCandidateOrigin,
+    candidatePath: string,
+  ): WorkspaceSectionDestination | undefined | 'failed' {
+    const section = origin.reference.section;
+    if (section === undefined) return undefined;
+    if (candidatePath === origin.sourcePath) {
+      const live = this.#liveDocuments.get(origin.sourcePath);
+      if (!live) return 'failed';
+      const parsed = parseYaml(live.text, origin.sourcePath);
+      return sectionDestination(
+        { observation: { path: origin.sourcePath, parsed } },
+        section,
+      );
+    }
+    const resolution = resolveReference(
+      catalog,
+      origin.reference,
+      origin.sourcePath,
+    );
+    // 이름이 여러 문서인 명시 선택은 섹션을 확인하지 않고 문서 맨 위를 연다.
+    if (resolution.status !== referenceResolutionStatuses.resolved)
+      return undefined;
+    const document = catalog.documents.get(candidatePath);
+    return document && resolution.section === section
+      ? sectionDestination(document, section)
+      : 'failed';
   }
 
   /** 더 이상 표시하지 않는 선택 근거를 해제한다. */
@@ -2242,9 +2301,19 @@ export class WorkspaceQuerySession {
       return undefined;
     if (scan !== this.#scan || this.#candidateObservationChanged(version))
       return false;
+    const destination = this.#sectionDestination(
+      catalog,
+      selection.origin,
+      candidate.path,
+    );
+    if (destination === 'failed') return undefined;
     const projected = withWorkspaceUris(scan.root.projectRoot, result);
     return projected.found
-      ? { catalogVersion: version, result: projected }
+      ? {
+          catalogVersion: version,
+          result: projected,
+          ...(destination ? { destination } : {}),
+        }
       : undefined;
   }
 
@@ -2454,6 +2523,25 @@ export function createWorkspaceQuerySession(
   options: WorkspaceQuerySessionOptions = {},
 ): WorkspaceQuerySession {
   return new WorkspaceQuerySession(input, observe, options);
+}
+
+/** 섹션 키 범위와 그 원문 텍스트로 클릭 목적지를 만든다. 확인하지 못하면 failed다. */
+function sectionDestination(
+  document: Parameters<typeof getSectionKeyRange>[0],
+  section: string,
+): WorkspaceSectionDestination | 'failed' {
+  const key = getSectionKeyRange(document, section);
+  const parsed = document.observation.parsed;
+  return key && parsed.success
+    ? {
+        kind: 'occurrence',
+        range: key.range,
+        markerText: parsed.source.slice(
+          key.offsetRange.start,
+          key.offsetRange.end,
+        ),
+      }
+    : 'failed';
 }
 
 /** 후보 출처의 경로도 저장된 발견 경로와 같은 표기로 비교한다. */

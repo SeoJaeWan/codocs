@@ -29,11 +29,13 @@ export const referenceResolutionStatuses = {
   missing: 'missing',
   /** 후보가 여러 개라 대상을 확정할 수 없다. */
   ambiguous: 'ambiguous',
-  /** 참조 대상이 작성 문서 자신이다. */
+  /** 참조 대상이 작성 문서 자신이다. 섹션을 적었고 그 섹션이 있으면 링크만 되는 같은 문서 섹션 참조다. */
   self: 'self',
   /** 탐색이나 후보 확인이 불완전하다. */
   unconfirmed: 'unconfirmed',
-  /** 다른 문서 하나로 확정되었다. */
+  /** 문서 하나로 확정되었지만 참조한 섹션이 그 문서에 없다. 같은 문서의 섹션 참조도 포함한다. */
+  missingSection: 'missing_section',
+  /** 다른 문서 하나로 확정되었다. 섹션을 적었다면 그 섹션도 대상 문서에 있다. */
   resolved: 'resolved',
 } as const;
 /** 원본 상수에서 도출한 ReferenceResolutionStatus 타입이다. */
@@ -88,6 +90,10 @@ export const renameBlockingReasons = {
   sourceNotLossless: 'source_not_lossless',
   /** 바꿀 위치의 YAML 표기 형식으로 새 값을 안전하게 쓸 수 없다. */
   unrepresentable: 'unrepresentable',
+  /** 섹션 이름 변경에서 같은 이름의 섹션이 대상 문서에 이미 있다. */
+  sectionConflict: 'section_conflict',
+  /** 섹션 이름 변경의 대상 섹션이 문서에 없다. */
+  sectionNotFound: 'section_not_found',
 } as const;
 /** 원본 상수에서 도출한 RenameBlockingReason 타입이다. */
 export type RenameBlockingReason =
@@ -105,3 +111,12 @@ export const catalogFailureKinds = {
 /** 원본 상수에서 도출한 CatalogFailureKind 타입이다. */
 export type CatalogFailureKind =
   (typeof catalogFailureKinds)[keyof typeof catalogFailureKinds];
+
+/** RenameChangeKind의 원본 값과 의미다. 본문 값 수정에는 kind를 적지 않는다. @domainValues */
+export const renameChangeKinds = {
+  /** 문서 최상위 섹션 키 이름을 바꾸는 수정이다. 따옴표 형식은 유지한다. */
+  key: 'key',
+} as const;
+/** 원본 상수에서 도출한 RenameChangeKind 타입이다. */
+export type RenameChangeKind =
+  (typeof renameChangeKinds)[keyof typeof renameChangeKinds];

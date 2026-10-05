@@ -13,13 +13,17 @@ import {
 } from '../diagnostics/index.js';
 import type { YamlParseResult } from '../parser/index.js';
 import {
+  getKeyRange,
   getStringRange,
   offsetToPosition,
   parseYaml,
 } from '../parser/index.js';
 import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import type { ReferenceOccurrence } from '../references/index.js';
-import { extractReferences } from '../references/index.js';
+import {
+  extractReferences,
+  getReferencePartRanges,
+} from '../references/index.js';
 import {
   codocsKey,
   documentFields,
@@ -31,6 +35,7 @@ import {
   catalogFailureKinds,
   referenceResolutionStatuses,
   renameBlockingReasons,
+  renameChangeKinds,
   renameImpactReasons,
   renamePlanStatuses,
   scanStatuses,
@@ -38,6 +43,7 @@ import {
   type CatalogFailureKind,
   type ReferenceResolutionStatus,
   type RenameBlockingReason,
+  type RenameChangeKind,
   type RenameImpactReason,
   type RenamePlanStatus,
   type ScanStatus,
@@ -91,6 +97,8 @@ export interface ReferenceResolution {
   status: ReferenceResolutionStatus;
   candidates: readonly ReferenceCandidate[];
   target?: ReferenceCandidate;
+  /** 참조가 섹션을 적었고 그 섹션이 대상 문서에 있다고 확인한 경우의 섹션 이름이다. */
+  section?: string;
 }
 /** 반복 등장과 실제 YAML 위치를 유지하는 의미 해석 기록이다. */
 export interface CatalogOccurrence {
@@ -105,6 +113,16 @@ export interface CatalogDocument extends CatalogIdentity {
   occurrences: readonly CatalogOccurrence[];
   references: readonly CatalogIdentity[];
   referencedBy: readonly CatalogIdentity[];
+  /** 이 문서를 가리키는 확정 참조를 등장 위치마다 하나씩 담은 섹션 단위 역참조다. */
+  sectionReferencedBy: readonly SectionBacklink[];
+}
+/** 섹션 단위 역참조 한 건이다. 문서 전체를 가리키는 `[[name]]`에는 targetSection이 없다. */
+export interface SectionBacklink {
+  sourcePath: string;
+  /** 참조를 쓴 문서의 루트 섹션 키다. */
+  sourceSection: string;
+  /** 참조가 가리킨 대상 문서의 섹션 이름이다. */
+  targetSection?: string;
 }
 /** 경로를 유일 키로 사용하는 IO 없는 계산 결과다. 반환 컬렉션은 읽기 전용 계약이다. */
 export interface Catalog {
@@ -186,6 +204,10 @@ const catalogDiagnosticDefinitions = {
     message: catalogDiagnosticMessages.ambiguousReference,
     severity: diagnosticSeverities.error,
   },
+  [catalogDiagnosticCodes.missingSectionReference]: {
+    message: catalogDiagnosticMessages.missingSectionReference,
+    severity: diagnosticSeverities.error,
+  },
   [catalogDiagnosticCodes.selfReference]: {
     message: catalogDiagnosticMessages.selfReference,
     severity: diagnosticSeverities.error,
@@ -265,16 +287,13 @@ function linkIdentity(document: CatalogIdentity): CatalogIdentity {
 }
 /**
  * 참조의 name으로 후보 문서를 찾아 경로순으로 돌려준다.
- * 도메인은 더 이상 문서에 없으므로 도메인을 적은 참조는 후보가 없다.
+ * 섹션은 문서를 확정한 뒤에 확인하므로 후보 찾기에는 쓰지 않는다.
  */
 function findCandidates(
   catalog: Catalog,
-  reference: { name: string; domain?: string },
+  reference: { name: string },
 ): ReferenceCandidate[] {
-  const paths =
-    reference.domain === undefined
-      ? catalog.namePaths.get(reference.name)
-      : undefined;
+  const paths = catalog.namePaths.get(reference.name);
   return [...(paths ?? [])].sort().flatMap((path) => {
     const doc = catalog.documents.get(path);
     return doc ? [candidate(doc)] : [];
@@ -297,12 +316,49 @@ function statusByCandidateCount(
   return referenceResolutionStatuses.resolved;
 }
 /**
+ * 문서의 루트 섹션 이름을 작성 순서대로 돌려준다. `_codocs`와 파싱에 실패한 문서는 제외한다.
+ */
+export function getSectionNames(parsed: YamlParseResult): string[] {
+  return parsed.success
+    ? Object.keys(parsed.data).filter((key) => key !== codocsKey)
+    : [];
+}
+/** 섹션 키의 원문 위치다. offsetRange는 원문 offset, range는 줄 좌표다. */
+export interface SectionKeyRange {
+  offsetRange: OffsetRange;
+  range: SourceRange;
+}
+/**
+ * 카탈로그 문서의 루트 섹션 키가 원문에서 차지하는 범위를 계산한다.
+ * 따옴표를 쓴 키는 따옴표를 포함한 범위다.
+ * @param document 섹션 키를 찾을 카탈로그 문서다. 저장된 색인 문서와 편집 중인 문서 모두 쓸 수 있다.
+ * @param section 루트 섹션 이름이다.
+ * @returns 섹션이 없거나 위치를 확인하지 못하면 undefined다.
+ */
+export function getSectionKeyRange(
+  document: Pick<CatalogDocument, 'observation'>,
+  section: string,
+): SectionKeyRange | undefined {
+  const parsed = document.observation.parsed;
+  if (!getSectionNames(parsed).includes(section)) return undefined;
+  const offsetRange = getKeyRange(parsed, [section]);
+  if (!offsetRange || !parsed.success) return undefined;
+  const start = offsetToPosition(parsed.source, offsetRange.start);
+  const end = offsetToPosition(parsed.source, offsetRange.end);
+  return start && end
+    ? { offsetRange: { ...offsetRange }, range: { start, end } }
+    : undefined;
+}
+/**
  * 참조 하나가 가리키는 대상을 후보를 찾아 판단한다.
+ * 문서가 하나로 확정되면 섹션을 대상 문서의 저장된 색인에서 확인한다.
+ * 같은 문서의 섹션은 sourceParsed(편집 중인 내용)가 있으면 그것으로 확인한다.
  */
 export function resolveReference(
   catalog: Catalog,
-  reference: { name: string; domain?: string },
+  reference: { name: string; section?: string },
   sourcePath?: string,
+  sourceParsed?: YamlParseResult,
 ): ReferenceResolution {
   const candidates = findCandidates(catalog, reference);
   if (!isScanComplete(catalog))
@@ -313,9 +369,23 @@ export function resolveReference(
   const target = candidates[0];
   if (!target)
     return { status: referenceResolutionStatuses.missing, candidates };
-  if (target.path === sourcePath)
-    return { status: referenceResolutionStatuses.self, candidates, target };
-  return { status: referenceResolutionStatuses.resolved, candidates, target };
+  const isSelf = target.path === sourcePath;
+  const confirmed = isSelf
+    ? referenceResolutionStatuses.self
+    : referenceResolutionStatuses.resolved;
+  if (reference.section === undefined)
+    return { status: confirmed, candidates, target };
+  const parsed =
+    isSelf && sourceParsed
+      ? sourceParsed
+      : catalog.documents.get(target.path)?.observation.parsed;
+  if (!parsed || !getSectionNames(parsed).includes(reference.section))
+    return {
+      status: referenceResolutionStatuses.missingSection,
+      candidates,
+      target,
+    };
+  return { status: confirmed, candidates, target, section: reference.section };
 }
 /** 계산할 때마다 다시 만드는 프로젝트 수준 진단 코드다. */
 const projectDiagnosticCodes: ReadonlySet<string> = new Set([
@@ -424,6 +494,21 @@ function resolveParents(
     });
   }
 }
+/** 섹션 단위 역참조를 출처 경로, 출처 섹션, 대상 섹션 순으로 정렬한다. */
+function compareSectionBacklinks(
+  left: SectionBacklink,
+  right: SectionBacklink,
+): number {
+  return (
+    compareText(left.sourcePath, right.sourcePath) ||
+    compareText(left.sourceSection, right.sourceSection) ||
+    compareText(left.targetSection ?? '', right.targetSection ?? '')
+  );
+}
+/** 로케일과 무관하게 UTF-16 코드 단위 순서로 문자열을 비교한다. */
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
 /** 보관 기록에서 색인·충돌·직접 연결을 매번 재계산한다. */
 function calculate(
   status: Catalog['status'],
@@ -443,6 +528,7 @@ function calculate(
       occurrences: [],
       references: [],
       referencedBy: [],
+      sectionReferencedBy: [],
     };
     documents.set(doc.path, doc);
     if (doc.id !== undefined) addPath(idPaths, doc.id, doc.path);
@@ -488,10 +574,29 @@ function calculate(
     conflicts(paths, catalogDiagnosticCodes.duplicateName);
   resolveParents(catalog, documents);
   const backlinks = new Map<string, Set<string>>();
+  const sectionBacklinks = new Map<string, SectionBacklink[]>();
   for (const [path, doc] of documents) {
     const resolved = resolveDocumentReferences(catalog, doc);
     for (const target of resolved.references)
       addPath(backlinks, target.path, path);
+    for (const item of resolved.occurrences) {
+      const sourceSection = item.occurrence.fieldPath[0];
+      if (
+        !isLinkable(item.resolution, resolved) ||
+        item.occurrence.syntax !== referenceSyntaxStatuses.valid ||
+        typeof sourceSection !== 'string'
+      )
+        continue;
+      const list = sectionBacklinks.get(item.resolution.target.path) ?? [];
+      list.push({
+        sourcePath: path,
+        sourceSection,
+        ...(item.occurrence.section !== undefined
+          ? { targetSection: item.occurrence.section }
+          : {}),
+      });
+      sectionBacklinks.set(item.resolution.target.path, list);
+    }
     documents.set(path, resolved);
   }
   for (const [path, doc] of documents)
@@ -501,6 +606,9 @@ function calculate(
         const d = documents.get(p);
         return d ? [linkIdentity(d)] : [];
       }),
+      sectionReferencedBy: (sectionBacklinks.get(path) ?? []).sort(
+        compareSectionBacklinks,
+      ),
     });
   return catalog;
 }
@@ -511,10 +619,11 @@ function resolveOccurrence(
   catalog: Catalog,
   occurrence: ReferenceOccurrence,
   sourcePath: string,
+  sourceParsed: YamlParseResult,
 ): ReferenceResolution {
   return occurrence.syntax === referenceSyntaxStatuses.invalid
     ? { status: referenceResolutionStatuses.invalid, candidates: [] }
-    : resolveReference(catalog, occurrence, sourcePath);
+    : resolveReference(catalog, occurrence, sourcePath, sourceParsed);
 }
 /**
  * 확정된 참조인지 확인해 연결과 역참조를 만들지 정한다.
@@ -566,17 +675,25 @@ function resolveDocumentReferences(
     /** 원문 등장을 해석하며 확정 연결만 별도 집계한다. */ (
       occurrence,
     ): CatalogOccurrence => {
-      const resolution = resolveOccurrence(catalog, occurrence, path);
+      const resolution = resolveOccurrence(
+        catalog,
+        occurrence,
+        path,
+        doc.observation.parsed,
+      );
       const key =
         resolution.status === referenceResolutionStatuses.missing
           ? catalogDiagnosticCodes.missingReference
           : resolution.status === referenceResolutionStatuses.ambiguous
             ? catalogDiagnosticCodes.ambiguousReference
-            : resolution.status === referenceResolutionStatuses.self
-              ? catalogDiagnosticCodes.selfReference
-              : resolution.status === referenceResolutionStatuses.unconfirmed
-                ? catalogDiagnosticCodes.unconfirmedReference
-                : undefined;
+            : resolution.status === referenceResolutionStatuses.missingSection
+              ? catalogDiagnosticCodes.missingSectionReference
+              : resolution.status === referenceResolutionStatuses.self &&
+                  resolution.section === undefined
+                ? catalogDiagnosticCodes.selfReference
+                : resolution.status === referenceResolutionStatuses.unconfirmed
+                  ? catalogDiagnosticCodes.unconfirmedReference
+                  : undefined;
       if (key)
         diagnostics.push(
           catalogDiagnostic(doc, key, occurrence.fieldPath, occurrence),
@@ -682,6 +799,7 @@ export function resolveLiveDocument(
     occurrences: [],
     references: [],
     referencedBy: [],
+    sectionReferencedBy: [],
   };
   const conflicts =
     document.id === undefined
@@ -763,6 +881,7 @@ export function buildCatalog(scan: CatalogScan, previous?: Catalog): Catalog {
         occurrences: [],
         references: [],
         referencedBy: [],
+        sectionReferencedBy: [],
       });
     }
   return calculate(scan.status, scan.failures ?? [], [...records.values()]);
@@ -793,6 +912,8 @@ export interface RenameChange {
   candidates: readonly ReferenceCandidate[];
   /** 본문 참조 등장의 순번이다. 이름 필드와 parent 항목 수정에는 없다. */
   occurrenceIndex?: number;
+  /** 값이 아니라 섹션 키 이름을 바꾸는 수정이면 key다. 이때 offsetRange는 따옴표를 포함한 키 범위다. */
+  kind?: RenameChangeKind;
 }
 /** 자동 확정하지 않은 영향 및 변경 후 다른 후보가 되는 영향도 보고한다. */
 export interface RenameImpact {
@@ -818,13 +939,27 @@ export interface RenamePlan {
   impacts: readonly RenameImpact[];
   invalidSelections: readonly RenameSelection[];
   blockingReason?: RenameBlockingReason;
+  /** 섹션 이름 변경 계획이면 바꾸기 전 섹션 이름이다. 이때 oldName·newName도 섹션 이름이다. */
+  targetSection?: string;
+}
+/** 문서 하나의 최상위 섹션 이름을 바꾸는 계산 요청이다. */
+export interface SectionRenameRequest {
+  targetPath: string;
+  /** 바꾸기 전 섹션 이름이다. */
+  section: string;
+  /** 새 섹션 이름이다. */
+  newName: string;
+  selections?: readonly RenameSelection[];
 }
 /** 새 표기를 공개 문법 추출로 round trip 검증한다. 표현 불가능한 구성은 추측하지 않는다. */
-function referenceText(name: string): string | undefined {
+function referenceText(name: string, section?: string): string | undefined {
   /** 구성 내부 콜론을 구분자와 구분한다. */
   const encode = (value: string): string => value.replace(/:/gu, '\\:');
-  const text = `[[${encode(name)}]]`;
-  if (name.includes('[') || name.includes(']')) return undefined;
+  const text =
+    section === undefined
+      ? `[[${encode(name)}]]`
+      : `[[${encode(name)}:${encode(section)}]]`;
+  if (/[\[\]]/u.test(name) || /[\[\]]/u.test(section ?? '')) return undefined;
   const extracted = extractReferences(
     parseYaml(`body: ${JSON.stringify(text)}\n`),
   );
@@ -832,17 +967,46 @@ function referenceText(name: string): string | undefined {
   return extracted.occurrences.length === 1 &&
     occurrence?.syntax === referenceSyntaxStatuses.valid &&
     occurrence.name === name &&
-    occurrence.domain === undefined
+    occurrence.section === section
     ? text
     : undefined;
 }
-/** 전체 후보가 같은지 판별하여 무선택 모호 참조의 의미 변화도 보고한다. */
+/**
+ * 문서 부분의 해석 상태를 돌려준다. 섹션 확인 결과(섹션 없음)는 문서 확정으로 본다.
+ */
+function documentStatus(
+  resolution: ReferenceResolution,
+): ReferenceResolutionStatus {
+  return resolution.status === referenceResolutionStatuses.missingSection
+    ? referenceResolutionStatuses.resolved
+    : resolution.status;
+}
+/**
+ * 이름 변경 계획에서 참조의 문서 부분이 확정한 대상을 돌려준다.
+ * 섹션이 없어도 문서가 확정되었으면 대상이며, 같은 문서의 섹션 참조도 대상이다.
+ */
+function confirmedDocumentTarget(
+  resolution: ReferenceResolution,
+  occurrence: ReferenceOccurrence,
+): ReferenceCandidate | undefined {
+  if (
+    resolution.status === referenceResolutionStatuses.resolved ||
+    resolution.status === referenceResolutionStatuses.missingSection
+  )
+    return resolution.target;
+  return resolution.status === referenceResolutionStatuses.self &&
+    occurrence.syntax === referenceSyntaxStatuses.valid &&
+    occurrence.section !== undefined
+    ? resolution.target
+    : undefined;
+}
+/** 전체 후보가 같은지 판별하여 무선택 모호 참조의 의미 변화도 보고한다. 섹션은 비교하지 않는다. */
 function sameResolution(
   before: ReferenceResolution,
   after: ReferenceResolution,
 ): boolean {
   return (
-    before.status === after.status &&
+    documentStatus(before) === documentStatus(after) &&
     before.target?.path === after.target?.path &&
     before.candidates.length === after.candidates.length &&
     before.candidates.every((c, i) => c.path === after.candidates[i]?.path)
@@ -1011,16 +1175,18 @@ export function planRename(
         continue;
       const occurrence = item.occurrence,
         before = item.resolution;
-      const after = resolveReference(simulated, occurrence, doc.path);
+      const after = resolveReference(
+        simulated,
+        { name: occurrence.name },
+        doc.path,
+      );
       const selection = request.selections?.find(
         (s) =>
           s.sourcePath === doc.path && s.occurrenceIndex === occurrenceIndex,
       );
       const selected = selection
         ? before.candidates.find((c) => c.path === selection.targetPath)
-        : before.status === referenceResolutionStatuses.resolved
-          ? before.target
-          : undefined;
+        : confirmedDocumentTarget(before, occurrence);
       /** 미해결 등장도 원문 위치와 전후 후보를 유지한다. */
       function impact(reason: RenameImpact['reason']): void {
         impacts.push({
@@ -1056,7 +1222,7 @@ export function planRename(
           );
         continue;
       }
-      if (selected.path === doc.path) {
+      if (selection && selected.path === doc.path) {
         if (affected) reject();
         continue;
       }
@@ -1076,13 +1242,16 @@ export function planRename(
       }
       const proposed = resolveReference(simulated, { name }, doc.path);
       if (
-        proposed.status !== referenceResolutionStatuses.resolved ||
+        proposed.status !==
+          (selected.path === doc.path
+            ? referenceResolutionStatuses.self
+            : referenceResolutionStatuses.resolved) ||
         proposed.target?.path !== selected.path
       ) {
         impact(renameImpactReasons.unrepresentable);
         continue;
       }
-      const newText = referenceText(name);
+      const newText = referenceText(name, occurrence.section);
       if (newText === undefined) {
         if (affected) impact(renameImpactReasons.unrepresentable);
         continue;
@@ -1144,6 +1313,222 @@ export function planRename(
       invalidSelections: rejectedSelections,
       blockingReason: renameBlockingReasons.invalidSelection,
     };
+  changes.sort(
+    /** 경로와 실제 원문 offset 순서로 수정안을 정렬한다. */ (a, b) =>
+      a.path < b.path
+        ? -1
+        : a.path > b.path
+          ? 1
+          : a.offsetRange.start - b.offsetRange.start,
+  );
+  return {
+    ...initial,
+    status: impacts.length
+      ? renamePlanStatuses.unresolved
+      : renamePlanStatuses.ready,
+    changes,
+    impacts,
+  };
+}
+
+/** 참조 구성 안의 콜론을 구분자와 구분되도록 `\:`로 쓴다. */
+function encodeColon(value: string): string {
+  return value.replace(/:/gu, '\\:');
+}
+/**
+ * 섹션 이름 변경의 새 이름이 쓸 수 없는 이름인지 확인한다.
+ * 비어 있거나 `_`로 시작하거나 대괄호를 포함하면 쓸 수 없다.
+ */
+function invalidSectionName(name: string): boolean {
+  return !nonblank(name) || name.startsWith('_') || /[\[\]]/u.test(name);
+}
+/**
+ * 섹션 이름 변경 선택이 가리키는 등장이 있고 그 후보 안의 대상인지 검사해 잘못된 선택을 모은다.
+ */
+function invalidSectionSelections(
+  catalog: Catalog,
+  selections: readonly RenameSelection[],
+): RenameSelection[] {
+  return selections.filter(
+    /** 존재하지 않는 등장·리터럴·후보 밖 대상·중복 선택을 임의로 무시하지 않는다. */ (
+      selection,
+      index,
+    ) => {
+      const item = catalog.documents.get(selection.sourcePath)?.occurrences[
+        selection.occurrenceIndex
+      ];
+      return (
+        !Number.isInteger(selection.occurrenceIndex) ||
+        selection.occurrenceIndex < 0 ||
+        !item ||
+        item.occurrence.syntax !== referenceSyntaxStatuses.valid ||
+        !item.resolution.candidates.some(
+          (c) => c.path === selection.targetPath,
+        ) ||
+        selections.some(
+          (other, otherIndex) =>
+            index !== otherIndex &&
+            other.sourcePath === selection.sourcePath &&
+            other.occurrenceIndex === selection.occurrenceIndex,
+        )
+      );
+    },
+  );
+}
+/**
+ * 문서 하나의 최상위 섹션 이름을 바꾸는 수정안을 계산한다. 파일·입력·원문은 변경하지 않는다.
+ * 섹션 키를 새 이름으로 바꾸고 그 문서의 그 섹션으로 확정된 모든 `[[문서:섹션]]`의 섹션 부분을 함께 고친다.
+ * 섹션 부분만 고치므로 문서 이름 부분과 `:`는 원문 그대로다. 후보가 여럿이라 모호했던 참조는 선택을 따른다.
+ * @param catalog 같은 스캔에서 만든 색인이다.
+ * @param request 대상 문서 경로·바꿀 섹션·새 섹션 이름·선택이다.
+ * @returns 문서 이름 변경과 같은 형태의 계획이다. oldName·newName은 섹션 이름이고 targetSection에 현재 섹션 이름이 담긴다.
+ */
+export function planSectionRename(
+  catalog: Catalog,
+  request: SectionRenameRequest,
+): RenamePlan {
+  const target = catalog.documents.get(request.targetPath);
+  const initial: RenamePlan = {
+    targetPath: request.targetPath,
+    oldName: request.section,
+    targetSection: request.section,
+    newName: request.newName,
+    status: renamePlanStatuses.blocked,
+    changes: [],
+    conflicts: [],
+    impacts: [],
+    invalidSelections: [],
+  };
+  const parsed = target?.observation.parsed;
+  if (!target || target.name === undefined || !parsed?.success)
+    return {
+      ...initial,
+      blockingReason: renameBlockingReasons.targetUnavailable,
+    };
+  if (invalidSectionName(request.newName))
+    return { ...initial, blockingReason: renameBlockingReasons.invalidName };
+  if (
+    catalog.status !== scanStatuses.complete ||
+    target.confirmation !== catalogConfirmations.confirmed
+  )
+    return { ...initial, blockingReason: renameBlockingReasons.unconfirmed };
+  const sections = getSectionNames(parsed);
+  if (!sections.includes(request.section))
+    return {
+      ...initial,
+      blockingReason: renameBlockingReasons.sectionNotFound,
+    };
+  if (request.newName === request.section)
+    return { ...initial, blockingReason: renameBlockingReasons.invalidName };
+  if (sections.includes(request.newName))
+    return {
+      ...initial,
+      conflicts: [{ candidates: [candidate(target)] }],
+      blockingReason: renameBlockingReasons.sectionConflict,
+    };
+  const selections = request.selections ?? [];
+  const invalidSelections = invalidSectionSelections(catalog, selections);
+  if (invalidSelections.length)
+    return {
+      ...initial,
+      invalidSelections,
+      blockingReason: renameBlockingReasons.invalidSelection,
+    };
+  const keyRange = getSectionKeyRange(target, request.section);
+  if (!keyRange)
+    return {
+      ...initial,
+      blockingReason: renameBlockingReasons.targetUnavailable,
+    };
+  const unrepresentable: RenamePlan = {
+    ...initial,
+    blockingReason: renameBlockingReasons.unrepresentable,
+  };
+  if (referenceText(target.name, request.newName) === undefined)
+    return unrepresentable;
+  const changes: RenameChange[] = [
+    {
+      path: target.path,
+      fieldPath: [request.section],
+      offsetRange: keyRange.offsetRange,
+      range: keyRange.range,
+      oldText: request.section,
+      newText: request.newName,
+      targetPath: target.path,
+      candidates: [candidate(target)],
+      kind: renameChangeKinds.key,
+    },
+  ];
+  const impacts: RenameImpact[] = [];
+  const oldText = encodeColon(request.section);
+  const newText = encodeColon(request.newName);
+  for (const doc of catalog.documents.values())
+    for (
+      let occurrenceIndex = 0;
+      occurrenceIndex < doc.occurrences.length;
+      occurrenceIndex++
+    ) {
+      const item = doc.occurrences[occurrenceIndex];
+      if (
+        !item ||
+        item.occurrence.syntax !== referenceSyntaxStatuses.valid ||
+        item.occurrence.section !== request.section
+      )
+        continue;
+      const occurrence = item.occurrence,
+        before = item.resolution;
+      const ambiguous = before.status === referenceResolutionStatuses.ambiguous;
+      const confirmed =
+        (before.status === referenceResolutionStatuses.resolved ||
+          before.status === referenceResolutionStatuses.self) &&
+        before.target?.path === target.path &&
+        before.section === request.section;
+      if (
+        !confirmed &&
+        !(ambiguous && before.candidates.some((c) => c.path === target.path))
+      )
+        continue;
+      if (ambiguous) {
+        const selection = selections.find(
+          (s) =>
+            s.sourcePath === doc.path && s.occurrenceIndex === occurrenceIndex,
+        );
+        if (!selection) {
+          impacts.push({
+            path: doc.path,
+            occurrenceIndex,
+            occurrence,
+            before,
+            after: before,
+            reason: renameImpactReasons.selectionRequired,
+          });
+          continue;
+        }
+        if (selection.targetPath !== target.path) continue;
+      }
+      const docParsed = doc.observation.parsed;
+      if (!docParsed.success) return unrepresentable;
+      const part = getReferencePartRanges(docParsed, occurrence)?.section;
+      const start = part
+        ? offsetToPosition(docParsed.source, part.start)
+        : undefined;
+      const end = part
+        ? offsetToPosition(docParsed.source, part.end)
+        : undefined;
+      if (!part || !start || !end || !occurrence.text.endsWith(`:${oldText}]]`))
+        return unrepresentable;
+      changes.push({
+        path: doc.path,
+        fieldPath: [...occurrence.fieldPath],
+        offsetRange: part,
+        range: { start, end },
+        oldText,
+        newText,
+        targetPath: target.path,
+        candidates: before.candidates,
+        occurrenceIndex,
+      });
+    }
   changes.sort(
     /** 경로와 실제 원문 offset 순서로 수정안을 정렬한다. */ (a, b) =>
       a.path < b.path

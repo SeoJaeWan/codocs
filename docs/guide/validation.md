@@ -10,6 +10,10 @@ ID가 여러 발견 경로에 있으면 `duplicate_id`다. 같은 이름이 여�
 
 일부 파일이나 폴더를 읽지 못한 상태에서는 `scanStatus: partial`과 함께 확인한 결과를 성공으로 제공한다. 이전 색인에서 보존한 문서는 `confirmation: unconfirmed`와 마지막 원문 `revision`을 유지하고, `unconfirmed_reference` 진단으로 최신성·존재를 보장하지 않음을 알린다. 보이지 않은 후보가 있을 수 있으므로 색인에 없는 ID를 `not_found`로 확정하지 않으며, 전체 탐색이 완료된 `scanStatus: complete`에서만 부재·단일 대상·충돌을 다시 계산한다. 프로젝트나 `.codocs` 자체를 탐색하지 못한 `failed`는 `success: false`와 원인을 반환한다.
 
+## 참조 진단
+
+참조 진단은 문서 이름과 섹션을 구분한다. 문서가 없으면 `reference_not_found`, 문서가 여럿이면 `reference_ambiguous`, 문서는 확정됐지만 `[[이름:섹션]]`의 섹션이 없으면 `section_reference_not_found`다. 섹션은 문서가 확정된 참조에서만 확인한다.
+
 ## 진단 읽기
 
 `codocs_validate({})`는 프로젝트 전체를, `{"path":".codocs/order.yaml"}`은 파일 하나를 검사한다.
