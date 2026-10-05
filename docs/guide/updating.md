@@ -35,7 +35,7 @@ ID를 바꿔도 과거 ID는 남기지 않는다. 이후 조회·수정은 새 I
 
 - 응답에 바꿀 섹션을 나타내는 `targetSection`이 더해지며 `oldName`·`newName`은 섹션 이름이다.
 - 그 문서의 섹션 키와, 그 섹션으로 확정된 모든 `[[환불:환불정책]]`의 섹션 부분을 함께 고친다. 같은 문서 안의 참조도 포함한다.
-- `blockingReason`이 `section_conflict`이면 같은 이름의 섹션이 이미 있고, `section_not_found`이면 바꿀 섹션이 문서에 없다. 새 이름이 비었거나 `_`로 시작하거나 대괄호를 포함하면 `invalid_name`, 키를 현재 형식으로 안전하게 적을 수 없으면 `unrepresentable`이다.
+- `blockingReason`이 `section_conflict`이면 같은 이름의 섹션이 이미 있고, `section_not_found`이면 바꿀 섹션이 문서에 없다. 새 이름이 비었거나 `_`로 시작하거나 대괄호를 포함하거나 현재 섹션 이름과 같으면 `invalid_name`, 키의 현재 형식이나 참조로 안전하게 적을 수 없으면 `unrepresentable`이다.
 - 선택·반영·`revisions`·복구는 문서 이름 변경과 같다.
 - VS Code에서는 섹션 키나 참조의 섹션 부분에서 이름 바꾸기(F2)를 시작하며 입력 상자에 현재 섹션 이름이 채워진다.
 

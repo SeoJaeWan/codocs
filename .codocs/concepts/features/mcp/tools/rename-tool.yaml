@@ -40,18 +40,19 @@ preview: |
   - blockingReason: blocked인 이유. blocked가 아니면 없다.
   - changes: 고칠 위치별 path·fieldPath·range·oldText·newText. 대상 문서의 이름을 가리키는 다른 문서의 `_codocs.parent` 항목도 포함하며, 이 항목의 fieldPath는 `["_codocs", "parent", 0]`처럼 배열 순번까지 담는다. 섹션 이름 변경이면 섹션 키의 변경도 포함한다.
   - impacts: 자동으로 고치지 않은 참조. path·occurrenceIndex·text·range·reason과 바꾸기 전후의 후보(before·after)를 가진다.
-  - conflicts: 새 이름과 같은 이름의 다른 문서, 또는 이름 변경으로 parent 오류가 새로 생기는 문서. 이름은 프로젝트 전체에서 유일해야 하므로 어느 폴더에 있든 충돌이다.  - invalidSelections: 잘못된 선택.
+  - conflicts: 새 이름과 같은 이름의 다른 문서, 또는 이름 변경으로 parent 오류가 새로 생기는 문서. 이름은 프로젝트 전체에서 유일해야 하므로 어느 폴더에 있든 충돌이다. 섹션 이름 변경에서 section_conflict이면 같은 이름의 섹션이 이미 있는 대상 문서를 담는다.
+  - invalidSelections: 잘못된 선택.
   - revisions: 영향받는 파일의 경로별 [[revision]].
 
   impacts 중 다음은 사용자가 대상을 골라야 하는 참조다.
   - before.status가 ambiguous인 참조: 이름 변경 뒤에도 모호하면 reason이 selection_required이고, 이름 변경 뒤 후보 하나로 바뀌면 changed_resolution이다. 후보는 before.candidates의 경로·이름이다.
   before가 모호하지 않은 changed_resolution과 그 밖의 reason은 고르지 않은 채로 남기거나 이름 변경으로 대상이 바뀐다는 알림이다.
   blockingReason은 target_unavailable·invalid_name·name_conflict·section_conflict·section_not_found·unconfirmed·invalid_selection·source_not_lossless·unrepresentable 중 하나다.
-  섹션 이름 변경에서는 새 섹션 이름의 섹션이 이미 있으면 section_conflict, 바꿀 섹션이 대상 문서에 없으면 section_not_found이며, 새 이름이 비었거나 `_`로 시작하거나 대괄호를 포함하면 invalid_name, 키의 현재 형식으로 적을 수 없으면 unrepresentable이다.
+  섹션 이름 변경에서는 새 섹션 이름의 섹션이 이미 있으면 section_conflict, 바꿀 섹션이 대상 문서에 없으면 section_not_found이며, 새 이름이 비었거나 `_`로 시작하거나 대괄호를 포함하거나 현재 섹션 이름과 같으면 invalid_name, 키의 현재 형식이나 참조로 안전하게 적을 수 없으면 unrepresentable이다.
   선택이 필요한 참조가 있으면 사용자에게 후보를 보여주고 고른 결과를 selections에 담아 preview를 다시 요청한다.
 apply: |
   preview와 같은 id·newName·selections에 revisions를 더해 보낸다. 서버는 다시 계산한 뒤 저장한다.
-  blocked이면 rename_blocked로 실패하고 응답의 preview에 이유와 후보를 담으며 파일은 바뀌지 않는다.
+  blocked이면 rename_blocked로 실패하고 응답의 preview에 blockingReason과 후보를 담고 섹션 이름 변경이면 targetSection도 담으며 파일은 바뀌지 않는다.
   revisions의 파일이 바뀌었으면 revision_conflict로 실패한다.
   영향받는 파일의 집합이 preview 때와 달라졌으면 rename_affected_files_changed로 실패하며, 이때는 preview를 다시 요청한다.
   쓰기 전에 파일을 쓸 수 없는 것으로 확인되면 그 이유를 진단으로 알리고 files는 빈 목록이며 파일은 바뀌지 않는다.
