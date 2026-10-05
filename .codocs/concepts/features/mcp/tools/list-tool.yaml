@@ -20,6 +20,8 @@ _codocs:
   - hasErrors: 검증 오류가 있는지.
   - sections: 섹션 이름 목록. 문서에 적은 순서이며 섹션 내용은 담지 않는다.
   - childCount: 이 문서의 이름을 parent로 적은 문서의 수.
+  - source.path: 문서 파일 위치.
+  - confirmation: 이전 색인에서 보존한 문서인지 확인한 문서인지.
 
   섹션 이름을 확인하면 [[codocs_get]]에 `이름:섹션` 주소를 주어 그 섹션만 읽을 수 있다.
   childCount가 0보다 크면 그 이름을 parent로 다시 조회해 아래 단계를 본다.
@@ -35,7 +37,7 @@ _codocs:
   unreachable은 최상위 문서에서 직속 자식을 따라 내려가도 닿을 수 없는 문서 가운데 다음 문서를 items와 같은 항목 형식과 순서로 모은 것이다.
   - parent에 적은 이름의 문서가 하나도 없는 문서(parent_not_found)
   - parent를 따라가면 자기 자신으로 돌아오는 순환에 속한 문서(parent_cycle)
-  - parent 값이 올바르지 않게 적힌 문서(invalid_field_type·invalid_field_value)
+  - parent 값이 이름을 하나 이상 담은 배열이 아닌 문서
 
   parent 중 하나로라도 최상위 문서에서 닿을 수 있으면 그 parent의 결과에 나오므로 unreachable에 넣지 않는다.
   unreachable에 있는 문서의 자식은 그 문서의 이름을 parent로 조회해 볼 수 있다.
