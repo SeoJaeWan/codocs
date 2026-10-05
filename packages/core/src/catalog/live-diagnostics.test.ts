@@ -11,7 +11,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
     const saved = {
       path: 'target.yaml',
       parsed: parseYaml(
-        'id: target\nname: 대상\ndefinition: 설명\ndomains: [test]\n',
+        '_codocs:\n  id: target\n  name: 대상\ndefinition: 설명\n',
       ),
     };
     const catalog = buildCatalog({
@@ -21,7 +21,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
     const live = {
       path: 'source.yaml',
       parsed: parseYaml(
-        '# 😀\r\nid: target\r\nname: 출처\r\ndefinition: 설명\r\ndomains: [test]\r\n',
+        '# 😀\r\n_codocs:\r\n  id: target\r\n  name: 출처\r\ndefinition: 설명\r\n',
       ),
     };
     const result = resolveLiveDocument(catalog, live);
@@ -32,14 +32,13 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
         path: live.path,
         severity: 'error',
         range: {
-          start: { line: 1, character: 4 },
-          end: { line: 1, character: 10 },
+          start: { line: 2, character: 6 },
+          end: { line: 2, character: 12 },
         },
         relatedPaths: ['source.yaml', 'target.yaml'],
       }),
     );
     expect(catalog.idPaths.get('target')).toEqual(new Set([saved.path]));
-    // @codocs [[문서 색인]]#L31-L34
     expect(catalog.documents.has(live.path)).toBe(false);
   });
 
@@ -47,7 +46,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
     const saved = {
       path: 'source.yaml',
       parsed: parseYaml(
-        'id: source\nname: 출처\ndefinition: 설명\ndomains: [test]\n',
+        '_codocs:\n  id: source\n  name: 출처\ndefinition: 설명\n',
       ),
     };
     const catalog = buildCatalog({
@@ -64,13 +63,13 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
         {
           path: 'source.yaml',
           parsed: parseYaml(
-            'id: same\nname: 출처\ndefinition: 설명\ndomains: [test]\n',
+            '_codocs:\n  id: same\n  name: 출처\ndefinition: 설명\n',
           ),
         },
         {
           path: 'target.yaml',
           parsed: parseYaml(
-            'id: same\nname: 대상\ndefinition: 설명\ndomains: [test]\n',
+            '_codocs:\n  id: same\n  name: 대상\ndefinition: 설명\n',
           ),
         },
       ],
@@ -78,7 +77,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
     const result = resolveLiveDocument(catalog, {
       path: 'source.yaml',
       parsed: parseYaml(
-        'id: unique\nname: 출처\ndefinition: 설명\ndomains: [test]\n',
+        '_codocs:\n  id: unique\n  name: 출처\ndefinition: 설명\n',
       ),
     });
     expect(result.diagnostics).toEqual([]);
@@ -94,7 +93,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
         {
           path: 'target.yaml',
           parsed: parseYaml(
-            'id: same\nname: 대상\ndefinition: 설명\ndomains: [test]\n',
+            '_codocs:\n  id: same\n  name: 대상\ndefinition: 설명\n',
           ),
         },
       ],
@@ -103,7 +102,7 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
       path: 'source.yaml',
       parsed: {
         success: true,
-        data: { id: 'same', name: '출처', definition: '설명' },
+        data: { _codocs: { id: 'same', name: '출처' }, definition: '설명' },
         source: '',
         fields: [],
         strings: [],
@@ -118,18 +117,14 @@ describe('저장 ID 색인과 현재 편집 진단', () => {
   });
 });
 
-describe('저장 이름·도메인 색인과 현재 편집 진단', () => {
+describe('저장 이름 색인과 현재 편집 진단', () => {
   const source = {
     path: 'source.yaml',
-    parsed: parseYaml(
-      'id: source\nname: Same\ndefinition: 설명\ndomains: [shared]\n',
-    ),
+    parsed: parseYaml('_codocs:\n  id: source\n  name: Same\n개요: 설명\n'),
   };
   const target = {
     path: 'target.yaml',
-    parsed: parseYaml(
-      'id: target\nname: Same\ndefinition: 설명\ndomains: [shared, other]\n',
-    ),
+    parsed: parseYaml('_codocs:\n  id: target\n  name: Same\n개요: 설명\n'),
   };
 
   it('저장된 이름 중복 문서를 그대로 열면 동일한 진단과 위치를 유지한다', () => {
@@ -144,38 +139,34 @@ describe('저장 이름·도메인 색인과 현재 편집 진단', () => {
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({
         code: catalogDiagnosticCodes.duplicateName,
-        domain: 'shared',
         relatedPaths: ['source.yaml', 'target.yaml'],
         range: {
-          start: { line: 1, character: 6 },
-          end: { line: 1, character: 10 },
+          start: { line: 2, character: 8 },
+          end: { line: 2, character: 12 },
         },
       }),
     );
   });
 
-  it.each([
-    ['이름', 'name: Unique\ndomains: [shared]'],
-    ['도메인', 'name: Same\ndomains: [different]'],
-  ])('%s 편집으로 충돌을 해소하면 현재 진단만 제거한다', (_label, fields) => {
+  it('이름 편집으로 충돌을 해소하면 현재 진단만 제거한다', () => {
     const catalog = buildCatalog({
       status: scanStatuses.complete,
       observations: [source, target],
     });
     const result = resolveLiveDocument(catalog, {
       path: source.path,
-      parsed: parseYaml('id: source\ndefinition: 설명\n' + fields + '\n'),
+      parsed: parseYaml('_codocs:\n  id: source\n  name: Unique\n개요: 설명\n'),
     });
     expect(result.diagnostics).toEqual([]);
     expect(catalog.documents.get(target.path)?.diagnostics).toContainEqual(
       expect.objectContaining({ code: catalogDiagnosticCodes.duplicateName }),
     );
-    expect(catalog.domainNamePaths.get('shared')?.get('Same')).toEqual(
+    expect(catalog.namePaths.get('Same')).toEqual(
       new Set([source.path, target.path]),
     );
   });
 
-  it('미저장 이름이 여러 도메인에서 충돌하면 각 도메인을 현재 원문 위치에 진단한다', () => {
+  it('미저장 이름이 저장된 다른 파일과 충돌하면 현재 원문 위치에 한 번 진단한다', () => {
     const catalog = buildCatalog({
       status: scanStatuses.complete,
       observations: [target],
@@ -183,24 +174,114 @@ describe('저장 이름·도메인 색인과 현재 편집 진단', () => {
     const result = resolveLiveDocument(catalog, {
       path: source.path,
       parsed: parseYaml(
-        '# 😀\r\nid: source\r\nname: Same\r\ndefinition: 설명\r\ndomains: [shared, other, shared]\r\n',
+        '# 😀\r\n_codocs:\r\n  id: source\r\n  name: Same\r\n개요: 설명\r\n',
       ),
     });
     const diagnostics = result.documentDiagnostics.filter(
       (item) => item.code === catalogDiagnosticCodes.duplicateName,
     );
-    expect(diagnostics).toHaveLength(2);
-    for (const domain of ['shared', 'other'])
-      expect(diagnostics).toContainEqual(
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({
+      relatedPaths: [source.path, target.path],
+      range: {
+        start: { line: 3, character: 8 },
+        end: { line: 3, character: 12 },
+      },
+    });
+    expect(catalog.documents.has(source.path)).toBe(false);
+  });
+});
+
+describe('편집 중인 문서의 parent 진단', () => {
+  const saved = {
+    path: 'parent.yaml',
+    parsed: parseYaml('_codocs:\n  id: parent\n  name: 상위\n개요: 설명\n'),
+  };
+
+  it.each([
+    ['없는 이름', '[없음]', catalogDiagnosticCodes.parentNotFound],
+    ['자기 자신', '[출처]', catalogDiagnosticCodes.parentCycle],
+  ])(
+    '편집 중 parent에 %s을 쓰면 현재 원문 위치에 진단한다',
+    (_label, parent, code) => {
+      const catalog = buildCatalog({
+        status: scanStatuses.complete,
+        observations: [saved],
+      });
+      const result = resolveLiveDocument(catalog, {
+        path: 'source.yaml',
+        parsed: parseYaml(
+          `_codocs:\n  id: source\n  name: 출처\n  parent: ${parent}\n개요: 설명\n`,
+        ),
+      });
+      expect(result.documentDiagnostics).toContainEqual(
         expect.objectContaining({
-          domain,
-          relatedPaths: [source.path, target.path],
-          range: {
-            start: { line: 2, character: 6 },
-            end: { line: 2, character: 10 },
-          },
+          code,
+          fieldPath: ['_codocs', 'parent', 0],
         }),
       );
-    expect(catalog.documents.has(source.path)).toBe(false);
+    },
+  );
+
+  it('저장된 상위 문서를 가리키면 진단하지 않는다', () => {
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [saved],
+    });
+    const result = resolveLiveDocument(catalog, {
+      path: 'source.yaml',
+      parsed: parseYaml(
+        '_codocs:\n  id: source\n  name: 출처\n  parent: [상위]\n개요: 설명\n',
+      ),
+    });
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('저장된 하위 문서를 parent로 가리켜 순환이 생기면 진단한다', () => {
+    const child = {
+      path: 'child.yaml',
+      parsed: parseYaml(
+        '_codocs:\n  id: child\n  name: 하위\n  parent: [출처]\n개요: 설명\n',
+      ),
+    };
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [child],
+    });
+    const result = resolveLiveDocument(catalog, {
+      path: 'source.yaml',
+      parsed: parseYaml(
+        '_codocs:\n  id: source\n  name: 출처\n  parent: [하위]\n개요: 설명\n',
+      ),
+    });
+    expect(result.documentDiagnostics).toContainEqual(
+      expect.objectContaining({ code: catalogDiagnosticCodes.parentCycle }),
+    );
+  });
+});
+
+describe('편집 중인 출처의 참조 해석', () => {
+  it('저장 원문과 다른 참조로 편집하면 현재 편집 내용의 참조로 대상을 판단한다', () => {
+    const observation = (id: string, name: string, definition: string) => ({
+      path: `${id}.yaml`,
+      parsed: parseYaml(
+        `_codocs:\n  id: ${id}\n  name: ${name}\ndefinition: "${definition}"\n`,
+      ),
+    });
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [
+        observation('a', 'A', '설명'),
+        observation('b', 'B', '설명'),
+        observation('source', '출처', '[[A]]'),
+      ],
+    });
+    const result = resolveLiveDocument(
+      catalog,
+      observation('source', '출처', '[[B]]'),
+    );
+    expect(result.references.map((reference) => reference.path)).toEqual([
+      'b.yaml',
+    ]);
   });
 });

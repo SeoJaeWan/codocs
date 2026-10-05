@@ -32,8 +32,7 @@ export interface CodocsToolResult {
 }
 
 /** 공통 결과 객체를 MCP 구조 결과와 JSON 텍스트에 손실 없이 담는다.
- * @codocs [[MCP:도구 결과]]
- * @codocs [[MCP:도구 결과]]#L17-L19 */
+ * */
 export function wrapCodocsResult(result: CodocsToolResult): CallToolResult {
   return {
     structuredContent: result as unknown as Record<string, unknown>,
@@ -43,8 +42,6 @@ export function wrapCodocsResult(result: CodocsToolResult): CallToolResult {
 }
 
 /** 한 세션을 공유하는 SDK 서버와 실행 handler를 연결한다. 세션 종료는 호출자가 소유한다.
- * @codocs [[MCP:MCP]]
- * @codocs [[MCP:MCP 도구 호출]]
  * @param session 조회와 변경이 공유할 프로젝트 세션이다.
  * @param guide 가이드 원문 경계다. 생략하면 배포된 자산을 읽는다.
  */
@@ -68,7 +65,8 @@ export function createCodocsServer(
     [
       'codocs_list',
       {
-        description: '프로젝트 문서 목록을 필터와 커서로 조회합니다.',
+        description:
+          '문서의 parent 구조를 한 단계씩 조회합니다. parent를 생략하면 최상위 문서와 parent 오류로 닿을 수 없는 문서(unreachable)를, parent에 문서 이름을 주면 그 이름을 parent로 적은 직속 자식을 이름 순서로 모두 돌려줍니다. 항목마다 name, id, hasErrors, sections(섹션 이름), childCount를 담으며 본문은 담지 않습니다. 없는 parent 이름은 not_found입니다.',
         execute: handlers.codocsList.bind(handlers),
       },
     ],
@@ -76,7 +74,7 @@ export function createCodocsServer(
       'codocs_get',
       {
         description:
-          '현재 ID로 문서 상세를 최대 20개 조회합니다. 중복 ID는 첫 등장만 사용합니다.',
+          '문서 이름 주소(addresses)로 문서 전체나 섹션 하나를 최대 20개 조회합니다. 주소는 "이름" 또는 "이름:섹션"이며 이름이나 섹션에 콜론이 있으면 \:로 적습니다. 중복 주소는 첫 등장만 사용합니다. 결과마다 address를 담고, references와 referencedBy는 문서 이름입니다. 주소 하나의 형식 오류·부재(not_found, section_not_found)·중복(conflict)은 그 결과에만 표시합니다.',
         execute: handlers.codocsGet.bind(handlers),
       },
     ],
@@ -104,6 +102,14 @@ export function createCodocsServer(
       },
     ],
     [
+      'codocs_rename',
+      {
+        description:
+          '문서 이름을 바꾸고 그 문서를 가리키던 참조를 함께 고칩니다. section(현재 섹션 이름)을 주면 그 문서의 최상위 섹션 이름을 바꾸고 그 섹션을 가리키던 [[문서:섹션]] 참조를 함께 고치며, 이때 newName은 새 섹션 이름이고 결과에 targetSection이 추가됩니다(section_conflict·section_not_found 등으로 blocked일 수 있음). section이 없으면 문서 이름 변경입니다. mode preview는 파일과 색인을 바꾸지 않고 상태(ready·unresolved·blocked), 변경 목록, 선택이 필요한 모호 참조의 후보, 충돌, 영향받는 파일별 revisions를 반환합니다. mode apply는 같은 id·newName·selections와 preview가 돌려준 revisions를 그대로 받아 다시 계산한 뒤 저장하며, blocked이거나 revision·영향 파일이 달라졌으면 파일을 바꾸지 않고 거절합니다. selections의 sourcePath·occurrenceIndex·targetPath는 preview 결과의 값을 그대로 사용합니다.',
+        execute: handlers.codocsRename.bind(handlers),
+      },
+    ],
+    [
       'codocs_duplicates',
       {
         description:
@@ -127,7 +133,7 @@ export function createCodocsServer(
   server.setRequestHandler(
     ListToolsRequestSchema,
     /** 실제 실행 가능한 도구만 나열한다.
-     * @codocs [[MCP:MCP 도구 호출]]#L11-L12 */ () => ({
+     * */ () => ({
       tools: Array.from(
         executionRegistry,
         /** 원본 스키마와 실행 설명을 같은 이름에 연결한다. */ ([
@@ -144,7 +150,7 @@ export function createCodocsServer(
   server.setRequestHandler(
     CallToolRequestSchema,
     /** 알려진 도구만 공통 결과로 포장한다.
-     * @codocs [[MCP:도구 결과]]#L21-L22 */ async (request, extra) => {
+     * */ async (request, extra) => {
       const name = request.params.name;
       const entry = executionRegistry.get(name as CodocsToolName);
       if (!entry)

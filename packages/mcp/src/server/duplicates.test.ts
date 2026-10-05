@@ -25,7 +25,7 @@ beforeAll(async () => {
   for (const id of ['alpha', 'bravo'])
     await writeFile(
       path.join(fixture, '.codocs', `${id}.yaml`),
-      `id: ${id}\nname: ${id}\ndomains: [test]\ndefinition: ${repeated}\n`,
+      `_codocs:\n  id: ${id}\n  name: ${id}\ndefinition: ${repeated}\n`,
     );
 });
 
@@ -40,10 +40,8 @@ function structured(response: unknown): Record<string, unknown> {
     .structuredContent;
 }
 
-// @codocs [[MCP:본문 중복 검토 요청]]
 describe('codocs_duplicates stdio 도구', () => {
-  // @codocs [[MCP:본문 중복 검토 요청]]#L10-L11
-  it('일곱 도구를 나열하고 전체·초안 검토와 만료 커서를 실제 stdio로 반환한다', async () => {
+  it('여덟 도구를 나열하고 전체·초안 검토와 만료 커서를 실제 stdio로 반환한다', async () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [sourceCli.entry],
@@ -54,7 +52,7 @@ describe('codocs_duplicates stdio 도구', () => {
     await client.connect(transport);
     try {
       const tools = (await client.listTools()).tools;
-      expect(tools).toHaveLength(7);
+      expect(tools).toHaveLength(8);
       const duplicates = tools.find(
         (tool) => tool.name === 'codocs_duplicates',
       );
@@ -77,9 +75,7 @@ describe('codocs_duplicates stdio 도구', () => {
               mode: 'create',
               path: '.codocs/charlie.yaml',
               document: {
-                id: 'charlie',
-                name: 'charlie',
-                domains: ['test'],
+                _codocs: { id: 'charlie', name: 'charlie' },
                 definition: repeated,
               },
             },
@@ -195,7 +191,7 @@ describe('codocs_duplicates stdio 도구', () => {
         jsonrpc: '2.0',
         id: 3,
         method: 'tools/call',
-        params: { name: 'codocs_get', arguments: { ids: ['a'] } },
+        params: { name: 'codocs_get', arguments: { addresses: ['a'] } },
       });
       await until(() => lines.some((line) => line.id === 3));
       expect(lines.some((line) => line.id === 2)).toBe(false);

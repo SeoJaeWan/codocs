@@ -5,8 +5,11 @@
 | `build/build.mjs`     | 빌드·번들·타입 검사                         |
 | `test/runtime/`       | 최종 CI 후보 준비·실제 읽기 제한 fixture    |
 | `test/support/`       | 여러 패키지 테스트가 공유하는 보조 코드     |
+| `dev/`                | 직접 실행용 개발용 VS Code 창 실행기        |
 | `toolchain.mjs`       | 저장소 루트와 고정 Node·pnpm 실행 환경 확인 |
 | `development-checks/` | 자체 ESLint 규칙과 인접 회귀 검사           |
+
+`pnpm dev:vscode`·`pnpm dev:mcp`는 사람이 직접 실행하는 진입점이며 CI와 커밋 훅은 실행하지 않는다. 사용법은 `.codocs`의 「직접 실행하기」를 따른다. `dev/open-vscode.mjs`는 `dev:vscode`가 개발용 확장·사용자 데이터 경로를 절대 경로로 바꿔 VS Code CLI(`code`)에 넘기는 일만 한다.
 
 각 도구의 테스트는 구현과 같은 폴더에 둔다. 패키지 전용 보조 코드와 mock은 해당 패키지의 `test-support`에서 관리한다.
 
@@ -23,4 +26,4 @@ Node glob은 도구의 `.mjs`·`.cjs`, 패키지 실행기의 인접 테스트�
 
 CI는 Ubuntu에서 타입·린트·서식을 정적으로 검사한다. `pack` job이 `release:pack`으로 `.workbench/release/`에 최종 tgz/VSIX를 한 번만 만들어 artifact로 올리고, 양 OS job은 그 파일을 같은 위치로 내려받아 `build`, `pnpm test`, `release:verify`, `test:vscode`를 순서대로 실행한다. UI 성공 여부는 runner의 종료 코드로 판정한다. 성공 artifact에는 이 식별 정보와 최소 결과만 보관하고, 실패 artifact에는 UI 로그와 화면 등 필요한 진단을 보관한다.
 
-최종 배포물은 MCP tarball 하나와 VSIX 하나다. `release:pack`은 `.workbench/release/`를 비우고 두 파일만 남기며, `release:verify`는 인자 없이 실행하면 그 위치의 파일을, 두 경로를 주면 그 파일을 검사한다. `verify-release.mjs`가 manifest·진입점·가이드·예제·메타데이터·notice·서버 번들을 검사한다. 저장소 밖 MCP 설치는 SDK 연결과 `listTools`의 여섯 도구 등록까지만 확인하며 설치 fixture는 종료 뒤 제거한다. 로컬 VS Code 창을 실행하지 않는다.
+최종 배포물은 MCP tarball 하나와 VSIX 하나다. `release:pack`은 `.workbench/release/`를 비우고 두 파일만 남기며, `release:verify`는 인자 없이 실행하면 그 위치의 파일을, 두 경로를 주면 그 파일을 검사한다. `verify-release.mjs`가 manifest·진입점·가이드·예제·메타데이터·notice·서버 번들을 검사한다. 저장소 밖 MCP 설치는 SDK 연결과 `listTools`의 여덟 도구 등록까지만 확인하며 설치 fixture는 종료 뒤 제거한다. 로컬 VS Code 창을 실행하지 않는다.

@@ -23,16 +23,15 @@ import {
   queryDiagnosticMessages,
   referenceDiagnosticCodes,
 } from '../diagnostics/index.js';
-import {
-  documentKinds,
-  documentStatuses,
-  type DocumentKind,
-  type DocumentStatus,
-} from '../validator/domain-values.js';
 import type { JsonValue } from '../validator/index.js';
 import { documentFields, type DocumentField } from '../validator/index.js';
 import { offsetToPosition, parseYaml } from '../parser/index.js';
-import { resolveLiveDocument } from '../catalog/index.js';
+import { parseReferenceComponents } from '../references/index.js';
+import {
+  compareText,
+  getSectionNames,
+  resolveLiveDocument,
+} from '../catalog/index.js';
 import {
   referenceIdFailureReasons,
   type ReferenceIdFailureReason,
@@ -40,44 +39,46 @@ import {
 export * from './domain-values.js';
 
 const validId = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
-const kinds = Object.values(documentKinds);
-const statuses = Object.values(documentStatuses);
 
-/** 목록에서 한 문서가 만족해야 하는 AND 조건이다. */
-export interface CatalogListFilters {
-  domain?: string;
-  kind?: DocumentKind;
-  status?: DocumentStatus;
-}
-
-/** 목록에 표시할 수 있는 유일 ID 문서다. */
-export interface CatalogListDocumentItem {
-  id: string;
+/** 목록 항목이 문서와 충돌 항목에서 공유하는 값이다. */
+interface CatalogListItemBase {
   name: string;
+  id: string;
+  hasErrors: boolean;
+  /** 문서에 적은 순서의 섹션 이름이며 섹션 내용은 담지 않는다. */
+  sections: readonly string[];
+  /** 이 문서의 이름을 parent로 적은 문서의 수다. */
+  childCount: number;
   source: { path: string };
   confirmation: CatalogIdentity['confirmation'];
-  domains?: readonly string[];
-  kind?: DocumentKind;
-  status?: DocumentStatus;
-  hasErrors: boolean;
+}
+
+/** 이름과 ID가 모두 유일한 문서의 목록 항목이다. */
+export interface CatalogListDocumentItem extends CatalogListItemBase {
   conflict: false;
 }
 
-/** 대표 문서를 선택하지 않는 중복 ID 목록 항목이다. */
-export interface CatalogListConflictItem {
-  id: string;
-  paths: readonly string[];
-  hasErrors: true;
+/** 같은 이름이나 같은 ID의 문서가 여럿일 때 문서마다 두는 항목이며 충돌한 모든 파일 경로를 담는다. */
+export interface CatalogListConflictItem extends CatalogListItemBase {
   conflict: true;
+  paths: readonly string[];
 }
 
-/** 정상 문서와 중복 ID를 구분하는 목록 항목이다. */
+/** 정상 문서와 충돌 문서를 구분하는 목록 항목이다. */
 export type CatalogListItem = CatalogListDocumentItem | CatalogListConflictItem;
 
-/** 페이지 처리를 하기 전의 결정적인 전체 목록 투영이다. */
+/** 목록 조회 입력이다. parent를 생략하면 최상위 문서를 조회한다. */
+export interface CatalogListInput {
+  parent?: string;
+}
+
+/** parent 기준으로 정렬한 전체 목록 투영이며 페이지로 나누지 않는다. */
 export interface CatalogListProjection {
   items: readonly CatalogListItem[];
-  totalCount: number;
+  /** parent를 생략한 조회에서만 최상위 문서에서 닿을 수 없는 문서를 담는다. */
+  unreachable?: readonly CatalogListItem[];
+  /** parent를 준 조회에서 그 이름의 문서가 Catalog에 있는지 나타낸다. parent를 생략하면 true다. */
+  parentFound: boolean;
 }
 
 /** 외부 참조 ID를 만들지 못한 이유다. */
@@ -85,43 +86,46 @@ export interface CatalogListProjection {
 /** Catalog 진단을 조회 결과에 필요한 관련 경로와 원인까지 확장한다. */
 export interface CatalogQueryDiagnostic extends Diagnostic<DiagnosticCode> {
   relatedPaths?: readonly string[];
-  domain?: string;
   offsetRange?: OffsetRange;
   reason?: ReferenceIdFailureReason;
 }
 
-/** 요청한 ID가 완전한 Catalog에 없는 결과다. */
+/** 요청한 주소의 문서나 섹션이 없거나 주소 형식이 틀린 결과다. */
 export interface CatalogGetMissingResult {
-  id: string;
+  address: string;
   found: false;
+  /** 문서는 있으나 섹션이 없을 때만 담으며 그 문서의 확인 상태다. */
+  confirmation?: CatalogIdentity['confirmation'];
   diagnostics: readonly CatalogQueryDiagnostic[];
 }
 
-/** 중복 ID의 대표 내용 없이 모든 경로만 반환하는 결과다. */
+/** 중복 이름이나 중복 ID의 대표 내용 없이 모든 경로만 반환하는 결과다. */
 export interface CatalogGetConflictResult {
-  id: string;
+  address: string;
   found: true;
   conflict: true;
   paths: readonly string[];
   diagnostics: readonly CatalogQueryDiagnostic[];
 }
 
-/** 유일 ID의 내용·진단·직접 참조 ID가 공유하는 결과다. */
-interface CatalogGetDocumentResultBase {
-  id: string;
+/** 문서 결과와 섹션 결과가 공유하는 값이다. references는 대상 문서 이름이다. */
+interface CatalogGetFoundResultBase {
+  address: string;
+  id?: string;
   found: true;
   conflict: false;
   source: { path: string };
   confirmation: CatalogIdentity['confirmation'];
   revision?: string;
   references: readonly string[];
-  referencedBy: readonly string[];
   diagnostics: readonly CatalogQueryDiagnostic[];
 }
 
-/** 유일 ID는 JSON 문서 또는 손실 없는 원문 중 정확히 하나를 반환한다. */
-export type CatalogGetDocumentResult = CatalogGetDocumentResultBase &
-  (
+/** 문서 결과는 JSON 문서 또는 손실 없는 원문 중 정확히 하나를 반환한다. */
+export type CatalogGetDocumentResult = CatalogGetFoundResultBase & {
+  referencedBy: readonly string[];
+  section?: never;
+} & (
     | {
         document: Readonly<Record<string, JsonValue>>;
         rawYaml?: never;
@@ -132,9 +136,24 @@ export type CatalogGetDocumentResult = CatalogGetDocumentResultBase &
       }
   );
 
-/** 각 ID가 다른 ID의 결과에 영향을 주지 않는 상세 결과다. */
+/** 섹션 결과는 문서 이름과 그 섹션 하나의 내용만 반환하며 referencedBy를 담지 않는다. */
+export type CatalogGetSectionResult = CatalogGetFoundResultBase & {
+  name: string;
+  referencedBy?: never;
+  document?: never;
+  rawYaml?: never;
+  section: { name: string } & (
+    | { content: JsonValue; rawYaml?: never }
+    | { content?: never; rawYaml: string }
+  );
+};
+
+/** 각 주소가 다른 주소의 결과에 영향을 주지 않는 상세 결과다. */
 export type CatalogGetResult =
-  CatalogGetMissingResult | CatalogGetConflictResult | CatalogGetDocumentResult;
+  | CatalogGetMissingResult
+  | CatalogGetConflictResult
+  | CatalogGetDocumentResult
+  | CatalogGetSectionResult;
 
 /** 유효 요청과 전체 invalid_input을 구분하는 상세 투영이다. */
 export type CatalogGetProjection =
@@ -216,15 +235,30 @@ function ownValue(value: unknown, key: string | number): unknown {
     : undefined;
 }
 
-/** 특정 최상위 속성에 오류가 없을 때만 목록 메타데이터로 사용한다. */
+/** 두 경로 중 짧은 쪽이 다른 경로의 앞부분이면 같은 필드에 대한 오류로 본다. */
+function overlapsField(
+  fieldPath: readonly (string | number)[],
+  key: DocumentField,
+): boolean {
+  const length = Math.min(fieldPath.length, key.length);
+  return (
+    length > 0 &&
+    key.slice(0, length).every((part, index) => part === fieldPath[index])
+  );
+}
+
+/** 특정 메타데이터 필드에 스키마 오류가 없을 때만 목록 메타데이터로 사용한다. */
 function validField(document: CatalogDocument, key: DocumentField): boolean {
   return !document.documentDiagnostics.some(
     /** 스키마 오류만 목록 메타데이터의 유효성을 막는다. */
     (diagnostic) =>
       diagnostic.severity === diagnosticSeverities.error &&
-      diagnostic.fieldPath?.[0] === key &&
+      diagnostic.fieldPath !== undefined &&
+      overlapsField(diagnostic.fieldPath, key) &&
       diagnostic.code !== catalogDiagnosticCodes.duplicateId &&
-      diagnostic.code !== catalogDiagnosticCodes.duplicateName,
+      diagnostic.code !== catalogDiagnosticCodes.duplicateName &&
+      diagnostic.code !== catalogDiagnosticCodes.parentNotFound &&
+      diagnostic.code !== catalogDiagnosticCodes.parentCycle,
   );
 }
 
@@ -252,108 +286,129 @@ function listIdentity(document: CatalogDocument): boolean {
   );
 }
 
-/** 전체 배열 속성이 유효할 때만 중복을 제거한 작성 순서로 반환한다. */
-function documentDomains(
-  document: CatalogDocument,
-): readonly string[] | undefined {
-  if (!validField(document, documentFields.domains)) return undefined;
-  const value = document.observation.parsed.success
-    ? ownValue(document.observation.parsed.data, documentFields.domains)
-    : undefined;
-  if (
-    !Array.isArray(value) ||
-    value.length === 0 ||
-    value.some(
-      (domain) => typeof domain !== 'string' || domain.trim().length === 0,
-    )
-  )
-    return undefined;
-  return [...new Set(value as string[])];
-}
-
-/** 작성된 선택 열거 속성이 유효할 때만 반환한다. */
-function documentEnum<const Values extends readonly string[]>(
-  document: CatalogDocument,
-  key: typeof documentFields.kind | typeof documentFields.status,
-  values: Values,
-): Values[number] | undefined {
-  if (!validField(document, key) || !document.observation.parsed.success)
-    return undefined;
-  const value = ownValue(document.observation.parsed.data, key);
-  return typeof value === 'string' && values.includes(value)
-    ? value
-    : undefined;
-}
-
-/** 한 파일이 생략하지 않은 모든 목록 조건을 동시에 만족하는지 판별한다. */
-function matchesFilters(
-  document: CatalogDocument,
-  filters: CatalogListFilters,
-): boolean {
-  const domains = documentDomains(document);
-  const kind = documentEnum(document, documentFields.kind, kinds);
-  const status = documentEnum(document, documentFields.status, statuses);
+/** 이름 순서, 같은 이름은 경로 순서로 비교한다. */
+function compareListed(left: CatalogDocument, right: CatalogDocument): number {
   return (
-    (filters.domain === undefined ||
-      domains?.includes(filters.domain) === true) &&
-    (filters.kind === undefined || kind === filters.kind) &&
-    (filters.status === undefined || status === filters.status)
+    compareText(left.name ?? '', right.name ?? '') ||
+    compareText(left.path, right.path)
   );
 }
 
-/** Catalog를 ID 오름차순의 전체 목록 snapshot으로 투영한다. @codocs [[조회 투영]]#L13-L23
+/** 문서 하나를 목록 항목으로 만든다. 이름이나 ID가 겹치면 충돌한 모든 경로를 담는다. */
+function listItem(
+  catalog: Catalog,
+  document: CatalogDocument,
+  childCount: number,
+): CatalogListItem {
+  const sameName = catalog.namePaths.get(document.name ?? '') ?? new Set();
+  const sameId = catalog.idPaths.get(document.id ?? '') ?? new Set();
+  const conflictPaths = [
+    ...new Set([
+      ...(sameName.size > 1 ? sameName : []),
+      ...(sameId.size > 1 ? sameId : []),
+    ]),
+  ].sort(compareText);
+  const base = {
+    name: document.name ?? '',
+    id: document.id ?? '',
+    hasErrors: document.diagnostics.some(
+      (diagnostic) => diagnostic.severity === diagnosticSeverities.error,
+    ),
+    sections: getSectionNames(document.observation.parsed),
+    childCount,
+    source: { path: document.path },
+    confirmation: document.confirmation,
+  };
+  return conflictPaths.length
+    ? { ...base, conflict: true, paths: conflictPaths }
+    : { ...base, conflict: false };
+}
+
+/** 최상위 문서에서 닿지 못한 문서가 parent 오류(형식 오류, 순환, 모든 parent 부재) 때문인지 판별한다. */
+function parentBroken(catalog: Catalog, document: CatalogDocument): boolean {
+  return (
+    document.parentInvalid === true ||
+    document.documentDiagnostics.some(
+      (diagnostic) => diagnostic.code === catalogDiagnosticCodes.parentCycle,
+    ) ||
+    (document.parent ?? []).every((name) => !catalog.namePaths.has(name))
+  );
+}
+
+/** Catalog를 parent 기준의 목록으로 투영한다. 호출당 문서와 parent 항목 수에 비례해 계산한다.
  * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
- * @param filters 한 파일이 모두 만족해야 하는 선택 조건이다.
+ * @param input parent를 주면 그 이름을 parent로 적은 직속 자식, 생략하면 최상위 문서와 unreachable이다.
  */
 export function projectCatalogList(
   catalog: Catalog,
-  filters: CatalogListFilters = {},
+  input: CatalogListInput = {},
 ): CatalogListProjection {
-  const items: CatalogListItem[] = [];
-  for (const [id, indexedPaths] of catalog.idPaths) {
-    const paths = [...indexedPaths].sort();
-    const matching = paths.flatMap(
-      /** 충돌 경로마다 필터 포함 가능성을 독립적으로 확인한다. */ (path) => {
-        const document = catalog.documents.get(path);
-        return document &&
-          listIdentity(document) &&
-          matchesFilters(document, filters)
-          ? [document]
-          : [];
-      },
-    );
-    if (!matching.length) continue;
-    if (paths.length > 1) {
-      items.push({ id, paths, hasErrors: true, conflict: true });
-      continue;
+  const listed = [...catalog.documents.values()].filter(listIdentity);
+  const children = new Map<string, CatalogDocument[]>();
+  for (const document of listed)
+    for (const name of new Set(document.parent ?? [])) {
+      const list = children.get(name) ?? [];
+      list.push(document);
+      children.set(name, list);
     }
-    const document = matching[0];
-    if (!document?.name) continue;
-    const domains = documentDomains(document);
-    const kind = documentEnum(document, documentFields.kind, kinds);
-    const status = documentEnum(document, documentFields.status, statuses);
-    items.push({
-      id,
-      name: document.name,
-      source: { path: document.path },
-      confirmation: document.confirmation,
-      ...(domains ? { domains } : {}),
-      ...(kind ? { kind } : {}),
-      ...(status ? { status } : {}),
-      hasErrors: document.diagnostics.some(
-        (diagnostic) => diagnostic.severity === diagnosticSeverities.error,
+  /** 자식 수와 함께 문서 목록을 정렬된 항목으로 바꾼다. */
+  const toItems = (documents: readonly CatalogDocument[]): CatalogListItem[] =>
+    [...documents]
+      .sort(compareListed)
+      .map(
+        /** 문서 하나를 자식 수와 함께 목록 항목으로 만든다. */ (document) =>
+          listItem(
+            catalog,
+            document,
+            (document.name ? children.get(document.name) : undefined)?.length ??
+              0,
+          ),
+      );
+  if (input.parent !== undefined)
+    return {
+      items: toItems(children.get(input.parent) ?? []),
+      parentFound: catalog.namePaths.has(input.parent),
+    };
+  const roots = listed.filter(
+    (document) => document.parent === undefined && !document.parentInvalid,
+  );
+  const reached = new Set(roots.map((document) => document.path));
+  const pending = [...roots];
+  for (let document = pending.pop(); document; document = pending.pop())
+    for (const child of children.get(document.name ?? '') ?? [])
+      if (!reached.has(child.path)) {
+        reached.add(child.path);
+        pending.push(child);
+      }
+  return {
+    items: toItems(roots),
+    unreachable: toItems(
+      listed.filter(
+        (document) =>
+          !reached.has(document.path) && parentBroken(catalog, document),
       ),
-      conflict: false,
-    });
-  }
-  items.sort((left, right) => left.id.localeCompare(right.id, 'en'));
-  return { items, totalCount: items.length };
+    ),
+    parentFound: true,
+  };
+}
+
+/** 목록에 나올 수 있는 항목 수이며 ID가 충돌한 문서는 하나로 센다. */
+export function countCatalogListItems(catalog: Catalog): number {
+  let count = 0;
+  for (const paths of catalog.idPaths.values())
+    if (
+      [...paths].some((path) => {
+        const document = catalog.documents.get(path);
+        return document !== undefined && listIdentity(document);
+      })
+    )
+      count++;
+  return count;
 }
 
 /** 진단 입력을 새 읽기 전용 값으로 복사한다. */
 function copyDiagnostic(diagnostic: Diagnostic): CatalogQueryDiagnostic {
   const relatedPaths = ownValue(diagnostic, 'relatedPaths');
-  const domain = ownValue(diagnostic, 'domain');
   const offsetRange = ownValue(diagnostic, 'offsetRange');
   return {
     code: diagnostic.code,
@@ -375,7 +430,6 @@ function copyDiagnostic(diagnostic: Diagnostic): CatalogQueryDiagnostic {
     relatedPaths.every((path) => typeof path === 'string')
       ? { relatedPaths: [...relatedPaths].sort() }
       : {}),
-    ...(typeof domain === 'string' ? { domain } : {}),
     ...(isOffsetRange(offsetRange)
       ? { offsetRange: { start: offsetRange.start, end: offsetRange.end } }
       : {}),
@@ -457,6 +511,7 @@ function queryDiagnostics(
   const replaced = new Set<string>([
     catalogDiagnosticCodes.missingReference,
     catalogDiagnosticCodes.ambiguousReference,
+    catalogDiagnosticCodes.missingSectionReference,
     catalogDiagnosticCodes.selfReference,
     catalogDiagnosticCodes.unconfirmedReference,
     catalogDiagnosticCodes.referenceTargetError,
@@ -484,7 +539,17 @@ function queryDiagnostics(
           .sort(),
         ...metadata,
       });
-    else if (resolution.status === referenceResolutionStatuses.self)
+    else if (resolution.status === referenceResolutionStatuses.missingSection)
+      diagnostics.push({
+        code: queryDiagnosticCodes.sectionReferenceNotFound,
+        severity: diagnosticSeverities.error,
+        message: queryDiagnosticMessages.sectionReferenceNotFound,
+        ...metadata,
+      });
+    else if (
+      resolution.status === referenceResolutionStatuses.self &&
+      resolution.section === undefined
+    )
       diagnostics.push({
         code: referenceDiagnosticCodes.invalidReference,
         severity: diagnosticSeverities.error,
@@ -656,23 +721,6 @@ function cloneJson(
   return { success: true, value: result };
 }
 
-/** 연결 경로에서 유효하고 전역 유일한 ID만 중복 제거해 정렬한다. @codocs [[조회 투영]]#L50-L56 */
-function externalIds(
-  catalog: Catalog,
-  identities: readonly CatalogIdentity[],
-): string[] {
-  const ids = new Set<string>();
-  for (const identity of identities) {
-    const document = catalog.documents.get(identity.path);
-    if (
-      document?.id !== undefined &&
-      idFailure(catalog, document) === undefined
-    )
-      ids.add(document.id);
-  }
-  return [...ids].sort((left, right) => left.localeCompare(right, 'en'));
-}
-
 /** 확정 관계의 발견 경로와 사용할 수 있는 현재 ID만 복사한다. */
 function pathLinks(
   catalog: Catalog,
@@ -723,10 +771,111 @@ function documentSource(
   };
 }
 
-/** 오류 문서도 원문을 손실하지 않고 한 유일 ID 결과로 투영한다. */
+/** 연결된 문서 이름을 중복 없이 이름 순서로 정렬한다. */
+function sortedNames(names: Iterable<string | undefined>): string[] {
+  return [...new Set([...names].filter((name) => name !== undefined))].sort(
+    compareText,
+  );
+}
+
+/** 주소 하나의 입력 형식이 틀린 결과다. */
+function invalidAddress(address: string): CatalogGetMissingResult {
+  return {
+    address,
+    found: false,
+    diagnostics: [
+      {
+        code: queryDiagnosticCodes.invalidInput,
+        severity: diagnosticSeverities.error,
+        message: queryDiagnosticMessages.invalidInput,
+      },
+    ],
+  };
+}
+
+/** 요청한 이름의 문서가 없는 결과다. */
+function missingAddress(address: string): CatalogGetMissingResult {
+  return {
+    address,
+    found: false,
+    diagnostics: [
+      {
+        code: queryDiagnosticCodes.notFound,
+        severity: diagnosticSeverities.error,
+        message: queryDiagnosticMessages.notFound,
+      },
+    ],
+  };
+}
+
+/** 문서는 있지만 요청한 섹션이 없는 결과다. */
+function missingSection(
+  address: string,
+  document: CatalogDocument,
+): CatalogGetMissingResult {
+  return {
+    address,
+    found: false,
+    confirmation: document.confirmation,
+    diagnostics: [
+      {
+        code: queryDiagnosticCodes.sectionNotFound,
+        severity: diagnosticSeverities.error,
+        message: queryDiagnosticMessages.sectionNotFound,
+      },
+    ],
+  };
+}
+
+/** 이름이나 ID가 겹쳐 하나로 정할 수 없는 주소의 충돌 결과다. */
+function conflictAddress(
+  address: string,
+  paths: readonly string[],
+  code:
+    | typeof catalogDiagnosticCodes.duplicateName
+    | typeof catalogDiagnosticCodes.duplicateId,
+): CatalogGetConflictResult {
+  return {
+    address,
+    found: true,
+    conflict: true,
+    paths,
+    diagnostics: [
+      {
+        code,
+        severity: diagnosticSeverities.error,
+        message:
+          code === catalogDiagnosticCodes.duplicateName
+            ? catalogDiagnosticMessages.duplicateName
+            : catalogDiagnosticMessages.duplicateId,
+        relatedPaths: paths,
+      },
+    ],
+  };
+}
+
+/** 문서 결과와 섹션 결과가 공유하는 위치·확인 상태·revision을 만든다. */
+function foundBase(
+  address: string,
+  document: CatalogDocument,
+  revisions?: ReadonlyMap<string, string>,
+): Omit<CatalogGetFoundResultBase, 'references' | 'diagnostics'> {
+  const revision = revisions?.get(document.path);
+  return {
+    address,
+    ...(document.id === undefined ? {} : { id: document.id }),
+    found: true,
+    conflict: false,
+    source: { path: document.path },
+    confirmation: document.confirmation,
+    ...(typeof revision === 'string' ? { revision } : {}),
+  };
+}
+
+/** 오류 문서도 원문을 손실하지 않고 문서 결과 하나로 투영한다. */
 function documentResult(
   catalog: Catalog,
-  id: string,
+  address: string,
   document: CatalogDocument,
   revisions?: ReadonlyMap<string, string>,
 ): CatalogGetDocumentResult {
@@ -734,38 +883,108 @@ function documentResult(
   const cloned = parsed.success
     ? cloneJson(parsed.data)
     : { success: false as const };
-  const revision = revisions?.get(document.path);
   return {
-    id,
-    found: true,
-    conflict: false,
-    source: { path: document.path },
-    confirmation: document.confirmation,
+    ...foundBase(address, document, revisions),
     ...(cloned.success
       ? { document: cloned.value as Readonly<Record<string, JsonValue>> }
       : { rawYaml: parsed.source ?? '' }),
-    ...(typeof revision === 'string' ? { revision } : {}),
-    references: externalIds(catalog, document.references),
-    referencedBy: externalIds(catalog, document.referencedBy),
+    references: sortedNames(document.references.map((link) => link.name)),
+    referencedBy: sortedNames(document.referencedBy.map((link) => link.name)),
     diagnostics: queryDiagnostics(catalog, document),
   };
 }
 
-/** 첫 등장 순서로 중복 제거한 1~20개 ID를 독립 결과로 투영한다. @codocs [[조회 투영]]#L25-L32
+/** 문서의 섹션 하나와 그 섹션 안의 확정 참조 대상 이름만 섹션 결과로 투영한다. */
+function sectionResult(
+  catalog: Catalog,
+  address: string,
+  document: CatalogDocument,
+  section: string,
+  revisions?: ReadonlyMap<string, string>,
+): CatalogGetSectionResult {
+  const parsed = document.observation.parsed;
+  const cloned = cloneJson(
+    parsed.success ? ownValue(parsed.data, section) : undefined,
+  );
+  const linkable = document.confirmation === catalogConfirmations.confirmed;
+  return {
+    ...foundBase(address, document, revisions),
+    name: document.name ?? '',
+    section: {
+      name: section,
+      ...(cloned.success
+        ? { content: cloned.value }
+        : { rawYaml: parsed.source ?? '' }),
+    },
+    references: sortedNames(
+      document.occurrences.flatMap(
+        /** 이 섹션 안에서 확정된 참조의 대상 이름만 고른다. */ (item) =>
+          linkable &&
+          item.occurrence.fieldPath[0] === section &&
+          item.resolution.status === referenceResolutionStatuses.resolved
+            ? [item.resolution.target?.name]
+            : [],
+      ),
+    ),
+    diagnostics: queryDiagnostics(catalog, document).filter(
+      (diagnostic) => diagnostic.fieldPath?.[0] === section,
+    ),
+  };
+}
+
+/** 한 이름 주소의 부재·충돌·문서·섹션 결과를 다른 주소와 독립적으로 계산한다. */
+function addressResult(
+  catalog: Catalog,
+  address: string,
+  revisions?: ReadonlyMap<string, string>,
+): CatalogGetResult {
+  const components = parseReferenceComponents(address);
+  if (!components) return invalidAddress(address);
+  const paths = [...(catalog.namePaths.get(components.name) ?? [])].sort(
+    compareText,
+  );
+  if (!paths.length) return missingAddress(address);
+  if (paths.length > 1)
+    return conflictAddress(
+      address,
+      paths,
+      catalogDiagnosticCodes.duplicateName,
+    );
+  const document = catalog.documents.get(paths[0] ?? '');
+  if (!document) return missingAddress(address);
+  const idPaths = [...(catalog.idPaths.get(document.id ?? '') ?? [])].sort(
+    compareText,
+  );
+  if (idPaths.length > 1)
+    return conflictAddress(
+      address,
+      idPaths,
+      catalogDiagnosticCodes.duplicateId,
+    );
+  if (components.section === undefined)
+    return documentResult(catalog, address, document, revisions);
+  return getSectionNames(document.observation.parsed).includes(
+    components.section,
+  )
+    ? sectionResult(catalog, address, document, components.section, revisions)
+    : missingSection(address, document);
+}
+
+/** 첫 등장 순서로 중복 제거한 1~20개 이름 주소를 독립 결과로 투영한다.
  * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
- * @param ids 조회할 ID 목록이다.
+ * @param addresses `이름` 또는 `이름:섹션` 주소 목록이다.
  * @param options 같은 원문 시점의 선택적인 경로별 revision이다.
  */
 export function projectCatalogGet(
   catalog: Catalog,
-  ids: readonly string[],
+  addresses: readonly string[],
   options: CatalogGetProjectionOptions = {},
 ): CatalogGetProjection {
-  const uniqueIds = [...new Set(ids)];
+  const uniqueAddresses = [...new Set(addresses)];
   if (
-    uniqueIds.length === 0 ||
-    uniqueIds.length > 20 ||
-    uniqueIds.some((id) => typeof id !== 'string' || id.length === 0)
+    uniqueAddresses.length === 0 ||
+    uniqueAddresses.length > 20 ||
+    uniqueAddresses.some((address) => typeof address !== 'string')
   )
     return {
       success: false,
@@ -775,58 +994,15 @@ export function projectCatalogGet(
         message: queryDiagnosticMessages.invalidInput,
       },
     };
-  const results = uniqueIds.map(
-    /** 한 ID의 없음·충돌·문서 오류를 다른 ID와 독립적으로 계산한다. */
-    (id): CatalogGetResult => {
-      const paths = [...(catalog.idPaths.get(id) ?? [])].sort();
-      if (!paths.length)
-        return {
-          id,
-          found: false,
-          diagnostics: [
-            {
-              code: queryDiagnosticCodes.notFound,
-              severity: diagnosticSeverities.error,
-              message: queryDiagnosticMessages.notFound,
-            },
-          ],
-        };
-      if (paths.length > 1)
-        return {
-          id,
-          found: true,
-          conflict: true,
-          paths,
-          diagnostics: [
-            {
-              code: catalogDiagnosticCodes.duplicateId,
-              severity: diagnosticSeverities.error,
-              message: catalogDiagnosticMessages.duplicateId,
-              relatedPaths: paths,
-            },
-          ],
-        };
-      const path = paths[0];
-      const document = path ? catalog.documents.get(path) : undefined;
-      return document
-        ? documentResult(catalog, id, document, options.revisions)
-        : {
-            id,
-            found: false,
-            diagnostics: [
-              {
-                code: queryDiagnosticCodes.notFound,
-                severity: diagnosticSeverities.error,
-                message: queryDiagnosticMessages.notFound,
-              },
-            ],
-          };
-    },
-  );
-  return { success: true, results };
+  return {
+    success: true,
+    results: uniqueAddresses.map((address) =>
+      addressResult(catalog, address, options.revisions),
+    ),
+  };
 }
 
-/** 발견 경로를 같은 Catalog 관측의 내용·진단·직접/역참조로 투영한다. @codocs [[조회 투영]]#L34-L38 @codocs [[조회 투영]]#L57-L58
+/** 발견 경로를 같은 Catalog 관측의 내용·진단·직접/역참조로 투영한다.
  * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
  * @param paths 코드 매칭이 반환한 발견 경로 목록이다.
  * @param options 같은 원문 시점의 선택적인 경로별 revision이다.
@@ -926,7 +1102,7 @@ export interface CatalogLiveReferenceResult {
   targets: readonly CatalogPathResult[];
 }
 
-/** 열린 YAML 하나만 파싱하고 기존 디스크 색인으로 이름 참조를 투영한다. @codocs [[조회 투영]]#L40-L46 */
+/** 열린 YAML 하나만 파싱하고 기존 디스크 색인으로 이름 참조를 투영한다. */
 export function projectLiveReferences(
   catalog: Catalog,
   sourcePath: string,

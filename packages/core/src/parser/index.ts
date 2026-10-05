@@ -59,7 +59,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** 유효한 UTF-16 offset을 줄 좌표로 변환한다. CRLF도 원문 그대로 센다. @codocs [[진단]]#L21-L22
+/** 유효한 UTF-16 offset을 줄 좌표로 변환한다. CRLF도 원문 그대로 센다.
  * @param source 원문 문자열이다.
  * @param offset EOF를 포함한 원문 offset이다.
  * @returns 범위 밖 또는 정수가 아닌 offset에는 좌표가 없다.
@@ -138,7 +138,7 @@ function nodeRange(value: unknown): OffsetRange | undefined {
   return { start: value.range[0], end: value.range[1] };
 }
 
-/** CST와 AST를 함께 사용해 속성 범위를 수집한다. 앞의 독립 주석은 제외한다. @codocs [[YAML 파싱]]#L25-L31 @codocs [[YAML 매핑 표기]]#L26-L30 */
+/** CST와 AST를 함께 사용해 속성 범위를 수집한다. 앞의 독립 주석은 제외한다. */
 function collectFields(
   value: unknown,
   fieldPath: FieldPath,
@@ -286,7 +286,7 @@ function keyAtOffset(value: unknown, offset: number): OffsetRange | undefined {
   return undefined;
 }
 
-/** IO 없이 단일 YAML 매핑을 해석한다. 오류가 있으면 정상 데이터와 범위를 제공하지 않는다. @codocs [[YAML 파싱]] @codocs [[Core]]#L7
+/** IO 없이 단일 YAML 매핑을 해석한다. 오류가 있으면 정상 데이터와 범위를 제공하지 않는다.
  * @param input 호출자가 읽은 외부 원문이다. 문자열만 허용한다.
  * @param path 진단에 전달할 경로이며 파일을 읽지 않는다.
  * @returns 원문과 오류 또는 해석 데이터 및 확인된 원문 위치다.
@@ -488,7 +488,7 @@ export function getStringMapping(
       }
     : undefined;
 }
-/** 해석 문자열의 비어 있지 않은 UTF-16 범위를 실제 YAML 원문 범위로 계산한다. @codocs [[문자열 위치 대응]]#L27-L32 */
+/** 해석 문자열의 비어 있지 않은 UTF-16 범위를 실제 YAML 원문 범위로 계산한다. */
 export function getStringRange(
   result: YamlParseResult,
   fieldPath: FieldPath,

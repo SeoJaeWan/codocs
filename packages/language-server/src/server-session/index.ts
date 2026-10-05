@@ -2,17 +2,14 @@ import {
   referenceResolutionStatuses,
   scanStatuses,
   type CatalogOccurrence,
-  type CodeMatchCandidate,
-  type CodeMatchEvidence,
-  type OffsetRange,
 } from '@codocs/core';
 import {
   createWorkspaceQuerySession,
   type WorkspaceQuerySession,
   type WorkspaceLiveReferenceSuccess,
+  type WorkspaceSectionDestination,
   type WorkspacePathDocumentResult,
   type WorkspaceQueryDiagnostic,
-  type WorkspaceMatchResult,
   type WorkspacePathGetResponse,
   type WorkspaceRefreshResult,
   type WorkspaceReadiness,
@@ -51,79 +48,29 @@ import {
 } from '../document-sync/index.js';
 import {
   createEmptyHover,
-  createHover,
   createStatusHover,
-  hoverCandidatePaths,
-  hoverDetailPaths,
-  selectHover,
   detailLabel,
   escapeMarkdown,
 } from '../hover/index.js';
+import {
+  nameValueRange,
+  referencePartAt,
+  sectionKeyAt,
+  renameRequestFailureCodes,
+  type ApplyRenameResponse,
+  type PlanRenameResponse,
+  type PrepareRenameRequest,
+  type PrepareRenameResponse,
+  type RenameFileUris,
+  type RenameRequestFailure,
+} from '../rename/index.js';
 import {
   SourceSelections,
   selectionTarget,
   type CandidateSession,
 } from '../navigation/index.js';
-export {
-  documentMatchErrorCodes,
-  type DocumentMatchErrorCode,
-} from './domain-values.js';
-import {
-  documentMatchErrorCodes,
-  type DocumentMatchErrorCode,
-} from './domain-values.js';
-
-/** 문서 매칭 요청의 메서드 이름이다. */
-export const documentMatchRequestMethod = 'codocs/match';
 /** 작업 공간 색인 수동 갱신 요청의 메서드 이름이다. */
 export const workspaceRefreshRequestMethod = 'codocs/refresh';
-
-/** 최신 열린 문서를 매칭하는 요청이다. */
-export interface DocumentMatchRequest {
-  textDocument: { uri: string };
-  version?: number;
-}
-
-/** 코어 offset과 편집기 Range를 함께 보존한 근거다. */
-export type LspMatchEvidence = Omit<CodeMatchEvidence, 'range'> & {
-  offsetRange: OffsetRange;
-  range: Range;
-};
-
-/** 모든 후보 정보와 변환된 근거를 함께 보존한다. */
-export type LspMatchCandidate = Omit<CodeMatchCandidate, 'evidence'> & {
-  evidence: readonly LspMatchEvidence[];
-};
-
-/** 최신 문서와 catalog snapshot이 일치할 때의 매칭 응답이다. */
-export type DocumentMatchSuccess = Omit<
-  Extract<WorkspaceMatchResult, { success: true }>,
-  'candidates' | 'evidence'
-> & {
-  success: true;
-  uri: string;
-  version: number;
-  workspaceUri: string;
-  workspaceState: WorkspaceReadiness;
-  candidates: readonly LspMatchCandidate[];
-  evidence: readonly LspMatchEvidence[];
-};
-
-/** 문서·작업 공간·색인의 현재 상태로 수행할 수 없는 매칭 응답이다. */
-export interface DocumentMatchFailure {
-  success: false;
-  code: DocumentMatchErrorCode;
-  uri: string;
-  requestedVersion?: number;
-  currentVersion?: number;
-  workspaceUri?: string;
-  workspaceState?: WorkspaceReadiness;
-  scanStatus?: WorkspaceMatchResult['scanStatus'];
-  error?: Extract<WorkspaceMatchResult, { success: false }>['error'];
-}
-
-/** 공개 문서 매칭 응답이다. */
-export type DocumentMatchResponse = DocumentMatchSuccess | DocumentMatchFailure;
 
 /** 색인을 명시적으로 다시 읽을 작업 공간 선택이다. */
 export interface WorkspaceRefreshRequest {
@@ -158,11 +105,12 @@ export interface WorkspaceSessionBoundary extends Partial<
     | 'confirmCodeReference'
     | 'releaseCodeReference'
     | 'onDidChangeCodeReferences'
+    | 'previewRename'
+    | 'applyRename'
   >
 > {
   readonly readiness: WorkspaceReadiness;
   readonly catalogVersion: number;
-  match(text: string): Promise<WorkspaceMatchResult>;
   getByPaths(
     paths: readonly string[],
     expectedCatalogVersion: number,
@@ -186,7 +134,7 @@ interface WorkspaceBinding {
 const defaultSessionFactory: WorkspaceSessionFactory = (rootPath) =>
   createWorkspaceQuerySession({ cwd: rootPath });
 
-/** LSP 연결과 분리해 문서·작업 공간·비동기 최신성을 관리한다. @codocs [[문서 동기화]] */
+/** LSP 연결과 분리해 문서·작업 공간·비동기 최신성을 관리한다. */
 export class LanguageServerSession {
   readonly documents = new SynchronizedDocuments();
   readonly #sessionFactory: WorkspaceSessionFactory;
@@ -237,7 +185,7 @@ export class LanguageServerSession {
     return this.#workspaces.size;
   }
 
-  /** didOpen 원문을 언어·확장자와 무관하게 저장한다. @codocs [[문서 동기화]]#L18-L21 */
+  /** didOpen 원문을 언어·확장자와 무관하게 저장한다. */
   openDocument(
     params: DidOpenTextDocumentParams,
   ): ReturnType<SynchronizedDocuments['open']> {
@@ -270,7 +218,7 @@ export class LanguageServerSession {
     };
   }
 
-  /** 편집 출처에 묶인 조회·선택을 무효화한다. @codocs [[문서 동기화]]#L36-L38 */
+  /** 편집 출처에 묶인 조회·선택을 무효화한다. */
   #documentChanged(uri: string): void {
     this.#diagnosticEpoch++;
     this.#live.delete(uri);
@@ -293,7 +241,7 @@ export class LanguageServerSession {
       .join('/');
   }
 
-  /** 같은 문서·완료 관측의 참조 요청을 공유하며 늦은 결과를 폐기한다. @codocs [[문서 동기화]]#L44-L47 */
+  /** 같은 문서·완료 관측의 참조 요청을 공유하며 늦은 결과를 폐기한다. */
   async #references(
     uri: string,
   ): Promise<WorkspaceLiveReferenceSuccess | undefined> {
@@ -344,8 +292,6 @@ export class LanguageServerSession {
     detail: WorkspacePathDocumentResult,
     catalogVersion: number,
     occurrence?: CatalogOccurrence,
-    codeCandidate = true,
-    relationship?: { path: string; reverse: boolean },
     explicit = false,
   ): string | undefined {
     const document = this.documents.get(uri);
@@ -363,21 +309,14 @@ export class LanguageServerSession {
         ? {
             reference: {
               name: reference.name,
-              ...('domain' in reference && reference.domain !== undefined
-                ? { domain: reference.domain }
+              ...('section' in reference && reference.section !== undefined
+                ? { section: reference.section }
                 : {}),
             },
             sourcePath: this.#sourcePath(uri, workspace),
             explicit,
           }
-        : occurrence
-          ? undefined
-          : codeCandidate || relationship
-            ? {
-                text: document.getText(),
-                ...(relationship ? { relationship } : {}),
-              }
-            : undefined;
+        : undefined;
     const selection = this.#selections.capture(
       uri,
       document.version,
@@ -389,7 +328,7 @@ export class LanguageServerSession {
     return selection ? selectionTarget(selection) : undefined;
   }
 
-  /** 단일 확정 YAML 참조에만 본문 링크를 제공한다. @codocs [[IDE 지원]]#L71-L77 */
+  /** 단일 확정 YAML 참조에만 본문 링크를 제공한다. */
   async #yamlLinks(
     uri: string,
     cancellation?: CancellationToken,
@@ -406,7 +345,15 @@ export class LanguageServerSession {
       return [];
     return result.occurrences.flatMap(
       /** 단일 확정 출현의 command 링크를 만든다. */ (item) => {
-        if (item.resolution.status !== referenceResolutionStatuses.resolved)
+        const section = item.resolution.section;
+        // 다른 문서는 resolved, 같은 문서의 섹션 참조는 self + section일 때만 링크가 된다.
+        if (
+          item.resolution.status !== referenceResolutionStatuses.resolved &&
+          !(
+            item.resolution.status === referenceResolutionStatuses.self &&
+            section !== undefined
+          )
+        )
           return [];
         const detail = result.targets.find(
           (target) => target.path === item.resolution.target?.path,
@@ -426,7 +373,9 @@ export class LanguageServerSession {
                 target,
                 // Host가 만드는 native 링크의 표시 이름에서도 메타데이터를 서식으로 해석하지 않는다.
                 tooltip: escapeMarkdown(
-                  `원문 열기: ${detailLabel(detail)} (${detail.path.replaceAll('\\', '/')})`,
+                  section === undefined
+                    ? `원문 열기: ${detailLabel(detail)} (${detail.path.replaceAll('\\', '/')})`
+                    : `${'name' in item.occurrence ? item.occurrence.name : detailLabel(detail)}:${section} · ${detail.path.replaceAll('\\', '/')}`,
                 ),
               },
             ]
@@ -451,7 +400,7 @@ export class LanguageServerSession {
     };
   }
 
-  /** 명시 링크를 우선하고 YAML 이름 링크와 단일 역참조를 함께 제공한다. @codocs [[IDE 지원]]#L98-L101 */
+  /** 명시 링크를 우선하고 YAML 이름 링크와 단일 역참조를 함께 제공한다. */
   async documentLinks(
     uri: string,
     cancellation?: CancellationToken,
@@ -484,7 +433,7 @@ export class LanguageServerSession {
     return [...forward.links, ...yaml, ...reverse];
   }
 
-  /** 열린 source들을 같은 프로젝트의 overlay에 먼저 반영한다. @codocs [[문서 동기화]]#L61-L62 */
+  /** 열린 source들을 같은 프로젝트의 overlay에 먼저 반영한다. */
   async #prepareCodeBuffers(session: CodeSession): Promise<void> {
     for (const document of this.documents.all()) {
       const owner = this.#codeOwner(document.uri);
@@ -501,7 +450,7 @@ export class LanguageServerSession {
     );
   }
 
-  /** 문서 전체 코드 출현은 원문 수정 없이 첫 행 Hint로 제공한다. @codocs [[IDE 지원]]#L40-L47 */
+  /** 문서 전체 코드 출현은 원문 수정 없이 첫 행 Hint로 제공한다. */
   async inlayHints(
     uri: string,
     cancellation?: CancellationToken,
@@ -536,7 +485,7 @@ export class LanguageServerSession {
     };
   }
 
-  /** 열린 원문을 우선하여 모든 저장 지식 문서를 진단하고 실패 관측을 분리한다. @codocs [[IDE 지원]]#L58-L66 */
+  /** 열린 원문을 우선하여 모든 저장 지식 문서를 진단하고 실패 관측을 분리한다. */
   async diagnostics(): Promise<
     | {
         documents: {
@@ -718,7 +667,11 @@ export class LanguageServerSession {
   /** 최신 출처 소유권·버전·선택 근거를 확인하고 file URI만 반환한다. */
   async confirmSource(
     input: unknown,
-  ): Promise<{ uri: string } | ConfirmedCodeSource | null> {
+  ): Promise<
+    | { uri: string; destination?: WorkspaceSectionDestination }
+    | ConfirmedCodeSource
+    | null
+  > {
     if (this.#code.has(input))
       return this.#code.confirm(input, (owner) =>
         this.#currentCodeOwner(owner),
@@ -731,57 +684,151 @@ export class LanguageServerSession {
     );
   }
 
-  /** 요청 시점의 원문을 매칭하고 완료 시점에도 같은 버전인지 확인한다. @codocs [[문서 동기화]]#L27-L29 */
-  async matchDocument(
-    request: DocumentMatchRequest,
-  ): Promise<DocumentMatchResponse> {
+  /**
+   * 이름 바꾸기를 시작할 수 있는 위치인지 확인하고 바꿀 문서와 현재 이름을 돌려준다.
+   * 문서의 name 값, 섹션 키, 하나의 문서(와 섹션)로 확정되는 참조에서만 시작할 수 있다.
+   * 참조의 섹션 부분과 섹션 키는 섹션 이름 변경이고 참조의 이름 부분과 name 값은 문서 이름 변경이다.
+   * @param request 편집 중인 문서와 커서 위치다.
+   * @returns 시작할 수 없는 위치이면 null이다.
+   */
+  async prepareRename(
+    request: PrepareRenameRequest,
+  ): Promise<PrepareRenameResponse | null> {
     const uri = request.textDocument.uri;
-    const snapshot = this.documents.get(uri);
-    if (!snapshot)
-      return {
-        success: false,
-        code: documentMatchErrorCodes.documentNotOpen,
-        uri,
-        ...(request.version === undefined
-          ? {}
-          : { requestedVersion: request.version }),
-      };
-    if (request.version !== undefined && request.version !== snapshot.version)
-      return staleResult(uri, request.version, snapshot.version);
-    const snapshotVersion = snapshot.version;
-    const snapshotText = snapshot.getText();
+    const document = this.documents.get(uri);
     const workspace = this.#workspaceForDocument(uri);
-    if (!workspace)
+    if (!document || !workspace || !this.#isKnowledgeDocument(uri, workspace))
+      return null;
+    const offset = document.offsetAt(request.position);
+    const text = document.getText();
+    const ownPath = path.relative(workspace.rootPath, fileURLToPath(uri));
+    const name = nameValueRange(text);
+    if (name && name.range.start <= offset && offset <= name.range.end)
       return {
-        success: false,
-        code: documentMatchErrorCodes.workspaceNotFound,
-        uri,
-        currentVersion: snapshot.version,
+        kind: 'document',
+        range: utf16OffsetsToRange(document, name.range),
+        placeholder: name.name,
+        targetPath: ownPath,
       };
-    const result = await workspace.session.match(snapshotText);
-    const current = this.documents.get(uri);
+    const key = sectionKeyAt(text, offset);
+    if (key)
+      return {
+        kind: 'section',
+        range: utf16OffsetsToRange(document, key.range),
+        placeholder: key.section,
+        targetPath: ownPath,
+        section: key.section,
+      };
+    const version = document.version;
+    const references = await this.#references(uri);
     if (
-      !current ||
-      current !== snapshot ||
-      current.version !== snapshotVersion ||
-      current.getText() !== snapshotText
+      !references ||
+      this.documents.get(uri)?.version !== version ||
+      references.catalogVersion !== workspace.session.catalogVersion
     )
-      return staleResult(uri, snapshotVersion, current?.version);
-    if (!result.success)
+      return null;
+    const item = references.occurrences.find(
+      ({ occurrence }) =>
+        occurrence.offsetRange.start <= offset &&
+        offset < occurrence.offsetRange.end,
+    );
+    const target = item?.resolution.target;
+    if (!item) return null;
+    const { status, section } = item.resolution;
+    const part = referencePartAt(text, item.occurrence, offset);
+    if (!part) return null;
+    if (part.part === 'section') {
+      if (
+        section === undefined ||
+        !target ||
+        (status !== referenceResolutionStatuses.resolved &&
+          status !== referenceResolutionStatuses.self)
+      )
+        return null;
       return {
-        success: false,
-        code: documentMatchErrorCodes.workspaceQueryFailed,
-        uri,
-        currentVersion: snapshotVersion,
-        workspaceUri: workspace.uri,
-        workspaceState: workspace.session.readiness,
-        scanStatus: result.scanStatus,
-        error: result.error,
+        kind: 'section',
+        range: utf16OffsetsToRange(document, part.range),
+        placeholder: section,
+        targetPath: target.path,
+        section,
       };
-    return mapMatchResult(current, workspace, result);
+    }
+    // 같은 문서의 섹션 참조(self + section)는 이름 부분에서 그 문서의 이름 변경을 시작한다.
+    if (
+      target?.name === undefined ||
+      (status !== referenceResolutionStatuses.resolved &&
+        !(status === referenceResolutionStatuses.self && section !== undefined))
+    )
+      return null;
+    return {
+      kind: 'document',
+      range: utf16OffsetsToRange(document, part.range),
+      placeholder: target.name,
+      targetPath: target.path,
+    };
   }
 
-  /** 같은 코드·catalog 관측의 커서 후보와 경로 상세로 표준 Hover를 만든다. @codocs [[문서 동기화]]#L32 @codocs [[코드 호버]]#L42 */
+  /** 파일과 색인을 바꾸지 않고 이름 변경을 계산한다. */
+  async planRename(input: unknown): Promise<PlanRenameResponse> {
+    const request = this.#renameRequest(input);
+    if ('success' in request) return request;
+    if (!request.workspace.session.previewRename)
+      return renameFailure(renameRequestFailureCodes.renameUnsupported);
+    const result = await request.workspace.session.previewRename(request.input);
+    return {
+      ...result,
+      fileUris: this.#renameFileUris(request.workspace, [
+        ...(result.success ? Object.keys(result.revisions) : []),
+      ]),
+    };
+  }
+
+  /** 미리보기와 같은 입력과 revision으로 이름 변경을 파일에 반영한다. */
+  async applyRename(input: unknown): Promise<ApplyRenameResponse> {
+    const request = this.#renameRequest(input);
+    if ('success' in request) return request;
+    if (!request.workspace.session.applyRename)
+      return renameFailure(renameRequestFailureCodes.renameUnsupported);
+    const result = await request.workspace.session.applyRename(request.input);
+    return {
+      ...result,
+      fileUris: this.#renameFileUris(request.workspace, [
+        ...result.files.map((file) => file.path),
+        ...(result.success ? [] : Object.keys(result.preview?.revisions ?? {})),
+      ]),
+    };
+  }
+
+  /** 요청의 출처 문서로 작업 공간을 고르고 세션에 넘길 입력만 남긴다. */
+  #renameRequest(
+    input: unknown,
+  ): { workspace: WorkspaceBinding; input: object } | RenameRequestFailure {
+    const uri =
+      typeof input === 'object' && input !== null && 'textDocument' in input
+        ? (input.textDocument as { uri?: unknown } | null)?.uri
+        : undefined;
+    const workspace =
+      typeof uri === 'string' ? this.#workspaceForDocument(uri) : undefined;
+    if (!workspace || typeof input !== 'object' || input === null)
+      return renameFailure(renameRequestFailureCodes.workspaceNotFound);
+    // 세션은 대상·새 이름·선택·revision만 읽고 나머지 필드는 무시한다.
+    return { workspace, input };
+  }
+
+  /** 프로젝트 상대 경로를 작업 공간 루트 기준 file URI로 바꾼다. */
+  #renameFileUris(
+    workspace: WorkspaceBinding,
+    paths: readonly string[],
+  ): RenameFileUris['fileUris'] {
+    return Object.fromEntries(
+      [...new Set(paths)].map((item) => [
+        item,
+        pathToFileURL(path.resolve(workspace.rootPath, item)).href,
+      ]),
+    );
+  }
+
+  /** 마커와 YAML 참조 위치의 표준 Hover를 만든다. 그 밖의 위치에는 Hover가 없다. */
   async hoverDocument(
     params: HoverParams,
     cancellation?: CancellationToken,
@@ -843,12 +890,9 @@ export class LanguageServerSession {
           occurrence.offsetRange.start <= offset &&
           offset < occurrence.offsetRange.end,
       );
-      const empty = createEmptyHover({
-        candidates: [],
-        catalogVersion: references.catalogVersion,
-        partial: references.scanStatus !== scanStatuses.complete,
-        workspaceState: workspace.session.readiness,
-      });
+      const empty = createEmptyHover(
+        references.scanStatus !== scanStatuses.complete,
+      );
       const reverse =
         owner && this.#isKnowledgeDocument(uri, workspace)
           ? await this.#code.reverseHover(owner, params.position.line)
@@ -883,8 +927,6 @@ export class LanguageServerSession {
             detail,
             references.catalogVersion,
             item,
-            false,
-            undefined,
             true,
           );
           const label = escapeMarkdown(detailLabel(detail, targets));
@@ -908,108 +950,7 @@ export class LanguageServerSession {
         range: item.occurrence.range,
       };
     }
-    const result = await workspace.session.match(snapshotText);
-    if (
-      cancellation?.isCancellationRequested ||
-      !this.#isCurrentSnapshot(
-        uri,
-        snapshotVersion,
-        snapshotText,
-        workspace,
-        snapshot,
-      )
-    )
-      return null;
-    if (!result.success)
-      return createStatusHover(workspace.session.readiness, result.error);
-    const match = mapMatchResult(snapshot, workspace, result);
-    const selection = selectHover(snapshot, match, params.position);
-    if (!selection) return createEmptyHover(match);
-    const candidatePaths = hoverCandidatePaths(selection);
-    const candidateQueryVersion = workspace.session.catalogVersion;
-    let details = await workspace.session.getByPaths(
-      candidatePaths,
-      match.catalogVersion,
-    );
-    if (
-      cancellation?.isCancellationRequested ||
-      !this.#isCurrentSnapshot(
-        uri,
-        snapshotVersion,
-        snapshotText,
-        workspace,
-        snapshot,
-      ) ||
-      workspace.session.catalogVersion !== candidateQueryVersion
-    )
-      return null;
-    if (!details.success)
-      return 'expectedCatalogVersion' in details
-        ? null
-        : createStatusHover(workspace.session.readiness, details.error);
-    const allPaths = hoverDetailPaths(candidatePaths, details);
-    if (allPaths.length !== candidatePaths.length) {
-      const detailQueryVersion = workspace.session.catalogVersion;
-      details = await workspace.session.getByPaths(
-        allPaths,
-        match.catalogVersion,
-      );
-      if (
-        cancellation?.isCancellationRequested ||
-        !this.#isCurrentSnapshot(
-          uri,
-          snapshotVersion,
-          snapshotText,
-          workspace,
-          snapshot,
-        ) ||
-        workspace.session.catalogVersion !== detailQueryVersion
-      )
-        return null;
-      if (!details.success)
-        return 'expectedCatalogVersion' in details
-          ? null
-          : createStatusHover(workspace.session.readiness, details.error);
-    }
-    const hover = createHover(selection, match, details);
-    if (
-      !Array.isArray(hover.contents) &&
-      typeof hover.contents === 'object' &&
-      'value' in hover.contents
-    ) {
-      hover.contents.value = hover.contents.value.replace(
-        /command:codocs\.openSource\?([^)]*)/gu,
-        /** 렌더러의 관측 링크를 불투명 서버 선택으로 바꾼다. */ (
-          _link,
-          query: string,
-        ) => {
-          const argument = (
-            JSON.parse(decodeURIComponent(query)) as {
-              uri: string;
-              relationship?: { path: string; reverse: boolean };
-            }[]
-          )[0];
-          const detail = details.success
-            ? details.results.find(
-                (item) => item.found && item.source.uri === argument?.uri,
-              )
-            : undefined;
-          const relationship = argument?.relationship;
-          return detail?.found
-            ? (this.#target(
-                uri,
-                workspace,
-                detail,
-                match.catalogVersion,
-                undefined,
-                !relationship && candidatePaths.includes(detail.path),
-                relationship,
-              ) ?? '')
-            : '';
-        },
-      );
-    }
-    return hover;
+    return null;
   }
 
   /** 서버가 발급하지 않은 외부 URI·명령의 resolve를 거부한다. */
@@ -1204,56 +1145,19 @@ function containsPath(rootPath: string, candidatePath: string): boolean {
   );
 }
 
-/** 비동기 결과가 현재 문서 버전과 달라졌음을 반환한다. */
-function staleResult(
-  uri: string,
-  requestedVersion: number,
-  currentVersion: number | undefined,
-): DocumentMatchFailure {
+/** 이름 변경 요청을 시작하지 못한 고정 실패를 만든다. */
+function renameFailure(
+  code: RenameRequestFailure['error']['code'],
+): RenameRequestFailure {
   return {
     success: false,
-    code: documentMatchErrorCodes.staleDocumentVersion,
-    uri,
-    requestedVersion,
-    ...(currentVersion === undefined ? {} : { currentVersion }),
-  };
-}
-
-/** 코어 근거의 offset을 보존하며 LSP 범위를 추가한다. */
-function mapEvidence(
-  document: TextDocument,
-  evidence: CodeMatchEvidence,
-): LspMatchEvidence {
-  return {
-    ...evidence,
-    offsetRange: { ...evidence.range },
-    range: utf16OffsetsToRange(document, evidence.range),
-  };
-}
-
-/** 최신 snapshot에 workspace 매칭 결과와 LSP 좌표를 결합한다. */
-function mapMatchResult(
-  document: TextDocument,
-  workspace: WorkspaceBinding,
-  result: Extract<WorkspaceMatchResult, { success: true }>,
-): DocumentMatchSuccess {
-  /** 후보 하나에 LSP 좌표로 변환한 근거 목록을 연결한다. */
-  const mapCandidate = (candidate: CodeMatchCandidate): LspMatchCandidate => ({
-    ...candidate,
-    evidence: candidate.evidence.map((evidence) =>
-      mapEvidence(document, evidence),
-    ),
-  });
-  return {
-    ...result,
-    uri: document.uri,
-    version: document.version,
-    workspaceUri: workspace.uri,
-    workspaceState: workspace.session.readiness,
-    candidates: result.candidates.map(mapCandidate),
-    evidence: result.evidence.map((evidence) =>
-      mapEvidence(document, evidence),
-    ),
+    error: {
+      code,
+      message:
+        code === renameRequestFailureCodes.workspaceNotFound
+          ? '출처 문서의 작업 공간을 찾을 수 없습니다.'
+          : '작업 공간 세션이 이름 변경을 지원하지 않습니다.',
+    },
   };
 }
 
