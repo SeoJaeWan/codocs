@@ -41,7 +41,7 @@ ID를 바꿔도 과거 ID는 남기지 않는다. 이후 조회·수정은 새 I
 
 ## get에서 set/unset과 validate까지
 
-먼저 `codocs_get({"ids":["sample-order"]})`로 문서와 `revision`을 읽고 수정할 설명과 연결을 검토한다.
+먼저 `codocs_get({"addresses":["주문"]})`로 문서와 `revision`을 읽고(섹션 하나만 볼 때는 `{"addresses":["주문:개요"]}`처럼 `이름:섹션`을 쓴다) 수정할 설명과 연결을 검토한다.
 아래의 `읽은 revision`은 실제 응답의 값으로 바꾼다.
 
 ```json
@@ -80,7 +80,7 @@ revision 값만 바꿔 이전 set을 자동 재적용하지 않는다.
 
 1. `codocs_write({"mode":"create","path":".codocs/a.yaml","document":{"_codocs":{"id":"a","name":"가상 A"},"개요":"가상 A의 의미다."}})`
 2. `codocs_write({"mode":"create","path":".codocs/b.yaml","document":{"_codocs":{"id":"b","name":"가상 B"},"개요":"[[가상 A]]를 사용하는 절차다."}})`
-3. `codocs_get({"ids":["a"]})`로 A의 최신 원문과 revision을 읽는다.
+3. `codocs_get({"addresses":["가상 A"]})`로 A의 최신 원문과 revision을 읽는다.
 4. 검토한 A의 섹션에 B를 연결한다: `codocs_write({"mode":"update","id":"a","revision":"A의 최신 revision","set":{"개요":"가상 A의 의미다. 사용 절차는 [[가상 B]]에서 확인한다."}})`
 5. `codocs_validate({})`로 양쪽 참조를 확인한다.
 

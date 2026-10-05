@@ -40,8 +40,8 @@ Windows에서는 JSON의 command 값으로 `C:\\absolute\\install\\node_modules\
 
 | 도구                | 역할                                                           |
 | ------------------- | -------------------------------------------------------------- |
-| `codocs_list`       | 필터와 페이지 단위로 문서 목록 검색                            |
-| `codocs_get`        | 문서 본문·참조·revision 조회                                   |
+| `codocs_list`       | 최상위 문서와 직속 자식을 섹션 이름과 함께 탐색                |
+| `codocs_get`        | `이름` 또는 `이름:섹션`으로 문서·섹션 본문·참조·revision 조회  |
 | `codocs_write`      | 문서 생성 및 읽은 revision을 사용한 수정                       |
 | `codocs_rename`     | 문서나 섹션의 이름과 그것을 가리키는 참조를 함께 미리보고 변경 |
 | `codocs_duplicates` | 프로젝트 전체나 저장 전 초안의 반복 구절 검토                  |
