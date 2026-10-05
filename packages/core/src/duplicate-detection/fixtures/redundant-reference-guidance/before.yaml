@@ -1,9 +1,6 @@
-id: parse-yaml
-name: 'YAML 파싱'
-domains:
-  - 'Core'
-deprecatedAliases:
-  - id: yaml-parsing
+_codocs:
+  id: parse-yaml
+  name: 'YAML 파싱'
 definition: |
   YAML 원문을 데이터로 해석하고 해석값과 원문 위치의 대응을 보존하는 처리다.
   [[문서]]의 속성을 검사하기 전에 원문의 구조와 값을 확인한다. 해석한 데이터가 문서 형식에 맞는지는 [[문서 검증]]에서 판단한다.

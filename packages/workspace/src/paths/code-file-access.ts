@@ -653,7 +653,6 @@ export async function discoverCodeFileState(
 }
 /**
  * Git 상태 실패와 명시적 비 Git을 구분하고 프로젝트 .gitignore만 적용한다.
- * @codocs [[작업 공간:코드 참조 색인]]#L14-L18
  */
 export async function discoverCodeFiles(
   projectRoot: string,

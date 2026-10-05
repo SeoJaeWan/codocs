@@ -3,7 +3,10 @@ import {
   type Catalog,
   type ReferenceCandidate,
 } from '../catalog/index.js';
-import { referenceResolutionStatuses } from '../catalog/domain-values.js';
+import {
+  referenceResolutionStatuses,
+  scanStatuses,
+} from '../catalog/domain-values.js';
 import { offsetToPosition } from '../parser/index.js';
 import { parseReferenceComponents } from '../references/index.js';
 import type { OffsetRange, SourceRange } from '../diagnostics/index.js';
@@ -29,7 +32,8 @@ export interface CodeReferenceMarker {
   range: SourceRange;
   syntax: (typeof codeReferenceSyntaxes)[keyof typeof codeReferenceSyntaxes];
   name?: string;
-  domain?: string;
+  /** 표기에 적은 섹션 이름이다. 코드 참조의 섹션 해석은 지원하지 않으므로 후보 없음으로 둔다. */
+  section?: string;
   destination?: CodeReferenceDestination;
   rowError?:
     | typeof codeReferenceStatuses.invalidRows
@@ -47,7 +51,7 @@ export interface CodeReferenceResolution {
 export function codeReferenceLineCount(text: string): number {
   return text.split(/\r\n|\r|\n/u).length;
 }
-/** 언어·YAML 필드·자기 참조 제한 없이 전체 텍스트의 명시 표기를 추출한다. @codocs [[명시적 코드 참조]]#L12-L28 */
+/** 언어·YAML 필드·자기 참조 제한 없이 전체 텍스트의 명시 표기를 추출한다. */
 export function extractCodeReferences(
   text: string,
 ): readonly CodeReferenceMarker[] {
@@ -106,7 +110,7 @@ export function extractCodeReferences(
   }
   return markers;
 }
-/** 저장 catalog만 사용하며 코드 출처를 YAML 자기 참조로 판단하지 않는다. @codocs [[명시적 코드 참조]]#L30-L40 */
+/** 저장 catalog만 사용하며 코드 출처를 YAML 자기 참조로 판단하지 않는다. */
 export function resolveCodeReference(
   catalog: Catalog,
   marker: CodeReferenceMarker,
@@ -118,10 +122,17 @@ export function resolveCodeReference(
     return { marker, status: codeReferenceStatuses.invalid, candidates: [] };
   if (marker.rowError)
     return { marker, status: marker.rowError, candidates: [] };
-  const resolution = resolveReference(catalog, {
-    name: marker.name,
-    ...(marker.domain !== undefined ? { domain: marker.domain } : {}),
-  });
+  // 코드 참조의 섹션 지원은 별도 이슈가 맡는다. 섹션을 적은 표기는 후보를 찾지 않는다.
+  if (marker.section !== undefined)
+    return {
+      marker,
+      status:
+        catalog.status === scanStatuses.complete
+          ? codeReferenceStatuses.missing
+          : codeReferenceStatuses.unconfirmed,
+      candidates: [],
+    };
+  const resolution = resolveReference(catalog, { name: marker.name });
   if (
     resolution.status !== referenceResolutionStatuses.resolved ||
     !resolution.target

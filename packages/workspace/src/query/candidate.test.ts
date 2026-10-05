@@ -14,6 +14,12 @@ import { scanStatuses } from '@codocs/core';
 import { workspaceTargetKinds } from '../paths/domain-values.js';
 import { WorkspaceQuerySession } from './index.js';
 
+/** 단일 문서로 확정되는 이름 참조 출처다. */
+const referenceOrigin = {
+  reference: { name: '대상' },
+  sourcePath: '.codocs/source.yaml',
+};
+
 let project: string;
 let session: WorkspaceQuerySession;
 beforeEach(async () => {
@@ -23,7 +29,7 @@ beforeEach(async () => {
   await mkdir(path.join(project, '.codocs'));
   await writeFile(
     path.join(project, '.codocs/target.yaml'),
-    'id: target\nname: 대상\ndomains: [업무]\ndefinition: 내용\n',
+    '_codocs:\n  id: target\n  name: 대상\ndefinition: 내용\n',
   );
   session = new WorkspaceQuerySession({ cwd: project });
 });
@@ -85,7 +91,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
     );
     expect(
       session.captureCandidate(
-        { text: 'target' },
+        referenceOrigin,
         '.codocs/target.yaml',
         session.catalogVersion,
       ),
@@ -95,11 +101,11 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
   it('선택 당시 ID가 중복이면 선택한 경로가 삭제된 뒤 남은 문서로 이동하지 않는다', async () => {
     await writeFile(
       path.join(project, '.codocs/other.yaml'),
-      'id: target\nname: 대상\ndomains: [업무]\ndefinition: 내용\n',
+      '_codocs:\n  id: target\n  name: 대상\ndefinition: 내용\n',
     );
     await session.refresh();
     const token = session.captureCandidate(
-      { text: 'target' },
+      { ...referenceOrigin, explicit: true },
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
@@ -113,18 +119,18 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
     await session.refresh();
     expect(
       session.captureCandidate(
-        { text: 'target' },
+        referenceOrigin,
         '.codocs/target.yaml',
         session.catalogVersion - 1,
       ),
     ).toBeUndefined();
   });
 
-  it('원래 매칭에 없는 경로이면 선택하지 않는다', async () => {
+  it('원래 이름 참조에 없는 경로이면 선택하지 않는다', async () => {
     await session.refresh();
     expect(
       session.captureCandidate(
-        { text: 'unrelated' },
+        { reference: { name: '없는 이름' }, sourcePath: '.codocs/source.yaml' },
         '.codocs/target.yaml',
         session.catalogVersion,
       ),
@@ -134,7 +140,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
   it('같은 이름이 여러 경로에 있어도 명시적으로 선택한 확인 후보를 연다', async () => {
     await writeFile(
       path.join(project, '.codocs/other.yaml'),
-      'id: other\nname: 대상\ndomains: [다른업무]\ndefinition: 내용\n',
+      '_codocs:\n  id: other\n  name: 대상\ndefinition: 내용\n',
     );
     await session.refresh();
     const token = session.captureCandidate(
@@ -160,7 +166,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
     )!;
     await writeFile(
       path.join(project, '.codocs/other.yaml'),
-      'id: other\nname: 대상\ndefinition: 내용\n',
+      '_codocs:\n  id: other\n  name: 대상\ndefinition: 내용\n',
     );
     await session.refresh();
     expect(await session.confirmCandidate(token)).toBeUndefined();
@@ -168,13 +174,16 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
 
   it('선택 근거의 입력 객체를 바꿔도 원래 매칭을 보존한다', async () => {
     await session.refresh();
-    const origin = { text: 'target' };
+    const origin = {
+      reference: { name: '대상' },
+      sourcePath: '.codocs/source.yaml',
+    };
     const token = session.captureCandidate(
       origin,
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
-    origin.text = 'unrelated';
+    origin.reference.name = '없는 이름';
     expect(await session.confirmCandidate(token)).toMatchObject({
       result: { path: path.join('.codocs', 'target.yaml') },
     });
@@ -183,7 +192,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
   it('취소한 확인 요청이면 후보를 반환하지 않는다', async () => {
     await session.refresh();
     const token = session.captureCandidate(
-      { text: 'target' },
+      referenceOrigin,
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
@@ -197,7 +206,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
   it('표시 종료로 선택을 해제하면 후보를 반환하지 않는다', async () => {
     await session.refresh();
     const token = session.captureCandidate(
-      { text: 'target' },
+      referenceOrigin,
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
@@ -219,7 +228,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
   it('ID 오류 문서도 같은 관측에서 이름 연결과 내용·진단을 유지한다', async () => {
     await writeFile(
       path.join(project, '.codocs/target.yaml'),
-      'id: BAD_ID\nname: 대상\ndefinition: 내용\n',
+      '_codocs:\n  id: BAD_ID\n  name: 대상\ndefinition: 내용\n',
     );
     const live = await session.references({
       sourcePath: '.codocs/source.yaml',
@@ -228,7 +237,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
     });
     expect(live).toMatchObject({
       success: true,
-      targets: [{ found: true, document: { id: 'BAD_ID' } }],
+      targets: [{ found: true, document: { _codocs: { id: 'BAD_ID' } } }],
     });
     const token = session.captureCandidate(
       { reference: { name: '대상' }, sourcePath: '.codocs/source.yaml' },
@@ -238,7 +247,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
     const confirmed = await session.confirmCandidate(token);
     expect(confirmed?.result).toMatchObject({
       found: true,
-      document: { id: 'BAD_ID' },
+      document: { _codocs: { id: 'BAD_ID' } },
     });
     expect(confirmed?.result.id).toBeUndefined();
     expect(confirmed?.result.diagnostics).not.toEqual([]);
@@ -247,7 +256,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
   it('ID 오류 문서의 파일 객체가 유지되면 내용 변경 뒤 이전 선택도 최신 내용을 연다', async () => {
     await writeFile(
       path.join(project, '.codocs/target.yaml'),
-      'id: BAD_ID\nname: 대상\ndefinition: 내용\n',
+      '_codocs:\n  id: BAD_ID\n  name: 대상\ndefinition: 내용\n',
     );
     await session.refresh();
     const token = session.captureCandidate(
@@ -257,11 +266,13 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
     )!;
     await writeFile(
       path.join(project, '.codocs/target.yaml'),
-      'id: BAD_ID\nname: 대상\ndefinition: 바뀐 내용\n',
+      '_codocs:\n  id: BAD_ID\n  name: 대상\ndefinition: 바뀐 내용\n',
     );
     await session.refresh();
     expect(await session.confirmCandidate(token)).toMatchObject({
-      result: { document: { id: 'BAD_ID', definition: '바뀐 내용' } },
+      result: {
+        document: { _codocs: { id: 'BAD_ID' }, definition: '바뀐 내용' },
+      },
     });
   });
 });
@@ -270,7 +281,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
   it('파일 확인 중 시작된 갱신이 완료될 때까지 기다려 최신 관측으로 재확인한다', async () => {
     await session.refresh();
     const token = session.captureCandidate(
-      { text: 'target' },
+      referenceOrigin,
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
@@ -324,7 +335,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
   it('클릭 대기가 만료되어도 공유 갱신은 취소하지 않고 나중에 완료한다', async () => {
     await session.refresh();
     const token = session.captureCandidate(
-      { text: 'target' },
+      referenceOrigin,
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
@@ -400,7 +411,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
     async (removed) => {
       await session.refresh();
       const token = session.captureCandidate(
-        { text: 'target' },
+        referenceOrigin,
         '.codocs/target.yaml',
         session.catalogVersion,
       )!;
@@ -479,54 +490,16 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
   it('같은 메타데이터로 옛 경로를 재사용해도 파일 객체가 바뀌면 이전 선택을 거부한다', async () => {
     await session.refresh();
     const token = session.captureCandidate(
-      { text: 'target' },
+      referenceOrigin,
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
     await rm(path.join(project, '.codocs/target.yaml'));
     await writeFile(
       path.join(project, '.codocs/target.yaml'),
-      'id: target\nname: 대상\ndomains: [업무]\ndefinition: 다른 문서\n',
+      '_codocs:\n  id: target\n  name: 대상\ndefinition: 다른 문서\n',
     );
     await session.refresh();
     expect(await session.confirmCandidate(token)).toBeUndefined();
   });
-
-  it.each([false, true])(
-    '코드 직접 매칭 밖의 역방향 %s 관계를 확인하고 관계가 사라지면 거부한다',
-    async (reverse) => {
-      await writeFile(
-        path.join(project, '.codocs/related.yaml'),
-        `id: related\nname: 관계\ndefinition: "${reverse ? '[[대상]]' : '내용'}"\n`,
-      );
-      if (!reverse)
-        await writeFile(
-          path.join(project, '.codocs/target.yaml'),
-          'id: target\nname: 대상\ndomains: [업무]\ndefinition: "[[관계]]"\n',
-        );
-      await session.refresh();
-      const token = session.captureCandidate(
-        {
-          text: 'target',
-          relationship: { path: '.codocs/target.yaml', reverse },
-        },
-        '.codocs/related.yaml',
-        session.catalogVersion,
-      )!;
-      expect(await session.confirmCandidate(token)).toMatchObject({
-        result: { path: path.join('.codocs', 'related.yaml') },
-      });
-      await writeFile(
-        path.join(
-          project,
-          reverse ? '.codocs/related.yaml' : '.codocs/target.yaml',
-        ),
-        reverse
-          ? 'id: related\nname: 관계\ndefinition: 관계 삭제\n'
-          : 'id: target\nname: 대상\ndomains: [업무]\ndefinition: 관계 삭제\n',
-      );
-      await session.refresh();
-      expect(await session.confirmCandidate(token)).toBeUndefined();
-    },
-  );
 });

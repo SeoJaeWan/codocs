@@ -5,10 +5,10 @@ import type {
 } from '../diagnostics/index.js';
 import type { YamlParseResult } from '../parser/index.js';
 import { getStringRange, offsetToPosition } from '../parser/index.js';
+import { codocsKey } from '../validator/index.js';
 import { duplicateDetectionConfig } from './config.js';
 import {
   duplicateComparisonStatuses,
-  duplicateFieldNames,
   duplicateMatchKinds,
   duplicateSkipReasons,
   type DuplicateComparisonStatus,
@@ -38,7 +38,7 @@ export interface DuplicateDocumentInput {
 
 /** 비교 대상 필드 한 개의 준비 결과다. */
 export interface PreparedDuplicateField {
-  /** definition 또는 examples와 배열 인덱스로 구성한 필드 경로다. */
+  /** section 이름 하나로 구성한 필드 경로다. */
   fieldPath: FieldPath;
   /** 해석 문자열이다. 구간 범위는 이 문자열의 UTF-16 index다. */
   value: string;
@@ -193,15 +193,9 @@ function orderMembers(left: Member, right: Member): [a: Member, b: Member] {
   return leftFirst ? [left, right] : [right, left];
 }
 
-/** 비교 필드인지 확인한다. definition과 examples[i]만 대상이다. */
+/** 비교 필드인지 확인한다. `_codocs`를 제외한 루트 section 문자열만 대상이다. */
 function isComparedField(fieldPath: FieldPath): boolean {
-  return (
-    (fieldPath.length === 1 &&
-      fieldPath[0] === duplicateFieldNames.definition) ||
-    (fieldPath.length === 2 &&
-      fieldPath[0] === duplicateFieldNames.examples &&
-      typeof fieldPath[1] === 'number')
-  );
+  return fieldPath.length === 1 && fieldPath[0] !== codocsKey;
 }
 
 /** 준비 결과를 path·revision·설정 버전으로 식별하는 캐시 키다. */
@@ -213,8 +207,8 @@ export function duplicatePreparationKey(
 }
 
 /**
- * 문서 한 건의 definition·examples를 비교 구간으로 준비한다. 다른 문서와 무관하므로 결과를 캐시해 재사용할 수 있다.
- * 파싱에 실패한 입력에서는 본문을 추측하지 않고 skipReason만 남긴다. 입력은 변경하지 않는다. @codocs [[본문 중복 탐지]]#L13-L15
+ * 문서 한 건의 section 본문을 비교 구간으로 준비한다. 다른 문서와 무관하므로 결과를 캐시해 재사용할 수 있다.
+ * 파싱에 실패한 입력에서는 본문을 추측하지 않고 skipReason만 남긴다. 입력은 변경하지 않는다.
  * @param input 이미 파싱한 문서다.
  * @returns 정규화한 구간을 가진 준비 결과다.
  */
@@ -656,7 +650,7 @@ export function createDuplicateComparison(
 }
 
 /**
- * 문서 준비와 전체 비교를 한 번에 끝까지 실행한다. 대형 입력에서는 예산을 나눠 진행하는 createDuplicateComparison을 쓴다. @codocs [[본문 중복 탐지]]
+ * 문서 준비와 전체 비교를 한 번에 끝까지 실행한다. 대형 입력에서는 예산을 나눠 진행하는 createDuplicateComparison을 쓴다.
  * @param inputs 이미 파싱한 문서 목록이다.
  * @returns 완료된 결과다.
  */

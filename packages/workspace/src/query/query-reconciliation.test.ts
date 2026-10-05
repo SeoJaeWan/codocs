@@ -147,10 +147,9 @@ function barrier(): { promise: Promise<void>; release: () => void } {
 }
 
 describe('최초 전체 순회 중 변경 범위 보정', () => {
-  /** @codocs [[작업 공간:색인 갱신]]#L31 @codocs [[작업 공간:작업 공간 조회 세션]]#L61 */
   it('변경이 없으면 각 원문을 한 번 읽고 파싱해 같은 초기화를 공유한다', async () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
-    const raw = 'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n';
+    const raw = '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n';
     await writeFile(target, raw);
     const parse = vi.spyOn(core, 'parseYaml');
     session = createWorkspaceQuerySession({ cwd: project });
@@ -173,11 +172,9 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
     const alpha = path.join(project, '.codocs', 'alpha.yaml');
     const beta = path.join(project, '.codocs', 'beta.yaml');
     const before = 'id: [\n';
-    const middle =
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 중간\n';
-    const latest =
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 최신\n';
-    const stable = 'id: beta\nname: beta\ndomains: [업무]\ndefinition: 고정\n';
+    const middle = '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 중간\n';
+    const latest = '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 최신\n';
+    const stable = '_codocs:\n  id: beta\n  name: beta\ndefinition: 고정\n';
     await writeFile(alpha, before);
     await writeFile(beta, stable);
     const parse = vi.spyOn(core, 'parseYaml');
@@ -216,14 +213,14 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
     const added = path.join(codocs, 'added.yaml');
     await writeFile(
       old,
-      'id: old\nname: old\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: old\n  name: old\ndefinition: 본문\n',
     );
     boundary.afterReadDirectory = async (directory) => {
       if (directory !== codocs) return;
       boundary.afterReadDirectory = undefined;
       await writeFile(
         added,
-        'id: added\nname: added\ndomains: [업무]\ndefinition: 추가\n',
+        '_codocs:\n  id: added\n  name: added\ndefinition: 추가\n',
       );
       boundary.emit([added]);
     };
@@ -242,11 +239,10 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
     '첫 읽기 반환 경계에서 %s하면 최종 존재와 원문을 게시한다',
     async (operation) => {
       const target = path.join(project, '.codocs', 'alpha.yaml');
-      const latest =
-        'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 교체\n';
+      const latest = '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 교체\n';
       await writeFile(
         target,
-        'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n',
+        '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 이전\n',
       );
       boundary.afterRead = async (file) => {
         if (file !== target) return;
@@ -285,7 +281,7 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
       await mkdir(directory);
       await writeFile(
         path.join(directory, 'old.yaml'),
-        'id: old\nname: old\ndomains: [업무]\ndefinition: 이전\n',
+        '_codocs:\n  id: old\n  name: old\ndefinition: 이전\n',
       );
       boundary.afterReadDirectory = async (selected) => {
         if (selected !== directory) return;
@@ -298,7 +294,7 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
           await mkdir(directory);
           await writeFile(
             path.join(directory, 'new.yaml'),
-            'id: new\nname: new\ndomains: [업무]\ndefinition: 새 문서\n',
+            '_codocs:\n  id: new\n  name: new\ndefinition: 새 문서\n',
           );
         }
         boundary.emit([directory, ...(operation === '이동' ? [moved] : [])]);
@@ -322,7 +318,7 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     const beta = path.join(folder, 'beta.yaml');
     await writeFile(
       alpha,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 본문\n',
     );
     session = createWorkspaceQuerySession({ cwd: project });
     expect(await session.list()).toMatchObject({
@@ -337,7 +333,7 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     expect(session.scanStatus).toBe('complete');
     await writeFile(
       beta,
-      'id: beta\nname: beta\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: beta\n  name: beta\ndefinition: 본문\n',
     );
     boundary.emit([beta]);
     await vi.waitFor(async () =>
@@ -363,11 +359,11 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     const folder = path.join(project, '.codocs');
     const alpha = path.join(folder, 'alpha.yaml');
     const beta = path.join(folder, 'beta.yaml');
-    const before = 'id: alpha\nname: 알파\ndomains: [업무]\ndefinition: 본문\n';
+    const before = '_codocs:\n  id: alpha\n  name: 알파\ndefinition: 본문\n';
     await writeFile(alpha, before);
     await writeFile(
       beta,
-      'id: beta\nname: 베타\ndomains: [업무]\ndefinition: 본문\n',
+      '_codocs:\n  id: beta\n  name: 베타\ndefinition: 본문\n',
     );
     session = createWorkspaceQuerySession(
       { cwd: project },
@@ -379,12 +375,14 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
           if (attempt !== 1) return;
           await writeFile(
             beta,
-            'id: beta\nname: 베타 최신\ndomains: [업무]\ndefinition: 본문\n',
+            '_codocs:\n  id: beta\n  name: 베타 최신\ndefinition: 본문\n',
           );
           boundary.emit([beta]);
           await vi.waitFor(async () =>
             expect(await session!.get(['beta'])).toMatchObject({
-              results: [{ found: true, document: { name: '베타 최신' } }],
+              results: [
+                { found: true, document: { _codocs: { name: '베타 최신' } } },
+              ],
             }),
           );
           boundary.failScopedOnce = alpha;
@@ -401,7 +399,7 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
       mode: 'update',
       id: 'alpha',
       revision: createHash('sha256').update(before).digest('hex'),
-      set: { name: '알파 저장' },
+      set: { definition: '알파 저장' },
     });
     expect(result).toMatchObject({
       success: true,
@@ -417,19 +415,18 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     expect(boundary.reads.get(beta)).toBe(3);
     expect(await session.get(['alpha', 'beta'])).toMatchObject({
       results: [
-        { found: true, document: { name: '알파 저장' } },
-        { found: true, document: { name: '베타 최신' } },
+        { found: true, document: { definition: '알파 저장' } },
+        { found: true, document: { _codocs: { name: '베타 최신' } } },
       ],
     });
   });
 
   it('배치 전달 전 첫 읽기가 끝나면 drain으로 변경을 반영한 뒤 최초 요청을 완료한다', async () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
-    const latest =
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 최신\n';
+    const latest = '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 최신\n';
     await writeFile(
       target,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 이전\n',
     );
     boundary.afterRead = async (file) => {
       if (file !== target) return;
@@ -450,11 +447,10 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
 
   it('마지막 drain 다음 microtask에 변경이 전달되면 공유 promise 정리 뒤 후속 갱신한다', async () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
-    const latest =
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이후\n';
+    const latest = '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 이후\n';
     await writeFile(
       target,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 이전\n',
     );
     let drains = 0;
     boundary.onDrain = () => {
@@ -484,11 +480,10 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
     const reached = barrier();
     const released = barrier();
-    const latest =
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 최신\n';
+    const latest = '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 최신\n';
     await writeFile(
       target,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 이전\n',
     );
     boundary.afterRead = async (file) => {
       if (file !== target) return;
@@ -523,7 +518,7 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     const released = barrier();
     await writeFile(
       target,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 이전\n',
     );
     boundary.afterRead = async () => {
       reached.release();
@@ -543,12 +538,12 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
 });
 
 describe('준비 상태별 저장 차단', () => {
-  const before = 'id: alpha\nname: 알파\ndomains: [업무]\ndefinition: 본문\n';
+  const before = '_codocs:\n  id: alpha\n  name: 알파\ndefinition: 본문\n';
   const change = () => ({
     mode: 'update',
     id: 'alpha',
     revision: createHash('sha256').update(before).digest('hex'),
-    set: { name: '변경' },
+    set: { definition: '변경' },
   });
 
   it('최초 탐색이 끝나기 전에는 저장하지 않고 완료 뒤에만 반영한다', async () => {
@@ -636,8 +631,7 @@ describe('준비 상태별 저장 차단', () => {
 describe('경로 보정 실패의 보존과 수동 전체 복구', () => {
   it('변경 파일의 재읽기가 실패하면 이전 본문과 revision을 미확인으로 보존한다', async () => {
     const target = path.join(project, '.codocs', 'alpha.yaml');
-    const before =
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n';
+    const before = '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 이전\n';
     await writeFile(target, before);
     session = createWorkspaceQuerySession({ cwd: project });
     await session.get(['alpha']);
@@ -668,11 +662,11 @@ describe('경로 보정 실패의 보존과 수동 전체 복구', () => {
     const beta = path.join(project, '.codocs', 'beta.yaml');
     await writeFile(
       alpha,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: 이전\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 이전\n',
     );
     await writeFile(
       beta,
-      'id: beta\nname: beta\ndomains: [업무]\ndefinition: 고정\n',
+      '_codocs:\n  id: beta\n  name: beta\ndefinition: 고정\n',
     );
     session = createWorkspaceQuerySession({ cwd: project });
     await session.list();
@@ -704,11 +698,11 @@ describe('전체 탐색 실패 뒤 확인 범위 복구', () => {
     const beta = path.join(codocs, 'beta.yaml');
     await writeFile(
       alpha,
-      'id: alpha\nname: alpha\ndomains: [업무]\ndefinition: A\n',
+      '_codocs:\n  id: alpha\n  name: alpha\ndefinition: A\n',
     );
     await writeFile(
       beta,
-      'id: beta\nname: beta\ndomains: [업무]\ndefinition: B\n',
+      '_codocs:\n  id: beta\n  name: beta\ndefinition: B\n',
     );
     boundary.afterReadDirectory = (directory) => {
       if (directory === codocs)

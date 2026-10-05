@@ -77,7 +77,7 @@ beforeEach(async () => {
   await mkdir(path.join(project, '.codocs'));
   await writeFile(
     path.join(project, '.codocs/a.yaml'),
-    'id: a\nname: A\ndefinition: original\ndomains: [test]\n',
+    '_codocs:\n  id: a\n  name: A\ndefinition: original\n',
   );
   clients = [];
   evidence = [
@@ -291,20 +291,16 @@ describe('실제 독립 MCP 작성자의 저장 경계', () => {
       mode: 'create',
       path: '.codocs/new.yaml',
       document: {
-        id: 'new-a',
-        name: 'New A',
+        _codocs: { id: 'new-a', name: 'New A' },
         definition: 'first',
-        domains: ['test'],
       },
     });
     const second = call(b, 'codocs_write', {
       mode: 'create',
       path: '.codocs/new.yaml',
       document: {
-        id: 'new-b',
-        name: 'New B',
+        _codocs: { id: 'new-b', name: 'New B' },
         definition: 'second',
-        domains: ['test'],
       },
     });
     await Promise.all([arrived('A', 'link'), arrived('B', 'link')]);
@@ -377,21 +373,14 @@ describe('실제 독립 MCP 작성자의 저장 경계', () => {
     const first = call(a, 'codocs_write', {
       mode: 'create',
       path: '.codocs/one.yaml',
-      document: {
-        id: 'shared',
-        name: 'One',
-        definition: 'first',
-        domains: ['test'],
-      },
+      document: { _codocs: { id: 'shared', name: 'One' }, definition: 'first' },
     });
     const second = call(b, 'codocs_write', {
       mode: 'create',
       path: '.codocs/two.yaml',
       document: {
-        id: 'shared',
-        name: 'Two',
+        _codocs: { id: 'shared', name: 'Two' },
         definition: 'second',
-        domains: ['test'],
       },
     });
     await Promise.all([arrived('A', 'link'), arrived('B', 'link')]);

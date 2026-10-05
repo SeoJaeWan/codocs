@@ -29,7 +29,6 @@ export const watcherRecoveryGuidance =
 
 /**
  * YAML이나 snapshot 없이 경로 신호·대상별 준비·배치 수명만 관리한다.
- * @codocs [[작업 공간:작업 공간 파일 감시]]
  */
 export class WorkspaceWatcher {
   readonly #observe:

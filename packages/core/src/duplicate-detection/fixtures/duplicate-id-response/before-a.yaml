@@ -1,9 +1,6 @@
-id: error-document-access
-name: '검증 오류가 있는 문서를 조회하고 수정하는 절차'
-domains:
-  - '문서 모델'
-  - '도구 연동'
-  - '작업 공간'
+_codocs:
+  id: error-document-access
+  name: '검증 오류가 있는 문서를 조회하고 수정하는 절차'
 kind: procedure
 status: confirmed
 definition: |

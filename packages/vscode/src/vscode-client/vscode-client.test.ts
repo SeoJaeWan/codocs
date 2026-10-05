@@ -20,9 +20,29 @@ const boundary = vi.hoisted(() => {
     },
     version: 1,
     isClosed: false,
+    isDirty: false,
   };
   return {
     disposable,
+    documents: [document] as unknown[],
+    renameProvider: undefined as
+      | {
+          selector: unknown;
+          prepareRename: (
+            document: unknown,
+            position: unknown,
+          ) => Promise<unknown>;
+          provideRenameEdits: (
+            document: unknown,
+            position: unknown,
+            newName: string,
+            token: unknown,
+          ) => Promise<unknown>;
+        }
+      | undefined,
+    quickPick: vi.fn(),
+    showInfo: vi.fn(),
+    showWarning: vi.fn(),
     folder,
     document,
     owner: folder,
@@ -70,6 +90,9 @@ vi.mock('vscode', () => ({
       dispose: vi.fn(),
     }),
     showErrorMessage: boundary.showError,
+    showQuickPick: boundary.quickPick,
+    showInformationMessage: boundary.showInfo,
+    showWarningMessage: boundary.showWarning,
     showTextDocument: boundary.showDocument,
     createStatusBarItem: () => ({
       name: '',
@@ -82,7 +105,7 @@ vi.mock('vscode', () => ({
   },
   workspace: {
     workspaceFolders: [boundary.folder],
-    textDocuments: [boundary.document],
+    textDocuments: boundary.documents,
     getWorkspaceFolder: () => boundary.owner,
     onDidChangeWorkspaceFolders: () => boundary.disposable,
     openTextDocument: boundary.openDocument,
@@ -111,6 +134,13 @@ vi.mock('vscode', () => ({
     },
   },
   languages: {
+    registerRenameProvider: (selector: unknown, provider: object) => {
+      boundary.renameProvider = {
+        selector,
+        ...provider,
+      } as NonNullable<typeof boundary.renameProvider>;
+      return boundary.disposable;
+    },
     registerDocumentLinkProvider: (
       _selector: unknown,
       provider: { provideDocumentLinks: typeof boundary.links },
@@ -142,7 +172,29 @@ vi.mock('vscode', () => ({
       return boundary.disposable;
     },
   },
-  ['Uri']: { parse: (value: string) => ({ toString: () => value }) },
+  ['Uri']: {
+    parse: (value: string) => ({
+      toString: () => value,
+      fsPath: new URL(value).pathname,
+    }),
+  },
+  ['Range']: class {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+    /** 테스트에서 범위 좌표를 관측한다. */
+    constructor(
+      startLine: number,
+      startCharacter: number,
+      endLine: number,
+      endCharacter: number,
+    ) {
+      this.start = { line: startLine, character: startCharacter };
+      this.end = { line: endLine, character: endCharacter };
+    }
+  },
+  ['WorkspaceEdit']: class {
+    size = 0;
+  },
   ['RelativePattern']: class {
     pattern: string;
     /** 감시 대상 패턴을 테스트에서 확인할 수 있게 보관한다. */
@@ -226,6 +278,12 @@ beforeEach(() => {
   boundary.openDocument.mockReset();
   boundary.commands.clear();
   boundary.watchers.length = 0;
+  boundary.documents.length = 1;
+  boundary.document.isDirty = false;
+  boundary.renameProvider = undefined;
+  boundary.quickPick.mockReset();
+  boundary.showInfo.mockReset().mockResolvedValue(undefined);
+  boundary.showWarning.mockReset().mockResolvedValue(undefined);
 });
 
 describe('VscodeExtensionRuntime 원문 이동 실패 출력', () => {
@@ -275,7 +333,6 @@ describe('VscodeExtensionRuntime 원문 이동 실패 출력', () => {
   );
 });
 
-// @codocs [[VS Code:언어 서버 연결]]
 describe('VscodeFolderClient 갱신 요청 신호', () => {
   it('.codocs 폴더 생성·삭제에만 refresh를 요청하고 내용 파일 변경과 폴더 변경에는 요청하지 않는다', async () => {
     boundary.send.mockResolvedValue(undefined);
@@ -376,7 +433,6 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
     await client.stop();
   });
 
-  // @codocs [[VS Code:언어 서버 연결]]#L43
   it('이전 client 세션의 늦은 실패 알림은 새 상태 항목에 게시하지 않는다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,
@@ -497,7 +553,6 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
       await client.stop();
     },
   );
-  // @codocs [[VS Code:원문 열기]]#L16
   it('확인 응답 사이에 snapshot 알림이 와도 같은 출처와 서버의 성공을 유지한다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,
@@ -594,7 +649,6 @@ describe('VscodeFolderClient 응답과 완료 알림 경합', () => {
 });
 
 describe('source-owning Inlay Hint provider', () => {
-  // @codocs [[VS Code:언어 서버 연결]]#L50-L51
   it('소유한 source의 힌트만 요청하고 서버가 생성한 tooltip command만 신뢰한다', async () => {
     const client = new VscodeFolderClient(
       boundary.folder as vscode.WorkspaceFolder,
@@ -627,5 +681,278 @@ describe('source-owning Inlay Hint provider', () => {
     };
     expect(await boundary.hints!(boundary.document, {}, token)).toEqual([]);
     await client.stop();
+  });
+});
+
+describe('VscodeExtensionRuntime 이름 바꾸기 provider', () => {
+  const orderUri = 'file:///fixture/.codocs/order.yaml';
+  const position = { line: 1, character: 7 };
+
+  /** 서버 요청 이름별 응답을 정해 준다. */
+  function respond(handlers: Record<string, (params: unknown) => unknown>) {
+    boundary.send.mockImplementation((method: unknown, params: unknown) =>
+      Promise.resolve(handlers[String(method)]?.(params)),
+    );
+  }
+
+  /** 미리보기 응답을 만든다. */
+  function plan(impacts: unknown[] = []) {
+    return {
+      success: true,
+      status: 'ready',
+      newName: '새주문',
+      oldName: '주문',
+      changes: [{ path: 'order' }],
+      impacts,
+      revisions: { order: 'r1' },
+      fileUris: { order: orderUri },
+    };
+  }
+
+  /** 이름 변경 가능 위치 응답을 만든다. */
+  const prepared = {
+    range: { start: { line: 1, character: 6 }, end: { line: 1, character: 8 } },
+    placeholder: '주문',
+    targetPath: 'order',
+  };
+
+  /** 확장을 활성화하고 등록된 provider를 반환한다. */
+  async function activate() {
+    const runtime = new VscodeExtensionRuntime({
+      extensionPath: '/unused',
+    } as vscode.ExtensionContext);
+    await runtime.activate();
+    return { runtime, provider: boundary.renameProvider! };
+  }
+
+  it('활성화하면 .codocs 폴더의 YAML 문서에 이름 바꾸기 provider를 등록한다', async () => {
+    const { runtime, provider } = await activate();
+
+    expect(provider.selector).toEqual({
+      scheme: 'file',
+      pattern: '**/.codocs/**/*.{yaml,yml}',
+    });
+    await runtime.deactivate();
+  });
+
+  it('서버가 시작 위치를 확인하면 name 값 범위와 현재 이름으로 입력 창을 연다', async () => {
+    respond({ ['codocs/prepareRename']: () => prepared });
+    const { runtime, provider } = await activate();
+
+    const result = await provider.prepareRename(boundary.document, position);
+
+    expect(result).toMatchObject({
+      range: { start: prepared.range.start, end: prepared.range.end },
+      placeholder: '주문',
+    });
+    expect(boundary.send).toHaveBeenCalledWith('codocs/prepareRename', {
+      textDocument: { uri: boundary.document.uri.toString() },
+      position,
+    });
+    await runtime.deactivate();
+  });
+
+  it('서버가 시작할 수 없는 위치로 답하면 이름을 바꿀 수 없다는 오류를 낸다', async () => {
+    respond({ ['codocs/prepareRename']: () => null });
+    const { runtime, provider } = await activate();
+
+    await expect(
+      provider.prepareRename(boundary.document, position),
+    ).rejects.toThrow('이 위치에서는 문서나 섹션 이름을 바꿀 수 없습니다.');
+    await runtime.deactivate();
+  });
+
+  it('영향받는 파일에 저장하지 않은 수정이 있으면 오류를 내고 반영 요청을 보내지 않는다', async () => {
+    boundary.documents.push({
+      uri: { fsPath: '/fixture/.codocs/order.yaml', toString: () => orderUri },
+      isDirty: true,
+    });
+    respond({
+      ['codocs/prepareRename']: () => prepared,
+      ['codocs/planRename']: () => plan(),
+    });
+    const { runtime, provider } = await activate();
+
+    await expect(
+      provider.provideRenameEdits(boundary.document, position, '새주문', {
+        isCancellationRequested: false,
+      }),
+    ).rejects.toThrow(/저장하지 않은 수정이 있는 파일.*: order$/u);
+
+    expect(
+      boundary.send.mock.calls.some(
+        ([method]) => method === 'codocs/applyRename',
+      ),
+    ).toBe(false);
+    await runtime.deactivate();
+  });
+
+  it('후보를 고르면 선택과 revision으로 반영을 요청하고 완료를 알린 뒤 빈 편집을 반환한다', async () => {
+    const ambiguous = {
+      path: 'ref',
+      occurrenceIndex: 0,
+      text: '[[쌍둥이]]',
+      reason: 'selection_required',
+      before: {
+        status: 'ambiguous',
+        candidates: [
+          { _codocs: { name: '쌍둥이' }, path: 'a' },
+          { _codocs: { name: '쌍둥이' }, path: 'b' },
+        ],
+      },
+    };
+    let planned = 0;
+    respond({
+      ['codocs/prepareRename']: () => prepared,
+      ['codocs/planRename']: () => plan(planned++ === 0 ? [ambiguous] : []),
+      ['codocs/applyRename']: () => ({
+        success: true,
+        files: [{ path: 'order', state: 'changed' }],
+        impacts: [],
+      }),
+    });
+    boundary.quickPick.mockImplementation((items: { id: string }[]) =>
+      Promise.resolve(items.find((item) => item.id === 'b')),
+    );
+    const { runtime, provider } = await activate();
+
+    const edit = await provider.provideRenameEdits(
+      boundary.document,
+      position,
+      '새주문',
+      { isCancellationRequested: false },
+    );
+
+    expect(boundary.quickPick).toHaveBeenCalledTimes(1);
+    expect(boundary.send).toHaveBeenCalledWith('codocs/applyRename', {
+      textDocument: { uri: boundary.document.uri.toString() },
+      targetPath: 'order',
+      newName: '새주문',
+      selections: [{ sourcePath: 'ref', occurrenceIndex: 0, targetPath: 'b' }],
+      revisions: { order: 'r1' },
+    });
+    expect(boundary.showInfo).toHaveBeenCalledTimes(1);
+    expect(edit).toMatchObject({ size: 0 });
+    await runtime.deactivate();
+  });
+
+  it('선택 목록을 닫으면 선택 없이 반영하고 바꾸지 않은 참조를 경고로 알린다', async () => {
+    const ambiguous = {
+      path: 'ref',
+      occurrenceIndex: 0,
+      text: '[[쌍둥이]]',
+      reason: 'selection_required',
+      before: {
+        status: 'ambiguous',
+        candidates: [{ _codocs: { name: '쌍둥이' }, path: 'a' }],
+      },
+    };
+    respond({
+      ['codocs/prepareRename']: () => prepared,
+      ['codocs/planRename']: () => plan([ambiguous]),
+      ['codocs/applyRename']: () => ({
+        success: true,
+        files: [{ path: 'order', state: 'changed' }],
+        impacts: [ambiguous],
+      }),
+    });
+    boundary.quickPick.mockResolvedValue(undefined);
+    const { runtime, provider } = await activate();
+
+    await provider.provideRenameEdits(boundary.document, position, '새주문', {
+      isCancellationRequested: false,
+    });
+
+    expect(boundary.send).toHaveBeenCalledWith(
+      'codocs/applyRename',
+      expect.objectContaining({ selections: [] }),
+    );
+    expect(boundary.showWarning).toHaveBeenCalledTimes(1);
+    await runtime.deactivate();
+  });
+  it('섹션 이름 변경 위치이면 section을 담아 요청하고 섹션 문구로 알린다', async () => {
+    const sectionPrepared = {
+      kind: 'section',
+      section: '환불정책',
+      range: {
+        start: { line: 3, character: 0 },
+        end: { line: 3, character: 4 },
+      },
+      placeholder: '환불정책',
+      targetPath: 'refund',
+    };
+    respond({
+      ['codocs/prepareRename']: () => sectionPrepared,
+      ['codocs/planRename']: () => ({
+        ...plan(),
+        oldName: '환불정책',
+        newName: '환불 규정',
+        targetSection: '환불정책',
+      }),
+      ['codocs/applyRename']: () => ({
+        success: true,
+        files: [{ path: 'refund', state: 'changed' }],
+        impacts: [],
+      }),
+    });
+    const { runtime, provider } = await activate();
+
+    const result = await provider.prepareRename(boundary.document, position);
+    await provider.provideRenameEdits(
+      boundary.document,
+      position,
+      '환불 규정',
+      {
+        isCancellationRequested: false,
+      },
+    );
+
+    expect(result).toMatchObject({ placeholder: '환불정책' });
+    expect(boundary.send).toHaveBeenCalledWith('codocs/applyRename', {
+      textDocument: { uri: boundary.document.uri.toString() },
+      targetPath: 'refund',
+      section: '환불정책',
+      newName: '환불 규정',
+      selections: [],
+      revisions: { order: 'r1' },
+    });
+    expect(boundary.showInfo).toHaveBeenCalledWith(
+      expect.stringContaining("섹션 이름을 '환불정책'에서 '환불 규정'(으)로"),
+    );
+    await runtime.deactivate();
+  });
+
+  it('섹션 이름 변경에서 저장하지 않은 파일이 있으면 섹션 문구로 중단하고 반영하지 않는다', async () => {
+    boundary.documents.push({
+      uri: { fsPath: '/fixture/.codocs/order.yaml', toString: () => orderUri },
+      isDirty: true,
+    });
+    respond({
+      ['codocs/prepareRename']: () => ({
+        kind: 'section',
+        section: '환불정책',
+        range: {
+          start: { line: 3, character: 0 },
+          end: { line: 3, character: 4 },
+        },
+        placeholder: '환불정책',
+        targetPath: 'refund',
+      }),
+      ['codocs/planRename']: () => plan(),
+    });
+    const { runtime, provider } = await activate();
+
+    await expect(
+      provider.provideRenameEdits(boundary.document, position, '환불 규정', {
+        isCancellationRequested: false,
+      }),
+    ).rejects.toThrow(/있어 섹션 이름을 바꾸지 않았습니다.*: order$/u);
+
+    expect(
+      boundary.send.mock.calls.some(
+        ([method]) => method === 'codocs/applyRename',
+      ),
+    ).toBe(false);
+    await runtime.deactivate();
   });
 });
