@@ -65,6 +65,7 @@ describe('prepareRename 시작 위치 확인', () => {
     });
 
     expect(result).toEqual({
+      kind: 'document',
       placeholder: '주문',
       range: {
         start: { line, character: 8 },
@@ -84,8 +85,13 @@ describe('prepareRename 시작 위치 확인', () => {
       position: { line, character },
     });
 
+    expect(result?.kind).toBe('document');
     expect(result?.placeholder).toBe('주문');
     expect(result?.targetPath).toBe(path.join('.codocs', 'order.yaml'));
+    expect(result?.range).toEqual({
+      start: { line, character },
+      end: { line, character: character + '주문'.length },
+    });
   });
 
   it('후보가 여럿인 참조 위에서는 시작할 수 없다', async () => {
@@ -133,6 +139,148 @@ describe('prepareRename 시작 위치 확인', () => {
     });
 
     expect(result).toBeNull();
+  });
+});
+
+/** 섹션이 있는 문서를 만들고 작업 공간을 다시 읽는다. */
+async function writeSectionFiles(): Promise<void> {
+  await writeFile(
+    path.join(root, '.codocs/refund.yaml'),
+    [
+      '_codocs:',
+      '  id: refund',
+      '  name: 환불',
+      '환불정책: 기준',
+      "'예외': 없음",
+      '"따옴표": 값',
+      '본문: 참고 [[환불:예외]] 와 [[환불]]',
+      '',
+    ].join('\n'),
+  );
+  await writeFile(
+    path.join(root, '.codocs/pay.yaml'),
+    document(
+      'pay',
+      '결제',
+      '참고 [[환불:환불정책]] [[환불:없는섹션]] [[주문]]',
+    ),
+  );
+  await session.refreshWorkspaces();
+}
+
+/** 줄 안에서 찾은 문자열 시작 위치에 커서를 두고 prepareRename을 요청한다. */
+async function prepareAt(file: string, needle: string, delta = 0) {
+  const text = await open(file);
+  const lines = text.split('\n');
+  const line = lines.findIndex((row) => row.includes(needle));
+  const character = lines[line]!.indexOf(needle) + delta;
+  return {
+    line,
+    character,
+    result: await session.prepareRename({
+      textDocument: { uri: uriOf(file) },
+      position: { line, character },
+    }),
+  };
+}
+
+describe('prepareRename 섹션 위치', () => {
+  beforeEach(writeSectionFiles);
+
+  it('루트 섹션 키 위에서는 따옴표를 제외한 키 범위로 섹션 이름 변경을 시작한다', async () => {
+    const plain = await prepareAt('.codocs/refund.yaml', '환불정책', 1);
+    expect(plain.result).toEqual({
+      kind: 'section',
+      section: '환불정책',
+      placeholder: '환불정책',
+      targetPath: path.join('.codocs', 'refund.yaml'),
+      range: {
+        start: { line: plain.line, character: 0 },
+        end: { line: plain.line, character: 4 },
+      },
+    });
+    const quoted = await prepareAt('.codocs/refund.yaml', "'예외'", 2);
+    expect(quoted.result?.section).toBe('예외');
+    expect(quoted.result?.range).toEqual({
+      start: { line: quoted.line, character: 1 },
+      end: { line: quoted.line, character: 3 },
+    });
+    const double = await prepareAt('.codocs/refund.yaml', '"따옴표"', 2);
+    expect(double.result?.section).toBe('따옴표');
+    expect(double.result?.range.start.character).toBe(1);
+  });
+
+  it('_codocs 키와 섹션 값 위에서는 섹션 이름 변경을 시작하지 않는다', async () => {
+    const key = await prepareAt('.codocs/refund.yaml', '_codocs', 2);
+    expect(key.result).toBeNull();
+    const value = await prepareAt('.codocs/refund.yaml', '기준', 1);
+    expect(value.result).toBeNull();
+  });
+
+  it('다른 문서 섹션 참조의 섹션 부분은 대상 문서의 섹션 이름 변경, 이름 부분은 문서 이름 변경이다', async () => {
+    const section = await prepareAt('.codocs/pay.yaml', '환불정책', 1);
+    expect(section.result).toEqual({
+      kind: 'section',
+      section: '환불정책',
+      placeholder: '환불정책',
+      targetPath: path.join('.codocs', 'refund.yaml'),
+      range: {
+        start: { line: section.line, character: section.character - 1 },
+        end: {
+          line: section.line,
+          character: section.character - 1 + '환불정책'.length,
+        },
+      },
+    });
+    const name = await prepareAt('.codocs/pay.yaml', '환불:환불정책', 1);
+    expect(name.result).toEqual({
+      kind: 'document',
+      placeholder: '환불',
+      targetPath: path.join('.codocs', 'refund.yaml'),
+      range: {
+        start: { line: name.line, character: name.character - 1 },
+        end: { line: name.line, character: name.character - 1 + '환불'.length },
+      },
+    });
+  });
+
+  it('같은 문서의 섹션 참조는 섹션 부분에서 섹션, 이름 부분에서 그 문서 이름 변경을 시작한다', async () => {
+    const section = await prepareAt('.codocs/refund.yaml', '환불:예외', 4);
+    expect(section.result?.kind).toBe('section');
+    expect(section.result?.section).toBe('예외');
+    expect(section.result?.targetPath).toBe(
+      path.join('.codocs', 'refund.yaml'),
+    );
+    const name = await prepareAt('.codocs/refund.yaml', '환불:예외', 1);
+    expect(name.result?.kind).toBe('document');
+    expect(name.result?.placeholder).toBe('환불');
+  });
+
+  it('섹션이 없는 참조의 섹션 부분과 구분 콜론, 대괄호 위에서는 시작하지 않는다', async () => {
+    const missing = await prepareAt('.codocs/pay.yaml', '없는섹션', 1);
+    expect(missing.result).toBeNull();
+    const colon = await prepareAt('.codocs/pay.yaml', ':환불정책', 0);
+    expect(colon.result?.kind).toBe('document');
+    const bracket = await prepareAt('.codocs/pay.yaml', '[[주문]]', 0);
+    expect(bracket.result).toBeNull();
+  });
+
+  it('섹션 이름 변경 미리보기 요청은 section을 세션에 전달한다', async () => {
+    await open('.codocs/pay.yaml');
+    const result = await session.planRename({
+      textDocument: { uri: uriOf('.codocs/pay.yaml') },
+      targetPath: path.join('.codocs', 'refund.yaml'),
+      section: '환불정책',
+      newName: '환불 규정',
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      status: 'ready',
+      oldName: '환불정책',
+      newName: '환불 규정',
+      targetSection: '환불정책',
+    });
   });
 });
 

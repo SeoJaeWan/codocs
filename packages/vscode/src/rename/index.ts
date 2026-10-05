@@ -24,6 +24,9 @@ export const planRenameMethod = 'codocs/planRename';
 /** 미리보기와 같은 입력으로 이름 변경을 파일에 반영하는 서버 요청이다. */
 export const applyRenameMethod = 'codocs/applyRename';
 
+/** 이름 변경 대상 종류다. 문서 이름 변경과 섹션 이름 변경이 같은 흐름을 쓴다. */
+export type RenameKind = 'document' | 'section';
+
 /** 모호한 참조에서 사용자가 고른 대상이며 서버의 선택 입력과 같은 모양이다. */
 export interface RenameSelection {
   sourcePath: string;
@@ -52,6 +55,8 @@ export interface RenamePreview {
   blockingReason?: string;
   oldName?: string;
   newName: string;
+  /** 섹션 이름 변경일 때 이름을 바꾸는 섹션의 현재 이름이다. */
+  targetSection?: string;
   changeCount: number;
   impacts: readonly RenameImpact[];
   revisions: Readonly<Record<string, string>>;
@@ -128,6 +133,20 @@ const blockedMessages: Readonly<Record<string, string>> = {
     '새 이름을 그 위치의 표기로 안전하게 적을 수 없습니다.',
 };
 
+/** 섹션 이름 변경에서 이유별 안내 문구가 문서와 다른 경우의 문구다. */
+const sectionBlockedMessages: Readonly<Record<string, string>> = {
+  [renameBlockingReasons.targetUnavailable]:
+    '이름을 바꿀 섹션을 확인할 수 없습니다.',
+  [renameBlockingReasons.invalidName]:
+    '새 섹션 이름이 올바르지 않습니다. 비어 있거나 _로 시작하거나 대괄호를 포함하거나 현재 이름과 같으면 쓸 수 없습니다.',
+  [renameBlockingReasons.sectionConflict]:
+    '문서에 새 이름과 같은 섹션이 있습니다.',
+  [renameBlockingReasons.sectionNotFound]:
+    '이름을 바꿀 섹션이 문서에 없습니다.',
+  [renameBlockingReasons.unrepresentable]:
+    '새 섹션 이름을 키의 표기로 안전하게 적을 수 없습니다.',
+};
+
 /** 반영이 거절·실패한 오류 코드별 안내 문구다. */
 const applyErrorMessages: Readonly<Record<string, string>> = {
   [renameApplyErrorCodes.renameBlocked]:
@@ -149,22 +168,35 @@ const fileStateLabels: Readonly<Record<string, string>> = {
 
 /** 사용자에게 보이는 고정 안내 문구다. */
 export const renameMessages = {
-  notRenamable: '이 위치에서는 문서 이름을 바꿀 수 없습니다.',
+  notRenamable: '이 위치에서는 문서나 섹션 이름을 바꿀 수 없습니다.',
   noChange: '바꿀 내용이 없습니다.',
   /** 계산에 실패한 이유를 서버 안내와 함께 알린다. */
   planFailed: (detail: string): string =>
     `이름 변경을 계산하지 못해 파일을 바꾸지 않았습니다: ${detail}`,
   /** 진행할 수 없는 이유를 알린다. */
-  blocked: (reason: string | undefined): string =>
-    `이름을 바꿀 수 없어 파일을 바꾸지 않았습니다. ${
-      (reason && blockedMessages[reason]) ?? '진행할 수 없는 상태입니다.'
+  blocked: (
+    reason: string | undefined,
+    kind: RenameKind = 'document',
+  ): string =>
+    `${kind === 'section' ? '섹션 ' : ''}이름을 바꿀 수 없어 파일을 바꾸지 않았습니다. ${
+      (reason &&
+        ((kind === 'section' ? sectionBlockedMessages[reason] : undefined) ??
+          blockedMessages[reason])) ??
+      '진행할 수 없는 상태입니다.'
     }`,
   /** 저장하지 않은 파일을 알리고 중단했음을 안내한다. */
-  dirtyFiles: (paths: readonly string[]): string =>
-    `저장하지 않은 수정이 있는 파일이 있어 이름을 바꾸지 않았습니다. 저장하거나 되돌린 뒤 다시 시작하세요: ${paths.join(', ')}`,
+  dirtyFiles: (
+    paths: readonly string[],
+    kind: RenameKind = 'document',
+  ): string =>
+    `저장하지 않은 수정이 있는 파일이 있어 ${kind === 'section' ? '섹션 ' : ''}이름을 바꾸지 않았습니다. 저장하거나 되돌린 뒤 다시 시작하세요: ${paths.join(', ')}`,
   /** 참조 선택 목록의 제목이다. */
-  chooseTitle: (path: string, text: string): string =>
-    `이름 변경: ${path}의 ${text}가 가리킬 문서를 고르세요`,
+  chooseTitle: (
+    path: string,
+    text: string,
+    kind: RenameKind = 'document',
+  ): string =>
+    `${kind === 'section' ? '섹션 ' : ''}이름 변경: ${path}의 ${text}가 가리킬 문서를 고르세요`,
   choosePlaceHolder:
     '고르지 않고 닫으면 이 참조는 바꾸지 않고 미해결로 남깁니다.',
   /** 반영 성공 결과를 알린다. */
@@ -172,8 +204,9 @@ export const renameMessages = {
     oldName: string | undefined,
     newName: string,
     changedFiles: number,
+    kind: RenameKind = 'document',
   ): string =>
-    `문서 이름을 ${oldName === undefined ? '' : `'${oldName}'에서 `}'${newName}'(으)로 바꿨습니다. 바뀐 파일: ${changedFiles}개.`,
+    `${kind === 'section' ? '섹션' : '문서'} 이름을 ${oldName === undefined ? '' : `'${oldName}'에서 `}'${newName}'(으)로 바꿨습니다. 바뀐 파일: ${changedFiles}개.`,
   /** 바꾸지 않고 남긴 참조를 알린다. */
   leftUnchanged: (count: number): string =>
     `바꾸지 않고 남긴 참조가 ${count}개 있습니다.`,
@@ -226,12 +259,16 @@ function parseCandidates(value: unknown): RenameCandidate[] | undefined {
 
 /** 이름 바꾸기를 시작할 수 있는 위치의 범위와 현재 이름이다. */
 export interface RenamePreparation {
+  /** 문서 이름 변경인지 섹션 이름 변경인지 나타낸다. */
+  kind: RenameKind;
   range: {
     start: { line: number; character: number };
     end: { line: number; character: number };
   };
   placeholder: string;
   targetPath: string;
+  /** 섹션 이름 변경일 때 현재 섹션 이름이다. */
+  section?: string;
 }
 
 /** 위치 하나가 유효한 편집기 좌표인지 확인한다. */
@@ -262,7 +299,12 @@ export function parsePrepareRenameResponse(
     typeof value['targetPath'] !== 'string'
   )
     return undefined;
+  const kind = value['kind'] === 'section' ? 'section' : 'document';
+  if (kind === 'section' && typeof value['section'] !== 'string')
+    return undefined;
   return {
+    kind,
+    ...(kind === 'section' ? { section: value['section'] as string } : {}),
     range: {
       start: { line: start.line, character: start.character },
       end: { line: end.line, character: end.character },
@@ -343,6 +385,9 @@ export function parsePlanResponse(
         ? { oldName: value['oldName'] }
         : {}),
       newName: value['newName'],
+      ...(typeof value['targetSection'] === 'string'
+        ? { targetSection: value['targetSection'] }
+        : {}),
       changeCount: (value['changes'] as unknown[]).length,
       impacts,
       revisions,
@@ -423,7 +468,11 @@ function withSelection(
 }
 
 /** 영향받는 파일 중 저장하지 않은 수정이 있는 파일이 있으면 중단한다. */
-function ensureClean(host: RenameHost, preview: RenamePreview): void {
+function ensureClean(
+  host: RenameHost,
+  preview: RenamePreview,
+  kind: RenameKind,
+): void {
   const byUri = new Map(
     Object.entries(preview.fileUris).map(([path, uri]) => [uri, path]),
   );
@@ -433,6 +482,7 @@ function ensureClean(host: RenameHost, preview: RenamePreview): void {
       renameAbortReasons.dirtyFiles,
       renameMessages.dirtyFiles(
         dirty.map((uri) => (byUri.get(uri) ?? uri).replaceAll('\\', '/')),
+        kind,
       ),
     );
 }
@@ -441,6 +491,7 @@ function ensureClean(host: RenameHost, preview: RenamePreview): void {
 async function plan(
   host: RenameHost,
   selections: readonly RenameSelection[],
+  kind: RenameKind,
 ): Promise<RenamePreview> {
   const parsed = parsePlanResponse(await host.planRename(selections));
   if ('failure' in parsed)
@@ -452,9 +503,9 @@ async function plan(
   if (preview.status === 'blocked')
     throw new RenameAborted(
       renameAbortReasons.blocked,
-      renameMessages.blocked(preview.blockingReason),
+      renameMessages.blocked(preview.blockingReason, kind),
     );
-  ensureClean(host, preview);
+  ensureClean(host, preview, kind);
   return preview;
 }
 
@@ -462,11 +513,13 @@ async function plan(
 async function choose(
   host: RenameHost,
   impact: RenameImpact,
+  kind: RenameKind,
 ): Promise<RenameSelection | undefined> {
   const picked = await host.choose({
     title: renameMessages.chooseTitle(
       impact.path.replaceAll('\\', '/'),
       impact.text,
+      kind,
     ),
     placeHolder: renameMessages.choosePlaceHolder,
     choices: impact.before.candidates.map(candidateChoice),
@@ -484,11 +537,15 @@ async function choose(
  * 이름 변경을 미리보기, 모호 참조 선택, 반영, 결과 알림 순서로 진행한다.
  * 파일을 바꾸기 전에 진행할 수 없으면 RenameAborted로 중단하며 파일을 바꾸지 않는다.
  * @param host 서버 요청·저장하지 않은 파일 확인·선택 목록·알림을 제공하는 경계다.
+ * @param kind 문서 이름 변경인지 섹션 이름 변경인지이며 안내 문구만 달라진다.
  */
-export async function renameDocument(host: RenameHost): Promise<void> {
+export async function renameDocument(
+  host: RenameHost,
+  kind: RenameKind = 'document',
+): Promise<void> {
   let selections: readonly RenameSelection[] = [];
   const asked = new Set<string>();
-  let preview = await plan(host, selections);
+  let preview = await plan(host, selections, kind);
   while (true) {
     const pending = preview.impacts.filter(
       (impact) => isChoice(impact) && !asked.has(impactKey(impact)),
@@ -497,7 +554,7 @@ export async function renameDocument(host: RenameHost): Promise<void> {
     const before = selections;
     for (const impact of pending) {
       asked.add(impactKey(impact));
-      const picked = await choose(host, impact);
+      const picked = await choose(host, impact, kind);
       if (picked) selections = withSelection(selections, picked);
       if (host.isCancelled())
         throw new RenameAborted(
@@ -506,7 +563,7 @@ export async function renameDocument(host: RenameHost): Promise<void> {
         );
     }
     if (selections === before) break;
-    preview = await plan(host, selections);
+    preview = await plan(host, selections, kind);
   }
   if (preview.changeCount === 0 && preview.impacts.length === 0) {
     host.notify('information', renameMessages.noChange);
@@ -517,7 +574,7 @@ export async function renameDocument(host: RenameHost): Promise<void> {
       renameAbortReasons.cancelled,
       renameMessages.noChange,
     );
-  ensureClean(host, preview);
+  ensureClean(host, preview, kind);
   const result = parseApplyResponse(
     await host.applyRename(selections, preview.revisions),
   );
@@ -535,6 +592,7 @@ export async function renameDocument(host: RenameHost): Promise<void> {
     preview.oldName,
     preview.newName,
     changed,
+    kind,
   );
   if (result.impactCount > 0)
     host.notify(

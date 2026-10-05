@@ -444,9 +444,116 @@ describe('renameDocument 반영 결과 알림', () => {
   });
 });
 
+describe('섹션 이름 변경 문구와 응답', () => {
+  it('저장하지 않은 파일이 있으면 섹션 이름 변경을 섹션 문구로 중단한다', async () => {
+    const host = createHost({ findDirtyFiles: vi.fn(() => [refUri]) });
+
+    const failure = await renameDocument(host, 'section').catch(
+      (error: unknown) => error,
+    );
+
+    expect((failure as RenameAborted).reason).toBe(
+      renameAbortReasons.dirtyFiles,
+    );
+    expect((failure as RenameAborted).message).toBe(
+      renameMessages.dirtyFiles(['.codocs/ref.yaml'], 'section'),
+    );
+    expect((failure as RenameAborted).message).toContain('섹션 이름을');
+    expect(host.applyRename).not.toHaveBeenCalled();
+  });
+
+  it('섹션 충돌과 섹션 없음은 섹션 문구로 알리고 파일을 바꾸지 않는다', async () => {
+    for (const [reason, text] of [
+      ['section_conflict', '문서에 새 이름과 같은 섹션이 있습니다.'],
+      ['section_not_found', '이름을 바꿀 섹션이 문서에 없습니다.'],
+      ['invalid_name', '새 섹션 이름이 올바르지 않습니다.'],
+    ] as const) {
+      const host = createHost({
+        planRename: vi.fn(() =>
+          Promise.resolve(
+            planResponse({ status: 'blocked', blockingReason: reason }),
+          ),
+        ),
+      });
+
+      const failure = await renameDocument(host, 'section').catch(
+        (error: unknown) => error,
+      );
+
+      expect((failure as RenameAborted).message).toContain(text);
+      expect((failure as RenameAborted).message).toContain('섹션 이름을');
+      expect(host.applyRename).not.toHaveBeenCalled();
+    }
+  });
+
+  it('문서 이름 변경의 invalid_name 문구는 그대로다', () => {
+    expect(renameMessages.blocked('invalid_name')).toContain(
+      '새 이름이 비어 있습니다.',
+    );
+  });
+
+  it('섹션 이름 변경 반영 결과는 섹션 문구로 알린다', async () => {
+    const host = createHost({
+      planRename: vi.fn(() =>
+        Promise.resolve(
+          planResponse({
+            oldName: '환불정책',
+            newName: '환불 규정',
+            targetSection: '환불정책',
+            changes: [{ path: orderPath, kind: 'key' }, { path: refPath }],
+          }),
+        ),
+      ),
+    });
+
+    await renameDocument(host, 'section');
+
+    expect(host.notify).toHaveBeenCalledWith(
+      'information',
+      renameMessages.applied('환불정책', '환불 규정', 2, 'section'),
+    );
+    expect(renameMessages.applied('환불정책', '환불 규정', 2, 'section')).toBe(
+      "섹션 이름을 '환불정책'에서 '환불 규정'(으)로 바꿨습니다. 바뀐 파일: 2개.",
+    );
+  });
+
+  it('섹션 시작 위치 응답은 section과 kind를 읽고 section이 없으면 형식 오류다', () => {
+    const range = {
+      start: { line: 3, character: 0 },
+      end: { line: 3, character: 4 },
+    };
+    const value = {
+      kind: 'section',
+      section: '환불정책',
+      range,
+      placeholder: '환불정책',
+      targetPath: orderPath,
+    };
+
+    expect(parsePrepareRenameResponse(value)).toEqual(value);
+    expect(
+      parsePrepareRenameResponse({ ...value, section: undefined }),
+    ).toBeUndefined();
+  });
+
+  it('미리보기 응답의 targetSection과 변경 kind를 받아들인다', () => {
+    const parsed = parsePlanResponse(
+      planResponse({
+        targetSection: '환불정책',
+        changes: [{ path: orderPath, kind: 'key', fieldPath: ['환불정책'] }],
+      }),
+    );
+
+    expect(parsed).toMatchObject({
+      preview: { targetSection: '환불정책', changeCount: 1 },
+    });
+  });
+});
+
 describe('서버 응답 확인', () => {
   it('이름 바꾸기 시작 위치 응답에서 범위와 현재 이름과 대상 경로를 읽는다', () => {
     const value = {
+      kind: 'document',
       range: {
         start: { line: 1, character: 6 },
         end: { line: 1, character: 8 },
@@ -456,6 +563,9 @@ describe('서버 응답 확인', () => {
     };
 
     expect(parsePrepareRenameResponse(value)).toEqual(value);
+    expect(parsePrepareRenameResponse({ ...value, kind: undefined })).toEqual(
+      value,
+    );
   });
 
   it('시작할 수 없는 위치의 null 응답은 undefined로 읽는다', () => {

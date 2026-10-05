@@ -102,6 +102,22 @@ async function startRename(c, name, newName) {
   await c.driver.key('Enter', 'Enter', 13);
 }
 
+/** 화면의 텍스트를 실제 마우스로 눌러 커서를 두고 F2로 새 이름을 입력해 확정한다. 커서가 놓인 행을 먼저 확인한다. */
+async function startRenameAt(c, text, line, newName) {
+  await c.driver.clickText(text);
+  await c.until(
+    () => c.vscode.window.activeTextEditor?.selection.start.line === line,
+    `cursor placed on ${text}`,
+  );
+  await c.driver.key('F2', 'F2', 113);
+  await c.until(
+    () => c.driver.isFocused('.rename-box'),
+    'rename input focused',
+  );
+  await c.driver.insertText(newName);
+  await c.driver.key('Enter', 'Enter', 13);
+}
+
 /** 출처 YAML의 [[Zone]] 링크가 표시되고 서버 준비가 끝날 때까지 Hover로 기다린다. */
 async function readyZoneLink(c) {
   await c.open(source);
@@ -153,19 +169,40 @@ module.exports.scenarios = [
   },
   {
     id: 'section-reference-diagnostics',
-    /** 첫 섹션이 아닌 섹션의 참조도 링크가 되고, 도메인 한정 표기는 대상 없음 진단이 된다. */
+    /** 첫 섹션이 아닌 섹션의 참조도 링크가 되고, 문서는 있으나 섹션이 없는 표기는 섹션 없음 진단이 된다. */
     async run(c) {
       const file = '.codocs/section-refs.yaml';
       await c.open(file);
       await c.until(
-        () => c.diagnostics(file, 'reference_not_found').length === 1,
-        'domain-qualified reference not found diagnostic',
+        () => c.diagnostics(file, 'section_reference_not_found').length === 1,
+        'missing section reference diagnostic',
       );
+      c.assert.equal(c.diagnostics(file, 'reference_not_found').length, 0);
       await c.driver.hover('[[Direct]]', 'Direct', 0, {
         providerLabel: 'Direct',
       });
       await c.driver.yamlLink('[[Direct]]');
       await c.atTop('.codocs/direct.yaml');
+    },
+  },
+  {
+    id: 'section-link-opens-key',
+    /** [[문서:섹션]] 링크 클릭이 대상 파일의 섹션 키를 선택해 연다. */
+    async run(c) {
+      const file = '.codocs/section-link-source.yaml';
+      const target = '.codocs/section-link-target.yaml';
+      await c.open(file);
+      const hover = await c.driver.hover(
+        '[[Section Link Target:Link Policy]]',
+        'Section Link Target:Link Policy',
+      );
+      c.assert.ok(
+        hover.body.includes('.codocs/section-link-target.yaml'),
+        'tooltip names the target path',
+      );
+      await c.driver.yamlLink('[[Section Link Target:Link Policy]]');
+      // 대상 파일의 'Link Policy:' 키(넷째 행)가 선택된다.
+      await selected(c, target, [3, 0, 3, 'Link Policy'.length], 'key opened');
     },
   },
   {
@@ -700,6 +737,62 @@ module.exports.scenarios = [
       await c.until(
         () => c.driver.hasText('저장하지 않은 수정이 있는 파일'),
         'dirty file abort message',
+      );
+      c.assert.equal(await read(target), targetBefore);
+      c.assert.equal(await read(reference), referenceBefore);
+      c.assert.ok(dirty.isDirty);
+    },
+  },
+  {
+    id: 'section-rename-updates-key-and-references',
+    /** 참조의 섹션 부분에서 F2로 섹션 이름을 바꾸면 대상 키와 참조가 디스크에서 함께 바뀌고 문서 name은 그대로다. */
+    async run(c) {
+      const target = '.codocs/section-rename-target.yaml';
+      const reference = '.codocs/section-rename-ref.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      await renameWhenIndexed(
+        c,
+        /** 참조의 섹션 부분에서 F2로 새 섹션 이름을 넣는다. */ async () => {
+          await c.open(reference);
+          await startRenameAt(c, 'Refund Policy', 3, 'Refund Rules');
+        },
+        /** 참조와 대상 키가 디스크에 반영되었는지 확인한다. */ async () =>
+          (await read(reference)).includes(
+            '[[Section Rename Target:Refund Rules]]',
+          ) &&
+          (await read(target)).includes('Refund Rules: Refund policy body'),
+        'section rename written to disk',
+      );
+      const after = await read(target);
+      c.assert.ok(!after.includes('Refund Policy:'));
+      c.assert.ok(after.includes('name: Section Rename Target'));
+      await c.until(
+        async () =>
+          (await c.driver.workbenchState()).notifications.some((text) =>
+            text.includes('섹션 이름을'),
+          ),
+        'section rename result notification',
+      );
+    },
+  },
+  {
+    id: 'section-rename-dirty-file-abort',
+    /** 섹션 키에서 시작한 F2가 참조 파일의 미저장 수정 때문에 중단되고 어느 파일도 바뀌지 않는다. */
+    async run(c) {
+      const target = '.codocs/section-abort-target.yaml';
+      const reference = '.codocs/section-abort-ref.yaml';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const targetBefore = await read(target);
+      const referenceBefore = await read(reference);
+      const dirty = await c.open(reference);
+      await c.replace(dirty, referenceBefore + '# unsaved\n');
+      await c.open(target);
+      await startRenameAt(c, 'Abort Policy', 3, 'Abort Rules');
+      await c.until(
+        () => c.driver.hasText('섹션 이름을 바꾸지 않았습니다'),
+        'section dirty file abort message',
       );
       c.assert.equal(await read(target), targetBefore);
       c.assert.equal(await read(reference), referenceBefore);

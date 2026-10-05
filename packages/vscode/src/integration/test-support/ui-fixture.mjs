@@ -192,8 +192,28 @@ export function uiFiles() {
       'Rename Parent Child',
       'Rename Parent Target',
     )}body: Rename parent child body\n`,
-    // 어느 섹션에서든 참조가 링크·진단이 되며 도메인 한정 표기는 대상 없음이다.
-    '.codocs/section-refs.yaml': `${meta('section-refs', 'Section Refs')}overview: Plain overview\nnotes: |\n  Notes see [[Direct]] and [[test:Direct]]\n`,
+    // 어느 섹션에서든 참조가 링크·진단이 되며 문서는 있으나 섹션이 없는 표기는 섹션 없음 진단이다.
+    '.codocs/section-refs.yaml': `${meta('section-refs', 'Section Refs')}overview: Plain overview\nnotes: |\n  Notes see [[Direct]] and [[Direct:Missing Section]]\n`,
+    // 섹션 링크: 대상 문서의 섹션 키 위치로 이동한다.
+    '.codocs/section-link-target.yaml': `${meta('section-link-target', 'Section Link Target')}Link Policy: Link policy body\nLink Extra: Link extra body\n`,
+    '.codocs/section-link-source.yaml': inlineDocument(
+      'section-link-source',
+      'Section Link Source',
+      'Link [[Section Link Target:Link Policy]] here',
+    ),
+    // 섹션 이름 변경: 대상 키와 참조의 섹션 부분만 바뀌는 별도 문서 쌍이다.
+    '.codocs/section-rename-target.yaml': `${meta('section-rename-target', 'Section Rename Target')}Refund Policy: Refund policy body\n`,
+    '.codocs/section-rename-ref.yaml': inlineDocument(
+      'section-rename-ref',
+      'Section Rename Ref',
+      'Ref [[Section Rename Target:Refund Policy]] end',
+    ),
+    '.codocs/section-abort-target.yaml': `${meta('section-abort-target', 'Section Abort Target')}Abort Policy: Abort policy body\n`,
+    '.codocs/section-abort-ref.yaml': inlineDocument(
+      'section-abort-ref',
+      'Section Abort Ref',
+      'Ref [[Section Abort Target:Abort Policy]] end',
+    ),
     '.codocs/whole-multiple.yaml': inlineDocument(
       'whole-multiple',
       'Whole Multiple',

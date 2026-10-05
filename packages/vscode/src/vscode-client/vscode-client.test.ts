@@ -758,7 +758,7 @@ describe('VscodeExtensionRuntime 이름 바꾸기 provider', () => {
 
     await expect(
       provider.prepareRename(boundary.document, position),
-    ).rejects.toThrow('이 위치에서는 문서 이름을 바꿀 수 없습니다.');
+    ).rejects.toThrow('이 위치에서는 문서나 섹션 이름을 바꿀 수 없습니다.');
     await runtime.deactivate();
   });
 
@@ -868,6 +868,91 @@ describe('VscodeExtensionRuntime 이름 바꾸기 provider', () => {
       expect.objectContaining({ selections: [] }),
     );
     expect(boundary.showWarning).toHaveBeenCalledTimes(1);
+    await runtime.deactivate();
+  });
+  it('섹션 이름 변경 위치이면 section을 담아 요청하고 섹션 문구로 알린다', async () => {
+    const sectionPrepared = {
+      kind: 'section',
+      section: '환불정책',
+      range: {
+        start: { line: 3, character: 0 },
+        end: { line: 3, character: 4 },
+      },
+      placeholder: '환불정책',
+      targetPath: 'refund',
+    };
+    respond({
+      ['codocs/prepareRename']: () => sectionPrepared,
+      ['codocs/planRename']: () => ({
+        ...plan(),
+        oldName: '환불정책',
+        newName: '환불 규정',
+        targetSection: '환불정책',
+      }),
+      ['codocs/applyRename']: () => ({
+        success: true,
+        files: [{ path: 'refund', state: 'changed' }],
+        impacts: [],
+      }),
+    });
+    const { runtime, provider } = await activate();
+
+    const result = await provider.prepareRename(boundary.document, position);
+    await provider.provideRenameEdits(
+      boundary.document,
+      position,
+      '환불 규정',
+      {
+        isCancellationRequested: false,
+      },
+    );
+
+    expect(result).toMatchObject({ placeholder: '환불정책' });
+    expect(boundary.send).toHaveBeenCalledWith('codocs/applyRename', {
+      textDocument: { uri: boundary.document.uri.toString() },
+      targetPath: 'refund',
+      section: '환불정책',
+      newName: '환불 규정',
+      selections: [],
+      revisions: { order: 'r1' },
+    });
+    expect(boundary.showInfo).toHaveBeenCalledWith(
+      expect.stringContaining("섹션 이름을 '환불정책'에서 '환불 규정'(으)로"),
+    );
+    await runtime.deactivate();
+  });
+
+  it('섹션 이름 변경에서 저장하지 않은 파일이 있으면 섹션 문구로 중단하고 반영하지 않는다', async () => {
+    boundary.documents.push({
+      uri: { fsPath: '/fixture/.codocs/order.yaml', toString: () => orderUri },
+      isDirty: true,
+    });
+    respond({
+      ['codocs/prepareRename']: () => ({
+        kind: 'section',
+        section: '환불정책',
+        range: {
+          start: { line: 3, character: 0 },
+          end: { line: 3, character: 4 },
+        },
+        placeholder: '환불정책',
+        targetPath: 'refund',
+      }),
+      ['codocs/planRename']: () => plan(),
+    });
+    const { runtime, provider } = await activate();
+
+    await expect(
+      provider.provideRenameEdits(boundary.document, position, '환불 규정', {
+        isCancellationRequested: false,
+      }),
+    ).rejects.toThrow(/있어 섹션 이름을 바꾸지 않았습니다.*: order$/u);
+
+    expect(
+      boundary.send.mock.calls.some(
+        ([method]) => method === 'codocs/applyRename',
+      ),
+    ).toBe(false);
     await runtime.deactivate();
   });
 });

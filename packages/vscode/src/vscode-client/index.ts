@@ -136,7 +136,7 @@ export class VscodeExtensionRuntime {
       vscode.languages.registerRenameProvider(
         { scheme: 'file', pattern: '**/.codocs/**/*.{yaml,yml}' },
         {
-          /** 문서의 name 값이나 확정된 참조에서만 이름 바꾸기를 시작한다. */
+          /** 문서의 name 값, 섹션 키, 확정된 참조의 이름·섹션 부분에서만 이름 바꾸기를 시작한다. */
           prepareRename: async (document, position) => {
             const prepared = await this.#prepareRename(document, position);
             if (!prepared) throw new Error(renameMessages.notRenamable);
@@ -159,6 +159,9 @@ export class VscodeExtensionRuntime {
             const input = {
               textDocument: { uri: document.uri.toString() },
               targetPath: prepared.targetPath,
+              ...(prepared.kind === 'section' && prepared.section !== undefined
+                ? { section: prepared.section }
+                : {}),
               newName,
             };
             /** 선택을 담아 미리보기를 요청한다. */
@@ -182,6 +185,7 @@ export class VscodeExtensionRuntime {
             try {
               await renameDocument(
                 vscodeRenameHost(planRename, applyRename, isCancelled),
+                prepared.kind,
               );
             } catch (error: unknown) {
               if (

@@ -64,6 +64,10 @@ export const renameBlockingReasons = {
   sourceNotLossless: 'source_not_lossless',
   /** 바꿀 위치의 표기로 새 이름을 안전하게 적을 수 없다. */
   unrepresentable: 'unrepresentable',
+  /** 같은 문서에 새 이름과 같은 섹션이 이미 있다. */
+  sectionConflict: 'section_conflict',
+  /** 이름을 바꿀 섹션이 문서에 없다. */
+  sectionNotFound: 'section_not_found',
 } as const;
 
 /** 참조 해석 상태 중 후보가 여럿이라 대상을 확정하지 못한 상태다. @domainValues */
