@@ -28,6 +28,7 @@ vi.mock('../paths/code-file-access.js', async (importOriginal) => {
   return countCodeAccess(actual);
 });
 import { ioFailures } from '../test-support/file-system.js';
+import { calculateRevision } from '../revision/index.js';
 import {
   codeAccessCounts,
   createFakeCodeWatch,
@@ -1518,5 +1519,69 @@ describe('WorkspaceCodeReferenceIndex: 겹치는 감시 재구성', () => {
     expect(fake.connections[0]!.closed).toBe(true);
     expect(fake.connections.at(-1)!.closed).toBe(false);
     expect(codeAccessCounts.discovery).toBeGreaterThan(0);
+  });
+});
+/** .codocs 문서를 제외한 코드 파일만 남긴다. 수집은 .codocs 안의 YAML도 일반 파일로 읽는다. */
+function codeOnly(
+  sources: ReturnType<WorkspaceCodeReferenceIndex['renameSources']>,
+) {
+  return sources.files.filter((file) => !file.path.startsWith('.codocs/'));
+}
+describe('WorkspaceCodeReferenceIndex.renameSources: 이름 변경 계산용 저장 관측', () => {
+  it('최초 수집이 끝나기 전에는 collecting이고 끝나면 경로 순서의 저장 원문·revision·표기를 제공한다', async () => {
+    await writeFile(path.join(project, 'b.ts'), '// @codocs [[대상]]');
+    await writeFile(path.join(project, 'a.ts'), '// @codocs [[대상:업무]]');
+    const index = createIndex();
+
+    expect(index.renameSources().status).toBe(
+      codeCollectionStatuses.collecting,
+    );
+
+    await index.ready();
+    const sources = index.renameSources();
+
+    expect(sources.status).toBe(codeCollectionStatuses.complete);
+    expect(codeOnly(sources).map((file) => file.path)).toEqual([
+      'a.ts',
+      'b.ts',
+    ]);
+    expect(codeOnly(sources)[0]).toMatchObject({
+      text: '// @codocs [[대상:업무]]',
+      markers: [{ name: '대상', section: '업무' }],
+    });
+    expect(codeOnly(sources)[0]?.revision).toBe(
+      calculateRevision(Buffer.from('// @codocs [[대상:업무]]', 'utf8')),
+    );
+  });
+
+  it('IDE buffer는 무시하고 저장된 디스크 원문과 revision만 제공한다', async () => {
+    await writeFile(path.join(project, 'source.ts'), '@codocs [[대상:업무]]');
+    const index = createIndex();
+    await index.ready();
+    const before = codeOnly(index.renameSources())[0]!;
+    await index.updateBuffer({
+      sourcePath: 'source.ts',
+      text: '@codocs [[대상:내용]] 편집 중',
+      documentVersion: 1,
+    });
+
+    expect(codeOnly(index.renameSources())[0]).toEqual(before);
+    expect(before.text).toBe('@codocs [[대상:업무]]');
+  });
+
+  it('읽지 못한 파일은 failures로 보고하고 읽은 파일은 계속 제공한다', async () => {
+    await writeFile(path.join(project, 'source.ts'), '@codocs [[대상]]');
+    await writeFile(path.join(project, 'legacy.ts'), '@codocs [[대상]]');
+    ioFailures.set(path.join(project, 'legacy.ts'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const index = createIndex();
+    await index.ready();
+    const sources = index.renameSources();
+
+    expect(sources.status).toBe(codeCollectionStatuses.incomplete);
+    expect(codeOnly(sources).map((file) => file.path)).toEqual(['source.ts']);
+    expect(sources.failures).toMatchObject([{ path: 'legacy.ts' }]);
   });
 });

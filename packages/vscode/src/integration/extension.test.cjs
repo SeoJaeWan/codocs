@@ -800,4 +800,66 @@ module.exports.scenarios = [
       c.assert.ok(dirty.isDirty);
     },
   },
+  {
+    id: 'section-rename-updates-code-file-markers',
+    /** 섹션 키 F2 이름 변경이 코드 파일의 그 문서 섹션 표기만 디스크에서 함께 바꾸고 다른 문서의 같은 이름 섹션 표기는 그대로 둔다. */
+    async run(c) {
+      const target = '.codocs/code-rename-target.yaml';
+      const other = '.codocs/code-rename-other.yaml';
+      const code = 'navigation/code-rename.java';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const otherBefore = await read(other);
+      await renameWhenIndexed(
+        c,
+        /** 코드 수집이 끝나 키 Hover에 연결된 코드가 보인 뒤 섹션 키에서 F2로 새 섹션 이름을 넣는다. */ async () => {
+          await c.open(target);
+          await c.driver.hover('Code Policy', '연결된 코드 · 1곳');
+          await c.driver.key('Escape', 'Escape', 27);
+          await startRenameAt(c, 'Code Policy', 3, 'Code Rules');
+        },
+        /** 코드 파일과 대상 키가 디스크에 반영되었는지 확인한다. */ async () =>
+          (await read(code)).includes('[[Code Rename Target:Code Rules]]#L9') &&
+          (await read(target)).includes('Code Rules: Policy body'),
+        'code file rename written to disk',
+      );
+      const after = await read(code);
+      c.assert.ok(after.includes('@codocs [[Code Rename Other:Code Policy]]'));
+      c.assert.ok(!after.includes('Target:Code Policy'));
+      c.assert.equal(await read(other), otherBefore);
+      await c.until(
+        async () =>
+          (await c.driver.workbenchState()).notifications.some((text) =>
+            text.includes('섹션 이름을'),
+          ),
+        'code file rename result notification',
+      );
+    },
+  },
+  {
+    id: 'section-rename-dirty-code-file-abort',
+    /** 섹션 키 F2가 코드 파일의 미저장 수정 때문에 중단되고 어느 파일도 바뀌지 않는다. */
+    async run(c) {
+      const target = '.codocs/code-abort-target.yaml';
+      const code = 'navigation/code-abort.java';
+      /** 디스크에 저장된 현재 원문을 읽는다. */
+      const read = (relative) => c.fs.readFile(c.uri(relative).fsPath, 'utf8');
+      const targetBefore = await read(target);
+      const codeBefore = await read(code);
+      const dirty = await c.open(code);
+      await c.replace(dirty, codeBefore + '// unsaved\n');
+      await c.open(target);
+      // 코드 수집이 끝나 연결된 코드가 Hover에 보이기 전에는 이름 변경이 진행 중 수집으로 막힌다.
+      await c.driver.hover('Code Abort Policy', '연결된 코드 · 1곳');
+      await c.driver.key('Escape', 'Escape', 27);
+      await startRenameAt(c, 'Code Abort Policy', 3, 'Code Abort Rules');
+      await c.until(
+        () => c.driver.hasText('섹션 이름을 바꾸지 않았습니다'),
+        'dirty code file abort message',
+      );
+      c.assert.equal(await read(target), targetBefore);
+      c.assert.equal(await read(code), codeBefore);
+      c.assert.ok(dirty.isDirty);
+    },
+  },
 ];

@@ -88,11 +88,18 @@ export function codeFileRelativePath(
     return undefined;
   return parts.join('/');
 }
-/** 부모 디렉터리의 ignore는 하위 규칙만으로 되살리지 않는다. */
+/** 저장·이름 변경이 같은 폴더에 잠시 만드는 임시 파일 이름이다. 코드로 수집하지 않는다. */
+const writeTempFilePattern = /^\.codocs-write-[^.]+\.tmp$/u;
+/**
+ * 수집 대상이 될 수 없는 경로인지 판단한다. 부모 디렉터리의 ignore는 하위 규칙만으로 되살리지 않는다.
+ * 쓰기 중 같은 폴더에 생기는 임시 파일(.codocs-write-*.tmp)은 새 원문을 담고 있어도 수집하지 않는다.
+ */
 export function isCodeFileIgnored(
   policy: CodeFilePolicy,
   relative: string,
 ): boolean {
+  if (writeTempFilePattern.test(relative.slice(relative.lastIndexOf('/') + 1)))
+    return true;
   if (policy.tracked.has(relative)) return false;
   const parts = relative.split('/');
   for (let end = 1; end <= parts.length; end++) {

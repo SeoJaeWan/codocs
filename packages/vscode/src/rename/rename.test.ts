@@ -121,6 +121,125 @@ describe('renameDocument 기본 진행', () => {
   });
 });
 
+describe('renameDocument 코드 파일 표기', () => {
+  const codePath = 'src/code.ts';
+  const codeUri = 'file:///fixture/src/code.ts';
+  const withCode = {
+    changes: [{ path: orderPath }, { path: codePath }],
+    revisions: { [orderPath]: 'r1', [codePath]: 'r3' },
+    fileUris: { [orderPath]: orderUri, [codePath]: codeUri },
+  };
+
+  it('저장하지 않은 코드 파일이 영향 파일에 있으면 시작 전에 중단하고 코드 경로를 안내한다', async () => {
+    const host = createHost({
+      planRename: vi.fn(() => Promise.resolve(planResponse(withCode))),
+      findDirtyFiles: vi.fn(() => [codeUri]),
+    });
+
+    const failure = await renameDocument(host).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(RenameAborted);
+    expect((failure as RenameAborted).reason).toBe(
+      renameAbortReasons.dirtyFiles,
+    );
+    expect((failure as RenameAborted).message).toBe(
+      renameMessages.dirtyFiles(['src/code.ts']),
+    );
+    expect(host.findDirtyFiles).toHaveBeenCalledWith([orderUri, codeUri]);
+    expect(host.applyRename).not.toHaveBeenCalled();
+  });
+
+  it('코드 파일의 revision을 반영 요청에 그대로 보내고 바뀐 코드 파일도 파일 수에 센다', async () => {
+    const host = createHost({
+      planRename: vi.fn(() => Promise.resolve(planResponse(withCode))),
+      applyRename: vi.fn(() =>
+        Promise.resolve(
+          applyResponse({
+            files: [
+              { path: orderPath, state: 'changed', revision: 'n1' },
+              {
+                path: codePath,
+                state: 'changed',
+                revision: 'n3',
+                fileKind: 'code',
+              },
+            ],
+          }),
+        ),
+      ),
+    });
+
+    await renameDocument(host);
+
+    expect(host.applyRename).toHaveBeenCalledWith([], {
+      [orderPath]: 'r1',
+      [codePath]: 'r3',
+    });
+    expect(host.notify).toHaveBeenCalledWith(
+      'information',
+      renameMessages.applied('주문', '새주문', 2),
+    );
+  });
+
+  it('읽지 못한 코드 파일의 unconfirmed 영향은 선택 대상이 아니며 바꾸지 않은 참조로 알린다', async () => {
+    const unread = {
+      path: 'src/legacy.ts',
+      occurrenceIndex: -1,
+      text: '',
+      reason: 'unconfirmed',
+      fileKind: 'code',
+      before: { status: 'unconfirmed', candidates: [] },
+    };
+    const host = createHost({
+      planRename: vi.fn(() =>
+        Promise.resolve(
+          planResponse({
+            ...withCode,
+            status: 'unresolved',
+            impacts: [unread],
+          }),
+        ),
+      ),
+      applyRename: vi.fn(() =>
+        Promise.resolve(
+          applyResponse({ status: 'unresolved', impacts: [unread] }),
+        ),
+      ),
+    });
+
+    await renameDocument(host);
+
+    expect(host.choose).not.toHaveBeenCalled();
+    expect(host.notify).toHaveBeenCalledWith(
+      'warning',
+      `${renameMessages.applied('주문', '새주문', 2)} ${renameMessages.leftUnchanged(1)}`,
+    );
+  });
+
+  it('코드 수집이 진행 중이라 blocked이면 파일을 바꾸지 않고 탐색 미완료 안내로 중단한다', async () => {
+    const host = createHost({
+      planRename: vi.fn(() =>
+        Promise.resolve(
+          planResponse({
+            status: 'blocked',
+            blockingReason: 'unconfirmed',
+            changes: [],
+          }),
+        ),
+      ),
+    });
+
+    const failure = await renameDocument(host).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(RenameAborted);
+    expect((failure as RenameAborted).reason).toBe(renameAbortReasons.blocked);
+    expect((failure as RenameAborted).message).toBe(
+      renameMessages.blocked('unconfirmed'),
+    );
+    expect(host.applyRename).not.toHaveBeenCalled();
+  });
+});
+
 describe('renameDocument 저장하지 않은 파일 확인', () => {
   it('영향받는 파일에 저장하지 않은 수정이 있으면 시작 전에 중단하고 파일 경로를 안내한다', async () => {
     const host = createHost({ findDirtyFiles: vi.fn(() => [refUri]) });

@@ -499,6 +499,89 @@ describe('codocs_rename section', () => {
   });
 });
 
+describe('codocs_rename의 코드 파일 표기', () => {
+  const refund = '_codocs:\n  id: refund\n  name: 환불\n환불정책: |\n  내용\n';
+
+  /** 프로젝트에 코드 파일을 쓴다. */
+  async function writeCode(name: string, text: string): Promise<void> {
+    await mkdir(path.dirname(path.join(project, name)), { recursive: true });
+    await writeFile(path.join(project, name), text);
+  }
+
+  it('섹션 이름 변경 preview는 코드 변경을 fileKind code로 보고하고 apply는 코드 파일을 고친다', async () => {
+    await start({ 'refund.yaml': refund });
+    const code = '// @codocs [[환불:환불정책]]#L2\n';
+    await writeCode('src/a.ts', code);
+    const request = {
+      id: 'refund',
+      section: '환불정책',
+      newName: '환불 규정',
+    };
+    const preview = await call('codocs_rename', {
+      mode: 'preview',
+      ...request,
+    });
+
+    expect(preview).toMatchObject({ success: true, status: 'ready' });
+    expect(preview.changes).toContainEqual(
+      expect.objectContaining({
+        path: 'src/a.ts',
+        fileKind: 'code',
+        oldText: '환불정책',
+        newText: '환불 규정',
+      }),
+    );
+    expect(Object.keys(preview.revisions)).toContain('src/a.ts');
+    expect(await readFile(path.join(project, 'src/a.ts'), 'utf8')).toBe(code);
+
+    const applied = await call('codocs_rename', {
+      mode: 'apply',
+      ...request,
+      revisions: preview.revisions,
+    });
+
+    expect(applied.success).toBe(true);
+    expect(applied.files).toContainEqual(
+      expect.objectContaining({
+        path: 'src/a.ts',
+        state: 'changed',
+        fileKind: 'code',
+      }),
+    );
+    expect(await readFile(path.join(project, 'src/a.ts'), 'utf8')).toBe(
+      '// @codocs [[환불:환불 규정]]#L2\n',
+    );
+    expect(await read('refund.yaml')).toContain('환불 규정: |');
+  });
+
+  it('미리보기 뒤 코드 파일이 바뀌면 apply는 revision_conflict로 거절하고 아무 파일도 바꾸지 않는다', async () => {
+    await start({ 'refund.yaml': refund });
+    await writeCode('src/a.ts', '// @codocs [[환불:환불정책]]\n');
+    const request = {
+      id: 'refund',
+      section: '환불정책',
+      newName: '환불 규정',
+    };
+    const preview = await call('codocs_rename', {
+      mode: 'preview',
+      ...request,
+    });
+    await writeCode('src/a.ts', '// @codocs [[환불:환불정책]]\n// 수정\n');
+
+    expect(
+      await call('codocs_rename', {
+        mode: 'apply',
+        ...request,
+        revisions: preview.revisions,
+      }),
+    ).toMatchObject({
+      success: false,
+      error: { code: 'revision_conflict' },
+    });
+    expect(await read('refund.yaml')).toBe(refund);
+  });
+});
+
 describe('codocs_write의 이름 변경 거부', () => {
   it('update의 set.name이 현재 이름과 다르면 저장하지 않고 codocs_rename을 안내한다', async () => {
     await start({ 'order.yaml': order });

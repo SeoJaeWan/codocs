@@ -82,7 +82,7 @@ export const renameBlockingReasons = {
   invalidName: 'invalid_name',
   /** 프로젝트의 다른 문서가 새 이름을 이미 쓴다. */
   nameConflict: 'name_conflict',
-  /** 스캔이나 대상을 확정하지 못했다. */
+  /** 스캔이나 대상을 확정하지 못했거나 코드 파일 수집이 진행 중(collecting)이다. */
   unconfirmed: 'unconfirmed',
   /** 참조 선택 입력이 유효하지 않다. */
   invalidSelection: 'invalid_selection',

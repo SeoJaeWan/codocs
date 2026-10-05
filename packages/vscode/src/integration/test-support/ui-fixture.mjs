@@ -221,6 +221,27 @@ export function uiFiles() {
       'Section Abort Ref',
       'Ref [[Section Abort Target:Abort Policy]] end',
     ),
+    // 코드 파일 표기를 포함한 섹션 이름 변경: 대상 문서와 같은 섹션 이름을 쓰는 다른 문서의 표기는 바뀌지 않는다.
+    '.codocs/code-rename-target.yaml': sectionDocument(
+      'code-rename-target',
+      'Code Rename Target',
+      'Code Policy',
+    ),
+    '.codocs/code-rename-other.yaml': sectionDocument(
+      'code-rename-other',
+      'Code Rename Other',
+      'Code Policy',
+    ),
+    'navigation/code-rename.java': `class CodeRename {\n  // @codocs [[Code Rename Target:Code Policy]]#L9\n  // @codocs [[Code Rename Other:Code Policy]]\n}\n`,
+    '.codocs/code-abort-target.yaml': sectionDocument(
+      'code-abort-target',
+      'Code Abort Target',
+      'Code Abort Policy',
+    ),
+    'navigation/code-abort.java': codeMarker(
+      'CodeAbort',
+      '@codocs [[Code Abort Target:Code Abort Policy]]',
+    ),
     '.codocs/whole-multiple.yaml': inlineDocument(
       'whole-multiple',
       'Whole Multiple',

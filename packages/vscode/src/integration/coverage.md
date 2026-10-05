@@ -1,6 +1,6 @@
 # 실제 VS Code UI 검사와 이전 assertion 소유권
 
-`extension.test.cjs`의 26개 대표 사례는 설치된 VSIX의 실제 renderer에서 포인터 Hover, 표시된 앵커 press/release, Windows Ctrl-click 또는 macOS Cmd-click, 이름 바꾸기(F2) 키 입력과 선택 목록 클릭을 사용한다. API는 활성화, 게시된 진단, fixture 편집 준비, 실제 editor/선택/탭 관측에만 사용한다. provider 응답이나 제품 command를 직접 호출하지 않는다. 설치 smoke는 활성화와 서버가 게시한 진단 응답만 확인한다.
+`extension.test.cjs`의 28개 대표 사례는 설치된 VSIX의 실제 renderer에서 포인터 Hover, 표시된 앵커 press/release, Windows Ctrl-click 또는 macOS Cmd-click, 이름 바꾸기(F2) 키 입력과 선택 목록 클릭을 사용한다. API는 활성화, 게시된 진단, fixture 편집 준비, 실제 editor/선택/탭 관측에만 사용한다. provider 응답이나 제품 command를 직접 호출하지 않는다. 설치 smoke는 활성화와 서버가 게시한 진단 응답만 확인한다.
 
 | UI 사례                                   | 고유한 화면/Host 관측                                                                                                                     |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
@@ -30,6 +30,8 @@
 | rename-dirty-file-abort                   | 영향 파일의 미저장 수정 때문에 F2 이름 변경이 중단되고 안내가 보이며 디스크·미저장 내용 보존                                              |
 | section-rename-updates-key-and-references | 참조의 섹션 부분 F2 입력, 대상 문서의 섹션 키와 참조의 섹션 부분이 디스크에서 함께 바뀌고 문서 name 유지, 섹션 문구 알림                  |
 | section-rename-dirty-file-abort           | 섹션 키 F2 이름 변경이 참조 파일의 미저장 수정 때문에 중단되고 섹션 문구 안내가 보이며 디스크·미저장 내용 보존                            |
+| section-rename-updates-code-file-markers  | 섹션 키 F2 이름 변경이 코드 파일의 그 문서 섹션 표기만 디스크에서 바꾸고(`#L9` 유지) 다른 문서의 같은 이름 섹션 표기와 문서는 그대로 둠   |
+| section-rename-dirty-code-file-abort      | 섹션 키 F2 이름 변경이 코드 파일의 미저장 수정 때문에 중단되고 섹션 문구 안내가 보이며 디스크·미저장 내용 보존                            |
 
 아래 표는 제거한 API 기능 묶음의 assertion을 현재 책임에 연결한다. 파일명은 repository 기준이며 인접 검사는 기본 `pnpm test`에 포함된다. 화면 조합 전체를 인접 검사로 대체했다고 주장하지 않는다. 상세 조건은 기존 책임 검사에 남고 UI 대표 경계는 위 사례로 확인한다. 실제 Windows/macOS UI 실행 전에는 화면 수락 결과가 미검증이다.
 

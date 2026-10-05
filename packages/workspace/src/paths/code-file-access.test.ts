@@ -46,6 +46,24 @@ afterEach(async () => {
 });
 
 describe('discoverCodeFiles: 프로젝트 코드 읽기 적격성', () => {
+  it('저장·이름 변경이 남기는 .codocs-write 임시 파일은 새 원문을 담고 있어도 수집하지 않는다', async () => {
+    await mkdir(path.join(project, 'src'));
+    await writeFile(path.join(project, 'src', 'a.ts'), '@codocs [[대상]]');
+    await writeFile(
+      path.join(project, 'src', '.codocs-write-1234-abcd.tmp'),
+      '@codocs [[대상]]',
+    );
+    const result = await discoverCodeFiles(project);
+
+    expect(result.files.map((file) => file.path)).toEqual(['src/a.ts']);
+    expect(
+      await readEligibleCodeFile(
+        result.policy,
+        'src/.codocs-write-1234-abcd.tmp',
+      ),
+    ).toBeUndefined();
+  });
+
   it('알 수 없는 확장자와 확장자 없는 UTF-8 파일이면 모두 수집한다', async () => {
     await writeFile(path.join(project, 'memo'), '@codocs [[대상]]');
     await writeFile(path.join(project, 'code.weird'), '@codocs [[대상]]');

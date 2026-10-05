@@ -7,6 +7,8 @@ import {
 import { parseYaml } from '../parser/index.js';
 import {
   extractCodeReferences,
+  getCodeReferencePartRanges,
+  replaceCodeReferencePart,
   resolveCodeReference,
   codeReferenceDestinationKinds,
   codeReferenceStatuses,
@@ -198,6 +200,75 @@ describe('resolveCodeReference: 저장 문서 후보와 섹션', () => {
         status: codeReferenceStatuses.ambiguous,
         candidates: [{ path: second.path }, { path: target.path }],
       });
+    },
+  );
+});
+
+describe('코드 표기의 이름·섹션 부분 범위', () => {
+  /** 파일 원문에서 첫 표기를 뽑는다. */
+  function first(text: string): ReturnType<typeof extractCodeReferences>[0] {
+    return extractCodeReferences(text)[0]!;
+  }
+  it('섹션이 없는 표기는 이름 부분 범위만 반환한다', () => {
+    const text = 'x\n// @codocs [[환불]]#L2\n';
+    const ranges = getCodeReferencePartRanges(first(text))!;
+
+    expect(text.slice(ranges.name.start, ranges.name.end)).toBe('환불');
+    expect(ranges.section).toBeUndefined();
+  });
+  it('이름과 섹션이 있는 표기는 파일 원문 기준의 두 범위를 반환한다', () => {
+    const text = 'a\n// @codocs [[환불:환불정책]]';
+    const ranges = getCodeReferencePartRanges(first(text))!;
+
+    expect(text.slice(ranges.name.start, ranges.name.end)).toBe('환불');
+    expect(text.slice(ranges.section!.start, ranges.section!.end)).toBe(
+      '환불정책',
+    );
+  });
+  it('이름 안의 escape된 콜론은 구분 콜론으로 보지 않고 범위에 포함한다', () => {
+    const text = '@codocs [[a\\:b\:c\\:d]]';
+    const ranges = getCodeReferencePartRanges(first(text))!;
+
+    expect(text.slice(ranges.name.start, ranges.name.end)).toBe('a\\:b');
+    expect(text.slice(ranges.section!.start, ranges.section!.end)).toBe(
+      'c\\:d',
+    );
+  });
+  it('문법 오류인 표기는 범위를 반환하지 않는다', () => {
+    expect(getCodeReferencePartRanges(first('@codocs [[a'))).toBeUndefined();
+    expect(
+      getCodeReferencePartRanges(first('@codocs [[a:b:c]]')),
+    ).toBeUndefined();
+  });
+  it('이름 부분만 바꾸고 섹션과 표기 뒤 글자는 그대로 둔다', () => {
+    const marker = first('// @codocs [[환불:환불정책]]#L2');
+    const edit = replaceCodeReferencePart(marker, 'name', '결제')!;
+
+    expect(edit.oldText).toBe('환불');
+    expect(edit.newText).toBe('결제');
+    expect(
+      marker.text.slice(0, edit.offsetRange.start - marker.offsetRange.start) +
+        edit.newText +
+        marker.text.slice(edit.offsetRange.end - marker.offsetRange.start),
+    ).toBe('@codocs [[결제:환불정책]]');
+  });
+  it('새 값의 콜론은 escape하여 한 부분으로 적는다', () => {
+    const marker = first('@codocs [[환불:환불정책]]');
+    const edit = replaceCodeReferencePart(marker, 'section', 'a:b')!;
+
+    expect(edit.newText).toBe('a\\:b');
+  });
+  it('섹션이 없는 표기의 섹션 부분 수정은 거부한다', () => {
+    expect(
+      replaceCodeReferencePart(first('@codocs [[환불]]'), 'section', '새'),
+    ).toBeUndefined();
+  });
+  it.each(['', 'a]b', 'a\nb', 'x\\'])(
+    '안전하게 적을 수 없는 새 값 %j는 거부한다',
+    (value) => {
+      expect(
+        replaceCodeReferencePart(first('@codocs [[환불:섹션]]'), 'name', value),
+      ).toBeUndefined();
     },
   );
 });

@@ -22,9 +22,15 @@ import {
   type SectionRenameRequest,
   type SourceRange,
 } from '@codocs/core';
+import { codeCollectionStatuses } from '../code-reference/domain-values.js';
+import type { WorkspaceCodeRenameSources } from '../code-reference/index.js';
 import { workspaceDocumentStatuses } from '../loader/domain-values.js';
 import type { WorkspaceScanResult } from '../loader/index.js';
-import type { WorkspaceRenameFileState } from './domain-values.js';
+import { codeRenameFiles, planCodeRename } from './code-rename.js';
+import type {
+  WorkspaceRenameFileKind,
+  WorkspaceRenameFileState,
+} from './domain-values.js';
 export * from './domain-values.js';
 
 /** 이름 변경 결과에서 참조 후보를 식별하는 이름·경로다. */
@@ -50,6 +56,12 @@ export interface WorkspaceRenameChange {
   occurrenceIndex?: number;
   /** 섹션 키 이름을 바꾸는 수정이면 key다. 이때 range는 따옴표를 포함한 키 위치이고 newText는 따옴표 없는 새 이름이다. */
   kind?: RenameChangeKind;
+  /**
+   * 코드 파일의 `@codocs [[ ]]` 표기 수정이면 code다. .codocs 문서 수정에는 없다.
+   * 이때 path는 프로젝트 상대 코드 경로(`/` 구분), range는 고칠 이름 또는 섹션 부분의 위치,
+   * oldText·newText는 그 부분의 원문(콜론은 `\:`)이며 occurrenceIndex는 그 파일에서 표기의 순번이다.
+   */
+  fileKind?: WorkspaceRenameFileKind;
 }
 
 /** 자동으로 고치지 않은 참조와 그 후보다. 선택이 필요한 참조는 reason으로 구분한다. */
@@ -61,6 +73,12 @@ export interface WorkspaceRenameImpact {
   reason: RenameImpact['reason'];
   before: WorkspaceRenameResolution;
   after: WorkspaceRenameResolution;
+  /**
+   * 코드 파일의 영향이면 code다. .codocs 문서의 영향에는 없다.
+   * 코드 파일을 읽지 못해 확인하지 못한 영향은 occurrenceIndex가 -1이고 text가 비어 있으며 reason이 unconfirmed다.
+   * 수집 실패를 특정 파일로 좁힐 수 없으면 path가 `.`이다.
+   */
+  fileKind?: WorkspaceRenameFileKind;
 }
 
 /** 프로젝트에서 새 이름과 겹치는 문서다. */
@@ -90,6 +108,8 @@ export interface WorkspaceRenameFileResult {
   path: string;
   state: WorkspaceRenameFileState;
   revision: string;
+  /** 코드 파일이면 code다. .codocs 문서에는 없다. */
+  fileKind?: WorkspaceRenameFileKind;
 }
 
 /** 반영 성공 결과다. unresolved는 고르지 않은 참조가 원문 그대로 남았다는 뜻이다. */
@@ -125,6 +145,8 @@ export interface WorkspaceRenameEdit {
   path: string;
   raw: string;
   revision: string;
+  /** 코드 파일 수정이면 code다. 코드 파일은 반영 경로에서만 수집 경계 기준으로 확인하고 쓴다. */
+  fileKind?: WorkspaceRenameFileKind;
 }
 
 /** 미리보기와 같은 계산에서 얻은 파일별 새 원문이다. */
@@ -291,25 +313,42 @@ function blocked(
 /**
  * 같은 스캔의 색인으로 이름 변경을 계산하고 파일별 새 원문까지 만든다. 디스크와 색인은 바꾸지 않는다.
  * 새 원문을 안전하게 만들 수 없는 파일이 하나라도 있으면 전체를 blocked로 돌려준다.
- * @param request 대상·새 이름·선택이다. section이 있으면 그 섹션의 이름 변경이다.
+ * code를 주면 코드 파일의 `@codocs [[ ]]` 표기도 같은 계산에 합류한다. 코드 수집이 진행 중(collecting)이면 blocked다.
+ * @param request 대상·새 이름·선택이다. section이 있으면 그 섹션의 이름 변경이다. 선택의 sourcePath가 코드 파일이면 그 파일의 표기 순번을 가리킨다.
  * @param scan 색인을 만든 같은 스캔이며 파일별 원문과 revision을 제공한다.
  * @param catalog 같은 스캔에서 만든 색인이다.
+ * @param code 코드 수집의 저장 관측이다. 없으면 코드 파일은 다루지 않는다.
  * @returns 미리보기와 반영에 쓸 파일별 새 원문이다.
  */
 export function prepareWorkspaceRename(
   request: WorkspaceRenameRequest,
   scan: WorkspaceScanResult,
   catalog: Catalog,
+  code?: WorkspaceCodeRenameSources,
 ): WorkspaceRenamePreparation {
+  const codeFiles = code ? codeRenameFiles(catalog, code) : undefined;
+  const selections = request.selections ?? [];
+  const codeSelections = selections.filter((item) =>
+    codeFiles?.has(item.sourcePath),
+  );
+  // 코드 표기를 가리키는 선택은 코드 계산이 검사하고, 나머지는 문서 계획이 검사한다.
+  const documentRequest: WorkspaceRenameRequest = codeSelections.length
+    ? {
+        ...request,
+        selections: selections.filter((item) => !codeSelections.includes(item)),
+      }
+    : request;
   const plan =
-    'section' in request
-      ? planSectionRename(catalog, request)
-      : planRename(catalog, request);
+    'section' in documentRequest
+      ? planSectionRename(catalog, documentRequest)
+      : planRename(catalog, documentRequest);
   if (plan.status === renamePlanStatuses.blocked)
     return blocked(
       plan,
       plan.blockingReason ?? renameBlockingReasons.targetUnavailable,
     );
+  if (code?.status === codeCollectionStatuses.collecting)
+    return blocked(plan, renameBlockingReasons.unconfirmed);
   const documents = new Map(
     scan.documents.map((document) => [document.source.path, document]),
   );
@@ -340,21 +379,38 @@ export function prepareWorkspaceRename(
       return blocked(plan, renameBlockingReasons.unrepresentable);
     edits.push({ path, raw: edited.raw, revision: document.revision });
   }
+  const codePlan =
+    code && codeFiles
+      ? planCodeRename(request, catalog, codeFiles, code, codeSelections)
+      : undefined;
+  if (codePlan?.invalidSelections.length)
+    return blocked(
+      { ...plan, invalidSelections: codePlan.invalidSelections },
+      renameBlockingReasons.invalidSelection,
+    );
+  const impacts = [...plan.impacts.map(impact), ...(codePlan?.impacts ?? [])];
   return {
     preview: {
-      status: plan.status,
+      status:
+        plan.status === renamePlanStatuses.unresolved ||
+        codePlan?.impacts.length
+          ? renamePlanStatuses.unresolved
+          : plan.status,
       targetPath: plan.targetPath,
       ...(plan.oldName === undefined ? {} : { oldName: plan.oldName }),
       newName: plan.newName,
       ...(plan.targetSection === undefined
         ? {}
         : { targetSection: plan.targetSection }),
-      changes: plan.changes.map(changeReport),
-      impacts: plan.impacts.map(impact),
+      changes: [
+        ...plan.changes.map(changeReport),
+        ...(codePlan?.changes ?? []),
+      ],
+      impacts,
       conflicts: [],
       invalidSelections: [],
-      revisions,
+      revisions: { ...revisions, ...codePlan?.revisions },
     },
-    edits,
+    edits: [...edits, ...(codePlan?.edits ?? [])],
   };
 }
