@@ -40,8 +40,8 @@ On Windows, use `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd` as the J
 
 | Tool                | Purpose                                                                                      |
 | ------------------- | -------------------------------------------------------------------------------------------- |
-| `codocs_list`       | Find documents using filters and paginated results                                           |
-| `codocs_get`        | Read document content, references, and revisions                                             |
+| `codocs_list`       | Explore root documents and direct children with section names                                |
+| `codocs_get`        | Read a document or section by `name` or `name:section`, with references and revisions        |
 | `codocs_write`      | Create documents or update them using a read revision                                        |
 | `codocs_rename`     | Preview and apply a document or section rename together with the references that point to it |
 | `codocs_duplicates` | Review repeated passages in the project or in a draft before saving                          |
