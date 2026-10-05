@@ -38,18 +38,18 @@ On Windows, use `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd` as the J
 
 ### Available tools
 
-| Tool                | Purpose                                                                           |
-| ------------------- | --------------------------------------------------------------------------------- |
-| `codocs_list`       | Find documents using filters and paginated results                                |
-| `codocs_get`        | Read document content, references, and revisions                                  |
-| `codocs_write`      | Create documents or update them using a read revision                             |
-| `codocs_rename`     | Preview and apply a document rename together with the references that point to it |
-| `codocs_duplicates` | Review repeated passages in the project or in a draft before saving               |
-| `codocs_validate`   | Check documents for errors and warnings                                           |
-| `codocs_refresh`    | Rebuild the project's knowledge index                                             |
-| `codocs_guide`      | Read guidance for writing, updating, and recovering documents                     |
+| Tool                | Purpose                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `codocs_list`       | Find documents using filters and paginated results                                           |
+| `codocs_get`        | Read document content, references, and revisions                                             |
+| `codocs_write`      | Create documents or update them using a read revision                                        |
+| `codocs_rename`     | Preview and apply a document or section rename together with the references that point to it |
+| `codocs_duplicates` | Review repeated passages in the project or in a draft before saving                          |
+| `codocs_validate`   | Check documents for errors and warnings                                                      |
+| `codocs_refresh`    | Rebuild the project's knowledge index                                                        |
+| `codocs_guide`      | Read guidance for writing, updating, and recovering documents                                |
 
-For example, ask your assistant to “find the definition of an order,” “check the project documents for errors,” or “document this business rule.” When updating a document, the assistant first reads it with `codocs_get`, can review the draft with `codocs_duplicates` for repeated passages (review information only, it never blocks saving), then passes the revision to `codocs_write`. To rename a document, the assistant previews with `codocs_rename` and then applies the previewed result; `codocs_write` does not change a document's name.
+For example, ask your assistant to “find the definition of an order,” “check the project documents for errors,” or “document this business rule.” When updating a document, the assistant first reads it with `codocs_get`, can review the draft with `codocs_duplicates` for repeated passages (review information only, it never blocks saving), then passes the revision to `codocs_write`. To rename a document or one of its sections (pass `section`), the assistant previews with `codocs_rename` and then applies the previewed result; `codocs_write` does not change a document's name.
 
 ## VS Code
 
@@ -68,7 +68,8 @@ Open the project folder containing `.codocs` to start using the extension.
 ### Features
 
 - **Document diagnostics:** Check YAML syntax, the `_codocs` metadata and sections, duplicate IDs and names, parent links, and reference errors in `.codocs` documents.
-- **Document links:** Navigate to resolved `[[Document name]]` references in any section of a document.
+- **Document links:** Navigate to resolved `[[Document name]]` references, or `[[Document name:Section]]` references to a section of a document, in any section of a document.
+- **Document and section rename:** Rename a document or a section (F2 on a name, a section key, or a reference) and update the references that point to it.
 - **Explicit code links:** Write `@codocs [[Document name]]`, `@codocs [[Document name]]#L11`, or `@codocs [[Document name]]#L11-L12` in project text to link to a document, line, or inclusive line range.
 - **Reverse code references:** Navigate from a referenced document line to the matching code occurrence. Multiple occurrences have separate hover links. Whole-document references appear in an Inlay Hint before the first row; a single occurrence uses the IDE navigation gesture.
 - **Workspace support:** Use separate project knowledge for each folder in a multi-folder workspace. Document changes are reflected automatically.
@@ -87,7 +88,7 @@ Overview: |
   An order records a customer's purchase and its fulfillment rules.
 ```
 
-Link code to the document with `@codocs [[Order]]` in a comment, or ask your AI assistant to retrieve it through MCP. A document is a `_codocs` object with `id`, `name`, and an optional `parent`, plus one or more sections; each section name is a key whose value is text. Use document references such as `[[Order]]` in any section to connect related knowledge. Codocs does not connect a document just because a variable or function has the same name.
+Link code to the document with `@codocs [[Order]]` in a comment, or ask your AI assistant to retrieve it through MCP. A document is a `_codocs` object with `id`, `name`, and an optional `parent`, plus one or more sections; each section name is a key whose value is text. Use document references such as `[[Order]]`, or section references such as `[[Order:Cancellation]]`, in any section to connect related knowledge. Codocs does not connect a document just because a variable or function has the same name.
 
 See the [writing guide](docs/guide/README.md) and [sample project](examples/.codocs) for more examples. The detailed guide and sample project are currently in Korean.
 

@@ -36,6 +36,7 @@ _codocs:
   - parent_cycle: parent를 따라가면 자기 자신으로 돌아옴. 자기 자신을 parent로 적은 경우를 포함하며 순환에 속한 모든 문서를 진단한다.
   - invalid_reference: 참조 표기 문법 오류
   - reference_not_found: 참조 대상이 없음
+  - section_reference_not_found: 참조한 문서는 확정됐지만 `\[[이름:섹션]]`의 섹션이 그 문서에 없음. 참조 전체 위치를 가리키는 오류이며 문서 자체가 없으면 reference_not_found다.
   - reference_ambiguous: 참조 대상이 여러 개
   - revision_conflict: 읽은 뒤 파일이 바뀜
   - file_exists: 만들려는 파일이 이미 있음
