@@ -6,6 +6,9 @@ import {
   codeReferenceDestinationKinds,
   codeReferenceStatuses,
   extractCodeReferences,
+  getSectionKeyRange,
+  getSectionNames,
+  parseYaml,
 } from '@codocs/core';
 import { codeCollectionStatuses, codeFileReasons } from '@codocs/workspace';
 import type {
@@ -18,14 +21,12 @@ import type {
   DocumentLink,
   InlayHint,
   Hover,
+  Position,
   Range,
 } from 'vscode-languageserver/node.js';
 import { escapeMarkdown } from '../hover/index.js';
-import {
-  isSourceSelection,
-  selectionTarget,
-  type SourceSelection,
-} from '../navigation/index.js';
+import { nameValueRange, sectionKeyAt } from '../rename/index.js';
+import { isSourceSelection, selectionTarget } from '../navigation/index.js';
 import {
   codeCollectionMessages,
   codeReferenceMessages,
@@ -37,7 +38,7 @@ export type CodeSession = Pick<
   | 'setCodeReferenceOwner'
   | 'updateCodeBuffer'
   | 'codeReferenceSnapshot'
-  | 'codeReferencesForRows'
+  | 'codeReferencesForSection'
   | 'codeReferencesForDocument'
   | 'captureCodeReference'
   | 'confirmCodeReference'
@@ -58,9 +59,7 @@ export interface CodeOwner {
 export interface ConfirmedCodeSource {
   uri: string;
   destination:
-    | { kind: 'top' }
-    | { kind: 'rows'; startLine: number; endLine: number }
-    | { kind: 'occurrence'; range: Range; markerText: string };
+    { kind: 'top' } | { kind: 'occurrence'; range: Range; markerText: string };
 }
 interface Selected {
   owner: CodeOwner;
@@ -208,8 +207,12 @@ export class CodeNavigation {
         path.resolve(selected.owner.rootPath, item.target.path),
       ).href,
       destination:
-        item.destination.kind === codeReferenceDestinationKinds.rows
-          ? { ...item.destination }
+        item.destination.kind === codeReferenceDestinationKinds.section
+          ? {
+              kind: 'occurrence',
+              range: item.destination.range,
+              markerText: item.destination.markerText,
+            }
           : { kind: 'top' },
     };
   }
@@ -271,110 +274,27 @@ export class CodeNavigation {
     }
     return { links, diagnostics };
   }
-  /** 같은 행의 모든 겹친 구간을 합집합으로 조회한다. */
-  async reverseHover(owner: CodeOwner, line: number): Promise<string> {
+  /**
+   * 커서가 문서 name 값 위이면 문서 전체 참조 목록, 섹션 키 위이면 그 섹션 참조 목록을 만든다.
+   * 두 위치가 아니면 빈 문자열이다.
+   */
+  async reverseHover(owner: CodeOwner, offset: number): Promise<string> {
     await this.prepare(owner);
-    const query = await owner.session.codeReferencesForRows(
-      owner.path,
-      line + 1,
-    );
-    return this.render(owner, query);
-  }
-  /** 완료 단일 구간만 직접 연결하며 문서 이름 링크와 겹친 구간은 양보한다. */
-  async reverseLinks(
-    owner: CodeOwner,
-    yamlLinks: readonly DocumentLink[],
-  ): Promise<DocumentLink[]> {
-    await this.prepare(owner);
-    const snapshot = await owner.session.codeReferenceSnapshot();
-    if (snapshot.hasCompletedCollection === false) return [];
-    const rows = owner.text.split(/\r\n|\r|\n/u);
-    const boundaries = new Set<number>();
-    for (const item of snapshot.occurrences)
-      if (
-        item.target?.path.split(path.sep).join('/') === owner.path &&
-        item.destination?.kind === codeReferenceDestinationKinds.rows
-      ) {
-        boundaries.add(item.destination.startLine);
-        boundaries.add(item.destination.endLine + 1);
-      }
-    const sorted = [...boundaries].sort((a, b) => a - b);
-    const links: DocumentLink[] = [];
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const first = sorted[i]!,
-        last = sorted[i + 1]! - 1;
-      if (first < 1 || last > rows.length) continue;
-      const query = await owner.session.codeReferencesForRows(
-        owner.path,
-        first,
-        last,
+    const name = nameValueRange(owner.text);
+    if (name && name.range.start <= offset && offset <= name.range.end)
+      return this.render(
+        owner,
+        await owner.session.codeReferencesForDocument(owner.path),
       );
-      if (query.occurrences.length !== 1) continue;
-      for (let line = first - 1; line < last; line++) {
-        const length = rows[line]!.length;
-        const blocked = yamlLinks
-          .filter(
-            (link) =>
-              link.range.start.line <= line && line <= link.range.end.line,
-          )
-          .map(
-            /** 실제 관측을 요청에 연결하고 실패를 호출자에게 전달한다. */ (
-              link,
-            ) => ({
-              start:
-                link.range.start.line === line ? link.range.start.character : 0,
-              end:
-                link.range.end.line === line
-                  ? link.range.end.character
-                  : length,
-            }),
-          )
-          .sort((left, right) => left.start - right.start);
-        let start = 0;
-        const segments: { start: number; end: number }[] = [];
-        for (const block of blocked) {
-          if (start < block.start) segments.push({ start, end: block.start });
-          start = Math.max(start, block.end);
-        }
-        if (start < length) segments.push({ start, end: length });
-        const text = rows[line]!;
-        const body = segments.flatMap(
-          /** 앞뒤 공백을 덜어낸 본문 구간만 남기고 공백뿐인 구간은 버린다. */ (
-            segment,
-          ) => {
-            const raw = text.slice(segment.start, segment.end);
-            const lead = raw.length - raw.trimStart().length;
-            const trimmed = raw.trim();
-            return trimmed
-              ? [
-                  {
-                    start: segment.start + lead,
-                    end: segment.start + lead + trimmed.length,
-                  },
-                ]
-              : [];
-          },
-        );
-        const target = await this.target(
+    const key = sectionKeyAt(owner.text, offset);
+    return key
+      ? this.render(
           owner,
-          query.occurrences[0]!,
-          true,
-          `${query.codeGeneration}/${query.documentGeneration}`,
-        );
-        if (target)
-          for (const segment of body)
-            links.push({
-              range: {
-                start: { line, character: segment.start },
-                end: { line, character: segment.end },
-              },
-              target,
-            });
-      }
-    }
-    return links;
+          await owner.session.codeReferencesForSection(owner.path, key.section),
+        )
+      : '';
   }
-  /** 문서 전체 출현만 실제 첫 행 앞에 표시한다. */
+  /** 문서 전체 출현은 첫 행에, 섹션 출현은 섹션 키 옆에 클릭 없는 개수 Hint로 표시한다. */
   async hints(owner: CodeOwner): Promise<InlayHint[]> {
     await this.prepare(owner);
     const query = await owner.session.codeReferencesForDocument(owner.path);
@@ -390,42 +310,48 @@ export class CodeNavigation {
           paddingRight: true,
         },
       ];
-    if (query.absent) return [];
+    const hints: InlayHint[] = [];
+    if (!query.absent)
+      hints.push(
+        await this.countHint(owner, query, { line: 0, character: 0 }, false),
+      );
+    const parsed = parseYaml(owner.text);
+    if (!parsed.success) return hints;
+    const document = { observation: { path: owner.path, parsed } };
+    for (const section of getSectionNames(parsed)) {
+      const key = getSectionKeyRange(document, section);
+      if (!key) continue;
+      const sectionQuery = await owner.session.codeReferencesForSection(
+        owner.path,
+        section,
+      );
+      if (sectionQuery.occurrences.length === 0) continue;
+      hints.push(
+        await this.countHint(owner, sectionQuery, key.range.end, true),
+      );
+    }
+    return hints;
+  }
+  /** 개수만 표시하고 명령은 두지 않는 Hint 하나를 만든다. 목록은 tooltip에 둔다. */
+  async countHint(
+    owner: CodeOwner,
+    query: WorkspaceCodeReferenceQuery,
+    position: Position,
+    afterKey: boolean,
+  ): Promise<InlayHint> {
     const count = query.occurrences.length;
     const documentComplete = await this.documentComplete(owner, query);
     const value = !documentComplete
       ? `확인된 코드 ${count}곳 · 문서 탐색 미확인`
       : query.status === codeCollectionStatuses.complete
-        ? `문서 전체에 연결된 코드 · ${count}곳`
+        ? `코드 ${count}곳`
         : `확인된 코드 ${count}곳 · ${incompleteLabel(query)}`;
-    const target =
-      count === 1
-        ? await this.target(
-            owner,
-            query.occurrences[0]!,
-            true,
-            `${query.codeGeneration}/${query.documentGeneration}`,
-          )
-        : undefined;
-    let command:
-      | { title: string; command: string; arguments: SourceSelection[] }
-      | undefined;
-    if (target)
-      command = {
-        title: '코드 참조 열기',
-        command: 'codocs.openSource',
-        arguments: JSON.parse(
-          decodeURIComponent(target.slice(target.indexOf('?') + 1)),
-        ) as SourceSelection[],
-      };
-    return [
-      {
-        position: { line: 0, character: 0 },
-        label: [{ value, ...(command ? { command } : {}) }],
-        tooltip: { kind: 'markdown', value: await this.render(owner, query) },
-        paddingRight: true,
-      },
-    ];
+    return {
+      position,
+      label: [{ value }],
+      tooltip: { kind: 'markdown', value: await this.render(owner, query) },
+      ...(afterKey ? { paddingLeft: true } : { paddingRight: true }),
+    };
   }
   /** 코드 수집과 별개인 저장 문서 탐색 완료 여부를 같은 세대로 확인한다. */
   async documentComplete(

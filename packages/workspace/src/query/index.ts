@@ -2400,16 +2400,13 @@ export class WorkspaceQuerySession {
     await this.#codeIndex?.closeBuffer(sourcePath);
   }
 
-  /** 겹친 저장 행 구간의 정확한 코드 출현 합집합이다. */
-  async codeReferencesForRows(
+  /** 지정한 섹션을 가리키는 코드 출현 목록이다. */
+  async codeReferencesForSection(
     targetPath: string,
-    startLine: number,
-    endLine = startLine,
+    section: string,
   ): Promise<WorkspaceCodeReferenceQuery> {
     return (
-      (await (
-        await this.#codeReferences()
-      )?.reverse(targetPath, { startLine, endLine })) ?? {
+      (await (await this.#codeReferences())?.reverse(targetPath, section)) ?? {
         ...this.#unavailableCodeSnapshot(),
         unique: false,
         absent: false,
@@ -2417,7 +2414,7 @@ export class WorkspaceQuerySession {
     );
   }
 
-  /** 행 연결을 제외한 문서 전체 코드 출현만 제공한다. */
+  /** 섹션 없는 문서 전체 표기의 코드 출현만 제공한다. */
   async codeReferencesForDocument(
     targetPath: string,
   ): Promise<WorkspaceCodeReferenceQuery> {

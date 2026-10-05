@@ -7,13 +7,9 @@ function meta(id, name, parent) {
   return `_codocs:\n  id: ${id}\n  name: ${name}\n${parents}`;
 }
 
-/** 실제 행 번호 11·12를 가진 열네 행 문서를 만든다. 다섯째 행부터 본문이며 마지막은 줄바꿈 뒤 빈 행이다. */
-function rowsDocument(id, name) {
-  const rows = Array.from(
-    { length: 10 },
-    (_, index) => `  ${name} row ${String(index + 5).padStart(2, '0')}`,
-  );
-  return `${meta(id, name)}body: |\n${rows.join('\n')}\n`;
+/** 넷째 행부터 섹션마다 한 줄 본문을 둔 시험 문서를 만든다. 첫 섹션 키가 실제 넷째 행(0부터 3)에 놓인다. */
+function sectionDocument(id, name, ...sections) {
+  return `${meta(id, name)}${sections.map((section) => `${section}: Policy body\n`).join('')}`;
 }
 
 /** 코드 파일의 둘째 행에 명시 표기를 둔 시험 원문을 만든다. */
@@ -69,82 +65,93 @@ export function uiFiles() {
       'Nested workspace body',
     ),
     // 코드 참조 이동: 기존 ID·이름·경로와 겹치지 않는 별도 문서와 코드만 사용한다.
-    '.codocs/navigation-target.yaml': rowsDocument(
+    '.codocs/navigation-target.yaml': sectionDocument(
       'navigation-target',
       'Navigation Target',
+      'Refund Policy',
     ),
     'navigation/explicit-whole.java': codeMarker(
       'ExplicitWhole',
       '@codocs [[Navigation Target]]',
     ),
-    'navigation/explicit-row.java': codeMarker(
-      'ExplicitRow',
+    'navigation/explicit-section.java': codeMarker(
+      'ExplicitSection',
+      '@codocs [[Navigation Target:Refund Policy]]',
+    ),
+    'navigation/explicit-suffix.java': codeMarker(
+      'ExplicitSuffix',
       '@codocs [[Navigation Target]]#L11',
     ),
-    'navigation/explicit-range.java': codeMarker(
-      'ExplicitRange',
-      '@codocs [[Navigation Target]]#L11-L12',
-    ),
-    '.codocs/dirty-nav-target.yaml': rowsDocument(
+    '.codocs/dirty-nav-target.yaml': sectionDocument(
       'dirty-nav-target',
       'Dirty Nav Target',
+      'Refund Policy',
     ),
-    'navigation/dirty-range.java': codeMarker(
-      'DirtyRange',
-      '@codocs [[Dirty Nav Target]]#L11-L12',
+    'navigation/dirty-section.java': codeMarker(
+      'DirtySection',
+      '@codocs [[Dirty Nav Target:Refund Policy]]',
     ),
     'navigation/invalid.java': codeMarker('Invalid', '@codocs [[Absent]]'),
+    'navigation/missing-section.java': codeMarker(
+      'MissingSection',
+      '@codocs [[Navigation Target:Absent Section]]',
+    ),
     'navigation/recover.java': codeMarker(
       'Recover',
       '@codocs [[Recovered Nav Target]]',
     ),
-    '.codocs/rejected-nav-target.yaml': rowsDocument(
+    '.codocs/rejected-nav-target.yaml': sectionDocument(
       'rejected-nav-target',
       'Rejected Nav Target',
+      'Refund Policy',
     ),
-    'navigation/rejected-range.java': codeMarker(
-      'RejectedRange',
-      '@codocs [[Rejected Nav Target]]#L11-L12',
+    'navigation/rejected-section.java': codeMarker(
+      'RejectedSection',
+      '@codocs [[Rejected Nav Target:Refund Policy]]',
     ),
-    '.codocs/reverse-single.yaml': inlineDocument(
+    '.codocs/reverse-single.yaml': sectionDocument(
       'reverse-single',
       'Reverse Single',
-      'Reverse single row',
+      'Single Policy',
     ),
     'navigation/reverse-single.java': codeMarker(
       'ReverseSingle',
-      '@codocs [[Reverse Single]]#L4',
+      '@codocs [[Reverse Single:Single Policy]]',
     ),
-    '.codocs/reverse-recreate.yaml': inlineDocument(
+    '.codocs/reverse-recreate.yaml': sectionDocument(
       'reverse-recreate',
       'Reverse Recreate',
-      'Reverse recreate row',
+      'Recreate Policy',
     ),
     'navigation/recreate/reverse-recreate.java': codeMarker(
       'ReverseRecreate',
-      '@codocs [[Reverse Recreate]]#L4',
+      '@codocs [[Reverse Recreate:Recreate Policy]]',
     ),
-    '.codocs/reverse-multiple.yaml': inlineDocument(
+    '.codocs/reverse-multiple.yaml': sectionDocument(
       'reverse-multiple',
       'Reverse Multiple',
-      'Reverse multiple row',
+      'Multiple Policy',
     ),
     'navigation/reverse-multiple-impl.java': codeMarker(
       'ReverseMultipleImpl',
-      '@codocs [[Reverse Multiple]]#L4',
+      '@codocs [[Reverse Multiple:Multiple Policy]]',
     ),
     'navigation/reverse-multiple-test.java': codeMarker(
       'ReverseMultipleTest',
-      '@codocs [[Reverse Multiple]]#L4',
+      '@codocs [[Reverse Multiple:Multiple Policy]]',
     ),
-    '.codocs/reverse-overlap.yaml': inlineDocument(
-      'reverse-overlap',
-      'Reverse Overlap',
-      'Overlap row [[Direct]] tail',
+    '.codocs/reverse-name.yaml': sectionDocument(
+      'reverse-name',
+      'Reverse Name',
+      'Name Policy',
     ),
-    'navigation/reverse-overlap.java': codeMarker(
-      'ReverseOverlap',
-      '@codocs [[Reverse Overlap]]#L4',
+    'navigation/reverse-name.java': codeMarker(
+      'ReverseName',
+      '@codocs [[Reverse Name]]',
+    ),
+    'navigation/reverse-name-section.java': codeMarker(
+      'ReverseNameSection',
+      '@codocs [[Reverse Name:Name Policy]]',
     ),
     '.codocs/whole-single.yaml': inlineDocument(
       'whole-single',

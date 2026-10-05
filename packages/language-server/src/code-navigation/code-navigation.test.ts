@@ -3,13 +3,12 @@ import { CodeNavigation, type CodeOwner, type CodeSession } from './index.js';
 import { codeCollectionStatuses, codeFileReasons } from '@codocs/workspace';
 import type { WorkspaceCodeReferenceQuery } from '@codocs/workspace';
 import { codeCollectionMessages } from './domain-values.js';
-import type { DocumentLink } from 'vscode-languageserver/node.js';
 const ownerBase = {
   uri: 'file:///fixture/.codocs/target.yaml',
   path: '.codocs/target.yaml',
   rootPath: '/fixture',
   version: 1,
-  text: 'id: target',
+  text: '_codocs:\n  id: target\n  name: 대상\n',
 };
 describe('완료되지 않은 코드 수집 표현', () => {
   it.each([
@@ -158,7 +157,7 @@ describe('코드 변경 감시 실패의 표현', () => {
 });
 
 describe('미완료 단일 출현과 저장 문서 탐색', () => {
-  it('수집 중 확인 1개는 이전 결과처럼 개별 tooltip 링크와 단일 command를 제공한다', async () => {
+  it('수집 중 확인 1개는 클릭 명령 없이 개수 Hint와 개별 tooltip 링크를 제공한다', async () => {
     const occurrence = {
       occurrenceId: 'one',
       sourcePath: 'source.ts',
@@ -207,7 +206,7 @@ describe('미완료 단일 출현과 저장 문서 탐색', () => {
     );
     expect(
       (hints[0]!.label as { command?: unknown }[])[0]!.command,
-    ).toBeDefined();
+    ).toBeUndefined();
   });
   it('코드 수집 완료여도 저장 문서 탐색이 partial이면 0개를 연결 없음으로 확정하지 않는다', async () => {
     const query: WorkspaceCodeReferenceQuery = {
@@ -268,8 +267,13 @@ describe('검색 제외 후 같은 buffer의 재포함', () => {
   });
 });
 
-/** 한 행 범위를 가진 단일 출현 fixture다. */
-const rowOccurrence = {
+/** 섹션 키가 있는 문서 원문이다. */
+const sectionText =
+  '_codocs:\n  id: target\n  name: 대상\n환불정책:\n  본문: 값\n';
+const nameOffset = sectionText.indexOf('대상');
+const keyOffset = sectionText.indexOf('환불정책');
+/** 단일 출현 fixture다. */
+const codeOccurrence = {
   occurrenceId: 'one',
   sourcePath: 'source.ts',
   sourceRevision: 'disk:1',
@@ -280,31 +284,36 @@ const rowOccurrence = {
     },
   },
   target: { path: '.codocs/target.yaml' },
-  destination: { kind: 'rows', startLine: 1, endLine: 4 },
 };
-/** 상태와 출현 수를 정한 역참조 session과 호출 기록을 만든다. */
+/** 상태와 출현 목록을 정한 역참조 session과 호출 기록을 만든다. */
 function reverseSession(
   fields: Partial<WorkspaceCodeReferenceQuery>,
   occurrences: unknown[],
+  sections: Record<string, unknown[]> = {},
 ) {
-  const query = {
+  /** 출현 목록으로 질의 결과를 만든다. */
+  const queryOf = (items: unknown[]) => ({
     status: codeCollectionStatuses.complete,
     hasCompletedCollection: true,
     codeGeneration: 1,
     documentGeneration: 1,
-    occurrences,
-    confirmedCount: occurrences.length,
+    occurrences: items,
+    confirmedCount: items.length,
     failures: [],
     unique: false,
-    absent: false,
+    absent: items.length === 0,
     ...fields,
-  };
+  });
   const session = {
     setCodeReferenceOwner: vi.fn(),
     updateCodeBuffer: vi.fn(),
-    codeReferenceSnapshot: vi.fn().mockResolvedValue(query),
-    codeReferencesForRows: vi.fn().mockResolvedValue(query),
-    codeReferencesForDocument: vi.fn().mockResolvedValue(query),
+    codeReferenceSnapshot: vi.fn().mockResolvedValue(queryOf(occurrences)),
+    codeReferencesForSection: vi
+      .fn()
+      .mockImplementation((_path: string, section: string) =>
+        Promise.resolve(queryOf(sections[section] ?? occurrences)),
+      ),
+    codeReferencesForDocument: vi.fn().mockResolvedValue(queryOf(occurrences)),
     getByPaths: vi
       .fn()
       .mockResolvedValue({ success: true, scanStatus: 'complete' }),
@@ -312,53 +321,100 @@ function reverseSession(
   };
   return { session: session as unknown as CodeSession, raw: session };
 }
-/** [start, end) 열 범위의 YAML 링크 fixture를 만든다. */
-function yamlLink(line: number, start: number, end: number): DocumentLink {
-  return {
-    range: {
-      start: { line, character: start },
-      end: { line, character: end },
-    },
-  };
-}
-describe('역참조 밑줄의 공백 제외', () => {
-  const text = '  본문 하나  \n\t\n  [[A]]  [[B]]  \na [[A]] b';
-  it('들여쓰기·링크 사이·행 끝 공백에는 링크를 만들지 않고 본문 구간은 유지한다', async () => {
-    const { session } = reverseSession({}, [rowOccurrence]);
-    const links = await new CodeNavigation().reverseLinks(
-      { ...ownerBase, text, session },
-      [yamlLink(2, 2, 7), yamlLink(2, 9, 14), yamlLink(3, 2, 7)],
-    );
-    expect(links.map((link) => link.range)).toEqual([
-      { start: { line: 0, character: 2 }, end: { line: 0, character: 7 } },
-      { start: { line: 3, character: 0 }, end: { line: 3, character: 1 } },
-      { start: { line: 3, character: 8 }, end: { line: 3, character: 9 } },
-    ]);
-  });
-  it.each([
-    codeCollectionStatuses.incomplete,
-    codeCollectionStatuses.collecting,
-  ])(
-    '상태 %s의 단일 출현도 완료처럼 밑줄 직접 링크를 만든다',
-    async (status) => {
-      const { session } = reverseSession({ status }, [rowOccurrence]);
-      const links = await new CodeNavigation().reverseLinks(
-        { ...ownerBase, text, session },
-        [],
+describe('섹션 키와 name 값의 역참조 호버', () => {
+  /** 같은 형식의 목록에서 항목 줄만 센다. */
+  const itemLines = (text: string) =>
+    text.split('\n').filter((line) => line.startsWith('- ['));
+  it.each([1, 3])(
+    '섹션 키 위 호버는 출현 %i개를 같은 목록 형식으로 보여준다',
+    async (count) => {
+      const items = Array.from({ length: count }, (_, index) => ({
+        ...codeOccurrence,
+        occurrenceId: String(index),
+      }));
+      const { session, raw } = reverseSession({}, [], { 환불정책: items });
+      const text = await new CodeNavigation().reverseHover(
+        { ...ownerBase, text: sectionText, session },
+        keyOffset,
       );
-      expect(links.length).toBeGreaterThan(0);
+      expect(raw.codeReferencesForSection).toHaveBeenCalledWith(
+        '.codocs/target.yaml',
+        '환불정책',
+      );
+      expect(text.split('\n')[0]).toBe(`연결된 코드 · ${count}곳`);
+      expect(itemLines(text)).toHaveLength(count);
+      expect(text).toContain('command:codocs.openSource?');
     },
   );
-  it('출현이 둘이면 밑줄 링크를 만들지 않는다', async () => {
-    const { session } = reverseSession({}, [
-      rowOccurrence,
-      { ...rowOccurrence, occurrenceId: 'two' },
-    ]);
+  it('name 값 위 호버는 문서 전체 참조 목록을 보여준다', async () => {
+    const { session, raw } = reverseSession({}, [codeOccurrence]);
+    const text = await new CodeNavigation().reverseHover(
+      { ...ownerBase, text: sectionText, session },
+      nameOffset,
+    );
+    expect(raw.codeReferencesForDocument).toHaveBeenCalled();
+    expect(raw.codeReferencesForSection).not.toHaveBeenCalled();
+    expect(itemLines(text)).toHaveLength(1);
+  });
+  it('섹션 키와 name 값이 아닌 위치의 호버는 조회 없이 비어 있다', async () => {
+    const { session, raw } = reverseSession({}, [codeOccurrence]);
+    const text = await new CodeNavigation().reverseHover(
+      { ...ownerBase, text: sectionText, session },
+      sectionText.indexOf('값'),
+    );
+    expect(text).toBe('');
+    expect(raw.codeReferencesForSection).not.toHaveBeenCalled();
+    expect(raw.codeReferencesForDocument).not.toHaveBeenCalled();
+  });
+  it('섹션 키 위인데 참조 항목이 없으면 빈 문자열이다', async () => {
+    const { session } = reverseSession({}, [], { 환불정책: [] });
     expect(
-      await new CodeNavigation().reverseLinks(
-        { ...ownerBase, text, session },
-        [],
+      await new CodeNavigation().reverseHover(
+        { ...ownerBase, text: sectionText, session },
+        keyOffset,
       ),
+    ).toBe('');
+  });
+});
+describe('개수 Hint', () => {
+  it('섹션 키 끝에 클릭 명령 없는 코드 N곳 Hint를 표시한다', async () => {
+    const items = [codeOccurrence, { ...codeOccurrence, occurrenceId: 'two' }];
+    const { session } = reverseSession({}, [], { 환불정책: items });
+    const hints = await new CodeNavigation().hints({
+      ...ownerBase,
+      text: sectionText,
+      session,
+    });
+    expect(hints).toHaveLength(1);
+    expect(hints[0]).toMatchObject({
+      position: { line: 3, character: '환불정책'.length },
+      label: [{ value: '코드 2곳' }],
+    });
+    expect(
+      (hints[0]!.label as { command?: unknown }[])[0]!.command,
+    ).toBeUndefined();
+  });
+  it('문서 전체 참조가 있으면 첫 행에 코드 N곳 Hint를 표시한다', async () => {
+    const { session } = reverseSession({}, [codeOccurrence], { 환불정책: [] });
+    const hints = await new CodeNavigation().hints({
+      ...ownerBase,
+      text: sectionText,
+      session,
+    });
+    expect(hints).toHaveLength(1);
+    expect(hints[0]).toMatchObject({
+      position: { line: 0, character: 0 },
+      label: [{ value: '코드 1곳' }],
+    });
+  });
+  it('참조가 없는 섹션에는 Hint를 표시하지 않는다', async () => {
+    const { session } = reverseSession({}, [], { 환불정책: [] });
+    expect(
+      await new CodeNavigation().hints({
+        ...ownerBase,
+        text: sectionText,
+        session,
+      }),
     ).toEqual([]);
   });
 });
@@ -368,15 +424,14 @@ describe('최초 수집 중의 표현', () => {
     status: codeCollectionStatuses.collecting,
     hasCompletedCollection: false,
   };
-  it('최초 수집 중에는 밑줄·@ 링크·진단을 만들지 않는다', async () => {
-    const { session, raw } = reverseSession(initial, [rowOccurrence]);
+  it('최초 수집 중에는 @ 링크와 진단을 만들지 않는다', async () => {
+    const { session, raw } = reverseSession(initial, [codeOccurrence]);
     const owner: CodeOwner = {
       ...ownerBase,
       path: '.codocs/target.yaml',
       session,
     };
     const navigation = new CodeNavigation();
-    expect(await navigation.reverseLinks(owner, [])).toEqual([]);
     expect(await navigation.forward(owner)).toEqual({
       links: [],
       diagnostics: [],
@@ -384,10 +439,10 @@ describe('최초 수집 중의 표현', () => {
     expect(raw.captureCodeReference).not.toHaveBeenCalled();
   });
   it('최초 수집 중 호버와 상단 Hint는 개별 링크 없이 수집 중 안내만 보인다', async () => {
-    const { session, raw } = reverseSession(initial, [rowOccurrence]);
+    const { session, raw } = reverseSession(initial, [codeOccurrence]);
     const navigation = new CodeNavigation();
-    const owner: CodeOwner = { ...ownerBase, session };
-    expect(await navigation.reverseHover(owner, 0)).toBe(
+    const owner: CodeOwner = { ...ownerBase, text: sectionText, session };
+    expect(await navigation.reverseHover(owner, keyOffset)).toBe(
       codeCollectionMessages.initialLabel,
     );
     const hints = await navigation.hints(owner);
@@ -420,11 +475,11 @@ describe('재수집과 불완전 수집의 호버 표현', () => {
   it('완료 뒤 재수집 중에는 이전 결과 링크를 두고 수집 중을 덧붙인다', async () => {
     const { session } = reverseSession(
       { status: codeCollectionStatuses.collecting },
-      [rowOccurrence],
+      [codeOccurrence],
     );
     const text = await new CodeNavigation().reverseHover(
-      { ...ownerBase, session },
-      0,
+      { ...ownerBase, text: sectionText, session },
+      keyOffset,
     );
     expect(text).toContain('command:codocs.openSource?');
     expect(text).toContain('수집 중');
@@ -441,11 +496,11 @@ describe('재수집과 불완전 수집의 호버 표현', () => {
           },
         ],
       },
-      [rowOccurrence],
+      [codeOccurrence],
     );
     const text = await new CodeNavigation().reverseHover(
-      { ...ownerBase, session },
-      0,
+      { ...ownerBase, text: sectionText, session },
+      keyOffset,
     );
     expect(text).toContain('command:codocs.openSource?');
     expect(text).toContain('수집 불완전');

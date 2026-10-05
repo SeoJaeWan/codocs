@@ -1,12 +1,10 @@
 import {
+  getSectionKeyRange,
   resolveReference,
   type Catalog,
   type ReferenceCandidate,
 } from '../catalog/index.js';
-import {
-  referenceResolutionStatuses,
-  scanStatuses,
-} from '../catalog/domain-values.js';
+import { referenceResolutionStatuses } from '../catalog/domain-values.js';
 import { offsetToPosition } from '../parser/index.js';
 import { parseReferenceComponents } from '../references/index.js';
 import type { OffsetRange, SourceRange } from '../diagnostics/index.js';
@@ -17,13 +15,14 @@ import {
 } from './domain-values.js';
 export * from './domain-values.js';
 
-/** 행 번호는 저장 YAML의 1부터 시작하며 끝 행을 포함한다. */
+/** 표기가 가리키는 저장 문서의 위치다. 섹션은 저장 색인의 섹션 키 위치를 그대로 담는다. */
 export type CodeReferenceDestination =
   | { kind: typeof codeReferenceDestinationKinds.document }
   | {
-      kind: typeof codeReferenceDestinationKinds.rows;
-      startLine: number;
-      endLine: number;
+      kind: typeof codeReferenceDestinationKinds.section;
+      section: string;
+      range: SourceRange;
+      markerText: string;
     };
 /** 무효 표기도 IDE에서 전체 span을 가로채도록 보존한다. */
 export interface CodeReferenceMarker {
@@ -32,24 +31,18 @@ export interface CodeReferenceMarker {
   range: SourceRange;
   syntax: (typeof codeReferenceSyntaxes)[keyof typeof codeReferenceSyntaxes];
   name?: string;
-  /** 표기에 적은 섹션 이름이다. 코드 참조의 섹션 해석은 지원하지 않으므로 후보 없음으로 둔다. */
+  /** 표기에 적은 섹션 이름이다. 섹션이 없으면 문서 전체를 가리킨다. */
   section?: string;
-  destination?: CodeReferenceDestination;
-  rowError?:
-    | typeof codeReferenceStatuses.invalidRows
-    | typeof codeReferenceStatuses.reversedRows;
 }
-/** 이름 후보와 범위 오류를 분리한 순수 해석 결과다. */
+/** 이름 후보와 섹션 확인을 분리한 순수 해석 결과다. */
 export interface CodeReferenceResolution {
   marker: CodeReferenceMarker;
   status: (typeof codeReferenceStatuses)[keyof typeof codeReferenceStatuses];
   candidates: readonly ReferenceCandidate[];
   target?: ReferenceCandidate;
+  /** 섹션 표기가 확인됐을 때만 있는 섹션 이름이다. */
+  section?: string;
   destination?: CodeReferenceDestination;
-}
-/** 저장 원문의 실제 행 수다. 마지막 줄바꿈 뒤 빈 실제 행도 유지한다. */
-export function codeReferenceLineCount(text: string): number {
-  return text.split(/\r\n|\r|\n/u).length;
 }
 /** 언어·YAML 필드·자기 참조 제한 없이 전체 텍스트의 명시 표기를 추출한다. */
 export function extractCodeReferences(
@@ -64,36 +57,10 @@ export function extractCodeReferences(
     const lineEnd = lineEndMatch ? bodyStart + lineEndMatch.index : text.length;
     const closing = text.indexOf(']]', bodyStart);
     const closed = closing >= 0 && closing < lineEnd;
-    let end = closed ? closing + 2 : lineEnd;
+    const end = closed ? closing + 2 : lineEnd;
     const parts = closed
       ? parseReferenceComponents(text.slice(bodyStart, closing))
       : undefined;
-    let destination: CodeReferenceDestination = {
-      kind: codeReferenceDestinationKinds.document,
-    };
-    let rowError: CodeReferenceMarker['rowError'];
-    if (closed && text[end] === '#') {
-      const suffix =
-        /^#[^\s"'`<>(){}\[\],;]*/u.exec(text.slice(end))?.[0] ?? '#';
-      end += suffix.length;
-      const rows = /^#L([1-9]\d*)(?:-L([1-9]\d*))?$/u.exec(suffix);
-      const startLine = Number(rows?.[1]);
-      const endLine = Number(rows?.[2] ?? rows?.[1]);
-      if (
-        !rows ||
-        !Number.isSafeInteger(startLine) ||
-        !Number.isSafeInteger(endLine)
-      )
-        rowError = codeReferenceStatuses.invalidRows;
-      else if (endLine < startLine)
-        rowError = codeReferenceStatuses.reversedRows;
-      else
-        destination = {
-          kind: codeReferenceDestinationKinds.rows,
-          startLine,
-          endLine,
-        };
-    }
     markers.push({
       text: text.slice(start, end),
       offsetRange: { start, end },
@@ -105,7 +72,6 @@ export function extractCodeReferences(
         ? codeReferenceSyntaxes.valid
         : codeReferenceSyntaxes.invalid,
       ...(parts ?? {}),
-      ...(rowError ? { rowError } : { destination }),
     });
   }
   return markers;
@@ -120,49 +86,40 @@ export function resolveCodeReference(
     marker.name === undefined
   )
     return { marker, status: codeReferenceStatuses.invalid, candidates: [] };
-  if (marker.rowError)
-    return { marker, status: marker.rowError, candidates: [] };
-  // 코드 참조의 섹션 지원은 별도 이슈가 맡는다. 섹션을 적은 표기는 후보를 찾지 않는다.
-  if (marker.section !== undefined)
-    return {
-      marker,
-      status:
-        catalog.status === scanStatuses.complete
-          ? codeReferenceStatuses.missing
-          : codeReferenceStatuses.unconfirmed,
-      candidates: [],
-    };
-  const resolution = resolveReference(catalog, { name: marker.name });
+  const resolution = resolveReference(catalog, {
+    name: marker.name,
+    ...(marker.section !== undefined ? { section: marker.section } : {}),
+  });
   if (
     resolution.status !== referenceResolutionStatuses.resolved ||
     !resolution.target
   )
     return {
       marker,
-      status:
-        resolution.status === referenceResolutionStatuses.ambiguous
-          ? codeReferenceStatuses.ambiguous
-          : resolution.status === referenceResolutionStatuses.missing
-            ? codeReferenceStatuses.missing
-            : codeReferenceStatuses.unconfirmed,
+      status: unresolvedStatus(resolution.status),
       candidates: resolution.candidates,
     };
-  const destination = marker.destination!;
-  const source = catalog.documents.get(resolution.target.path)?.observation
-    .parsed.source;
-  if (source === undefined)
+  const document = catalog.documents.get(resolution.target.path);
+  if (!document)
     return {
       marker,
       status: codeReferenceStatuses.unconfirmed,
       candidates: resolution.candidates,
     };
-  if (
-    destination.kind === codeReferenceDestinationKinds.rows &&
-    destination.endLine > codeReferenceLineCount(source)
-  )
+  if (marker.section === undefined)
     return {
       marker,
-      status: codeReferenceStatuses.outOfBounds,
+      status: codeReferenceStatuses.resolved,
+      candidates: resolution.candidates,
+      target: resolution.target,
+      destination: { kind: codeReferenceDestinationKinds.document },
+    };
+  const key = getSectionKeyRange(document, marker.section);
+  const parsed = document.observation.parsed;
+  if (!key || !parsed.success)
+    return {
+      marker,
+      status: codeReferenceStatuses.unconfirmed,
       candidates: resolution.candidates,
     };
   return {
@@ -170,6 +127,30 @@ export function resolveCodeReference(
     status: codeReferenceStatuses.resolved,
     candidates: resolution.candidates,
     target: resolution.target,
-    destination,
+    section: marker.section,
+    destination: {
+      kind: codeReferenceDestinationKinds.section,
+      section: marker.section,
+      range: key.range,
+      markerText: parsed.source.slice(
+        key.offsetRange.start,
+        key.offsetRange.end,
+      ),
+    },
   };
+}
+/** 문서 해석 결과 중 확정되지 않은 상태를 코드 참조 상태로 옮긴다. */
+function unresolvedStatus(
+  status: (typeof referenceResolutionStatuses)[keyof typeof referenceResolutionStatuses],
+): CodeReferenceResolution['status'] {
+  switch (status) {
+    case referenceResolutionStatuses.ambiguous:
+      return codeReferenceStatuses.ambiguous;
+    case referenceResolutionStatuses.missing:
+      return codeReferenceStatuses.missing;
+    case referenceResolutionStatuses.missingSection:
+      return codeReferenceStatuses.missingSection;
+    default:
+      return codeReferenceStatuses.unconfirmed;
+  }
 }

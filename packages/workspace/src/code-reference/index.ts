@@ -3,7 +3,6 @@ import { calculateRevision } from '../revision/index.js';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  codeReferenceDestinationKinds,
   codeReferenceStatuses,
   scanStatuses,
   extractCodeReferences,
@@ -307,9 +306,6 @@ export class WorkspaceCodeReferenceIndex {
             start: { ...cachedMarker.range.start },
             end: { ...cachedMarker.range.end },
           },
-          ...(cachedMarker.destination
-            ? { destination: { ...cachedMarker.destination } }
-            : {}),
         };
         const resolution: CodeReferenceResolution = this.#catalog
           ? resolveCodeReference(this.#catalog, marker)
@@ -348,23 +344,21 @@ export class WorkspaceCodeReferenceIndex {
       ],
     };
   }
-  /** 1부터 시작하는 행 또는 문서 전체에 연결된 정확한 출현 합집합이다. */
+  /** 대상 문서의 지정한 섹션 또는 섹션 없는 문서 전체 표기에 연결된 정확한 출현 목록이다. */
   async reverse(
     targetPath: string,
-    rows?: { startLine: number; endLine: number },
+    section?: string,
   ): Promise<WorkspaceCodeReferenceQuery> {
     const relative = codeFileRelativePath(this.projectRoot, targetPath);
     const snapshot = await this.snapshot();
     const occurrences = snapshot.occurrences.filter(
-      /** 저장 대상과 요청한 실제 행의 교집합만 고른다. */ (item) =>
+      /** 저장 대상과 요청한 섹션(미지정이면 문서 전체)이 같은 출현만 고른다. */ (
+        item,
+      ) =>
         item.status === codeReferenceStatuses.resolved &&
         codeFileRelativePath(this.projectRoot, item.target?.path ?? '') ===
           relative &&
-        (rows
-          ? item.destination?.kind === codeReferenceDestinationKinds.rows &&
-            item.destination.startLine <= rows.endLine &&
-            item.destination.endLine >= rows.startLine
-          : item.destination?.kind === codeReferenceDestinationKinds.document),
+        item.section === section,
     );
     const displayable =
       snapshot.hasCompletedCollection !== false &&

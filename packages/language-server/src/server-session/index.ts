@@ -99,7 +99,7 @@ export interface WorkspaceSessionBoundary extends Partial<
     | 'setCodeReferenceOwner'
     | 'updateCodeBuffer'
     | 'codeReferenceSnapshot'
-    | 'codeReferencesForRows'
+    | 'codeReferencesForSection'
     | 'codeReferencesForDocument'
     | 'captureCodeReference'
     | 'confirmCodeReference'
@@ -400,13 +400,12 @@ export class LanguageServerSession {
     };
   }
 
-  /** 명시 링크를 우선하고 YAML 이름 링크와 단일 역참조를 함께 제공한다. */
+  /** 명시 링크를 우선하고 YAML 이름 링크를 함께 제공한다. */
   async documentLinks(
     uri: string,
     cancellation?: CancellationToken,
   ): Promise<DocumentLink[]> {
     const document = this.documents.get(uri);
-    const workspace = this.#workspaceForDocument(uri);
     if (!document) return [];
     const owner = this.#codeOwner(uri);
     if (owner) await this.#prepareCodeBuffers(owner.session);
@@ -421,16 +420,12 @@ export class LanguageServerSession {
           this.#code.markerAt(owner, document.offsetAt(link.range.start))
         ),
     );
-    const reverse =
-      owner && workspace && this.#isKnowledgeDocument(uri, workspace)
-        ? await this.#code.reverseLinks(owner, [...yaml, ...forward.links])
-        : [];
     if (
       cancellation?.isCancellationRequested ||
       (owner && !this.#currentCodeOwner(owner))
     )
       return [];
-    return [...forward.links, ...yaml, ...reverse];
+    return [...forward.links, ...yaml];
   }
 
   /** 열린 source들을 같은 프로젝트의 overlay에 먼저 반영한다. */
@@ -450,7 +445,7 @@ export class LanguageServerSession {
     );
   }
 
-  /** 문서 전체 코드 출현은 원문 수정 없이 첫 행 Hint로 제공한다. */
+  /** 문서 전체와 섹션별 코드 출현 개수를 원문 수정 없이 Hint로 제공한다. */
   async inlayHints(
     uri: string,
     cancellation?: CancellationToken,
@@ -895,7 +890,7 @@ export class LanguageServerSession {
       );
       const reverse =
         owner && this.#isKnowledgeDocument(uri, workspace)
-          ? await this.#code.reverseHover(owner, params.position.line)
+          ? await this.#code.reverseHover(owner, offset)
           : '';
       if (
         cancellation?.isCancellationRequested ||
