@@ -1,7 +1,6 @@
-id: codocs-validate
-name: '문서 검증 요청'
-domains:
-  - 'MCP'
+_codocs:
+  id: codocs-validate
+  name: '문서 검증 요청'
 definition: |
   codocs_validate로 지정한 파일 또는 프로젝트 전체의 문서 문제를 확인하는 요청이다.
   단일 데이터의 형식 검사인 [[문서 검증]]과 프로젝트 전체의 충돌·참조 검사를 함께 적용한다.

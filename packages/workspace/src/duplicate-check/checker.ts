@@ -78,7 +78,6 @@ export type DuplicateCheckerOutcome =
 
 /**
  * 문서별 준비 캐시와 최근 검사 결과 한 건을 세션 수명 동안 소유하고 검사를 실행한다.
- * @codocs [[작업 공간:작업 공간 중복 검사]]
  */
 export class WorkspaceDuplicateChecker {
   readonly #cache = new DuplicatePreparationCache();

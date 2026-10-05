@@ -1,7 +1,6 @@
-id: query
-name: '조회'
-domains:
-  - '도구 연동'
+_codocs:
+  id: query
+  name: '조회'
 definition: |
   ## 도구 표면
 

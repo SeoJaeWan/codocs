@@ -37,7 +37,7 @@ export type FolderClientFactory = (
 ) => FolderClientBoundary;
 
 /** 지정 시간 안의 연속 종료만 세어 무한 재시작을 막는다.
- * @codocs [[VS Code:언어 서버 연결]]#L32-L33 */
+ * */
 export class RollingRestartBudget {
   readonly #maximumRestarts: number;
   readonly #windowMilliseconds: number;
@@ -65,7 +65,7 @@ export class RollingRestartBudget {
 }
 
 /** 동적인 workspace folder 목록과 일대일 클라이언트 생명주기를 맞춘다.
- * @codocs [[VS Code:언어 서버 연결]] */
+ * */
 export class WorkspaceClientManager {
   readonly #host: WorkspaceHostBoundary;
   readonly #factory: FolderClientFactory;

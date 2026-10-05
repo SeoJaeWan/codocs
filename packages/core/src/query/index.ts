@@ -23,12 +23,6 @@ import {
   queryDiagnosticMessages,
   referenceDiagnosticCodes,
 } from '../diagnostics/index.js';
-import {
-  documentKinds,
-  documentStatuses,
-  type DocumentKind,
-  type DocumentStatus,
-} from '../validator/domain-values.js';
 import type { JsonValue } from '../validator/index.js';
 import { documentFields, type DocumentField } from '../validator/index.js';
 import { offsetToPosition, parseYaml } from '../parser/index.js';
@@ -40,15 +34,6 @@ import {
 export * from './domain-values.js';
 
 const validId = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
-const kinds = Object.values(documentKinds);
-const statuses = Object.values(documentStatuses);
-
-/** 목록에서 한 문서가 만족해야 하는 AND 조건이다. */
-export interface CatalogListFilters {
-  domain?: string;
-  kind?: DocumentKind;
-  status?: DocumentStatus;
-}
 
 /** 목록에 표시할 수 있는 유일 ID 문서다. */
 export interface CatalogListDocumentItem {
@@ -56,9 +41,6 @@ export interface CatalogListDocumentItem {
   name: string;
   source: { path: string };
   confirmation: CatalogIdentity['confirmation'];
-  domains?: readonly string[];
-  kind?: DocumentKind;
-  status?: DocumentStatus;
   hasErrors: boolean;
   conflict: false;
 }
@@ -85,7 +67,6 @@ export interface CatalogListProjection {
 /** Catalog 진단을 조회 결과에 필요한 관련 경로와 원인까지 확장한다. */
 export interface CatalogQueryDiagnostic extends Diagnostic<DiagnosticCode> {
   relatedPaths?: readonly string[];
-  domain?: string;
   offsetRange?: OffsetRange;
   reason?: ReferenceIdFailureReason;
 }
@@ -216,15 +197,30 @@ function ownValue(value: unknown, key: string | number): unknown {
     : undefined;
 }
 
-/** 특정 최상위 속성에 오류가 없을 때만 목록 메타데이터로 사용한다. */
+/** 두 경로 중 짧은 쪽이 다른 경로의 앞부분이면 같은 필드에 대한 오류로 본다. */
+function overlapsField(
+  fieldPath: readonly (string | number)[],
+  key: DocumentField,
+): boolean {
+  const length = Math.min(fieldPath.length, key.length);
+  return (
+    length > 0 &&
+    key.slice(0, length).every((part, index) => part === fieldPath[index])
+  );
+}
+
+/** 특정 메타데이터 필드에 스키마 오류가 없을 때만 목록 메타데이터로 사용한다. */
 function validField(document: CatalogDocument, key: DocumentField): boolean {
   return !document.documentDiagnostics.some(
     /** 스키마 오류만 목록 메타데이터의 유효성을 막는다. */
     (diagnostic) =>
       diagnostic.severity === diagnosticSeverities.error &&
-      diagnostic.fieldPath?.[0] === key &&
+      diagnostic.fieldPath !== undefined &&
+      overlapsField(diagnostic.fieldPath, key) &&
       diagnostic.code !== catalogDiagnosticCodes.duplicateId &&
-      diagnostic.code !== catalogDiagnosticCodes.duplicateName,
+      diagnostic.code !== catalogDiagnosticCodes.duplicateName &&
+      diagnostic.code !== catalogDiagnosticCodes.parentNotFound &&
+      diagnostic.code !== catalogDiagnosticCodes.parentCycle,
   );
 }
 
@@ -252,74 +248,19 @@ function listIdentity(document: CatalogDocument): boolean {
   );
 }
 
-/** 전체 배열 속성이 유효할 때만 중복을 제거한 작성 순서로 반환한다. */
-function documentDomains(
-  document: CatalogDocument,
-): readonly string[] | undefined {
-  if (!validField(document, documentFields.domains)) return undefined;
-  const value = document.observation.parsed.success
-    ? ownValue(document.observation.parsed.data, documentFields.domains)
-    : undefined;
-  if (
-    !Array.isArray(value) ||
-    value.length === 0 ||
-    value.some(
-      (domain) => typeof domain !== 'string' || domain.trim().length === 0,
-    )
-  )
-    return undefined;
-  return [...new Set(value as string[])];
-}
-
-/** 작성된 선택 열거 속성이 유효할 때만 반환한다. */
-function documentEnum<const Values extends readonly string[]>(
-  document: CatalogDocument,
-  key: typeof documentFields.kind | typeof documentFields.status,
-  values: Values,
-): Values[number] | undefined {
-  if (!validField(document, key) || !document.observation.parsed.success)
-    return undefined;
-  const value = ownValue(document.observation.parsed.data, key);
-  return typeof value === 'string' && values.includes(value)
-    ? value
-    : undefined;
-}
-
-/** 한 파일이 생략하지 않은 모든 목록 조건을 동시에 만족하는지 판별한다. */
-function matchesFilters(
-  document: CatalogDocument,
-  filters: CatalogListFilters,
-): boolean {
-  const domains = documentDomains(document);
-  const kind = documentEnum(document, documentFields.kind, kinds);
-  const status = documentEnum(document, documentFields.status, statuses);
-  return (
-    (filters.domain === undefined ||
-      domains?.includes(filters.domain) === true) &&
-    (filters.kind === undefined || kind === filters.kind) &&
-    (filters.status === undefined || status === filters.status)
-  );
-}
-
-/** Catalog를 ID 오름차순의 전체 목록 snapshot으로 투영한다. @codocs [[조회 투영]]#L13-L23
+/** Catalog를 ID 오름차순의 전체 목록 snapshot으로 투영한다.
  * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
- * @param filters 한 파일이 모두 만족해야 하는 선택 조건이다.
  */
-export function projectCatalogList(
-  catalog: Catalog,
-  filters: CatalogListFilters = {},
-): CatalogListProjection {
+export function projectCatalogList(catalog: Catalog): CatalogListProjection {
   const items: CatalogListItem[] = [];
   for (const [id, indexedPaths] of catalog.idPaths) {
     const paths = [...indexedPaths].sort();
     const matching = paths.flatMap(
-      /** 충돌 경로마다 필터 포함 가능성을 독립적으로 확인한다. */ (path) => {
+      /** 충돌 경로마다 목록에 쓸 수 있는 식별 정보를 독립적으로 확인한다. */ (
+        path,
+      ) => {
         const document = catalog.documents.get(path);
-        return document &&
-          listIdentity(document) &&
-          matchesFilters(document, filters)
-          ? [document]
-          : [];
+        return document && listIdentity(document) ? [document] : [];
       },
     );
     if (!matching.length) continue;
@@ -329,17 +270,11 @@ export function projectCatalogList(
     }
     const document = matching[0];
     if (!document?.name) continue;
-    const domains = documentDomains(document);
-    const kind = documentEnum(document, documentFields.kind, kinds);
-    const status = documentEnum(document, documentFields.status, statuses);
     items.push({
       id,
       name: document.name,
       source: { path: document.path },
       confirmation: document.confirmation,
-      ...(domains ? { domains } : {}),
-      ...(kind ? { kind } : {}),
-      ...(status ? { status } : {}),
       hasErrors: document.diagnostics.some(
         (diagnostic) => diagnostic.severity === diagnosticSeverities.error,
       ),
@@ -353,7 +288,6 @@ export function projectCatalogList(
 /** 진단 입력을 새 읽기 전용 값으로 복사한다. */
 function copyDiagnostic(diagnostic: Diagnostic): CatalogQueryDiagnostic {
   const relatedPaths = ownValue(diagnostic, 'relatedPaths');
-  const domain = ownValue(diagnostic, 'domain');
   const offsetRange = ownValue(diagnostic, 'offsetRange');
   return {
     code: diagnostic.code,
@@ -375,7 +309,6 @@ function copyDiagnostic(diagnostic: Diagnostic): CatalogQueryDiagnostic {
     relatedPaths.every((path) => typeof path === 'string')
       ? { relatedPaths: [...relatedPaths].sort() }
       : {}),
-    ...(typeof domain === 'string' ? { domain } : {}),
     ...(isOffsetRange(offsetRange)
       ? { offsetRange: { start: offsetRange.start, end: offsetRange.end } }
       : {}),
@@ -656,7 +589,7 @@ function cloneJson(
   return { success: true, value: result };
 }
 
-/** 연결 경로에서 유효하고 전역 유일한 ID만 중복 제거해 정렬한다. @codocs [[조회 투영]]#L50-L56 */
+/** 연결 경로에서 유효하고 전역 유일한 ID만 중복 제거해 정렬한다. */
 function externalIds(
   catalog: Catalog,
   identities: readonly CatalogIdentity[],
@@ -751,7 +684,7 @@ function documentResult(
   };
 }
 
-/** 첫 등장 순서로 중복 제거한 1~20개 ID를 독립 결과로 투영한다. @codocs [[조회 투영]]#L25-L32
+/** 첫 등장 순서로 중복 제거한 1~20개 ID를 독립 결과로 투영한다.
  * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
  * @param ids 조회할 ID 목록이다.
  * @param options 같은 원문 시점의 선택적인 경로별 revision이다.
@@ -826,7 +759,7 @@ export function projectCatalogGet(
   return { success: true, results };
 }
 
-/** 발견 경로를 같은 Catalog 관측의 내용·진단·직접/역참조로 투영한다. @codocs [[조회 투영]]#L34-L38 @codocs [[조회 투영]]#L57-L58
+/** 발견 경로를 같은 Catalog 관측의 내용·진단·직접/역참조로 투영한다.
  * @param catalog IO 계층에서 이미 구축한 읽기 전용 Catalog다.
  * @param paths 코드 매칭이 반환한 발견 경로 목록이다.
  * @param options 같은 원문 시점의 선택적인 경로별 revision이다.
@@ -926,7 +859,7 @@ export interface CatalogLiveReferenceResult {
   targets: readonly CatalogPathResult[];
 }
 
-/** 열린 YAML 하나만 파싱하고 기존 디스크 색인으로 이름 참조를 투영한다. @codocs [[조회 투영]]#L40-L46 */
+/** 열린 YAML 하나만 파싱하고 기존 디스크 색인으로 이름 참조를 투영한다. */
 export function projectLiveReferences(
   catalog: Catalog,
   sourcePath: string,

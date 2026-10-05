@@ -98,7 +98,6 @@ function payload(response: unknown): Record<string, unknown> {
   return value.structuredContent;
 }
 
-// @codocs [[MCP:사용 가이드]]#L21-L23
 describe('색인 상태와 독립된 MCP guide', () => {
   it.each(['initialization', 'refresh'])(
     '%s의 실제 읽기가 대기 중이면 guide는 스캔을 추가하지 않고 응답한다',
@@ -106,7 +105,7 @@ describe('색인 상태와 독립된 MCP guide', () => {
       const target = path.join(project, '.codocs/a.yaml');
       await writeFile(
         target,
-        'id: a\nname: A\ndefinition: 본문\ndomains: [test]\n',
+        '_codocs:\n  id: a\n  name: A\ndefinition: 본문\n',
       );
       await connect(createWorkspaceQuerySession({ cwd: project }));
       if (phase === 'refresh')
@@ -156,7 +155,6 @@ describe('색인 상태와 독립된 MCP guide', () => {
 });
 
 describe('MCP 저장 후 색인 복구', () => {
-  // @codocs [[MCP:도구 결과]]#L42-L44
   it('실제 저장 후 두 관측 오류가 나면 저장 revision을 보존하고 refresh로 복구한다', async () => {
     const attempts: number[] = [];
     await connect(
@@ -174,10 +172,8 @@ describe('MCP 저장 후 색인 복구', () => {
           mode: 'create',
           path: '.codocs/a.yaml',
           document: {
-            id: 'a',
-            name: 'A',
+            _codocs: { id: 'a', name: 'A' },
             definition: '저장 원문',
-            domains: ['test'],
           },
         },
       }),
@@ -233,10 +229,8 @@ describe('MCP 저장 후 색인 복구', () => {
             mode: 'create',
             path: '.codocs/a.yaml',
             document: {
-              id: 'a',
-              name: 'A',
+              _codocs: { id: 'a', name: 'A' },
               definition: '느린 관측',
-              domains: ['test'],
             },
           },
         })
@@ -270,7 +264,7 @@ describe('MCP refresh 집계·중복·커서', () => {
   it('전체 탐색 실패 뒤 원인을 해소하면 refresh가 실제 파일을 다시 읽어 복구한다', async () => {
     await writeFile(
       path.join(project, '.codocs/a.yaml'),
-      'id: a\nname: A\ndefinition: 복구 원문\ndomains: [test]\n',
+      '_codocs:\n  id: a\n  name: A\ndefinition: 복구 원문\n',
     );
     io.denied = path.join(project, '.codocs');
     await connect(createWorkspaceQuerySession({ cwd: project }));
@@ -301,16 +295,16 @@ describe('MCP refresh 집계·중복·커서', () => {
   it('전체 재구성하면 파일·목록 항목·진단 수를 구분한다', async () => {
     await writeFile(
       path.join(project, '.codocs/a.yaml'),
-      'id: a\nname: A\ndefinition: 본문\ndomains: [test]\ncustom: true\n',
+      '_codocs:\n  id: a\n  name: A\ndefinition: 본문\ncustom: true\n',
     );
     await writeFile(
       path.join(project, '.codocs/duplicate.yaml'),
-      'id: a\nname: B\ndefinition: 본문\ndomains: [test]\n',
+      '_codocs:\n  id: a\n  name: B\ndefinition: 본문\n',
     );
     await writeFile(path.join(project, '.codocs/broken.yaml'), 'id: [\n');
     await writeFile(
       path.join(project, '.codocs/unidentified.yaml'),
-      'name: 없음\n',
+      '_codocs:\n  name: 없음\n',
     );
     await connect(createWorkspaceQuerySession({ cwd: project }));
     const result = payload(
@@ -322,7 +316,7 @@ describe('MCP refresh 집계·중복·커서', () => {
       countsComplete: true,
       fileCount: 4,
       itemCount: 1,
-      warningCount: 1,
+      warningCount: 0,
     });
     const diagnostics = result.diagnostics as { severity: string }[];
     expect(result.errorCount).toBe(
@@ -341,7 +335,7 @@ describe('MCP refresh 집계·중복·커서', () => {
       for (let n = 0; n < 51; n++)
         await writeFile(
           path.join(project, '.codocs', n + '.yaml'),
-          `id: d-${n}\nname: D${n}\ndefinition: 본문\ndomains: [test]\n`,
+          `_codocs:\n  id: d-${n}\n  name: D${n}\ndefinition: 본문\n`,
         );
       await connect(createWorkspaceQuerySession({ cwd: project }));
       const first = payload(

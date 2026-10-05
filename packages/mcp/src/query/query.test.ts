@@ -64,7 +64,6 @@ function invalidInput() {
   };
 }
 
-// @codocs [[MCP:조회]]
 describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증', () => {
   describe('상세 조회 응답 전달', () => {
     it('유효한 ID 하나를 조회하면 작업 공간의 문서 응답을 그대로 반환한다', async () => {
@@ -78,7 +77,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             conflict: false,
             source: { path: '.codocs/normal.yaml' },
             confirmation: 'confirmed',
-            document: { id: 'normal' },
+            document: { _codocs: { id: 'normal' } },
             references: [],
             referencedBy: [],
             diagnostics: [],
@@ -104,7 +103,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         conflict: false,
         source: { path: '.codocs/normal.yaml' },
         confirmation: 'confirmed',
-        document: { id: 'normal', definition: '본문' },
+        document: { _codocs: { id: 'normal' }, definition: '본문' },
         revision: 'revision',
         references: ['target'],
         referencedBy: ['source'],
@@ -140,7 +139,6 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(backend.get).toHaveBeenCalledWith(input.ids);
     });
 
-    // @codocs [[MCP:조회]]#L32
     it('중복 ID와 정상 문서를 함께 조회하면 충돌 결과의 금지 필드를 덧붙이지 않는다', async () => {
       const response = {
         success: true,
@@ -159,7 +157,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             conflict: false,
             source: { path: '.codocs/normal.yaml' },
             confirmation: 'confirmed',
-            document: { id: 'normal' },
+            document: { _codocs: { id: 'normal' } },
             references: [],
             referencedBy: [],
             diagnostics: [],
@@ -192,7 +190,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             conflict: false,
             source: { path: '.codocs/alpha.yaml' },
             confirmation: 'unconfirmed',
-            document: { id: 'alpha', definition: '이전' },
+            document: { _codocs: { id: 'alpha' }, definition: '이전' },
             revision: 'previous',
             references: [],
             referencedBy: [],
@@ -244,11 +242,11 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
   describe('요청 입력 검증과 backend 호출 방지', () => {
     it.each([
       { name: '알 수 없는 목록 속성', method: 'list', input: { limit: 10 } },
-      { name: '잘못된 종류 값', method: 'list', input: { kind: 'knowledge' } },
+      { name: 'kind 필터', method: 'list', input: { kind: 'policy' } },
       {
-        name: '명시적 undefined 상태',
+        name: 'status 필터',
         method: 'list',
-        input: { status: undefined },
+        input: { status: 'confirmed' },
       },
       { name: '빈 ID 목록', method: 'get', input: { ids: [] } },
       { name: '희소 ID 배열', method: 'get', input: { ids: Array(1) } },
@@ -316,7 +314,6 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(backend.get).not.toHaveBeenCalled();
     });
 
-    // @codocs [[MCP:조회]]#L26-L27
     it('같은 ID 21개를 전달하면 중복 제거한 한 ID로 backend를 호출한다', async () => {
       const response = {
         success: true,
@@ -337,25 +334,15 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
   });
 
   describe('목록 조건과 cursor 응답 전달', () => {
-    it('목록 필터를 전달하면 backend에 같은 조건을 보내고 응답을 반환한다', async () => {
-      const response = {
-        success: true,
-        scanStatus: 'complete',
-        items: [],
-        totalCount: 51,
-        returnedCount: 50,
-        nextCursor: 'cursor',
-      };
-      backend.list.mockResolvedValue(response);
+    it('제거된 domain 인자를 전달하면 backend를 호출하지 않고 입력 오류를 반환한다', async () => {
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { domain: '업무', kind: 'policy', status: 'confirmed' };
 
-      const result = await handlers.codocsList(input);
+      const result = await handlers.codocsList({ domain: '업무' });
 
-      expect(result).toBe(response);
-      expect(backend.list).toHaveBeenCalledWith(input);
+      expect(result).toEqual(invalidInput());
+      expect(backend.list).not.toHaveBeenCalled();
     });
 
     it('partial 목록의 공통 진단을 그대로 전달한다', async () => {
@@ -427,20 +414,6 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         backend as unknown as WorkspaceQuerySession,
       );
       const input = { cursor: 'cursor' };
-
-      const result = await handlers.codocsList(input);
-
-      expect(result).toBe(response);
-      expect(backend.list).toHaveBeenCalledWith(input);
-    });
-
-    it('cursor와 다른 도메인을 함께 전달하면 backend의 입력 오류를 그대로 반환한다', async () => {
-      const response = invalidInput();
-      backend.list.mockResolvedValue(response);
-      const handlers = createCodocsQueryHandlers(
-        backend as unknown as WorkspaceQuerySession,
-      );
-      const input = { cursor: 'cursor', domain: '다른 업무' };
 
       const result = await handlers.codocsList(input);
 
@@ -652,7 +625,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         conflict: false,
         source: { path: '.codocs/json.yaml' },
         confirmation: 'confirmed',
-        document: { id: 'json', definition: large },
+        document: { _codocs: { id: 'json' }, definition: large },
         revision: 'json-revision',
         references: ['raw'],
         referencedBy: [],
@@ -699,7 +672,6 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     expect(serialized).not.toContain('truncated');
   });
 
-  // @codocs [[MCP:본문 중복 검토 요청]]#L10-L11
   it('중복 검토는 draft를 write 입력으로 풀고 cursor·signal을 세션에 전달하며 잘못된 조합은 거부한다', async () => {
     const handlers = createCodocsQueryHandlers(
       backend as unknown as WorkspaceQuerySession,

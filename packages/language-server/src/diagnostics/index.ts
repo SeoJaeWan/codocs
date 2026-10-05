@@ -7,7 +7,7 @@ import type { Diagnostic } from 'vscode-languageserver/node.js';
 /** 진단 재검사의 실패 상태를 밑줄과 별도로 전달하는 알림이다. */
 export const diagnosticStatusMethod = 'codocs/diagnosticStatus';
 
-/** 이전 진단은 과거 관측이며 현재 검사 성공을 의미하지 않는다. @codocs [[IDE 지원]]#L62-L65 */
+/** 이전 진단은 과거 관측이며 현재 검사 성공을 의미하지 않는다. */
 export interface DiagnosticFailure {
   uri?: string;
   reason: string;
@@ -20,7 +20,7 @@ export interface WorkspaceDiagnosticStatus {
   failures: readonly DiagnosticFailure[];
 }
 
-/** 실제 원문에서 확인한 위치만 편집기 진단으로 변환한다. @codocs [[IDE 지원]]#L79-L80 */
+/** 실제 원문에서 확인한 위치만 편집기 진단으로 변환한다. */
 export function toLspDiagnostics(
   items: readonly CoreDiagnostic<string>[],
   sourcePath: string,

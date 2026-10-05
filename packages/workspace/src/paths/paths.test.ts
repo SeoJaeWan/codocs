@@ -40,7 +40,6 @@ afterEach(async () => {
 });
 
 describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
-  /** @codocs [[작업 공간:작업 공간 경로 확인]]#L6-L7 @codocs [[작업 공간:파일 접근 범위]]#L7 @codocs [[작업 공간:발견 경로]]#L6-L7 */
   it('일반 파일은 경로와 접근 범위를 제공한다', async () => {
     const file = path.join(project, '.codocs', '한글.yaml');
     await writeFile(file, '원문');
@@ -57,7 +56,6 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
     }
   });
 
-  /** @codocs [[작업 공간:파일 접근 범위]]#L16 */
   it('일반 폴더의 ..는 허용하되 .codocs 밖 이동은 거부한다', async () => {
     await mkdir(path.join(project, '.codocs', 'nested'));
     await writeFile(path.join(project, '.codocs', 'target.yaml'), '원문');
@@ -115,7 +113,6 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
     });
   });
 
-  /** @codocs [[작업 공간:작업 공간 경로 확인]]#L12-L13 @codocs [[작업 공간:파일 접근 범위]]#L14-L15 */
   it('중간 정션은 대상이 .codocs 안이어도 거부하며 ..로 숨길 수 없다', async () => {
     const target = path.join(project, '.codocs', 'ordinary');
     await mkdir(target);

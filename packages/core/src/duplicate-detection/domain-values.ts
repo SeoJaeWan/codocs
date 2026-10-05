@@ -28,7 +28,7 @@ export type DuplicateExclusionReason =
 
 /** 문서 한 건을 비교에 쓰지 못한 사유다. 본문을 추측해 채우지 않고 입력 단위로 남긴다. @domainValues */
 export const duplicateSkipReasons = {
-  /** 파싱에 실패한 원문이라 definition·examples를 신뢰할 수 없다. */
+  /** 파싱에 실패한 원문이라 section 본문을 신뢰할 수 없다. */
   parseFailed: 'parse_failed',
   /** 준비 결과의 설정 버전이 이번 비교의 설정 버전과 다르다. */
   configVersionMismatch: 'config_version_mismatch',
@@ -47,11 +47,3 @@ export const duplicateComparisonStatuses = {
 /** 원본 상수에서 도출한 DuplicateComparisonStatus 타입이다. */
 export type DuplicateComparisonStatus =
   (typeof duplicateComparisonStatuses)[keyof typeof duplicateComparisonStatuses];
-
-/** 비교하는 본문 필드의 종류다. 필드 경로로 구분하며 다른 필드는 비교하지 않는다. @domainValues */
-export const duplicateFieldNames = {
-  /** 문서의 definition 문자열이다. */
-  definition: 'definition',
-  /** 문서의 examples 배열 원소 문자열이다. */
-  examples: 'examples',
-} as const;

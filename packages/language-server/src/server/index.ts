@@ -5,11 +5,8 @@ import {
   type Connection,
 } from 'vscode-languageserver/node.js';
 import {
-  documentMatchRequestMethod,
   LanguageServerSession,
   workspaceRefreshRequestMethod,
-  type DocumentMatchRequest,
-  type DocumentMatchResponse,
   type WorkspaceRefreshRequest,
 } from '../server-session/index.js';
 import {
@@ -17,6 +14,12 @@ import {
   snapshotChangedMethod,
 } from '../navigation/index.js';
 import { diagnosticStatusMethod } from '../diagnostics/index.js';
+import {
+  applyRenameMethod,
+  planRenameMethod,
+  prepareRenameMethod,
+  type PrepareRenameRequest,
+} from '../rename/index.js';
 
 /** 프로토콜 외 로그를 stdout과 분리하는 최소 로거다. */
 export interface ServerLogger {
@@ -36,7 +39,7 @@ const stderrLogger: ServerLogger = {
   },
 };
 
-/** 기존 Connection에 초기화·동기화·매칭·종료 핸들러를 등록한다. @codocs [[Language Server]] */
+/** 기존 Connection에 초기화·동기화·매칭·종료 핸들러를 등록한다. */
 export function bindLanguageServer(
   connection: Connection,
   session = new LanguageServerSession(),
@@ -46,7 +49,7 @@ export function bindLanguageServer(
   let generation = 0;
   let stopped = false;
   let published = new Set<string>();
-  /** 편집 시 이전 범위를 즉시 지우고 최신 전체 관측만 게시한다. @codocs [[문서 동기화]]#L48-L49 */
+  /** 편집 시 이전 범위를 즉시 지우고 최신 전체 관측만 게시한다. */
   const publish = (changedUri?: string): void => {
     const current = ++generation;
     if (changedUri) {
@@ -89,7 +92,7 @@ export function bindLanguageServer(
         .catch((error: unknown) => logger.error(String(error)));
   };
   session.onDidChange(publish);
-  /** LSP 초기화 요청을 세션에 적용하고 서버 capability를 반환한다. @codocs [[코드 호버]]#L41 @codocs [[코드 자동완성]]#L9-L19 */
+  /** LSP 초기화 요청을 세션에 적용하고 서버 capability를 반환한다. */
   const initialize: Parameters<Connection['onInitialize']>[0] = async (
     params,
   ) => {
@@ -159,6 +162,15 @@ export function bindLanguageServer(
   connection.onRequest(confirmSourceMethod, (input: unknown) =>
     session.confirmSource(input),
   );
+  connection.onRequest(prepareRenameMethod, (request: PrepareRenameRequest) =>
+    session.prepareRename(request),
+  );
+  connection.onRequest(planRenameMethod, (input: unknown) =>
+    session.planRename(input),
+  );
+  connection.onRequest(applyRenameMethod, (input: unknown) =>
+    session.applyRename(input),
+  );
   /** 초기화 완료 뒤 workspace folder 변경 알림을 등록한다. */
   const initialized: Parameters<Connection['onInitialized']>[0] = () => {
     publish();
@@ -173,11 +185,6 @@ export function bindLanguageServer(
     connection.workspace.onDidChangeWorkspaceFolders(changeWorkspaceFolders);
   };
   connection.onInitialized(initialized);
-  connection.onRequest(
-    documentMatchRequestMethod,
-    async (request: DocumentMatchRequest): Promise<DocumentMatchResponse> =>
-      session.matchDocument(request),
-  );
   connection.onRequest(
     workspaceRefreshRequestMethod,
     async (request: WorkspaceRefreshRequest | undefined) =>

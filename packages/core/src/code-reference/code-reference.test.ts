@@ -12,24 +12,18 @@ import {
   codeReferenceSyntaxes,
 } from './index.js';
 
-const source = 'id: target\nname: 대상\ndomains: [업무]\ndefinition: 본문\n';
+const source = '_codocs:\n  id: target\n  name: 대상\ndefinition: 본문\n';
 const target: CatalogDocument = {
   path: '.codocs/target.yaml',
   id: 'target',
   name: '대상',
-  domains: ['업무'],
   confirmation: catalogConfirmations.confirmed,
   observation: {
     path: '.codocs/target.yaml',
     parsed: {
       success: true,
       source,
-      data: {
-        id: 'target',
-        name: '대상',
-        domains: ['업무'],
-        definition: '본문',
-      },
+      data: { _codocs: { id: 'target', name: '대상' }, definition: '본문' },
       fields: [],
       strings: [],
       diagnostics: [],
@@ -47,9 +41,6 @@ const catalog: Catalog = {
   documents: new Map([[target.path, target]]),
   idPaths: new Map([['target', new Set([target.path])]]),
   namePaths: new Map([['대상', new Set([target.path])]]),
-  domainNamePaths: new Map([
-    ['업무', new Map([['대상', new Set([target.path])]])],
-  ]),
 };
 
 describe('extractCodeReferences: 일반 텍스트의 명시 참조', () => {
@@ -70,7 +61,6 @@ describe('extractCodeReferences: 일반 텍스트의 명시 참조', () => {
   });
   it('도메인과 escaped 콜론이 있으면 기존 이름 문법으로 해석한다', () => {
     const markers = extractCodeReferences('@codocs [[업무:이름\\:설명]]#L2-L4');
-    // @codocs [[명시적 코드 참조]]#L24-L26
     expect(markers[0]).toMatchObject({
       name: '이름:설명',
       domain: '업무',
@@ -118,7 +108,6 @@ describe('extractCodeReferences: 일반 텍스트의 명시 참조', () => {
     });
   });
   it('범위가 역전되면 전체 표기와 별도 범위 오류를 보존한다', () => {
-    // @codocs [[명시적 코드 참조]]#L34
     expect(extractCodeReferences('@codocs [[대상]]#L4-L2')[0]).toMatchObject({
       text: '@codocs [[대상]]#L4-L2',
       rowError: codeReferenceStatuses.reversedRows,
@@ -145,7 +134,7 @@ describe('extractCodeReferences: 일반 텍스트의 명시 참조', () => {
 });
 describe('resolveCodeReference: 저장 문서 후보와 실제 행', () => {
   it('자기 문서 이름을 일반 텍스트에서 참조하면 정상 대상을 확인한다', () => {
-    const marker = extractCodeReferences('@codocs [[업무:대상]]#L4')[0]!;
+    const marker = extractCodeReferences('@codocs [[대상]]#L4')[0]!;
     expect(resolveCodeReference(catalog, marker)).toMatchObject({
       status: codeReferenceStatuses.resolved,
       target: { path: target.path },
@@ -154,6 +143,12 @@ describe('resolveCodeReference: 저장 문서 후보와 실제 행', () => {
         startLine: 4,
         endLine: 4,
       },
+    });
+  });
+  it('도메인을 적은 코드 참조는 도메인이 없으므로 대상을 찾지 않는다', () => {
+    const marker = extractCodeReferences('@codocs [[업무:대상]]#L4')[0]!;
+    expect(resolveCodeReference(catalog, marker)).toMatchObject({
+      status: codeReferenceStatuses.missing,
     });
   });
   it('ID만 같은 이름을 참조하면 이름 대상으로 확정하지 않는다', () => {

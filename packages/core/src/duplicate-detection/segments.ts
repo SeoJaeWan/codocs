@@ -165,7 +165,7 @@ function splitWindows(
   return windows;
 }
 
-/** 구간 문자열을 비교용으로 정규화한다. 링크는 표시 문구만 남기고 목적지를 따로 모으며 숫자·부정 표현은 지우지 않는다. @codocs [[본문 중복 탐지]]#L25-L27 */
+/** 구간 문자열을 비교용으로 정규화한다. 링크는 표시 문구만 남기고 목적지를 따로 모으며 숫자·부정 표현은 지우지 않는다. */
 function normalize(text: string): { text: string; destinations: string[] } {
   const destinations: string[] = [];
   const labelOnly = text.replace(

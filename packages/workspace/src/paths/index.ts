@@ -65,7 +65,6 @@ interface CheckedTarget {
 
 /**
  * 입력 경로의 구분자를 나누되 대소문자·유니코드 및 ..를 보존한다.
- * @codocs [[작업 공간:발견 경로]]#L15
  */
 function pathSegments(input: string): string[] {
   return input
@@ -151,8 +150,6 @@ async function checkTarget(
 
 /**
  * .codocs의 일반 파일·폴더만 확인한다. 후속 IO는 사용 직전에 다시 확인해야 한다.
- * @codocs [[작업 공간:작업 공간 경로 확인]]
- * @codocs [[작업 공간:파일 접근 범위]]
  */
 export async function resolveWorkspacePath(
   root: ProjectRoot,

@@ -86,10 +86,6 @@ it('배포 원본 예제 네 개는 유효하고 명시한 참조·역참조 관
     ).toBe(true);
     expect(
       document.diagnostics.map((issue) => [issue.code, issue.severity]),
-    ).toEqual(
-      document.id === 'sample-order'
-        ? [['deprecated_reference', 'warning']]
-        : [],
-    );
+    ).toEqual([]);
   }
 });

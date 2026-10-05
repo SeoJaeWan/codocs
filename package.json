@@ -11,6 +11,8 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier . --write",
     "test": "vitest run && node --test tools/**/*.test.{mjs,cjs} packages/**/test-runner/**/*.test.{mjs,cjs} packages/**/src/**/test-support/**/*.test.{mjs,cjs}",
+    "dev:vscode": "pnpm build && node tools/dev/open-vscode.mjs",
+    "dev:mcp": "pnpm build && mcp-inspector node packages/mcp/dist/cli.js --project .",
     "test:vscode": "node packages/vscode/test-runner/ui/run.mjs",
     "changeset": "changeset",
     "release:pack": "node tools/build/release.mjs",
@@ -26,6 +28,7 @@
   "devDependencies": {
     "@changesets/cli": "3.0.3",
     "@codocs/core": "workspace:*",
+    "@modelcontextprotocol/inspector": "2.9.0",
     "@types/node": "22.19.3",
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.6.2",

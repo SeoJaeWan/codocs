@@ -76,7 +76,11 @@ export default defineConfig(
         },
         { selector: 'typeLike', format: ['PascalCase'] },
         { selector: 'enumMember', format: ['PascalCase'] },
-        { selector: 'property', format: ['camelCase'] },
+        {
+          selector: 'property',
+          format: ['camelCase'],
+          leadingUnderscore: 'allow',
+        },
         { selector: 'property', modifiers: ['requiresQuotes'], format: null },
         { selector: 'import', format: ['camelCase', 'PascalCase'] },
       ],
