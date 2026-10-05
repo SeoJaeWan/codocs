@@ -31,8 +31,9 @@ _codocs:
 대상 문서: |
   id에 해당하는 문서가 없으면 not_found로 실패한다.
   프로젝트 탐색이 끝나지 않았으면 고칠 곳을 확정할 수 없으므로 preview는 blocked를 돌려주고 apply는 저장하지 않는다.
-  코드 파일을 수집하는 중이어도 같다.
-  코드 수집이 끝났지만 일부 코드 파일을 읽지 못했으면 읽은 파일만 고치고, 읽지 못한 경로를 impacts에 unconfirmed 영향으로 담으며 status는 unresolved다.
+  이미 코드 색인이 있는 세션이 코드 파일을 다시 수집하는 중이어도 같다. blockingReason은 unconfirmed이며 apply는 rename_blocked로 실패한다.
+  세션에 코드 색인이 아직 없으면 첫 이름 변경은 처음 수집이 끝나기를 기다린다.
+  코드 수집이 끝났지만 일부 코드 파일을 읽지 못했으면 읽은 파일만 고치고, 읽지 못한 경로를 impacts에 reason이 unconfirmed이고 `fileKind: "code"`인 영향으로 담으며(특정 경로가 없는 실패는 path가 ".") status는 unresolved다.
 preview: |
   파일과 색인을 바꾸지 않고 [[이름 변경]]의 미리보기를 돌려준다.
   응답은 success:true와 scanStatus에 이어 다음 값을 가진다.
@@ -40,14 +41,14 @@ preview: |
   - targetPath·oldName·newName: 대상 문서의 경로와 바꾸기 전후의 이름. 섹션 이름 변경이면 oldName·newName은 섹션 이름이다.
   - targetSection: 섹션 이름 변경일 때만 있으며 바꿀 섹션의 현재 이름이다.
   - blockingReason: blocked인 이유. blocked가 아니면 없다.
-  - changes: 고칠 위치별 path·fieldPath·range·oldText·newText. 코드 파일의 표기 변경도 포함하며 문서 변경과 구분할 수 있다. 대상 문서의 이름을 가리키는 다른 문서의 `_codocs.parent` 항목도 포함하며, 이 항목의 fieldPath는 `["_codocs", "parent", 0]`처럼 배열 순번까지 담는다. 섹션 이름 변경이면 섹션 키의 변경도 포함한다.
+  - changes: 고칠 위치별 path·fieldPath·range·oldText·newText. 코드 파일의 표기 변경도 포함하며 이 항목은 `fileKind: "code"`를 가져 문서 변경과 구분된다(문서 항목에는 fileKind가 없다). 대상 문서의 이름을 가리키는 다른 문서의 `_codocs.parent` 항목도 포함하며, 이 항목의 fieldPath는 `["_codocs", "parent", 0]`처럼 배열 순번까지 담는다. 섹션 이름 변경이면 섹션 키의 변경도 포함한다.
   - impacts: 자동으로 고치지 않은 참조. path·occurrenceIndex·text·range·reason과 바꾸기 전후의 후보(before·after)를 가진다.
   - conflicts: 새 이름과 같은 이름의 다른 문서, 또는 이름 변경으로 parent 오류가 새로 생기는 문서. 이름은 프로젝트 전체에서 유일해야 하므로 어느 폴더에 있든 충돌이다. 섹션 이름 변경에서 section_conflict이면 같은 이름의 섹션이 이미 있는 대상 문서를 담는다.
   - invalidSelections: 잘못된 선택.
-  - revisions: 영향받는 파일의 경로별 [[revision]]. 고칠 코드 파일도 포함한다.
+  - revisions: 영향받는 파일의 경로별 [[revision]]. 고칠 코드 파일의 경로도 포함한다.
 
   impacts 중 다음은 사용자가 대상을 골라야 하는 참조다.
-  - before.status가 ambiguous인 참조: 이름 변경 뒤에도 모호하면 reason이 selection_required이고, 이름 변경 뒤 후보 하나로 바뀌면 changed_resolution이다. 후보는 before.candidates의 경로·이름이다.
+  - before.status가 ambiguous인 참조: 이름 변경 뒤에도 모호하면 reason이 selection_required이고(코드 파일의 모호한 표기는 `fileKind: "code"`이며 selections의 sourcePath에 코드 경로를 쓸 수 있다), 이름 변경 뒤 후보 하나로 바뀌면 changed_resolution이다. 후보는 before.candidates의 경로·이름이다.
   before가 모호하지 않은 changed_resolution과 그 밖의 reason은 고르지 않은 채로 남기거나 이름 변경으로 대상이 바뀐다는 알림이다.
   blockingReason은 target_unavailable·invalid_name·name_conflict·section_conflict·section_not_found·unconfirmed·invalid_selection·source_not_lossless·unrepresentable 중 하나다.
   섹션 이름 변경에서는 새 섹션 이름의 섹션이 이미 있으면 section_conflict, 바꿀 섹션이 대상 문서에 없으면 section_not_found이며, 새 이름이 비었거나 `_`로 시작하거나 대괄호를 포함하거나 현재 섹션 이름과 같으면 invalid_name, 키의 현재 형식이나 참조로 안전하게 적을 수 없으면 unrepresentable이다.
@@ -64,7 +65,7 @@ apply: |
   apply의 성공 응답은 다음 값을 가진다.
   - success:true와 status: ready 또는 unresolved. unresolved는 고르지 않은 참조를 원문 그대로 남겼다는 뜻이다.
   - saved·changed: 파일 저장 여부와 내용 변경 여부.
-  - files: 파일별 path·state·revision. state는 changed·restored·restore_failed·unchanged 중 하나다.
+  - files: 파일별 path·state·revision. state는 changed·restored·restore_failed·unchanged 중 하나이며 코드 파일 항목은 `fileKind: "code"`를 가진다.
   - impacts: 고치지 않고 남긴 참조.
   - diagnostics: 경고를 포함한 진단.
   - indexUpdated: 바뀐 파일이 있을 때만 있으며 색인 반영 결과를 나타낸다.

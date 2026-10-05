@@ -12,7 +12,7 @@
 이름 변경은 미리보기와 반영 두 단계이며, 다른 문서의 `_codocs.parent`에 적힌 이전 이름도 함께 새 이름으로 고친다. 이전 이름의 문서가 둘 이상이면 `parent`는 고치지 않는다. MCP에서는 `codocs_rename`을 쓰고, VS Code에서는 문서의 `_codocs.name` 값이나 참조의 이름 부분에서 이름 바꾸기(F2)를 쓴다.
 `[[환불:환불정책]]`처럼 섹션이 붙은 참조도 이름 부분만 고치며 `:환불정책`은 그대로 둔다. 문서 안의 자기 섹션 참조와 섹션이 없는 참조도 이름 부분은 고친다.
 코드 파일의 `@codocs [[환불]]`과 `@codocs [[환불:환불정책]]`도 같은 규칙으로 함께 고친다. 코드 파일은 이름 변경을 반영할 때만 고쳐지며 `codocs_write`는 코드 파일을 고치지 않는다.
-코드 파일을 수집하는 중이면 `blocked`다. 수집은 끝났지만 일부 코드 파일을 읽지 못했으면 읽은 파일만 고치고, 읽지 못한 경로는 `unconfirmed` 영향으로 알리며 `status`는 `unresolved`다.
+이미 코드 색인이 있는 세션이 코드 파일을 수집하는 중이면 바로 `blocked`(`blockingReason`은 `unconfirmed`)이고 반영은 `rename_blocked`로 실패한다. 코드 색인이 아직 없는 세션의 첫 이름 변경은 처음 수집이 끝나기를 기다린다. 수집은 끝났지만 일부 코드 파일을 읽지 못했으면 읽은 파일만 고치고, 읽지 못한 경로는 `reason`이 `unconfirmed`인 영향으로 알리며 `status`는 `unresolved`다. 응답에서 코드 파일의 `changes`·`impacts`·`files` 항목은 `fileKind: "code"`를 가지며 `revisions`에도 코드 파일 경로가 들어간다.
 
 1. 먼저 `codocs_rename({"mode":"preview","id":"sample-order","newName":"새 주문"})`로 미리본다. 파일은 바뀌지 않는다.
 2. 응답의 `status`를 확인한다. `ready`는 고칠 내용을 모두 계산했다는 뜻이며 저장해도 된다는 허가가 아니다.
