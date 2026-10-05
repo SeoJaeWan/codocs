@@ -158,7 +158,8 @@ describe('language server stdio 프로세스', () => {
         path.resolve('.workbench/fixtures/protocol-links-'),
       );
       await mkdir(path.join(root, '.codocs'));
-      const target = 'id: target\nname: 대상\ndefinition: 설명\n';
+      const target =
+        '_codocs:\n  id: target\n  name: 대상\ndefinition: 설명\n빈 section: ""\n';
       await writeFile(path.join(root, '.codocs/target.yaml'), target);
       if (ambiguous)
         await writeFile(
@@ -201,7 +202,7 @@ describe('language server stdio 프로세스', () => {
             uri,
             version: 1,
             languageId: 'yaml',
-            text: 'id: source\nname: 출처\ndefinition: "[[대상]]"\n',
+            text: '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[대상]]"\n',
           },
         });
         const response = await client.request(3, 'textDocument/documentLink', {
@@ -211,7 +212,7 @@ describe('language server stdio 프로세스', () => {
         expect(links).toHaveLength(ambiguous ? 0 : 1);
         const hovered = await client.request(4, 'textDocument/hover', {
           textDocument: { uri },
-          position: { line: 2, character: 15 },
+          position: { line: 3, character: 15 },
         });
         expect(
           JSON.stringify(hovered.result).match(/command:codocs.openSource/gu),
@@ -255,7 +256,7 @@ describe('language server stdio 프로세스', () => {
           textDocument: { uri, version: 2 },
           contentChanges: [
             {
-              text: 'id: source\nname: 출처\ndefinition: 삭제\ndomains: [업무]\n',
+              text: '_codocs:\n  id: source\n  name: 출처\ndefinition: 삭제\n',
             },
           ],
         });
@@ -300,7 +301,7 @@ describe('language server stdio 프로세스', () => {
     await mkdir(path.join(root, '.codocs'));
     await writeFile(
       path.join(root, '.codocs/반납 구역.yaml'),
-      'id: return-zone\r\nname: Return Zone\r\ndefinition: 한글 본문\r\ndomains: [test]\r\n',
+      '_codocs:\r\n  id: return-zone\r\n  name: Return Zone\r\ndefinition: 한글 본문\r\n',
       'utf8',
     );
     await build({
@@ -401,17 +402,17 @@ describe('language server stdio 프로세스', () => {
     await Promise.all([
       writeFile(
         path.join(parent, '.codocs/parent-zone.yaml'),
-        'id: parent-zone\nname: Parent Zone\ndefinition: parent\ndomains: [test]\n',
+        '_codocs:\n  id: parent-zone\n  name: Parent Zone\ndefinition: parent\n',
         'utf8',
       ),
       writeFile(
         path.join(nested, '.codocs/nested-zone.yaml'),
-        'id: nested-zone\nname: Nested Zone\ndefinition: nested\ndomains: [test]\n',
+        '_codocs:\n  id: nested-zone\n  name: Nested Zone\ndefinition: nested\n',
         'utf8',
       ),
       writeFile(
         path.join(sibling, '.codocs/sibling-zone.yaml'),
-        'id: sibling-zone\nname: Sibling Zone\ndefinition: sibling\ndomains: [test]\n',
+        '_codocs:\n  id: sibling-zone\n  name: Sibling Zone\ndefinition: sibling\n',
         'utf8',
       ),
     ]);
@@ -448,7 +449,7 @@ describe('language server stdio 프로세스', () => {
     ).href;
     /** 이름 참조 한 개를 가진 YAML 원문을 만든다. */
     const reference = (name: string): string =>
-      `id: live\nname: 출처\ndefinition: "[[${name}]]"\n`;
+      `_codocs:\n  id: live\n  name: 출처\ndefinition: "[[${name}]]"\n`;
     /** 참조 위치의 Hover 응답을 요청한다. */
     const hoverAt = (
       client: StdioProtocolClient,
@@ -457,7 +458,7 @@ describe('language server stdio 프로세스', () => {
     ): Promise<JsonRpcResponse> =>
       client.request(id, 'textDocument/hover', {
         textDocument: { uri },
-        position: { line: 2, character: 17 },
+        position: { line: 3, character: 17 },
       });
     /** Hover 응답의 Markdown 본문을 꺼낸다. */
     const hoverText = (response: JsonRpcResponse): string =>
@@ -537,7 +538,7 @@ describe('language server stdio 프로세스', () => {
       await mkdir(path.join(missing, '.codocs'));
       await writeFile(
         path.join(missing, '.codocs/created-zone.yaml'),
-        'id: created-zone\nname: Created Zone\ndefinition: created\ndomains: [test]\n',
+        '_codocs:\n  id: created-zone\n  name: Created Zone\ndefinition: created\n',
         'utf8',
       );
       await firstClient.request(8, workspaceRefreshRequestMethod, {
@@ -554,7 +555,7 @@ describe('language server stdio 프로세스', () => {
 
       await writeFile(
         path.join(missing, '.codocs/created-zone.yaml'),
-        'id: changed-zone\nname: Changed Zone\ndefinition: changed\ndomains: [test]\n',
+        '_codocs:\n  id: changed-zone\n  name: Changed Zone\ndefinition: changed\n',
         'utf8',
       );
       firstClient.send('textDocument/didChange', {
@@ -628,11 +629,11 @@ describe('language server stdio 프로세스', () => {
     const root = await mkdtemp(path.join(fixtureParent, 'server-rename-'));
     const output = path.join(root, 'server.cjs');
     await mkdir(path.join(root, '.codocs'));
-    const order = 'id: order\nname: 주문\ndomains: [test]\ndefinition: 설명\n';
+    const order = '_codocs:\n  id: order\n  name: 주문\ndefinition: 설명\n';
     await writeFile(path.join(root, '.codocs/order.yaml'), order, 'utf8');
     await writeFile(
       path.join(root, '.codocs/ref.yaml'),
-      'id: ref\nname: 참조\ndomains: [test]\ndefinition: 본문 [[주문]]\n',
+      '_codocs:\n  id: ref\n  name: 참조\ndefinition: 본문 [[주문]]\n',
       'utf8',
     );
     await build({
@@ -678,7 +679,7 @@ describe('language server stdio 프로세스', () => {
 
       const prepared = await client.request(3, 'codocs/prepareRename', {
         textDocument: { uri: orderUri },
-        position: { line: 1, character: 7 },
+        position: { line: 2, character: 9 },
       });
       const planned = await client.request(4, 'codocs/planRename', {
         textDocument: { uri: orderUri },

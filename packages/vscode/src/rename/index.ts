@@ -29,14 +29,12 @@ export interface RenameSelection {
   sourcePath: string;
   occurrenceIndex: number;
   targetPath: string;
-  domain?: string;
 }
 
 /** 사용자가 고를 수 있는 후보 문서다. */
 export interface RenameCandidate {
   path: string;
   name?: string;
-  domains: readonly string[];
 }
 
 /** 자동으로 고치지 않은 참조와 그 후보다. */
@@ -120,7 +118,7 @@ const blockedMessages: Readonly<Record<string, string>> = {
     '이름을 바꿀 문서를 확인할 수 없습니다.',
   [renameBlockingReasons.invalidName]: '새 이름이 비어 있습니다.',
   [renameBlockingReasons.nameConflict]:
-    '같은 도메인에 새 이름과 같은 문서가 있습니다.',
+    '프로젝트에 새 이름과 같은 문서가 있습니다.',
   [renameBlockingReasons.unconfirmed]:
     '프로젝트 탐색이 끝나지 않아 이름을 바꿀 수 없습니다.',
   [renameBlockingReasons.invalidSelection]: '선택한 참조가 올바르지 않습니다.',
@@ -167,9 +165,6 @@ export const renameMessages = {
   /** 참조 선택 목록의 제목이다. */
   chooseTitle: (path: string, text: string): string =>
     `이름 변경: ${path}의 ${text}가 가리킬 문서를 고르세요`,
-  /** 도메인 선택 목록의 제목이다. */
-  chooseDomainTitle: (path: string, text: string): string =>
-    `이름 변경: ${path}의 ${text}에 적을 도메인을 고르세요`,
   choosePlaceHolder:
     '고르지 않고 닫으면 이 참조는 바꾸지 않고 미해결로 남깁니다.',
   /** 반영 성공 결과를 알린다. */
@@ -220,19 +215,10 @@ function parseCandidates(value: unknown): RenameCandidate[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const result: RenameCandidate[] = [];
   for (const item of value as unknown[]) {
-    if (
-      !isRecord(item) ||
-      typeof item['path'] !== 'string' ||
-      !Array.isArray(item['domains']) ||
-      !(item['domains'] as unknown[]).every(
-        (domain) => typeof domain === 'string',
-      )
-    )
-      return undefined;
+    if (!isRecord(item) || typeof item['path'] !== 'string') return undefined;
     result.push({
       path: item['path'],
       ...(typeof item['name'] === 'string' ? { name: item['name'] } : {}),
-      domains: item['domains'] as string[],
     });
   }
   return result;
@@ -396,15 +382,14 @@ export function parseApplyResponse(value: unknown): RenameApplyResult {
 }
 
 /**
- * 사용자가 대상이나 도메인을 골라야 하는 영향인지 확인한다.
+ * 사용자가 대상을 골라야 하는 영향인지 확인한다.
  * 후보가 여러 개였던 참조는 이름 변경 뒤에도 모호하면 selection_required, 다른 후보로 확정되면 changed_resolution으로 보고되며 둘 다 대상을 고르게 한다.
  */
 function isChoice(impact: RenameImpact): boolean {
   return (
-    impact.reason === renameChoiceReasons.domainRequired ||
-    ((impact.reason === renameChoiceReasons.selectionRequired ||
+    (impact.reason === renameChoiceReasons.selectionRequired ||
       impact.reason === renameChoiceReasons.changedResolution) &&
-      impact.before.status === renameAmbiguousStatus)
+    impact.before.status === renameAmbiguousStatus
   );
 }
 
@@ -418,7 +403,6 @@ function candidateChoice(candidate: RenameCandidate): RenameChoice {
   return {
     id: candidate.path,
     label: candidate.name ?? candidate.path,
-    description: candidate.domains.join(', '),
     detail: candidate.path.replaceAll('\\', '/'),
   };
 }
@@ -474,57 +458,25 @@ async function plan(
   return preview;
 }
 
-/** 영향 하나에 대해 사용자가 고른 선택을 반환하며 닫았으면 undefined다. */
+/** 영향 하나에 대해 사용자가 고른 선택을 반환하며 닫았으면 undefined다. 같은 이름의 후보는 경로로 구분한다. */
 async function choose(
   host: RenameHost,
   impact: RenameImpact,
-  selections: readonly RenameSelection[],
 ): Promise<RenameSelection | undefined> {
-  const current = selections.find(
-    (item) =>
-      item.sourcePath === impact.path &&
-      item.occurrenceIndex === impact.occurrenceIndex,
-  );
-  if (impact.reason !== renameChoiceReasons.domainRequired) {
-    const picked = await host.choose({
-      title: renameMessages.chooseTitle(
-        impact.path.replaceAll('\\', '/'),
-        impact.text,
-      ),
-      placeHolder: renameMessages.choosePlaceHolder,
-      choices: impact.before.candidates.map(candidateChoice),
-    });
-    return picked === undefined
-      ? undefined
-      : {
-          sourcePath: impact.path,
-          occurrenceIndex: impact.occurrenceIndex,
-          targetPath: picked,
-        };
-  }
-  const candidate =
-    impact.before.candidates.find(
-      (item) => item.path === current?.targetPath,
-    ) ??
-    (impact.before.candidates.length === 1
-      ? impact.before.candidates[0]
-      : undefined);
-  if (!candidate) return undefined;
   const picked = await host.choose({
-    title: renameMessages.chooseDomainTitle(
+    title: renameMessages.chooseTitle(
       impact.path.replaceAll('\\', '/'),
       impact.text,
     ),
     placeHolder: renameMessages.choosePlaceHolder,
-    choices: candidate.domains.map((domain) => ({ id: domain, label: domain })),
+    choices: impact.before.candidates.map(candidateChoice),
   });
   return picked === undefined
     ? undefined
     : {
         sourcePath: impact.path,
         occurrenceIndex: impact.occurrenceIndex,
-        targetPath: candidate.path,
-        domain: picked,
+        targetPath: picked,
       };
 }
 
@@ -545,7 +497,7 @@ export async function renameDocument(host: RenameHost): Promise<void> {
     const before = selections;
     for (const impact of pending) {
       asked.add(impactKey(impact));
-      const picked = await choose(host, impact, selections);
+      const picked = await choose(host, impact);
       if (picked) selections = withSelection(selections, picked);
       if (host.isCancelled())
         throw new RenameAborted(

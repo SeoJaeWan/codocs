@@ -52,8 +52,7 @@ let project: string;
 const indexes: WorkspaceCodeReferenceIndex[] = [];
 const sessions: WorkspaceQuerySession[] = [];
 const targetPath = '.codocs/target.yaml';
-const targetText =
-  'id: target\nname: 대상\ndomains: [업무]\ndefinition: 본문\n';
+const targetText = '_codocs:\n  id: target\n  name: 대상\ndefinition: 본문\n';
 beforeEach(async () => {
   resetCodeAccessCounts();
   await mkdir('.workbench/fixtures', { recursive: true });

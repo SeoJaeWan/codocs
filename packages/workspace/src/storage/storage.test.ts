@@ -24,12 +24,10 @@ let root: string;
 let folder: string;
 let originalFile: string;
 const original =
-  '# 원문 주석\r\nid: first\r\nname: 첫 문서\r\ndefinition: 설명\r\ndomains: [업무]\r\n';
+  '# 원문 주석\r\n_codocs:\r\n  id: first\r\n  name: 첫 문서\r\ndefinition: 설명\r\n';
 const document = {
-  id: 'created',
-  name: '새 문서',
+  _codocs: { id: 'created', name: '새 문서' },
   definition: '설명',
-  domains: ['업무'],
 };
 
 /** 실제 원문 바이트의 SHA-256을 독립적으로 계산한다. */
@@ -97,7 +95,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
       path.join(folder, 'new', 'nested', 'created.yaml'),
     );
     expect(bytes.toString()).toBe(
-      'id: created\nname: 새 문서\ndefinition: 설명\ndomains:\n  - 업무\n',
+      '_codocs:\n  id: created\n  name: 새 문서\ndefinition: 설명\n',
     );
     expect(result.revision).toBe(sha256(bytes));
     expect(sawTemp).toBe(true);
@@ -119,8 +117,10 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     );
   });
 
-  it('update가 주석과 CRLF를 보존해 반영하며 이전 ID는 남기지 않는다', async () => {
-    const { scan, input } = await updateRequest({ id: 'renamed' });
+  it('update가 앞 주석과 CRLF를 보존해 반영한다', async () => {
+    const { scan, input } = await updateRequest({
+      _codocs: { id: 'renamed', name: '첫 문서' },
+    });
     const result = await saveWorkspaceChange(input, scan);
     expect(result).toMatchObject({
       success: true,
@@ -132,7 +132,6 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     const bytes = await readFile(originalFile);
     expect(bytes.toString()).toContain('# 원문 주석\r\n');
     expect(bytes.toString()).toContain('id: renamed\r\n');
-    expect(bytes.toString()).not.toContain('deprecatedAliases');
     expect(result.revision).toBe(sha256(bytes));
   });
 
@@ -146,7 +145,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
         mode: 'update',
         id: 'first',
         revision: source?.revision,
-        set: { name: '첫 문서' },
+        set: { _codocs: { id: 'first', name: '첫 문서' } },
       },
       scan,
     );
@@ -256,7 +255,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     const scan = await loadWorkspace({ cwd: root });
     const target = path.join(folder, 'created.yaml');
     const source =
-      'id: created\nname: 다른 생성\ndefinition: 설명\ndomains: [업무]\n';
+      '_codocs:\n  id: created\n  name: 다른 생성\ndefinition: 설명\n';
     const result = await saveWorkspaceChange(
       { mode: 'create', path: '.codocs/created.yaml', document },
       scan,
@@ -309,12 +308,14 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
   });
 
   it('늦게 추가된 동일 ID 문서가 있으면 파일을 저장하지 않는다', async () => {
-    const { scan, input } = await updateRequest({ id: 'new-id' });
+    const { scan, input } = await updateRequest({
+      _codocs: { id: 'new-id', name: '첫 문서' },
+    });
     const result = await saveWorkspaceChange(input, scan, {
       beforeApply: async () => {
         await writeFile(
           path.join(folder, 'other.yaml'),
-          'id: new-id\nname: 충돌\ndefinition: 설명\ndomains: [업무]\n',
+          '_codocs:\n  id: new-id\n  name: 충돌\ndefinition: 설명\n',
         );
       },
     });

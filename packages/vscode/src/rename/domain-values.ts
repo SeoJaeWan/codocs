@@ -16,14 +16,12 @@ export const renameAbortReasons = {
 export type RenameAbortReason =
   (typeof renameAbortReasons)[keyof typeof renameAbortReasons];
 
-/** 영향 참조 중 사용자가 대상이나 도메인을 골라야 하는 이유다. @domainValues */
+/** 영향 참조 중 사용자가 대상을 골라야 하는 이유다. @domainValues */
 export const renameChoiceReasons = {
   /** 후보 여럿 중 대상을 골라야 한다. */
   selectionRequired: 'selection_required',
   /** 이름 변경으로 모호한 참조가 다른 후보로 확정되어 대상을 골라야 한다. */
   changedResolution: 'changed_resolution',
-  /** 고른 대상이 속한 도메인 중 하나를 골라야 한다. */
-  domainRequired: 'domain_required',
 } as const;
 
 /** 서버가 반영을 거절하거나 실패했을 때 알리는 오류 코드다. @domainValues */
@@ -56,7 +54,7 @@ export const renameBlockingReasons = {
   targetUnavailable: 'target_unavailable',
   /** 새 이름이 유효하지 않다. */
   invalidName: 'invalid_name',
-  /** 같은 도메인에서 새 이름이 충돌한다. */
+  /** 프로젝트의 다른 문서가 새 이름을 이미 쓴다. */
   nameConflict: 'name_conflict',
   /** 스캔이나 대상을 확정하지 못했다. */
   unconfirmed: 'unconfirmed',

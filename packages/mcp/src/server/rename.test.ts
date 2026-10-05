@@ -43,7 +43,6 @@ async function start(files: Record<string, string>): Promise<Client> {
 interface Candidate {
   path: string;
   name?: string;
-  domains: string[];
 }
 
 /** 테스트가 읽는 응답 필드만 가진 공통 결과 형태다. */
@@ -60,7 +59,11 @@ interface Reply {
     before: { candidates: Candidate[] };
   }[];
   revisions: Record<string, string>;
-  results: { found: boolean; revision: string; document: { name: string } }[];
+  results: {
+    found: boolean;
+    revision: string;
+    document: { _codocs: { name: string } };
+  }[];
 }
 
 /** 도구 호출 결과의 JSON 본문과 구조 결과가 같음을 확인하고 꺼낸다. */
@@ -89,17 +92,12 @@ function read(name: string): Promise<string> {
 }
 
 /** 문서 원문을 만든다. */
-function doc(id: string, name: string, domain: string, body: string): string {
-  return `id: ${id}\nname: '${name}'\ndomains:\n  - '${domain}'\ndefinition: |\n  ${body}\n`;
+function doc(id: string, name: string, body: string): string {
+  return `_codocs:\n  id: ${id}\n  name: '${name}'\ndefinition: |\n  ${body}\n`;
 }
 
-const order = doc('order', '주문', '판매', '주문의 의미다.');
-const referrer = doc(
-  'ref',
-  '참조',
-  '판매',
-  '[[주문]]을 쓰고 [[주문]]을 다시 쓴다.',
-);
+const order = doc('order', '주문', '주문의 의미다.');
+const referrer = doc('ref', '참조', '[[주문]]을 쓰고 [[주문]]을 다시 쓴다.');
 
 describe('codocs_rename preview', () => {
   it('preview는 파일을 바꾸지 않고 상태·변경 목록·파일별 revisions를 반환한다', async () => {
@@ -123,10 +121,10 @@ describe('codocs_rename preview', () => {
     expect(await read('ref.yaml')).toBe(referrer);
   });
 
-  it('원래 모호한 참조는 후보의 도메인·이름·경로와 영향 이유를 반환한다', async () => {
+  it('원래 모호한 참조는 후보의 이름·경로와 영향 이유를 반환한다', async () => {
     await start({
       'order.yaml': order,
-      'other.yaml': doc('other-order', '주문', '물류', '다른 주문이다.'),
+      'other.yaml': doc('other-order', '주문', '다른 주문이다.'),
       'ref.yaml': referrer,
     });
     const result = await call('codocs_rename', {
@@ -139,21 +137,18 @@ describe('codocs_rename preview', () => {
     expect(result.impacts).toHaveLength(2);
     const first = result.impacts[0]!;
     expect(first.reason).toBe('changed_resolution');
-    expect(
-      first.before.candidates
-        .map((item) => [item.name, item.domains[0]])
-        .sort(),
-    ).toEqual([
-      ['주문', '물류'],
-      ['주문', '판매'],
+    expect(first.before.candidates.map((item) => item.name)).toEqual([
+      '주문',
+      '주문',
     ]);
     expect(first.before.candidates.every((item) => item.path)).toBe(true);
+    expect(first.before.candidates[0]).not.toHaveProperty('domains');
   });
 
-  it('같은 도메인에 새 이름의 문서가 있으면 blocked와 충돌을 반환하고 파일을 바꾸지 않는다', async () => {
+  it('프로젝트에 새 이름의 문서가 있으면 blocked와 충돌을 반환하고 파일을 바꾸지 않는다', async () => {
     await start({
       'order.yaml': order,
-      'taken.yaml': doc('taken', '새주문', '판매', '이미 있다.'),
+      'taken.yaml': doc('taken', '새주문', '이미 있다.'),
       'ref.yaml': referrer,
     });
     const result = await call('codocs_rename', {
@@ -203,14 +198,15 @@ describe('codocs_rename apply', () => {
     expect(await read('ref.yaml')).toContain('[[새주문]]을 쓰고 [[새주문]]을');
     expect(await read('order.yaml')).toContain("name: '새주문'");
     expect(
-      (await call('codocs_get', { ids: ['order'] })).results[0]!.document.name,
+      (await call('codocs_get', { ids: ['order'] })).results[0]!.document
+        ._codocs.name,
     ).toBe('새주문');
   });
 
   it('원래 모호한 참조는 선택이 없으면 원문 그대로 두고 unresolved로 반영한다', async () => {
     await start({
       'order.yaml': order,
-      'other.yaml': doc('other-order', '주문', '물류', '다른 주문이다.'),
+      'other.yaml': doc('other-order', '주문', '다른 주문이다.'),
       'ref.yaml': referrer,
     });
     const input = { id: 'order', newName: '새주문' };
@@ -229,14 +225,14 @@ describe('codocs_rename apply', () => {
   it('preview가 준 경로로 대상을 고르면 선택한 참조만 선택 대상 기준으로 고친다', async () => {
     await start({
       'order.yaml': order,
-      'other.yaml': doc('other-order', '주문', '물류', '다른 주문이다.'),
+      'other.yaml': doc('other-order', '주문', '다른 주문이다.'),
       'ref.yaml': referrer,
     });
     const input = { id: 'order', newName: '새주문' };
     const preview = await call('codocs_rename', { mode: 'preview', ...input });
     const first = preview.impacts[0]!;
-    const picked = first.before.candidates.find(
-      (item) => item.domains[0] === '판매',
+    const picked = first.before.candidates.find((item) =>
+      item.path.endsWith('order.yaml'),
     );
     const result = await call('codocs_rename', {
       mode: 'apply',
@@ -254,10 +250,10 @@ describe('codocs_rename apply', () => {
     expect(await read('ref.yaml')).toContain('[[새주문]]을 쓰고 [[주문]]을');
   });
 
-  it('같은 도메인에 새 이름의 문서가 있으면 rename_blocked로 거절하고 파일을 바꾸지 않는다', async () => {
+  it('프로젝트에 새 이름의 문서가 있으면 rename_blocked로 거절하고 파일을 바꾸지 않는다', async () => {
     await start({
       'order.yaml': order,
-      'taken.yaml': doc('taken', '새주문', '판매', '이미 있다.'),
+      'taken.yaml': doc('taken', '새주문', '이미 있다.'),
       'ref.yaml': referrer,
     });
     const input = { id: 'order', newName: '새주문' };
@@ -303,7 +299,7 @@ describe('codocs_rename apply', () => {
     await start({ 'order.yaml': order, 'ref.yaml': referrer });
     const input = { id: 'order', newName: '새주문' };
     const preview = await call('codocs_rename', { mode: 'preview', ...input });
-    const added = doc('late', '늦은 문서', '판매', '[[주문]]을 쓴다.');
+    const added = doc('late', '늦은 문서', '[[주문]]을 쓴다.');
     await writeFile(path.join(project, '.codocs', 'late.yaml'), added);
     // 감시가 새 파일을 색인에 반영할 때까지 최신 상태를 조회로 확인한다.
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -367,7 +363,7 @@ describe('codocs_write의 이름 변경 거부', () => {
       mode: 'update',
       id: 'order',
       revision: fetched.results[0]!.revision,
-      set: { name: '새주문' },
+      set: { _codocs: { id: 'order', name: '새주문' } },
     });
     expect(result).toMatchObject({
       success: false,
@@ -386,7 +382,7 @@ describe('codocs_write의 이름 변경 거부', () => {
         mode: 'update',
         id: 'order',
         revision: fetched.results[0]!.revision,
-        set: { name: '주문' },
+        set: { _codocs: { id: 'order', name: '주문' } },
       }),
     ).toMatchObject({ success: true, saved: false, changed: false });
   });

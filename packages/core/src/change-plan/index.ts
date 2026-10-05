@@ -16,7 +16,6 @@ import {
   changePlanDiagnosticCodes,
   changePlanDiagnosticMessages,
   diagnosticSeverities,
-  schemaDiagnosticMessages,
   type Diagnostic,
 } from '../diagnostics/index.js';
 import {
@@ -26,7 +25,8 @@ import {
   type YamlParseResult,
 } from '../parser/index.js';
 import {
-  documentFields,
+  codocsKey,
+  metadataFields,
   validateDocument,
   type Document,
 } from '../validator/index.js';
@@ -115,16 +115,23 @@ function stringList(value: unknown): value is string[] {
   }
 }
 
-/** JSON 자체의 안전성 오류를 YAML 직렬화 전에 걸러낸다. */
-function unsafeJson(diagnostic: Diagnostic<string>): boolean {
-  return new Set<string>([
-    schemaDiagnosticMessages.nonFiniteNumber,
-    schemaDiagnosticMessages.jsonValueRequired,
-    schemaDiagnosticMessages.cyclicReference,
-    schemaDiagnosticMessages.jsonObjectRequired,
-    schemaDiagnosticMessages.jsonDataPropertyRequired,
-    schemaDiagnosticMessages.missingArrayElement,
-  ]).has(diagnostic.message);
+/** 접근자·특수 객체·순환 없이 데이터 속성만으로 이루어진 값인지 확인한다. 깊이는 제한한다. */
+function plainData(value: unknown, depth = 0): boolean {
+  if (depth > 8) return false;
+  if (typeof value !== 'object' || value === null) return true;
+  if (Array.isArray(value))
+    return Array.from({ length: value.length }, (_, index) =>
+      Object.getOwnPropertyDescriptor(value, index),
+    ).every(
+      (descriptor) =>
+        descriptor !== undefined &&
+        'value' in descriptor &&
+        plainData(descriptor.value, depth + 1),
+    );
+  return (
+    record(value) &&
+    Object.keys(value).every((key) => plainData(value[key], depth + 1))
+  );
 }
 
 /** 요청 오류를 코드와 함께 반환한다. */
@@ -250,16 +257,6 @@ function adjacentCommentEdit(entry: FlowEntry): Edit | undefined {
   };
 }
 
-/** Codocs가 문서를 저장할 때 원문에서 지우는 폐기된 최상위 속성 이름이다. */
-const deprecatedAliasesKey = 'deprecatedAliases';
-
-/** 저장할 문서 데이터에서 폐기된 deprecatedAliases 속성만 뺀 복사본을 만든다. */
-function withoutDeprecatedAliases(data: object): Record<string, unknown> {
-  const copy: Record<string, unknown> = { ...data };
-  delete copy[deprecatedAliasesKey];
-  return copy;
-}
-
 /** 각 최상위 값·속성 범위만 수정한다. */
 function editYaml(
   parsed: Extract<YamlParseResult, { success: true }>,
@@ -281,6 +278,18 @@ function editYaml(
     if (Object.hasOwn(expected, key)) {
       const range = getValueRange(parsed, [key]);
       if (!range) return undefined;
+      const blockText = nestedBlockText(
+        expected[key],
+        source,
+        range,
+        field.key,
+        flow,
+        eol,
+      );
+      if (blockText !== undefined) {
+        edits.push({ ...range, text: blockText });
+        continue;
+      }
       edits.push({
         ...range,
         text: valueText(
@@ -429,6 +438,30 @@ function editYaml(
   return result;
 }
 
+/**
+ * 값이 다음 줄에서 시작하는 블록 매핑을 새 매핑으로 바꿀 텍스트를 만든다.
+ * 첫 줄은 원래 값이 시작하던 자리에 이어지고 나머지 줄은 같은 들여쓰기를 따른다.
+ * @returns 블록 매핑 교체가 아니면 undefined다.
+ */
+function nestedBlockText(
+  value: unknown,
+  source: string,
+  range: { start: number; end: number },
+  key: { start: number; end: number } | undefined,
+  flow: boolean,
+  eol: string,
+): string | undefined {
+  if (flow || !key || !record(value) || !Object.keys(value).length)
+    return undefined;
+  if (!source.slice(key.end, range.start).includes('\n')) return undefined;
+  const column = range.start - (source.lastIndexOf('\n', range.start - 1) + 1);
+  const output = stringify(value, { lineWidth: 0 }).replace(/\n$/u, '');
+  const text = output
+    .replace(/\n/gu, `\n${' '.repeat(column)}`)
+    .replace(/\n/gu, eol);
+  return source[range.end - 1] === '\n' ? text + eol : text;
+}
+
 /** 기존 확인 상태를 유지한 임시 색인에서 후보 경로의 진단만 추출한다. */
 function candidateDiagnostics(
   catalog: Catalog,
@@ -485,13 +518,9 @@ function planDocumentChangeInternal(
     )
       return failure('invalidRequest');
     if (context.catalog.documents.has(path)) return failure('pathExists', path);
+    if (!plainData(input.document)) return failure('invalidRequest');
     const validation = validateDocument({
-      data:
-        typeof input.document === 'object' &&
-        input.document !== null &&
-        !Array.isArray(input.document)
-          ? withoutDeprecatedAliases(input.document)
-          : input.document,
+      data: input.document,
       path,
     });
     if (!validation.success)
@@ -511,7 +540,7 @@ function planDocumentChangeInternal(
     return {
       status: changePlanStatuses.candidate,
       path,
-      id: validation.data.id,
+      id: validation.data._codocs.id,
       raw,
       data: validation.data,
       diagnostics,
@@ -538,14 +567,11 @@ function planDocumentChangeInternal(
     new Set(removals).size !== removals.length ||
     changes.some((key) => removals.includes(key)) ||
     removals.some(
-      /** 필수 필드는 unset할 수 없다. */
-      (key) =>
-        !key ||
-        key === documentFields.id ||
-        key === documentFields.name ||
-        key === documentFields.definition ||
-        key === documentFields.domains,
-    )
+      /** 메타데이터 `_codocs`는 unset할 수 없다. */
+      (key) => !key || key === codocsKey,
+    ) ||
+    (set !== undefined &&
+      !Object.values(set).every((value) => plainData(value)))
   )
     return failure('invalidRequest');
   const paths = context.catalog.idPaths.get(id);
@@ -570,30 +596,19 @@ function planDocumentChangeInternal(
       status: changePlanStatuses.failed,
       diagnostics: parsed.diagnostics,
     };
+  const requestedMetadata = set?.[codocsKey];
+  const currentMetadata = parsed.data[codocsKey];
   if (
-    set &&
-    Object.hasOwn(set, documentFields.name) &&
-    set[documentFields.name] !== parsed.data[documentFields.name]
+    record(requestedMetadata) &&
+    Object.hasOwn(requestedMetadata, metadataFields.name) &&
+    requestedMetadata[metadataFields.name] !==
+      (record(currentMetadata)
+        ? currentMetadata[metadataFields.name]
+        : undefined)
   )
     return failure('nameChangeNotAllowed', source.path);
   const expected: Record<string, unknown> = { ...parsed.data, ...(set ?? {}) };
   for (const key of removals) delete expected[key];
-  delete expected[deprecatedAliasesKey];
-  const preliminary = validateDocument({ data: expected, path: source.path });
-  if (!preliminary.success && preliminary.errors.some(unsafeJson))
-    return {
-      status: changePlanStatuses.failed,
-      diagnostics: preliminary.errors,
-    };
-  const completeExpected = validateDocument({
-    data: expected,
-    path: source.path,
-  });
-  if (!completeExpected.success && completeExpected.errors.some(unsafeJson))
-    return {
-      status: changePlanStatuses.failed,
-      diagnostics: completeExpected.errors,
-    };
   const raw = editYaml(parsed, expected);
   if (raw === undefined) return failure('candidateMismatch', source.path);
   const candidate = parseYaml(raw, source.path);
@@ -615,22 +630,18 @@ function planDocumentChangeInternal(
       status: changePlanStatuses.failed,
       diagnostics: validation.errors,
     };
-  /** 키 삭제만을 위해 저장하지 않는다. 키를 남겨 둔 기대값이 원본과 같으면 변경이 없는 요청이다. */
-  const keptKey = Object.hasOwn(parsed.data, deprecatedAliasesKey)
-    ? { [deprecatedAliasesKey]: parsed.data[deprecatedAliasesKey] }
-    : {};
-  if (raw === source.raw || same({ ...expected, ...keptKey }, parsed.data))
+  if (raw === source.raw || same(expected, parsed.data))
     return {
       status: changePlanStatuses.unchanged,
       path: source.path,
-      id: validation.data.id,
+      id: validation.data._codocs.id,
       revision: source.revision,
       diagnostics,
     };
   return {
     status: changePlanStatuses.candidate,
     path: source.path,
-    id: validation.data.id,
+    id: validation.data._codocs.id,
     raw,
     data: validation.data,
     baseRevision: source.revision,
@@ -793,19 +804,12 @@ export function applyRenameChanges(
       value.slice(0, span.start) + change.newText + value.slice(span.end),
     );
   }
-  let reparsed = parseYaml(result);
+  const reparsed = parseYaml(result);
   if (!reparsed.success) return { success: false };
-  /** 저장하는 문서에서 deprecatedAliases 속성만 원문 범위로 지운다. 참조 편집을 먼저 끝낸 원문에서 하므로 겹치지 않는다. */
-  if (Object.hasOwn(reparsed.data, deprecatedAliasesKey)) {
-    const removed = editYaml(reparsed, withoutDeprecatedAliases(reparsed.data));
-    if (removed === undefined) return { success: false };
-    result = removed;
-    reparsed = parseYaml(result);
-    if (!reparsed.success) return { success: false };
-  }
-  const expectedData = withoutDeprecatedAliases(
-    JSON.parse(JSON.stringify(parsed.data)) as Record<string, unknown>,
-  );
+  const expectedData = JSON.parse(JSON.stringify(parsed.data)) as Record<
+    string,
+    unknown
+  >;
   for (const [key, value] of expectedValues) {
     const fieldPath = JSON.parse(key) as (string | number)[];
     if (!setAtPath(expectedData, fieldPath, value)) return { success: false };

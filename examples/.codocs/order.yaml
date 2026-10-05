@@ -1,7 +1,6 @@
-id: sample-order
-name: 가상 주문
-domains:
-  - sample-sales
-definition: |
+_codocs:
+  id: sample-order
+  name: 가상 주문
+개요: |
   가상 고객의 구매 요청이다. 처리 순서는 [[가상 주문 처리]]에서 확인한다.
   현재 현장에서 부르는 이름의 맥락은 [[가상 접수건]]으로 연결한다.

@@ -23,7 +23,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 let root: string;
 let session: LanguageServerSession;
 let uri: string;
-const saved = 'id: target\nname: 출처\ndefinition: 설명\ndomains: [test]\n';
+const saved = '_codocs:\n  id: target\n  name: 출처\ndefinition: 설명\n';
 
 beforeEach(async () => {
   io.blocked = '';
@@ -33,7 +33,7 @@ beforeEach(async () => {
   await writeFile(path.join(root, '.codocs/source.yaml'), saved);
   await writeFile(
     path.join(root, '.codocs/target.yaml'),
-    'id: target\nname: 대상\ndefinition: 설명\ndomains: [test]\n',
+    '_codocs:\n  id: target\n  name: 대상\ndefinition: 설명\n',
   );
   uri = pathToFileURL(path.join(root, '.codocs/source.yaml')).href;
   session = new LanguageServerSession();
@@ -173,8 +173,8 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
       expect.objectContaining({
         code: catalogDiagnosticCodes.duplicateId,
         range: {
-          start: { line: 0, character: 4 },
-          end: { line: 0, character: 10 },
+          start: { line: 1, character: 6 },
+          end: { line: 1, character: 12 },
         },
       }),
     );
@@ -265,7 +265,7 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
         uri: other,
         languageId: 'yaml',
         version: 1,
-        text: 'id: unsaved\nname: 새 문서\ndefinition: 설명\ndomains: [test]\n',
+        text: '_codocs:\n  id: unsaved\n  name: 새 문서\ndefinition: 설명\n',
       },
     });
     const result = await session.diagnostics();

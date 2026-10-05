@@ -57,15 +57,13 @@ export type RenamePlanStatus =
 export const renameImpactReasons = {
   /** 참조 대상을 명시적으로 선택해야 한다. */
   selectionRequired: 'selection_required',
-  /** 대상을 구분할 도메인이 필요하다. */
-  domainRequired: 'domain_required',
   /** 선택한 대상이나 참조가 유효하지 않다. */
   invalidSelection: 'invalid_selection',
   /** 참조 수정이 비활성화되어 있다. */
   referencesDisabled: 'references_disabled',
   /** 대상이나 해석을 현재 확정할 수 없다. */
   unconfirmed: 'unconfirmed',
-  /** 새 이름을 지원하는 참조 문법으로 표현할 수 없다. */
+  /** 새 이름을 지원하는 참조 문법으로 하나의 문서로 확정해 표현할 수 없다. */
   unrepresentable: 'unrepresentable',
   /** 이름 변경 후 참조 해석 결과가 달라진다. */
   changedResolution: 'changed_resolution',
@@ -80,7 +78,7 @@ export const renameBlockingReasons = {
   targetUnavailable: 'target_unavailable',
   /** 새 이름이 유효하지 않다. */
   invalidName: 'invalid_name',
-  /** 같은 도메인에서 새 이름이 충돌한다. */
+  /** 프로젝트의 다른 문서가 새 이름을 이미 쓴다. */
   nameConflict: 'name_conflict',
   /** 스캔이나 대상을 확정하지 못했다. */
   unconfirmed: 'unconfirmed',

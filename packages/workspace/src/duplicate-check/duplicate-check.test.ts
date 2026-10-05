@@ -72,7 +72,7 @@ async function file(name: string, raw: string): Promise<string> {
 
 /** definition 하나만 가진 유효한 문서 원문이다. */
 function raw(id: string, definition: string): string {
-  return `id: ${id}\nname: 문서 ${id}\ndomains: [업무]\ndefinition: ${JSON.stringify(definition)}\n`;
+  return `_codocs:\n  id: ${id}\n  name: 문서 ${id}\ndefinition: ${JSON.stringify(definition)}\n`;
 }
 
 /** success가 true인 응답만 통과시킨다. */
@@ -113,12 +113,7 @@ function createDraft(definition: string): {
   return {
     mode: 'create',
     path: '.codocs/draft.yaml',
-    document: {
-      id: 'draft',
-      name: '초안 문서',
-      domains: ['업무'],
-      definition,
-    },
+    document: { _codocs: { id: 'draft', name: '초안 문서' }, definition },
   };
 }
 
@@ -160,10 +155,10 @@ describe('WorkspaceQuerySession.duplicates: 전체 검사', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('한 문서의 definition과 examples가 같은 문장을 가지면 문서 내부 반복 후보를 반환한다', async () => {
+  it('한 문서의 definition과 예시 section이 같은 문장을 가지면 문서 내부 반복 후보를 반환한다', async () => {
     await file(
       'alpha.yaml',
-      `id: alpha\nname: 문서 alpha\ndomains: [업무]\ndefinition: ${JSON.stringify(repeated)}\nexamples:\n  - ${JSON.stringify(repeated)}\n`,
+      `_codocs:\n  id: alpha\n  name: 문서 alpha\ndefinition: ${JSON.stringify(repeated)}\n예시: ${JSON.stringify(repeated)}\n`,
     );
 
     const result = succeeded(await session().duplicates());
@@ -171,7 +166,7 @@ describe('WorkspaceQuerySession.duplicates: 전체 검사', () => {
     expect(result.totalCandidates).toBe(1);
     expect(result.candidates[0]?.a.path).toBe(result.candidates[0]?.b.path);
     expect(result.candidates[0]?.a.fieldPath).toEqual(['definition']);
-    expect(result.candidates[0]?.b.fieldPath).toEqual(['examples', 0]);
+    expect(result.candidates[0]?.b.fieldPath).toEqual(['예시']);
   });
 
   it('반복이 없는 문서만 있으면 완료 상태와 빈 후보 목록을 반환한다', async () => {
@@ -327,9 +322,7 @@ describe('WorkspaceQuerySession.duplicates: 문서별 준비 캐시', () => {
       mode: 'create',
       path: '.codocs/draft.yaml',
       document: {
-        id: 'draft',
-        name: '초안 문서',
-        domains: ['업무'],
+        _codocs: { id: 'draft', name: '초안 문서' },
         definition: settlement,
       },
     };
@@ -438,7 +431,7 @@ describe('WorkspaceQuerySession.duplicates: 초안 검사', () => {
     await file('alpha.yaml', raw('alpha', shipping));
     await file('beta.yaml', raw('beta', shipping));
     const request = createDraft(settlement);
-    request.document.examples = [settlement];
+    request.document.예시 = settlement;
 
     const result = succeeded(await session().duplicates(request));
 
@@ -573,11 +566,9 @@ describe('WorkspaceQuerySession.duplicates: 초안 검사', () => {
       mode: 'create',
       path: '.codocs/draft.yaml',
       document: {
-        id: 'draft',
-        name: '초안 문서',
-        domains: ['업무'],
+        _codocs: { id: 'draft', name: '초안 문서' },
         definition: settlement,
-        examples: [settlement],
+        예시: settlement,
       },
     };
 
@@ -590,7 +581,7 @@ describe('WorkspaceQuerySession.duplicates: 초안 검사', () => {
     expect(result.candidates[0]?.b.origin).toBe(
       workspaceDuplicateLocationOrigins.draft,
     );
-    expect(result.candidates[0]?.b.fieldPath).toEqual(['examples', 0]);
+    expect(result.candidates[0]?.b.fieldPath).toEqual(['예시']);
   });
 
   it('초안을 검사해도 파일 바이트·디렉터리 목록·색인 조회 결과가 바뀌지 않는다', async () => {
@@ -607,9 +598,7 @@ describe('WorkspaceQuerySession.duplicates: 초안 검사', () => {
       mode: 'create',
       path: '.codocs/draft.yaml',
       document: {
-        id: 'draft',
-        name: '초안 문서',
-        domains: ['업무'],
+        _codocs: { id: 'draft', name: '초안 문서' },
         definition: repeated,
       },
     };
@@ -981,9 +970,7 @@ describe('WorkspaceQuerySession.duplicates: 결과 페이지와 커서 만료', 
       mode: 'create',
       path: '.codocs/draft.yaml',
       document: {
-        id: 'draft',
-        name: '초안 문서',
-        domains: ['업무'],
+        _codocs: { id: 'draft', name: '초안 문서' },
         definition: repeated,
       },
     };

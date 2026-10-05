@@ -67,9 +67,9 @@ Open the project folder containing `.codocs` to start using the extension.
 
 ### Features
 
-- **Document diagnostics:** Check YAML syntax, required fields, duplicate IDs, and reference errors in `.codocs` documents.
-- **Document links:** Navigate to resolved `[[Document name]]` references in YAML content.
-- **Explicit code links:** Write `@codocs [[Document name]]`, `@codocs [[Document name]]#L11`, or `@codocs [[Domain:Document name]]#L11-L12` in project text to link to a document, line, or inclusive line range.
+- **Document diagnostics:** Check YAML syntax, the `_codocs` metadata and sections, duplicate IDs and names, parent links, and reference errors in `.codocs` documents.
+- **Document links:** Navigate to resolved `[[Document name]]` references in any section of a document.
+- **Explicit code links:** Write `@codocs [[Document name]]`, `@codocs [[Document name]]#L11`, or `@codocs [[Document name]]#L11-L12` in project text to link to a document, line, or inclusive line range.
 - **Reverse code references:** Navigate from a referenced document line to the matching code occurrence. Multiple occurrences have separate hover links. Whole-document references appear in an Inlay Hint before the first row; a single occurrence uses the IDE navigation gesture.
 - **Workspace support:** Use separate project knowledge for each folder in a multi-folder workspace. Document changes are reflected automatically.
 
@@ -80,14 +80,14 @@ If you need to reconnect after resolving a server problem, run **Codocs: Restart
 Create `.codocs/order.yaml` in your project:
 
 ```yaml
-id: order
-name: Order
-domains: [Sales]
-definition: |
+_codocs:
+  id: order
+  name: Order
+Overview: |
   An order records a customer's purchase and its fulfillment rules.
 ```
 
-Link code to the document with `@codocs [[Order]]` in a comment, or ask your AI assistant to retrieve it through MCP. Use document references such as `[[Order]]` to connect related knowledge. Codocs does not connect a document just because a variable or function has the same name.
+Link code to the document with `@codocs [[Order]]` in a comment, or ask your AI assistant to retrieve it through MCP. A document is a `_codocs` object with `id`, `name`, and an optional `parent`, plus one or more sections; each section name is a key whose value is text. Use document references such as `[[Order]]` in any section to connect related knowledge. Codocs does not connect a document just because a variable or function has the same name.
 
 See the [writing guide](docs/guide/README.md) and [sample project](examples/.codocs) for more examples. The detailed guide and sample project are currently in Korean.
 

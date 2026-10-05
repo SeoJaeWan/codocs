@@ -15,7 +15,7 @@ const target: WorkspacePathDocumentResult = {
     uri: 'file:///root/.codocs/target.yaml',
   },
   confirmation: catalogConfirmations.confirmed,
-  document: { id: 'target', name: '대상' },
+  document: { _codocs: { id: 'target', name: '대상' } },
   diagnostics: [],
 };
 const sourceUri = 'file:///root/source.ts';

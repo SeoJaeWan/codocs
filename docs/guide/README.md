@@ -18,7 +18,7 @@ AI도 `codocs_guide`를 호출하면 이 디렉터리의 같은 원문을 읽는
 | topic      | 안내                                            |
 | ---------- | ----------------------------------------------- |
 | overview   | 이 문서: 전체 순서와 주제 목록                  |
-| schema     | [YAML 속성과 허용 값](schema.md)                |
+| schema     | [`_codocs`와 섹션의 형식과 허용 값](schema.md)  |
 | writing    | [설명의 책임과 이름·참조·코드 연결](writing.md) |
 | examples   | [실행 가능한 가상 프로젝트](examples.md)        |
 | updating   | [revision 수정·삭제·충돌](updating.md)          |

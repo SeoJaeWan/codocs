@@ -19,10 +19,9 @@ import { applyWorkspaceRename } from './index.js';
 let root: string;
 const orderPath = path.join('.codocs', 'order.yaml');
 const sourcePath = path.join('.codocs', 'source.yaml');
-const order =
-  "id: order\nname: '주문'\ndomains: [판매]\ndefinition: 주문 설명\n";
+const order = "_codocs:\n  id: order\n  name: '주문'\ndefinition: 주문 설명\n";
 const source =
-  'id: source\nname: 출처\ndomains: [판매]\ndefinition: "참조 [[주문]]"\n';
+  '_codocs:\n  id: source\n  name: 출처\ndefinition: "참조 [[주문]]"\n';
 
 /** 실패 연산에 실제 시스템 코드 형태를 부여한다. */
 function ioError(code: string): Error {
@@ -87,10 +86,10 @@ describe('applyWorkspaceRename: 이름 변경 반영', () => {
         ],
       });
       expect(await read('order.yaml')).toBe(
-        "id: order\nname: '새주문'\ndomains: [판매]\ndefinition: 주문 설명\n",
+        "_codocs:\n  id: order\n  name: '새주문'\ndefinition: 주문 설명\n",
       );
       expect(await read('source.yaml')).toBe(
-        'id: source\nname: 출처\ndomains: [판매]\ndefinition: "참조 [[새주문]]"\n',
+        '_codocs:\n  id: source\n  name: 출처\ndefinition: "참조 [[새주문]]"\n',
       );
     });
 
@@ -107,7 +106,7 @@ describe('applyWorkspaceRename: 이름 변경 반영', () => {
     it('고를 참조가 남은 unresolved 상태도 반영하고 고르지 않은 참조는 원문 그대로 둔다', async () => {
       await writeDocuments({
         'purchase-order.yaml':
-          'id: purchase-order\nname: 주문\ndomains: [구매]\ndefinition: 구매\n',
+          '_codocs:\n  id: purchase-order\n  name: 주문\ndefinition: 구매\n',
       });
       const { scan, catalog, input } = await previewed();
       const result = await applyWorkspaceRename(input, scan, catalog);
@@ -139,7 +138,7 @@ describe('applyWorkspaceRename: 이름 변경 반영', () => {
     it('같은 도메인에 새 이름과 같은 문서가 있으면 blocked로 거절하고 파일을 바꾸지 않는다', async () => {
       await writeDocuments({
         'other.yaml':
-          'id: other\nname: 새주문\ndomains: [판매]\ndefinition: 설명\n',
+          '_codocs:\n  id: other\n  name: 새주문\ndefinition: 설명\n',
       });
       const { scan, catalog, input } = await previewed();
       const result = await applyWorkspaceRename(input, scan, catalog);
@@ -181,7 +180,7 @@ describe('applyWorkspaceRename: 이름 변경 반영', () => {
       const { input } = await previewed();
       await writeDocuments({
         'late.yaml':
-          'id: late\nname: 늦은 문서\ndomains: [판매]\ndefinition: "[[주문]]"\n',
+          '_codocs:\n  id: late\n  name: 늦은 문서\ndefinition: "[[주문]]"\n',
       });
       const scan = await loadWorkspace({ cwd: root });
       const result = await applyWorkspaceRename(
@@ -344,7 +343,7 @@ describe('applyWorkspaceRename: 이름 변경 반영', () => {
       const { scan, catalog, input } = await previewed();
       let appliedCalls = 0;
       const external =
-        "id: order\nname: '외부'\ndomains: [판매]\ndefinition: 외부\n";
+        "_codocs:\n  id: order\n  name: '외부'\ndefinition: 외부\n";
       const result = await applyWorkspaceRename(input, scan, catalog, {
         operations: {
           rename: async (from, to) => {

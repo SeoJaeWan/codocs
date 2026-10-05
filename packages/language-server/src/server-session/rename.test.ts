@@ -9,13 +9,8 @@ let root: string;
 let session: LanguageServerSession;
 
 /** 고정 문서 하나의 원문을 만든다. */
-function document(
-  id: string,
-  name: string,
-  definition: string,
-  domain = 'test',
-) {
-  return `id: ${id}\nname: ${name}\ndomains: [${domain}]\ndefinition: ${definition}\n`;
+function document(id: string, name: string, definition: string) {
+  return `_codocs:\n  id: ${id}\n  name: ${name}\ndefinition: ${definition}\n`;
 }
 
 /** 프로젝트 상대 경로의 file URI를 만든다. */
@@ -39,8 +34,8 @@ beforeEach(async () => {
   const files: Record<string, string> = {
     'order.yaml': document('order', '주문', '주문 설명'),
     'ref.yaml': document('ref', '참조', '본문 [[주문]] 끝'),
-    'twin-a.yaml': document('twin-a', '쌍둥이', 'A 설명', 'alpha'),
-    'twin-b.yaml': document('twin-b', '쌍둥이', 'B 설명', 'beta'),
+    'twin-a.yaml': document('twin-a', '쌍둥이', 'A 설명'),
+    'twin-b.yaml': document('twin-b', '쌍둥이', 'B 설명'),
     'twin-ref.yaml': document('twin-ref', '쌍둥이참조', '본문 [[쌍둥이]] 끝'),
   };
   for (const [name, text] of Object.entries(files))
@@ -62,18 +57,18 @@ afterEach(async () => {
 describe('prepareRename 시작 위치 확인', () => {
   it('문서의 name 값 위에서는 그 문서의 현재 이름과 name 값 범위를 반환한다', async () => {
     const text = await open('.codocs/order.yaml');
-    const line = text.split('\n').findIndex((row) => row.startsWith('name:'));
+    const line = text.split('\n').findIndex((row) => row.startsWith('  name:'));
 
     const result = await session.prepareRename({
       textDocument: { uri: uriOf('.codocs/order.yaml') },
-      position: { line, character: 7 },
+      position: { line, character: 9 },
     });
 
     expect(result).toEqual({
       placeholder: '주문',
       range: {
-        start: { line, character: 6 },
-        end: { line, character: 8 },
+        start: { line, character: 8 },
+        end: { line, character: 10 },
       },
       targetPath: path.join('.codocs', 'order.yaml'),
     });

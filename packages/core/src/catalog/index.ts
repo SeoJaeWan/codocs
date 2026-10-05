@@ -20,7 +20,12 @@ import {
 import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import type { ReferenceOccurrence } from '../references/index.js';
 import { extractReferences } from '../references/index.js';
-import { documentFields, validateDocument } from '../validator/index.js';
+import {
+  codocsKey,
+  documentFields,
+  metadataFields,
+  validateDocument,
+} from '../validator/index.js';
 import {
   catalogConfirmations,
   catalogFailureKinds,
@@ -68,17 +73,17 @@ export interface CatalogIdentity {
   realPath?: string;
   id?: string;
   name?: string;
-  domains: readonly string[];
+  /** 모두 비어 있지 않은 문자열일 때만 작성 순서 그대로 담는다. */
+  parent?: readonly string[];
   confirmation: CatalogConfirmation;
 }
 /** 후보마다 오류와 확인 상태를 함께 제공한다. */
 export interface ReferenceCandidate extends CatalogIdentity {
   errors: readonly Diagnostic[];
 }
-/** 충돌의 모든 발견 경로와 해당 도메인 및 확인한 원문 범위를 추가하는 의미 진단이다. */
+/** 충돌의 모든 발견 경로와 확인한 원문 범위를 추가하는 의미 진단이다. */
 export interface CatalogDiagnostic extends Diagnostic<CatalogDiagnosticCode> {
   relatedPaths?: readonly string[];
-  domain?: string;
   offsetRange?: OffsetRange;
 }
 /** 문법 오류와 이름 해석을 구분하며 불확실한 검색을 부재·성공으로 확정하지 않는다. */
@@ -108,12 +113,8 @@ export interface Catalog {
   documents: ReadonlyMap<string, CatalogDocument>;
   idPaths: ReadonlyMap<string, ReadonlySet<string>>;
   namePaths: ReadonlyMap<string, ReadonlySet<string>>;
-  domainNamePaths: ReadonlyMap<
-    string,
-    ReadonlyMap<string, ReadonlySet<string>>
-  >;
 }
-/** 공백만인 값은 확인 가능한 이름·ID·도메인으로 취급하지 않으며 정규화하지 않는다. */
+/** 공백만인 값은 확인 가능한 이름·ID·parent로 취급하지 않으며 정규화하지 않는다. */
 function nonblank(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -124,20 +125,30 @@ function identity(
 ): CatalogIdentity {
   const parsed = observation.parsed;
   const data = parsed.success ? parsed.data : {};
-  const name = data.name;
-  const domains = Array.isArray(data.domains)
-    ? data.domains.filter(nonblank)
-    : [];
+  const metadata = ownValue(data, codocsKey);
+  const name = ownValue(metadata, metadataFields.name);
+  const metadataId = ownValue(metadata, metadataFields.id);
+  const parent = ownValue(metadata, metadataFields.parent);
   return {
     path: observation.path,
     ...(observation.realPath !== undefined
       ? { realPath: observation.realPath }
       : {}),
-    ...(nonblank(data.id) ? { id: data.id } : {}),
+    ...(nonblank(metadataId) ? { id: metadataId } : {}),
     ...(nonblank(name) ? { name } : {}),
-    domains: [...new Set(domains)],
+    ...(Array.isArray(parent) && parent.length && parent.every(nonblank)
+      ? { parent: [...parent] }
+      : {}),
     confirmation,
   };
+}
+/** 자체 데이터 속성만 조회하며 getter와 상속 속성을 실행하지 않는다. */
+function ownValue(value: unknown, key: string): unknown {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && 'value' in descriptor
+    ? (descriptor.value as unknown)
+    : undefined;
 }
 /** 구분자를 연결하지 않고 값별 집합에 경로를 추가한다. */
 function addPath(
@@ -157,6 +168,14 @@ const catalogDiagnosticDefinitions = {
   },
   [catalogDiagnosticCodes.duplicateName]: {
     message: catalogDiagnosticMessages.duplicateName,
+    severity: diagnosticSeverities.error,
+  },
+  [catalogDiagnosticCodes.parentNotFound]: {
+    message: catalogDiagnosticMessages.parentNotFound,
+    severity: diagnosticSeverities.error,
+  },
+  [catalogDiagnosticCodes.parentCycle]: {
+    message: catalogDiagnosticMessages.parentCycle,
     severity: diagnosticSeverities.error,
   },
   [catalogDiagnosticCodes.missingReference]: {
@@ -190,7 +209,7 @@ function catalogDiagnostic(
   code: CatalogDiagnosticCode,
   fieldPath?: FieldPath,
   occurrence?: ReferenceOccurrence,
-  context?: { relatedPaths: readonly string[]; domain?: string },
+  context?: { relatedPaths: readonly string[] },
 ): CatalogDiagnostic {
   const parsed = document.observation.parsed;
   const offsets =
@@ -218,12 +237,7 @@ function catalogDiagnostic(
     code,
     ...catalogDiagnosticDefinitions[code],
     path: document.path,
-    ...(context
-      ? {
-          relatedPaths: [...context.relatedPaths],
-          ...(context.domain !== undefined ? { domain: context.domain } : {}),
-        }
-      : {}),
+    ...(context ? { relatedPaths: [...context.relatedPaths] } : {}),
     ...(fieldPath ? { fieldPath: [...fieldPath] } : {}),
     ...(offsets ? { offsetRange: { ...offsets } } : {}),
     ...(start && end ? { range: { start, end } } : {}),
@@ -245,31 +259,13 @@ function linkIdentity(document: CatalogIdentity): CatalogIdentity {
     ...(document.realPath !== undefined ? { realPath: document.realPath } : {}),
     ...(document.id !== undefined ? { id: document.id } : {}),
     ...(document.name !== undefined ? { name: document.name } : {}),
-    domains: [...document.domains],
+    ...(document.parent !== undefined ? { parent: [...document.parent] } : {}),
     confirmation: document.confirmation,
   };
 }
 /**
- * 도메인을 적은 참조의 후보를 그 도메인에 속한 문서에서만 찾는다.
- */
-function findInDomain(
-  catalog: Catalog,
-  domain: string,
-  name: string,
-): ReadonlySet<string> | undefined {
-  return catalog.domainNamePaths.get(domain)?.get(name);
-}
-/**
- * 도메인을 생략한 참조의 후보를 모든 도메인에서 찾는다.
- */
-function findInAllDomains(
-  catalog: Catalog,
-  name: string,
-): ReadonlySet<string> | undefined {
-  return catalog.namePaths.get(name);
-}
-/**
- * 참조의 name과 도메인으로 후보 문서를 찾아 경로순으로 돌려준다.
+ * 참조의 name으로 후보 문서를 찾아 경로순으로 돌려준다.
+ * 도메인은 더 이상 문서에 없으므로 도메인을 적은 참조는 후보가 없다.
  */
 function findCandidates(
   catalog: Catalog,
@@ -277,8 +273,8 @@ function findCandidates(
 ): ReferenceCandidate[] {
   const paths =
     reference.domain === undefined
-      ? findInAllDomains(catalog, reference.name)
-      : findInDomain(catalog, reference.domain, reference.name);
+      ? catalog.namePaths.get(reference.name)
+      : undefined;
   return [...(paths ?? [])].sort().flatMap((path) => {
     const doc = catalog.documents.get(path);
     return doc ? [candidate(doc)] : [];
@@ -321,6 +317,113 @@ export function resolveReference(
     return { status: referenceResolutionStatuses.self, candidates, target };
   return { status: referenceResolutionStatuses.resolved, candidates, target };
 }
+/** 계산할 때마다 다시 만드는 프로젝트 수준 진단 코드다. */
+const projectDiagnosticCodes: ReadonlySet<string> = new Set([
+  catalogDiagnosticCodes.duplicateId,
+  catalogDiagnosticCodes.duplicateName,
+  catalogDiagnosticCodes.parentNotFound,
+  catalogDiagnosticCodes.parentCycle,
+]);
+/** parent 이름이 가리키는 후보 경로를 찾는다. 이름에 해당하는 문서가 여러 개여도 모두 후보다. */
+function parentPaths(catalog: Catalog, name: string): readonly string[] {
+  return [...(catalog.namePaths.get(name) ?? [])].sort();
+}
+/**
+ * 문서 관계 그래프에서 순환에 속한 경로 집합을 Tarjan 알고리즘으로 구한다.
+ * @param edges 경로별 상위 문서 경로다. 자기 자신으로의 간선도 순환이다.
+ * @returns 순환에 속한 경로마다 그 순환 구성원 전체를 돌려준다.
+ */
+function cycleGroups(
+  edges: ReadonlyMap<string, readonly string[]>,
+): Map<string, ReadonlySet<string>> {
+  const index = new Map<string, number>(),
+    low = new Map<string, number>();
+  const stack: string[] = [],
+    onStack = new Set<string>();
+  const groups = new Map<string, ReadonlySet<string>>();
+  let counter = 0;
+  /** 한 경로에서 시작해 강연결 요소를 찾는다. */
+  function visit(node: string): void {
+    index.set(node, counter);
+    low.set(node, counter);
+    counter++;
+    stack.push(node);
+    onStack.add(node);
+    for (const next of edges.get(node) ?? []) {
+      if (!index.has(next)) {
+        visit(next);
+        low.set(node, Math.min(low.get(node) ?? 0, low.get(next) ?? 0));
+      } else if (onStack.has(next))
+        low.set(node, Math.min(low.get(node) ?? 0, index.get(next) ?? 0));
+    }
+    if (low.get(node) !== index.get(node)) return;
+    const members = new Set<string>();
+    for (;;) {
+      const member = stack.pop();
+      if (member === undefined) break;
+      onStack.delete(member);
+      members.add(member);
+      if (member === node) break;
+    }
+    if (members.size > 1 || (edges.get(node) ?? []).includes(node))
+      for (const member of members) groups.set(member, members);
+  }
+  for (const node of edges.keys()) if (!index.has(node)) visit(node);
+  return groups;
+}
+/**
+ * 각 문서의 parent 이름을 해석해 존재·순환 오류를 추가한다. 상위 문서 연결은 참조와 별개이며 저장하지 않는다.
+ * 불완전한 탐색에서는 없는 이름을 오류로 확정하지 않는다.
+ */
+function resolveParents(
+  catalog: Catalog,
+  documents: Map<string, CatalogDocument>,
+): void {
+  const edges = new Map<string, readonly string[]>();
+  for (const [path, doc] of documents)
+    edges.set(
+      path,
+      (doc.parent ?? []).flatMap((name) => parentPaths(catalog, name)),
+    );
+  const groups = cycleGroups(edges);
+  for (const [path, doc] of documents) {
+    const names = doc.parent ?? [];
+    const diagnostics: CatalogDiagnostic[] = [];
+    names.forEach(
+      /** 항목별로 존재 여부를 확인한다. */ (name, position) => {
+        const paths = parentPaths(catalog, name);
+        const fieldPath = [...documentFields.parent, position];
+        if (!paths.length && isScanComplete(catalog))
+          diagnostics.push(
+            catalogDiagnostic(
+              doc,
+              catalogDiagnosticCodes.parentNotFound,
+              fieldPath,
+            ),
+          );
+      },
+    );
+    const group = groups.get(path);
+    if (group) {
+      const position = names.findIndex((name) =>
+        parentPaths(catalog, name).some((target) => group.has(target)),
+      );
+      diagnostics.push(
+        catalogDiagnostic(
+          doc,
+          catalogDiagnosticCodes.parentCycle,
+          [...documentFields.parent, position],
+          undefined,
+          { relatedPaths: [...group].sort() },
+        ),
+      );
+    }
+    documents.set(path, {
+      ...doc,
+      documentDiagnostics: [...doc.documentDiagnostics, ...diagnostics],
+    });
+  }
+}
 /** 보관 기록에서 색인·충돌·직접 연결을 매번 재계산한다. */
 function calculate(
   status: Catalog['status'],
@@ -330,14 +433,11 @@ function calculate(
   const documents = new Map<string, CatalogDocument>();
   const idPaths = new Map<string, Set<string>>(),
     namePaths = new Map<string, Set<string>>();
-  const domainNamePaths = new Map<string, Map<string, Set<string>>>();
   for (const record of records) {
     const doc: CatalogDocument = {
       ...record,
       documentDiagnostics: record.documentDiagnostics.filter(
-        (d) =>
-          d.code !== catalogDiagnosticCodes.duplicateId &&
-          d.code !== catalogDiagnosticCodes.duplicateName,
+        (d) => !projectDiagnosticCodes.has(d.code),
       ),
       diagnostics: [],
       occurrences: [],
@@ -346,15 +446,7 @@ function calculate(
     };
     documents.set(doc.path, doc);
     if (doc.id !== undefined) addPath(idPaths, doc.id, doc.path);
-    if (doc.name !== undefined) {
-      addPath(namePaths, doc.name, doc.path);
-      for (const domain of doc.domains) {
-        const names =
-          domainNamePaths.get(domain) ?? new Map<string, Set<string>>();
-        addPath(names, doc.name, doc.path);
-        domainNamePaths.set(domain, names);
-      }
-    }
+    if (doc.name !== undefined) addPath(namePaths, doc.name, doc.path);
   }
   const catalog: Catalog = {
     status,
@@ -362,7 +454,6 @@ function calculate(
     documents,
     idPaths,
     namePaths,
-    domainNamePaths,
   };
   /** 충돌의 모든 경로를 개별 진단한다. */
   function conflicts(
@@ -370,24 +461,21 @@ function calculate(
     code:
       | typeof catalogDiagnosticCodes.duplicateId
       | typeof catalogDiagnosticCodes.duplicateName,
-    domain?: string,
   ): void {
     if (paths.size < 2) return;
     for (const path of paths) {
       const doc = documents.get(path);
       if (doc) {
-        const field = [
+        const field =
           code === catalogDiagnosticCodes.duplicateId
             ? documentFields.id
-            : documentFields.name,
-        ];
+            : documentFields.name;
         documents.set(path, {
           ...doc,
           documentDiagnostics: [
             ...doc.documentDiagnostics,
             catalogDiagnostic(doc, code, field, undefined, {
               relatedPaths: [...paths].sort(),
-              ...(domain !== undefined ? { domain } : {}),
             }),
           ],
         });
@@ -396,9 +484,9 @@ function calculate(
   }
   for (const paths of idPaths.values())
     conflicts(paths, catalogDiagnosticCodes.duplicateId);
-  for (const [domain, names] of domainNamePaths)
-    for (const paths of names.values())
-      conflicts(paths, catalogDiagnosticCodes.duplicateName, domain);
+  for (const paths of namePaths.values())
+    conflicts(paths, catalogDiagnosticCodes.duplicateName);
+  resolveParents(catalog, documents);
   const backlinks = new Map<string, Set<string>>();
   for (const [path, doc] of documents) {
     const resolved = resolveDocumentReferences(catalog, doc);
@@ -513,6 +601,59 @@ function resolveDocumentReferences(
 }
 
 /**
+ * 편집 중인 문서의 parent가 저장된 색인에서 존재하고 순환하지 않는지 확인한다.
+ * 저장된 다른 문서의 상위 관계는 바꾸지 않고 읽기만 한다.
+ */
+function liveParentDiagnostics(
+  catalog: Catalog,
+  document: CatalogDocument,
+): CatalogDiagnostic[] {
+  const diagnostics: CatalogDiagnostic[] = [];
+  (document.parent ?? []).forEach(
+    /** 항목별로 존재와 순환을 확인한다. */ (name, position) => {
+      const fieldPath = [...documentFields.parent, position];
+      const paths = parentPaths(catalog, name);
+      if (!paths.length && name !== document.name) {
+        if (isScanComplete(catalog))
+          diagnostics.push(
+            catalogDiagnostic(
+              document,
+              catalogDiagnosticCodes.parentNotFound,
+              fieldPath,
+            ),
+          );
+        return;
+      }
+      const seen = new Set<string>();
+      const pending = paths.filter((path) => path !== document.path);
+      let cyclic = name === document.name;
+      while (!cyclic && pending.length) {
+        const path = pending.pop();
+        if (path === undefined || seen.has(path)) continue;
+        seen.add(path);
+        for (const parentName of catalog.documents.get(path)?.parent ?? []) {
+          if (parentName === document.name) cyclic = true;
+          for (const parent of parentPaths(catalog, parentName))
+            if (parent === document.path) cyclic = true;
+            else pending.push(parent);
+        }
+      }
+      if (cyclic)
+        diagnostics.push(
+          catalogDiagnostic(
+            document,
+            catalogDiagnosticCodes.parentCycle,
+            fieldPath,
+            undefined,
+            { relatedPaths: [document.path] },
+          ),
+        );
+    },
+  );
+  return diagnostics;
+}
+
+/**
  * 편집 중인 문서의 저장하지 않은 내용으로 참조를 해석한다.
  * 대상은 저장된 색인으로 판단하며 색인과 역참조는 바꾸지 않는다.
  */
@@ -553,32 +694,29 @@ export function resolveLiveDocument(
       catalogDiagnostic(
         document,
         catalogDiagnosticCodes.duplicateId,
-        [documentFields.id],
+        documentFields.id,
         undefined,
         {
           relatedPaths: [observation.path, ...conflicts].sort(),
         },
       ),
     );
-  if (document.name !== undefined)
-    for (const domain of document.domains) {
-      const nameConflicts = [
-        ...(catalog.domainNamePaths.get(domain)?.get(document.name) ?? []),
-      ].filter((path) => path !== observation.path);
-      if (nameConflicts.length)
-        documentDiagnostics.push(
-          catalogDiagnostic(
-            document,
-            catalogDiagnosticCodes.duplicateName,
-            [documentFields.name],
-            undefined,
-            {
-              relatedPaths: [observation.path, ...nameConflicts].sort(),
-              domain,
-            },
-          ),
-        );
-    }
+  if (document.name !== undefined) {
+    const nameConflicts = [
+      ...(catalog.namePaths.get(document.name) ?? []),
+    ].filter((path) => path !== observation.path);
+    if (nameConflicts.length)
+      documentDiagnostics.push(
+        catalogDiagnostic(
+          document,
+          catalogDiagnosticCodes.duplicateName,
+          documentFields.name,
+          undefined,
+          { relatedPaths: [observation.path, ...nameConflicts].sort() },
+        ),
+      );
+  }
+  documentDiagnostics.push(...liveParentDiagnostics(catalog, document));
   return resolveDocumentReferences(catalog, document);
 }
 
@@ -630,12 +768,11 @@ export function buildCatalog(scan: CatalogScan, previous?: Catalog): Catalog {
   return calculate(scan.status, scan.failures ?? [], [...records.values()]);
 }
 
-/** 모호한 후보 또는 명시 도메인을 사용자가 선택한 등장별 결정이다. */
+/** 모호한 후보 중 하나를 사용자가 선택한 등장별 결정이다. */
 export interface RenameSelection {
   sourcePath: string;
   occurrenceIndex: number;
   targetPath: string;
-  domain?: string;
 }
 /** 계산만 수행하는 이름 변경 요청이다. 참조 동시 변경은 기본으로 활성화된다. */
 export interface RenameRequest {
@@ -654,6 +791,7 @@ export interface RenameChange {
   newText: string;
   targetPath: string;
   candidates: readonly ReferenceCandidate[];
+  /** 본문 참조 등장의 순번이다. 이름 필드와 parent 항목 수정에는 없다. */
   occurrenceIndex?: number;
 }
 /** 자동 확정하지 않은 영향 및 변경 후 다른 후보가 되는 영향도 보고한다. */
@@ -665,9 +803,8 @@ export interface RenameImpact {
   after: ReferenceResolution;
   reason: RenameImpactReason;
 }
-/** 같은 도메인의 새 이름 충돌은 종류를 가리지 않고 변경을 차단한다. */
+/** 프로젝트에서 새 이름을 이미 쓰는 문서가 있으면 변경을 차단한다. */
 export interface RenameConflict {
-  domain: string;
   candidates: readonly ReferenceCandidate[];
 }
 /** 순수 수정안이며 blocked/unresolved를 저장 허용으로 해석하지 않는다. */
@@ -683,25 +820,19 @@ export interface RenamePlan {
   blockingReason?: RenameBlockingReason;
 }
 /** 새 표기를 공개 문법 추출로 round trip 검증한다. 표현 불가능한 구성은 추측하지 않는다. */
-function referenceText(name: string, domain?: string): string | undefined {
+function referenceText(name: string): string | undefined {
   /** 구성 내부 콜론을 구분자와 구분한다. */
   const encode = (value: string): string => value.replace(/:/gu, '\\:');
-  const text = `[[${domain === undefined ? '' : `${encode(domain)}:`}${encode(name)}]]`;
-  if (
-    name.includes('[') ||
-    name.includes(']') ||
-    domain?.includes('[') ||
-    domain?.includes(']')
-  )
-    return undefined;
+  const text = `[[${encode(name)}]]`;
+  if (name.includes('[') || name.includes(']')) return undefined;
   const extracted = extractReferences(
-    parseYaml(`definition: ${JSON.stringify(text)}\n`),
+    parseYaml(`body: ${JSON.stringify(text)}\n`),
   );
   const occurrence = extracted.occurrences[0];
   return extracted.occurrences.length === 1 &&
     occurrence?.syntax === referenceSyntaxStatuses.valid &&
     occurrence.name === name &&
-    occurrence.domain === domain
+    occurrence.domain === undefined
     ? text
     : undefined;
 }
@@ -778,35 +909,70 @@ export function planRename(
       invalidSelections,
       blockingReason: renameBlockingReasons.invalidSelection,
     };
-  const conflicts: RenameConflict[] = target.domains.flatMap(
-    /** 모든 소속 도메인의 cross-kind 새 이름 충돌을 계산한다. */ (domain) => {
-      const resolution = resolveReference(catalog, {
-        name: request.newName,
-        domain,
-      });
-      const candidates = resolution.candidates.filter(
-        (c) => c.path !== target.path,
-      );
-      return candidates.length ? [{ domain, candidates }] : [];
-    },
-  );
+  const newNameCandidates = resolveReference(catalog, {
+    name: request.newName,
+  }).candidates.filter((c) => c.path !== target.path);
+  const conflicts: RenameConflict[] = newNameCandidates.length
+    ? [{ candidates: newNameCandidates }]
+    : [];
   if (conflicts.length)
     return {
       ...initial,
       conflicts,
       blockingReason: renameBlockingReasons.nameConflict,
     };
+  /** 이름이 유일할 때만 다른 문서의 parent 항목이 이 문서를 가리킨다고 본다. */
+  const parentOwners =
+    target.name !== request.newName &&
+    (catalog.namePaths.get(target.name)?.size ?? 0) === 1
+      ? [...catalog.documents.values()].filter(
+          (doc) =>
+            doc.path !== target.path && doc.parent?.includes(target.name ?? ''),
+        )
+      : [];
   const simulated = calculate(
     catalog.status,
     catalog.failures,
-    [...catalog.documents.values()].map((doc) =>
-      doc.path === target.path ? { ...doc, name: request.newName } : doc,
+    [...catalog.documents.values()].map(
+      /** 이름 변경을 반영한 시뮬레이션 기록을 만든다. */ (doc) =>
+        doc.path === target.path
+          ? { ...doc, name: request.newName }
+          : parentOwners.includes(doc)
+            ? {
+                ...doc,
+                parent: (doc.parent ?? []).map((name) =>
+                  name === target.name ? request.newName : name,
+                ),
+              }
+            : doc,
     ),
   );
+  const brokenParents = [...simulated.documents.values()].filter(
+    /** 이름 변경으로 새로 생기는 parent 오류만 찾는다. */ (doc) =>
+      doc.documentDiagnostics.some(
+        /** 같은 위치의 parent 오류가 이미 있었는지 비교한다. */ (d) =>
+          (d.code === catalogDiagnosticCodes.parentNotFound ||
+            d.code === catalogDiagnosticCodes.parentCycle) &&
+          !catalog.documents
+            .get(doc.path)
+            ?.documentDiagnostics.some(
+              (before) =>
+                before.code === d.code &&
+                JSON.stringify(before.fieldPath) ===
+                  JSON.stringify(d.fieldPath),
+            ),
+      ),
+  );
+  if (brokenParents.length)
+    return {
+      ...initial,
+      conflicts: [{ candidates: brokenParents.map(candidate) }],
+      blockingReason: renameBlockingReasons.nameConflict,
+    };
   const changes: RenameChange[] = [],
     impacts: RenameImpact[] = [],
     rejectedSelections: RenameSelection[] = [];
-  const fieldPath = [documentFields.name];
+  const fieldPath = documentFields.name;
   const parsed = target.observation.parsed;
   const offsetRange = getStringRange(parsed, fieldPath, {
     start: 0,
@@ -908,49 +1074,15 @@ export function planRename(
           impact(renameImpactReasons.referencesDisabled);
         continue;
       }
-      let domain = occurrence.domain;
-      if (selection?.domain !== undefined) {
-        if (
-          !selected.domains.includes(selection.domain) ||
-          (domain !== undefined && domain !== selection.domain)
-        ) {
-          reject();
-          continue;
-        }
-        if (domain === undefined) domain = selection.domain;
-      }
-      const proposed = resolveReference(
-        simulated,
-        { name, ...(domain !== undefined ? { domain } : {}) },
-        doc.path,
-      );
+      const proposed = resolveReference(simulated, { name }, doc.path);
       if (
         proposed.status !== referenceResolutionStatuses.resolved ||
         proposed.target?.path !== selected.path
       ) {
-        if (domain !== undefined) {
-          reject();
-          continue;
-        }
-        if (selected.domains.length !== 1) {
-          impact(renameImpactReasons.domainRequired);
-          continue;
-        }
-        domain = selected.domains[0];
-        const qualified = resolveReference(
-          simulated,
-          { name, ...(domain !== undefined ? { domain } : {}) },
-          doc.path,
-        );
-        if (
-          qualified.status !== referenceResolutionStatuses.resolved ||
-          qualified.target?.path !== selected.path
-        ) {
-          reject();
-          continue;
-        }
+        impact(renameImpactReasons.unrepresentable);
+        continue;
       }
-      const newText = referenceText(name, domain);
+      const newText = referenceText(name);
       if (newText === undefined) {
         if (affected) impact(renameImpactReasons.unrepresentable);
         continue;
@@ -968,6 +1100,43 @@ export function planRename(
           occurrenceIndex,
         });
     }
+  for (const owner of parentOwners) {
+    const ownerParsed = owner.observation.parsed;
+    if (!ownerParsed.success)
+      return {
+        ...initial,
+        blockingReason: renameBlockingReasons.targetUnavailable,
+      };
+    for (const [position, name] of (owner.parent ?? []).entries()) {
+      if (name !== target.name) continue;
+      const parentPath = [...documentFields.parent, position];
+      const parentRange = getStringRange(ownerParsed, parentPath, {
+        start: 0,
+        end: name.length,
+      });
+      const parentStart = parentRange
+        ? offsetToPosition(ownerParsed.source, parentRange.start)
+        : undefined;
+      const parentEnd = parentRange
+        ? offsetToPosition(ownerParsed.source, parentRange.end)
+        : undefined;
+      if (!parentRange || !parentStart || !parentEnd)
+        return {
+          ...initial,
+          blockingReason: renameBlockingReasons.targetUnavailable,
+        };
+      changes.push({
+        path: owner.path,
+        fieldPath: parentPath,
+        offsetRange: parentRange,
+        range: { start: parentStart, end: parentEnd },
+        oldText: name,
+        newText: request.newName,
+        targetPath: target.path,
+        candidates: [candidate(target)],
+      });
+    }
+  }
   if (rejectedSelections.length)
     return {
       ...initial,

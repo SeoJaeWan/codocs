@@ -796,8 +796,8 @@ describe('VscodeExtensionRuntime 이름 바꾸기 provider', () => {
       before: {
         status: 'ambiguous',
         candidates: [
-          { path: 'a', name: '쌍둥이', domains: ['alpha'] },
-          { path: 'b', name: '쌍둥이', domains: ['beta'] },
+          { _codocs: { name: '쌍둥이' }, path: 'a' },
+          { _codocs: { name: '쌍둥이' }, path: 'b' },
         ],
       },
     };
@@ -844,7 +844,7 @@ describe('VscodeExtensionRuntime 이름 바꾸기 provider', () => {
       reason: 'selection_required',
       before: {
         status: 'ambiguous',
-        candidates: [{ path: 'a', name: '쌍둥이', domains: ['alpha'] }],
+        candidates: [{ _codocs: { name: '쌍둥이' }, path: 'a' }],
       },
     };
     respond({

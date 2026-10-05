@@ -31,7 +31,6 @@ import {
   storageDiagnosticMessages,
   type Catalog,
   type CatalogGetResult,
-  type CatalogListFilters,
   type CatalogListItem,
   type CatalogPathDocumentResult,
   type CatalogPathLink,
@@ -124,7 +123,7 @@ import {
 } from '../lifecycle/index.js';
 
 const pageSize = 50;
-const cursorVersion = 1;
+const cursorVersion = 2;
 
 /** 목록 커서가 현재 process 또는 snapshot에서 더 이상 유효하지 않을 때 사용하는 코드다. @domainValues */
 export const workspaceQueryDiagnosticCodes = {
@@ -158,8 +157,8 @@ export type WorkspaceQueryDiagnostic =
       (typeof workspaceQueryDiagnosticCodes)[keyof typeof workspaceQueryDiagnosticCodes]
     >;
 
-/** 목록 입력은 고정 페이지와 선택 필터 또는 이전 페이지 커서만 제공한다. */
-export interface WorkspaceListInput extends CatalogListFilters {
+/** 목록 입력은 고정 페이지의 이전 페이지 커서만 제공한다. */
+export interface WorkspaceListInput {
   cursor?: string;
 }
 
@@ -445,7 +444,6 @@ function superseded(): WorkspaceQueryFailure {
 
 interface CursorPayload {
   version: typeof cursorVersion;
-  filters: CatalogListFilters;
   position: number;
   fingerprint: string;
   generation: number;
@@ -458,12 +456,6 @@ function ownValue(value: unknown, key: string): unknown {
   return descriptor && 'value' in descriptor
     ? (descriptor.value as unknown)
     : undefined;
-}
-
-/** own data property가 실제로 제공됐는지 확인한다. */
-function hasOwnData(value: object, key: string): boolean {
-  const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  return descriptor !== undefined && 'value' in descriptor;
 }
 
 /** 공개 unknown 입력에서 own data path 선택값만 복사한다. */
@@ -486,16 +478,9 @@ function sessionInput(input: unknown): unknown {
   }
 }
 
-/** 생략 속성을 제외한 고정 순서 필터를 만든다. */
-function normalizeFilters(input: CatalogListFilters): CatalogListFilters {
-  return {
-    ...(input.domain === undefined ? {} : { domain: input.domain }),
-  };
-}
-
-/** 커서와 함께 필터가 하나라도 명시되었는지 판별한다. */
-function hasSuppliedFilters(input: WorkspaceListInput): boolean {
-  return ['domain'].some((key) => hasOwnData(input, key));
+/** 커서 외의 자체 속성(제거된 필터 포함)이 제공되었는지 판별한다. */
+function hasUnsupportedInput(input: WorkspaceListInput): boolean {
+  return Object.keys(input).some((key) => key !== 'cursor');
 }
 
 /** 목록에 보이는 모든 값만 canonical snapshot으로 해시한다. */
@@ -515,26 +500,20 @@ function encodeCursor(payload: CursorPayload): string {
 /** JSON payload를 own data property 확인 뒤 계약 타입으로 좁힌다. */
 function cursorPayload(value: unknown): CursorPayload | undefined {
   const version = ownValue(value, 'version');
-  const filters = ownValue(value, 'filters');
   const position = ownValue(value, 'position');
   const listFingerprint = ownValue(value, 'fingerprint');
   const generation = ownValue(value, 'generation');
-  const domain = ownValue(filters, 'domain');
   if (
     version !== cursorVersion ||
     !Number.isSafeInteger(position) ||
     (position as number) < 0 ||
     typeof listFingerprint !== 'string' ||
     !Number.isSafeInteger(generation) ||
-    (generation as number) < 0 ||
-    (domain !== undefined && typeof domain !== 'string')
+    (generation as number) < 0
   )
     return undefined;
   return {
     version,
-    filters: normalizeFilters({
-      ...(typeof domain === 'string' ? { domain } : {}),
-    }),
     position: position as number,
     fingerprint: listFingerprint,
     generation: generation as number,
@@ -864,7 +843,7 @@ export class WorkspaceQuerySession {
     if (this.#closed) return;
     const initial = !this.#scan;
     const previousFingerprint = this.#catalog
-      ? fingerprint(projectCatalogList(this.#catalog, {}).items)
+      ? fingerprint(projectCatalogList(this.#catalog).items)
       : undefined;
     if (scan.status !== scanStatuses.failed) {
       const next = buildWorkspaceCatalog(scan, this.#catalog);
@@ -879,7 +858,7 @@ export class WorkspaceQuerySession {
       this.#catalogVersion++;
       if (
         previousFingerprint !== undefined &&
-        previousFingerprint !== fingerprint(projectCatalogList(next, {}).items)
+        previousFingerprint !== fingerprint(projectCatalogList(next).items)
       )
         this.#generation++;
       if (scan.status === scanStatuses.complete) {
@@ -1372,15 +1351,8 @@ export class WorkspaceQuerySession {
       input.cursor === undefined ? undefined : decodeCursor(input.cursor);
     if (input.cursor !== undefined && !decoded)
       return cursorExpired(scanStatus);
-    const supplied = normalizeFilters(input);
-    if (
-      decoded &&
-      hasSuppliedFilters(input) &&
-      JSON.stringify(supplied) !== JSON.stringify(decoded.filters)
-    )
-      return invalidInput(scanStatus);
-    const filters = decoded?.filters ?? supplied;
-    const projection = projectCatalogList(catalog, filters);
+    if (hasUnsupportedInput(input)) return invalidInput(scanStatus);
+    const projection = projectCatalogList(catalog);
     const currentFingerprint = fingerprint(projection.items);
     if (
       decoded &&
@@ -1420,7 +1392,6 @@ export class WorkspaceQuerySession {
       nextPosition < projection.totalCount
         ? encodeCursor({
             version: cursorVersion,
-            filters,
             position: nextPosition,
             fingerprint: currentFingerprint,
             generation: this.#generation,
@@ -2078,7 +2049,6 @@ export class WorkspaceQuerySession {
         path: identity.path,
         ...(identity.id === undefined ? {} : { id: identity.id }),
         ...(identity.name === undefined ? {} : { name: identity.name }),
-        domains: [...identity.domains],
         confirmation: identity.confirmation,
       },
       catalogVersion,
@@ -2218,11 +2188,7 @@ export class WorkspaceQuerySession {
             candidate.path === identity.path) &&
           candidate.id === identity.id &&
           candidate.confirmation === catalogConfirmations.confirmed &&
-          candidate.name === identity.name &&
-          candidate.domains.length === identity.domains.length &&
-          candidate.domains.every((domain) =>
-            identity.domains.includes(domain),
-          ),
+          candidate.name === identity.name,
       );
     const candidate =
       candidates.find((item) => item.path === identity.path) ??
@@ -2312,7 +2278,7 @@ export class WorkspaceQuerySession {
               scan.failures.filter(
                 (failure) => failure.kind === workspaceTargetKinds.file,
               ).length,
-            itemCount: projectCatalogList(this.#catalog!, {}).totalCount,
+            itemCount: projectCatalogList(this.#catalog!).totalCount,
             errorCount: scan.diagnostics.filter(
               (diagnostic) =>
                 diagnostic.severity === diagnosticSeverities.error,

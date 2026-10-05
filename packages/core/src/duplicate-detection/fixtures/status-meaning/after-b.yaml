@@ -1,11 +1,6 @@
-id: index
-name: '프로젝트 지식 읽기 안내'
-domains:
-  - '문서 모델'
-  - '참조'
-  - '작업 공간'
-  - '도구 연동'
-  - '개발'
+_codocs:
+  id: index
+  name: '프로젝트 지식 읽기 안내'
 kind: procedure
 status: confirmed
 definition: |
