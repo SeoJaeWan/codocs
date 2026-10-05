@@ -1785,6 +1785,49 @@ describe('buildCatalog: parent 관계 검사', () => {
     expect(catalog.documents.get('root.yaml')?.referencedBy).toEqual([]);
   });
 
+  it.each([
+    { label: '빈 배열', parent: '[]' },
+    { label: '빈 문자열', parent: '""' },
+    { label: '배열이 아닌 값', parent: '루트' },
+    { label: '공백 항목이 섞인 배열', parent: '[루트, " "]' },
+  ])(
+    'parent를 $label 로 적으면 parent 없이 parentInvalid 표시를 남긴다',
+    ({ parent }) => {
+      const child = observe(
+        'child.yaml',
+        `_codocs:\n  id: child\n  name: 하위\n  parent: ${parent}\n개요: 설명\n`,
+      );
+
+      const catalog = buildCatalog({
+        status: scanStatuses.complete,
+        observations: [root, child],
+      });
+
+      const document = catalog.documents.get('child.yaml');
+      expect(document?.parent).toBeUndefined();
+      expect(document?.parentInvalid).toBe(true);
+    },
+  );
+
+  it('parent를 적지 않거나 올바르게 적으면 parentInvalid 표시를 남기지 않는다', () => {
+    const child = observe(
+      'child.yaml',
+      '_codocs:\n  id: child\n  name: 하위\n  parent: [루트]\n개요: 설명\n',
+    );
+
+    const catalog = buildCatalog({
+      status: scanStatuses.complete,
+      observations: [root, child],
+    });
+
+    expect(catalog.documents.get('root.yaml')).not.toHaveProperty(
+      'parentInvalid',
+    );
+    expect(catalog.documents.get('child.yaml')).not.toHaveProperty(
+      'parentInvalid',
+    );
+  });
+
   it('없는 문서를 parent로 지정하면 해당 항목에 parent_not_found를 추가한다', () => {
     const child = observe(
       'child.yaml',

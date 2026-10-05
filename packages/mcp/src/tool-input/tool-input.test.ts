@@ -5,6 +5,7 @@ import {
   codocsJsonInputSchema,
   parseDuplicatesInput,
   parseGetInput,
+  parseListInput,
   parseRenameInput,
   parseValidateInput,
 } from './index.js';
@@ -61,16 +62,34 @@ describe('MCP 여덟 입력 계약', () => {
     expect(acceptsToolInput('codocs_duplicates', { cursor: 1 })).toBe(false);
   });
 
-  it('ID는 중복 제거 후 상한을 검사하며 사용자 속성은 삭제하지 않는다', () => {
-    expect(parseGetInput({ ids: [] })).toBeUndefined();
+  it('list 입력은 parent 하나만 허용하고 cursor와 필터는 거부한다', () => {
+    expect(parseListInput({})).toEqual({});
+    expect(parseListInput({ parent: '개발' })).toEqual({ parent: '개발' });
+    expect(parseListInput({ cursor: 'x' })).toBeUndefined();
+    expect(parseListInput({ kind: 'policy' })).toBeUndefined();
+    expect(parseListInput({ parent: 1 })).toBeUndefined();
+    expect(parseListInput({ parent: ['개발'] })).toBeUndefined();
+  });
+
+  it('get 입력은 addresses를 중복 제거 후 상한까지 검사하되 주소 문법은 거부하지 않는다', () => {
+    expect(parseGetInput({ addresses: [] })).toBeUndefined();
     expect(
       parseGetInput({
-        ids: Array.from({ length: 21 }, (_, index) => `id-${index}`),
+        addresses: Array.from({ length: 21 }, (_, index) => `문서 ${index}`),
       }),
     ).toBeUndefined();
-    expect(parseGetInput({ ids: Array(21).fill('same') })).toEqual({
-      ids: ['same'],
+    expect(parseGetInput({ addresses: Array(21).fill('same') })).toEqual({
+      addresses: ['same'],
     });
+    expect(parseGetInput({ addresses: ['', 'a:b:c', '[[x]]'] })).toEqual({
+      addresses: ['', 'a:b:c', '[[x]]'],
+    });
+    expect(parseGetInput({ ids: ['sample'] })).toBeUndefined();
+    expect(parseGetInput({ addresses: ['a'], extra: 1 })).toBeUndefined();
+    expect(parseGetInput({ addresses: [1] })).toBeUndefined();
+  });
+
+  it('write 입력은 사용자 속성을 삭제하지 않는다', () => {
     const document = {
       id: 'sample',
       name: 'Sample',

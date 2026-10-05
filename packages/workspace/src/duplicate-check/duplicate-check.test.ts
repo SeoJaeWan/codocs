@@ -944,18 +944,15 @@ describe('WorkspaceQuerySession.duplicates: 결과 페이지와 커서 만료', 
     expect(result.success).toBe(true);
   });
 
-  it('서명이 없는 문자열이나 목록 커서를 전달하면 unrecognized 이유로 만료된다', async () => {
+  it('서명이 없는 문자열이나 서명 형식만 흉내 낸 토큰을 전달하면 unrecognized 이유로 만료된다', async () => {
     await eightRepeatedDocuments();
     const target = session();
-    const listed = await target.list();
     await target.duplicates();
 
     const garbage = await target.duplicates({ cursor: 'not-a-cursor' });
-    const listCursor = await target.duplicates({
-      cursor: listed.success ? (listed.nextCursor ?? 'x.y') : 'x.y',
-    });
+    const forged = await target.duplicates({ cursor: 'x.y' });
 
-    for (const result of [garbage, listCursor])
+    for (const result of [garbage, forged])
       expect(result).toMatchObject({
         success: false,
         status: workspaceDuplicateStatuses.expired,

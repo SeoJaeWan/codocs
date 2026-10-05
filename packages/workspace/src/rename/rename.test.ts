@@ -338,7 +338,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
           'utf8',
         ),
       }).toEqual(before);
-      expect(await session.get(['order'])).toMatchObject({
+      expect(await session.get(['주문'])).toMatchObject({
         success: true,
         results: [
           {
@@ -377,7 +377,7 @@ describe('WorkspaceQuerySession.applyRename: 이름 변경 반영과 색인', ()
       changed: true,
       indexUpdated: true,
     });
-    expect(await session.get(['order'])).toMatchObject({
+    expect(await session.get(['새주문'])).toMatchObject({
       success: true,
       results: [
         {

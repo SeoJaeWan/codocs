@@ -81,6 +81,8 @@ export interface CatalogIdentity {
   name?: string;
   /** 모두 비어 있지 않은 문자열일 때만 작성 순서 그대로 담는다. */
   parent?: readonly string[];
+  /** `_codocs.parent` 키를 적었지만 값이 올바른 이름 배열이 아닐 때만 true다. */
+  parentInvalid?: true;
   confirmation: CatalogConfirmation;
 }
 /** 후보마다 오류와 확인 상태를 함께 제공한다. */
@@ -147,6 +149,13 @@ function identity(
   const name = ownValue(metadata, metadataFields.name);
   const metadataId = ownValue(metadata, metadataFields.id);
   const parent = ownValue(metadata, metadataFields.parent);
+  const parentValid =
+    Array.isArray(parent) && parent.length > 0 && parent.every(nonblank);
+  const parentWritten =
+    typeof metadata === 'object' &&
+    metadata !== null &&
+    Object.getOwnPropertyDescriptor(metadata, metadataFields.parent) !==
+      undefined;
   return {
     path: observation.path,
     ...(observation.realPath !== undefined
@@ -154,9 +163,8 @@ function identity(
       : {}),
     ...(nonblank(metadataId) ? { id: metadataId } : {}),
     ...(nonblank(name) ? { name } : {}),
-    ...(Array.isArray(parent) && parent.length && parent.every(nonblank)
-      ? { parent: [...parent] }
-      : {}),
+    ...(parentValid ? { parent: [...parent] } : {}),
+    ...(parentWritten && !parentValid ? { parentInvalid: true as const } : {}),
     confirmation,
   };
 }
@@ -506,7 +514,7 @@ function compareSectionBacklinks(
   );
 }
 /** 로케일과 무관하게 UTF-16 코드 단위 순서로 문자열을 비교한다. */
-function compareText(left: string, right: string): number {
+export function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 /** 보관 기록에서 색인·충돌·직접 연결을 매번 재계산한다. */

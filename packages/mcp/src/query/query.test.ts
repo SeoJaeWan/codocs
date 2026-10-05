@@ -15,6 +15,9 @@ const backend = vi.hoisted(
     return {
       list: vi.fn(),
       get: vi.fn(),
+      resolveIdPath: vi.fn(),
+      previewRename: vi.fn(),
+      applyRename: vi.fn(),
       refresh: vi.fn(),
       duplicates: vi.fn(),
       readiness,
@@ -66,12 +69,13 @@ function invalidInput() {
 
 describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증', () => {
   describe('상세 조회 응답 전달', () => {
-    it('유효한 ID 하나를 조회하면 작업 공간의 문서 응답을 그대로 반환한다', async () => {
+    it('유효한 이름 주소 하나를 조회하면 작업 공간의 문서 응답을 그대로 반환한다', async () => {
       const response = {
         success: true,
         scanStatus: 'complete',
         results: [
           {
+            address: 'normal',
             id: 'normal',
             found: true,
             conflict: false,
@@ -88,16 +92,17 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { ids: ['normal'] };
+      const input = { addresses: ['normal'] };
 
       const result = await handlers.codocsGet(input);
 
       expect(result).toBe(response);
-      expect(backend.get).toHaveBeenCalledWith(input.ids);
+      expect(backend.get).toHaveBeenCalledWith(input.addresses);
     });
 
-    it('정상 문서와 없는 ID를 함께 조회하면 항목별 결과를 그대로 반환한다', async () => {
+    it('정상 문서와 없는 이름을 함께 조회하면 항목별 결과를 그대로 반환한다', async () => {
       const normal = {
+        address: 'normal',
         id: 'normal',
         found: true,
         conflict: false,
@@ -105,8 +110,8 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         confirmation: 'confirmed',
         document: { _codocs: { id: 'normal' }, definition: '본문' },
         revision: 'revision',
-        references: ['target'],
-        referencedBy: ['source'],
+        references: ['대상'],
+        referencedBy: ['출처'],
         diagnostics: [],
       };
       const response = {
@@ -115,7 +120,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         results: [
           normal,
           {
-            id: 'missing',
+            address: 'missing',
             found: false,
             diagnostics: [
               {
@@ -131,27 +136,28 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { ids: ['normal', 'missing'] };
+      const input = { addresses: ['normal', 'missing'] };
 
       const result = await handlers.codocsGet(input);
 
       expect(result).toBe(response);
-      expect(backend.get).toHaveBeenCalledWith(input.ids);
+      expect(backend.get).toHaveBeenCalledWith(input.addresses);
     });
 
-    it('중복 ID와 정상 문서를 함께 조회하면 충돌 결과의 금지 필드를 덧붙이지 않는다', async () => {
+    it('중복 이름과 정상 문서를 함께 조회하면 충돌 결과의 금지 필드를 덧붙이지 않는다', async () => {
       const response = {
         success: true,
         scanStatus: 'complete',
         results: [
           {
-            id: 'shared',
+            address: 'shared',
             found: true,
             conflict: true,
             paths: ['.codocs/a.yaml', '.codocs/z.yaml'],
             diagnostics: [],
           },
           {
+            address: 'normal',
             id: 'normal',
             found: true,
             conflict: false,
@@ -168,7 +174,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { ids: ['shared', 'normal'] };
+      const input = { addresses: ['shared', 'normal'] };
 
       const result = await handlers.codocsGet(input);
 
@@ -185,6 +191,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         scanStatus: 'partial',
         results: [
           {
+            address: 'alpha',
             id: 'alpha',
             found: true,
             conflict: false,
@@ -197,7 +204,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             diagnostics: [],
           },
           {
-            id: 'outside',
+            address: 'outside',
             found: false,
             confirmation: 'unconfirmed',
             diagnostics: [],
@@ -208,12 +215,12 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { ids: ['alpha', 'outside'] };
+      const input = { addresses: ['alpha', 'outside'] };
 
       const result = await handlers.codocsGet(input);
 
       expect(result).toBe(response);
-      expect(backend.get).toHaveBeenCalledWith(input.ids);
+      expect(backend.get).toHaveBeenCalledWith(input.addresses);
     });
 
     it('작업 공간 조회가 실패하면 문서 결과를 만들지 않고 실패 응답을 전달한다', async () => {
@@ -230,7 +237,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { ids: ['alpha'] };
+      const input = { addresses: ['alpha'] };
 
       const result = await handlers.codocsGet(input);
 
@@ -243,23 +250,31 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     it.each([
       { name: '알 수 없는 목록 속성', method: 'list', input: { limit: 10 } },
       { name: 'kind 필터', method: 'list', input: { kind: 'policy' } },
+      { name: '제거된 cursor', method: 'list', input: { cursor: 'x' } },
+      {
+        name: '문자열이 아닌 parent',
+        method: 'list',
+        input: { parent: 1 },
+      },
+      { name: '문자열이 아닌 주소', method: 'get', input: { addresses: [1] } },
+      { name: '제거된 ids 입력', method: 'get', input: { ids: ['alpha'] } },
       {
         name: 'status 필터',
         method: 'list',
         input: { status: 'confirmed' },
       },
-      { name: '빈 ID 목록', method: 'get', input: { ids: [] } },
-      { name: '희소 ID 배열', method: 'get', input: { ids: Array(1) } },
+      { name: '빈 주소 목록', method: 'get', input: { addresses: [] } },
+      { name: '희소 주소 배열', method: 'get', input: { addresses: Array(1) } },
       {
         name: '알 수 없는 상세 속성',
         method: 'get',
-        input: { ids: ['alpha'], extra: true },
+        input: { addresses: ['alpha'], extra: true },
       },
       {
-        name: '21개 고유 ID',
+        name: '21개 고유 주소',
         method: 'get',
         input: {
-          ids: Array.from({ length: 21 }, (_, index) => 'id-' + index),
+          addresses: Array.from({ length: 21 }, (_, index) => '문서 ' + index),
         },
       },
     ])(
@@ -280,12 +295,12 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       },
     );
 
-    it('ID 속성이 접근자이면 접근자를 실행하지 않고 입력 오류를 반환한다', async () => {
+    it('addresses 속성이 접근자이면 접근자를 실행하지 않고 입력 오류를 반환한다', async () => {
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
       let reads = 0;
-      const input = Object.defineProperty({}, 'ids', {
+      const input = Object.defineProperty({}, 'addresses', {
         enumerable: true,
         /** 접근자 실행 여부를 관찰한다. */
         get: () => {
@@ -305,7 +320,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const revoked = Proxy.revocable({ ids: ['alpha'] }, {});
+      const revoked = Proxy.revocable({ addresses: ['alpha'] }, {});
       revoked.revoke();
 
       const result = await handlers.codocsGet(revoked.proxy);
@@ -314,17 +329,17 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(backend.get).not.toHaveBeenCalled();
     });
 
-    it('같은 ID 21개를 전달하면 중복 제거한 한 ID로 backend를 호출한다', async () => {
+    it('같은 주소 21개를 전달하면 중복 제거한 한 주소로 backend를 호출한다', async () => {
       const response = {
         success: true,
         scanStatus: 'complete',
-        results: [{ id: 'same', found: false, diagnostics: [] }],
+        results: [{ address: 'same', found: false, diagnostics: [] }],
       };
       backend.get.mockResolvedValue(response);
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { ids: Array(21).fill('same') as string[] };
+      const input = { addresses: Array(21).fill('same') as string[] };
 
       const result = await handlers.codocsGet(input);
 
@@ -333,7 +348,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     });
   });
 
-  describe('목록 조건과 cursor 응답 전달', () => {
+  describe('목록 조건과 parent 응답 전달', () => {
     it('제거된 domain 인자를 전달하면 backend를 호출하지 않고 입력 오류를 반환한다', async () => {
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
@@ -345,7 +360,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(backend.list).not.toHaveBeenCalled();
     });
 
-    it('partial 목록의 공통 진단을 그대로 전달한다', async () => {
+    it('partial 목록의 공통 진단과 unreachable을 그대로 전달한다', async () => {
       const response = {
         success: true,
         scanStatus: 'partial',
@@ -356,6 +371,8 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             source: { path: '.codocs/old.yaml' },
             confirmation: 'unconfirmed',
             hasErrors: false,
+            sections: ['정의'],
+            childCount: 0,
             conflict: false,
             diagnostics: [
               { code: 'unconfirmed_reference', severity: 'warning' },
@@ -367,12 +384,23 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
             source: { path: '.codocs/new.yaml' },
             confirmation: 'confirmed',
             hasErrors: false,
+            sections: [],
+            childCount: 1,
             conflict: false,
           },
         ],
-        totalCount: 2,
-        returnedCount: 2,
-        nextCursor: null,
+        unreachable: [
+          {
+            id: 'orphan',
+            name: '고아',
+            source: { path: '.codocs/orphan.yaml' },
+            confirmation: 'unconfirmed',
+            hasErrors: true,
+            sections: [],
+            childCount: 0,
+            conflict: false,
+          },
+        ],
       };
       backend.list.mockResolvedValue(response);
       const handlers = createCodocsQueryHandlers(
@@ -384,7 +412,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(result).toMatchObject({
         success: true,
         scanStatus: 'partial',
-        totalCount: 2,
+        unreachable: [{ id: 'orphan', hasErrors: true }],
         items: [
           {
             id: 'old',
@@ -400,20 +428,17 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         expect(result.items[1]).not.toHaveProperty('diagnostics');
     });
 
-    it('cursor를 전달하면 backend에 cursor를 보내고 다음 페이지를 반환한다', async () => {
+    it('parent를 전달하면 backend에 parent를 보내고 응답을 그대로 반환한다', async () => {
       const response = {
         success: true,
         scanStatus: 'complete',
         items: [],
-        totalCount: 51,
-        returnedCount: 1,
-        nextCursor: null,
       };
       backend.list.mockResolvedValue(response);
       const handlers = createCodocsQueryHandlers(
         backend as unknown as WorkspaceQuerySession,
       );
-      const input = { cursor: 'cursor' };
+      const input = { parent: '개발' };
 
       const result = await handlers.codocsList(input);
 
@@ -421,30 +446,25 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       expect(backend.list).toHaveBeenCalledWith(input);
     });
 
-    it.each(['tampered', 'changed-snapshot', 'after-refresh', 'other-process'])(
-      '%s cursor가 만료되면 backend의 만료 오류를 그대로 반환한다',
-      async (cursor) => {
-        const response = {
-          success: false,
-          scanStatus: 'complete',
-          error: {
-            code: 'cursor_expired',
-            severity: 'error',
-            message: '목록 커서가 만료되었습니다.',
-          },
-        };
-        backend.list.mockResolvedValue(response);
-        const handlers = createCodocsQueryHandlers(
-          backend as unknown as WorkspaceQuerySession,
-        );
-        const input = { cursor };
+    it('없는 parent의 not_found 실패를 그대로 반환한다', async () => {
+      const response = {
+        success: false,
+        scanStatus: 'complete',
+        error: {
+          code: queryDiagnosticCodes.notFound,
+          severity: 'error',
+          message: queryDiagnosticMessages.notFound,
+        },
+      };
+      backend.list.mockResolvedValue(response);
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
 
-        const result = await handlers.codocsList(input);
+      const result = await handlers.codocsList({ parent: '없음' });
 
-        expect(result).toBe(response);
-        expect(backend.list).toHaveBeenCalledWith(input);
-      },
-    );
+      expect(result).toBe(response);
+    });
 
     it('새로 고침을 호출하면 같은 작업 공간 세션의 응답을 반환한다', async () => {
       const response = { success: true, scanStatus: 'complete' };
@@ -457,6 +477,85 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
 
       expect(result).toBe(response);
       expect(backend.refresh).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('이름 변경의 ID 조회', () => {
+    const input = { mode: 'preview', id: 'order', newName: '새주문' };
+
+    it('현재 ID의 경로를 내부 조회로 구해 preview에 전달하고 get을 호출하지 않는다', async () => {
+      backend.resolveIdPath.mockResolvedValue({
+        success: true,
+        scanStatus: 'complete',
+        path: '.codocs/order.yaml',
+      });
+      const preview = { success: true, scanStatus: 'complete' };
+      backend.previewRename.mockResolvedValue(preview);
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
+
+      const result = await handlers.codocsRename(input);
+
+      expect(result).toBe(preview);
+      expect(backend.resolveIdPath).toHaveBeenCalledWith('order');
+      expect(backend.previewRename).toHaveBeenCalledWith({
+        newName: '새주문',
+        targetPath: '.codocs/order.yaml',
+      });
+      expect(backend.get).not.toHaveBeenCalled();
+    });
+
+    it('없거나 중복인 ID는 not_found로 실패하고 변경 계산을 호출하지 않는다', async () => {
+      backend.resolveIdPath.mockResolvedValue({
+        success: true,
+        scanStatus: 'complete',
+      });
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
+
+      const preview = await handlers.codocsRename(input);
+      const apply = await handlers.codocsRename({
+        ...input,
+        mode: 'apply',
+        revisions: { '.codocs/order.yaml': 'revision' },
+      });
+
+      expect(preview).toMatchObject({
+        success: false,
+        scanStatus: 'complete',
+        error: { code: queryDiagnosticCodes.notFound },
+      });
+      expect(apply).toMatchObject({
+        success: false,
+        saved: false,
+        changed: false,
+        error: { code: queryDiagnosticCodes.notFound },
+      });
+      expect(backend.previewRename).not.toHaveBeenCalled();
+      expect(backend.applyRename).not.toHaveBeenCalled();
+    });
+
+    it('ID 조회가 실패하면 그 실패를 그대로 전달한다', async () => {
+      const failure = {
+        success: false,
+        scanStatus: 'failed',
+        error: {
+          code: 'index_not_ready',
+          severity: 'error',
+          message: '준비 중',
+        },
+      };
+      backend.resolveIdPath.mockResolvedValue(failure);
+      const handlers = createCodocsQueryHandlers(
+        backend as unknown as WorkspaceQuerySession,
+      );
+
+      const result = await handlers.codocsRename(input);
+
+      expect(result).toBe(failure);
+      expect(backend.previewRename).not.toHaveBeenCalled();
     });
   });
 
@@ -504,7 +603,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
           backend as unknown as WorkspaceQuerySession,
         );
         const list = await handlers.codocsList();
-        const get = await handlers.codocsGet({ ids: ['alpha'] });
+        const get = await handlers.codocsGet({ addresses: ['alpha'] });
 
         expect(list).toBe(pending);
         expect(get).toBe(pending);
@@ -573,7 +672,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         canValidate: false,
       });
       expect(await handlers.codocsList()).toMatchObject({ success: true });
-      expect(await handlers.codocsGet({ ids: ['alpha'] })).toMatchObject({
+      expect(await handlers.codocsGet({ addresses: ['alpha'] })).toMatchObject({
         success: true,
       });
     });
@@ -620,6 +719,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     const large = '가'.repeat(200_000);
     const results = [
       {
+        address: 'json',
         id: 'json',
         found: true,
         conflict: false,
@@ -632,6 +732,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
         diagnostics: [],
       },
       {
+        address: 'raw',
         id: 'raw',
         found: true,
         conflict: false,
@@ -646,7 +747,7 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
       ...Array.from(
         { length: 18 },
         /** 남은 정상 결과를 만든다. */ (_, index) => ({
-          id: `small-${index}`,
+          address: `small-${index}`,
           found: false,
           diagnostics: [],
         }),
@@ -661,10 +762,10 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     const handlers = createCodocsQueryHandlers(
       backend as unknown as WorkspaceQuerySession,
     );
-    const ids = results.map(
-      /** 결과 순서와 같은 요청 ID를 만든다. */ (result) => result.id,
+    const addresses = results.map(
+      /** 결과 순서와 같은 요청 주소를 만든다. */ (result) => result.address,
     );
-    const returned = await handlers.codocsGet({ ids });
+    const returned = await handlers.codocsGet({ addresses });
     expect(returned).toBe(response);
     const serialized = JSON.stringify(returned);
     expect(serialized).toContain(large);

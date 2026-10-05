@@ -40,18 +40,17 @@ describe('workspace 공통 조회 결과', () => {
     try {
       const [list, get] = await Promise.all([
         session.list(),
-        session.get(['one', 'missing']),
+        session.get(['하나', '없음']),
       ]);
       expect(list).toMatchObject({
         success: true,
         scanStatus: 'complete',
-        totalCount: 1,
       });
       expect(get).toMatchObject({ success: true, scanStatus: 'complete' });
       if (get.success) {
-        expect(get.results[0]).toMatchObject({ id: 'one', found: true });
+        expect(get.results[0]).toMatchObject({ address: '하나', found: true });
         expect(get.results[1]).toMatchObject({
-          id: 'missing',
+          address: '없음',
           found: false,
           diagnostics: [{ code: 'not_found' }],
         });

@@ -184,10 +184,12 @@ export const queryDiagnosticCodes = {
   invalidPath: 'invalid_path',
   /** 검증 대상 파일이나 배포 가이드 원문에 접근하지 못하면 반환한다. */
   fileAccessFailed: 'file_access_failed',
-  /** 전체 요청의 ID 배열이나 크기가 계약과 다르면 반환한다. */
+  /** 전체 요청이나 주소 하나의 입력이 계약과 다르면 반환한다. */
   invalidInput: 'invalid_input',
-  /** 완전한 Catalog에 요청한 ID가 없으면 반환한다. */
+  /** 완전한 Catalog에 요청한 이름의 문서가 없으면 반환한다. */
   notFound: 'not_found',
+  /** 요청한 이름의 문서는 있지만 `이름:섹션` 주소의 섹션이 그 문서에 없으면 반환한다. */
+  sectionNotFound: 'section_not_found',
   /** 직접 참조 이름에 해당하는 대상 경로가 없으면 반환한다. */
   referenceNotFound: 'reference_not_found',
   /** 직접 참조 이름에 해당하는 대상 경로가 여러 개면 반환한다. */
@@ -204,7 +206,8 @@ export const queryDiagnosticMessages = {
   guideFileAccessFailed:
     '배포된 가이드 원문을 읽을 수 없습니다. 패키지 설치 상태를 확인하세요.',
   invalidInput: '조회 입력이 올바르지 않습니다.',
-  notFound: '요청한 ID의 문서가 없습니다.',
+  notFound: '요청한 문서가 없습니다.',
+  sectionNotFound: '요청한 문서에 해당 섹션이 없습니다.',
   referenceNotFound: '참조 이름에 해당하는 문서가 없습니다.',
   referenceAmbiguous: '참조 이름에 해당하는 문서가 여러 개입니다.',
   sectionReferenceNotFound: '참조한 문서에 해당 섹션이 없습니다.',

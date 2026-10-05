@@ -65,7 +65,8 @@ export function createCodocsServer(
     [
       'codocs_list',
       {
-        description: '프로젝트 문서 목록을 필터와 커서로 조회합니다.',
+        description:
+          '문서의 parent 구조를 한 단계씩 조회합니다. parent를 생략하면 최상위 문서와 parent 오류로 닿을 수 없는 문서(unreachable)를, parent에 문서 이름을 주면 그 이름을 parent로 적은 직속 자식을 이름 순서로 모두 돌려줍니다. 항목마다 name, id, hasErrors, sections(섹션 이름), childCount를 담으며 본문은 담지 않습니다. 없는 parent 이름은 not_found입니다.',
         execute: handlers.codocsList.bind(handlers),
       },
     ],
@@ -73,7 +74,7 @@ export function createCodocsServer(
       'codocs_get',
       {
         description:
-          '현재 ID로 문서 상세를 최대 20개 조회합니다. 중복 ID는 첫 등장만 사용합니다.',
+          '문서 이름 주소(addresses)로 문서 전체나 섹션 하나를 최대 20개 조회합니다. 주소는 "이름" 또는 "이름:섹션"이며 이름이나 섹션에 콜론이 있으면 \:로 적습니다. 중복 주소는 첫 등장만 사용합니다. 결과마다 address를 담고, references와 referencedBy는 문서 이름입니다. 주소 하나의 형식 오류·부재(not_found, section_not_found)·중복(conflict)은 그 결과에만 표시합니다.',
         execute: handlers.codocsGet.bind(handlers),
       },
     ],

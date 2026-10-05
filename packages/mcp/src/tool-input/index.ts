@@ -53,8 +53,8 @@ export type CodocsToolName =
   | 'codocs_rename'
   | 'codocs_duplicates';
 
-const listSchema = z.strictObject({ cursor: z.string().optional() });
-const getSchema = z.strictObject({ ids: z.array(z.string().min(1)) });
+const listSchema = z.strictObject({ parent: z.string().optional() });
+const getSchema = z.strictObject({ addresses: z.array(z.string()) });
 const validateSchema = z.strictObject({ path: z.string().optional() });
 const guideSchema = z.strictObject({ topic: z.enum(guideTopics).optional() });
 const writeSchema = z.discriminatedUnion('mode', [
@@ -156,18 +156,22 @@ export function parseListInput(input: unknown): WorkspaceListInput | undefined {
   if (!dataOnly(input)) return undefined;
   const result = listSchema.safeParse(input);
   if (!result.success) return undefined;
-  const { cursor } = result.data;
-  return cursor === undefined ? {} : { cursor };
+  const { parent } = result.data;
+  return parent === undefined ? {} : { parent };
 }
 
-/** ID를 첫 등장 순서로 중복 제거한 뒤 1~20개를 허용한다.
+/** 이름 주소를 첫 등장 순서로 중복 제거한 뒤 1~20개를 허용한다. 주소 문법은 조회에서 주소마다 판정한다.
  * */
-export function parseGetInput(input: unknown): { ids: string[] } | undefined {
+export function parseGetInput(
+  input: unknown,
+): { addresses: string[] } | undefined {
   if (!dataOnly(input)) return undefined;
   const result = getSchema.safeParse(input);
   if (!result.success) return undefined;
-  const ids = [...new Set(result.data.ids)];
-  return ids.length >= 1 && ids.length <= 20 ? { ids } : undefined;
+  const addresses = [...new Set(result.data.addresses)];
+  return addresses.length >= 1 && addresses.length <= 20
+    ? { addresses }
+    : undefined;
 }
 
 /** 선택 경로를 입력 그대로 보존하며 알 수 없는 속성은 거부한다. */

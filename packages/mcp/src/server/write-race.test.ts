@@ -136,7 +136,7 @@ async function start(actor: string, stage = ''): Promise<Client> {
   await expect
     .poll(
       async () =>
-        (await call(client, 'codocs_get', { ids: ['a'] })).results?.[0]
+        (await call(client, 'codocs_get', { addresses: ['A'] })).results?.[0]
           ?.document?.definition,
     )
     .toBe('original');
@@ -221,8 +221,8 @@ describe('실제 독립 MCP 작성자의 저장 경계', () => {
     await expect
       .poll(
         async () =>
-          (await call(b, 'codocs_get', { ids: ['a'] })).results?.[0]?.document
-            ?.definition,
+          (await call(b, 'codocs_get', { addresses: ['A'] })).results?.[0]
+            ?.document?.definition,
       )
       .toBe('writer A');
     const before = await bytes();
@@ -359,7 +359,8 @@ describe('실제 독립 MCP 작성자의 저장 경계', () => {
       await expect
         .poll(
           async () =>
-            (await call(client, 'codocs_get', { ids: ['a'] })).results?.[0],
+            (await call(client, 'codocs_get', { addresses: ['A'] }))
+              .results?.[0],
           { timeout: 15000 },
         )
         .toMatchObject({
@@ -394,8 +395,8 @@ describe('실제 독립 MCP 작성자의 저장 경계', () => {
       await expect
         .poll(
           async () =>
-            (await call(client, 'codocs_get', { ids: ['shared'] })).results?.[0]
-              ?.conflict,
+            (await call(client, 'codocs_get', { addresses: ['One'] }))
+              .results?.[0]?.conflict,
         )
         .toBe(true);
   });
