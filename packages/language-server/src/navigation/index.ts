@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type {
   WorkspaceCandidateOrigin,
   WorkspaceQuerySession,
+  WorkspaceSectionDestination,
   WorkspacePathDocumentResult,
 } from '@codocs/workspace';
 import { openSourceCommand } from '../hover/index.js';
@@ -95,7 +96,10 @@ export class SourceSelections {
       version: number,
       session: CandidateSession,
     ) => boolean,
-  ): Promise<{ uri: string } | null> {
+  ): Promise<{
+    uri: string;
+    destination?: WorkspaceSectionDestination;
+  } | null> {
     if (!isSourceSelection(input)) return null;
     const selected = this.#selections.get(input.token);
     if (
@@ -114,7 +118,11 @@ export class SourceSelections {
       !current(selected.sourceUri, selected.version, selected.session)
     )
       return null;
-    return { uri: confirmed.result.source.uri };
+    return {
+      uri: confirmed.result.source.uri,
+      // 섹션 링크만 최신 확인에서 얻은 섹션 키 위치를 함께 전달한다.
+      ...(confirmed.destination ? { destination: confirmed.destination } : {}),
+    };
   }
 }
 

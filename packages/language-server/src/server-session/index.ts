@@ -7,6 +7,7 @@ import {
   createWorkspaceQuerySession,
   type WorkspaceQuerySession,
   type WorkspaceLiveReferenceSuccess,
+  type WorkspaceSectionDestination,
   type WorkspacePathDocumentResult,
   type WorkspaceQueryDiagnostic,
   type WorkspacePathGetResponse,
@@ -342,7 +343,15 @@ export class LanguageServerSession {
       return [];
     return result.occurrences.flatMap(
       /** 단일 확정 출현의 command 링크를 만든다. */ (item) => {
-        if (item.resolution.status !== referenceResolutionStatuses.resolved)
+        const section = item.resolution.section;
+        // 다른 문서는 resolved, 같은 문서의 섹션 참조는 self + section일 때만 링크가 된다.
+        if (
+          item.resolution.status !== referenceResolutionStatuses.resolved &&
+          !(
+            item.resolution.status === referenceResolutionStatuses.self &&
+            section !== undefined
+          )
+        )
           return [];
         const detail = result.targets.find(
           (target) => target.path === item.resolution.target?.path,
@@ -362,7 +371,9 @@ export class LanguageServerSession {
                 target,
                 // Host가 만드는 native 링크의 표시 이름에서도 메타데이터를 서식으로 해석하지 않는다.
                 tooltip: escapeMarkdown(
-                  `원문 열기: ${detailLabel(detail)} (${detail.path.replaceAll('\\', '/')})`,
+                  section === undefined
+                    ? `원문 열기: ${detailLabel(detail)} (${detail.path.replaceAll('\\', '/')})`
+                    : `${'name' in item.occurrence ? item.occurrence.name : detailLabel(detail)}:${section} · ${detail.path.replaceAll('\\', '/')}`,
                 ),
               },
             ]
@@ -654,7 +665,11 @@ export class LanguageServerSession {
   /** 최신 출처 소유권·버전·선택 근거를 확인하고 file URI만 반환한다. */
   async confirmSource(
     input: unknown,
-  ): Promise<{ uri: string } | ConfirmedCodeSource | null> {
+  ): Promise<
+    | { uri: string; destination?: WorkspaceSectionDestination }
+    | ConfirmedCodeSource
+    | null
+  > {
     if (this.#code.has(input))
       return this.#code.confirm(input, (owner) =>
         this.#currentCodeOwner(owner),
