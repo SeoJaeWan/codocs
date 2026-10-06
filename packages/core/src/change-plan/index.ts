@@ -8,11 +8,18 @@ import {
 import {
   buildCatalog,
   catalogConfirmations,
+  getSectionNames,
+  referenceResolutionStatuses,
   renameChangeKinds,
   scanStatuses,
   type Catalog,
   type RenameChange,
 } from '../catalog/index.js';
+import {
+  codeReferenceStatuses,
+  resolveCodeReference,
+  type CodeReferenceMarker,
+} from '../code-reference/index.js';
 import {
   changePlanDiagnosticCodes,
   changePlanDiagnosticMessages,
@@ -42,10 +49,23 @@ export interface ChangePlanSource {
   utf8Lossless: boolean;
 }
 
+/** 호출자가 디스크에서 새로 읽은, 이번 변경이 건드리지 않는 코드 파일의 명시 표기 하나다. */
+export interface ChangePlanCodeReference {
+  /** 표기가 있는 코드 파일의 프로젝트 기준 경로다. */
+  sourcePath: string;
+  /** 그 파일 원문에서 추출한 표기다. */
+  marker: CodeReferenceMarker;
+}
+
 /** 순수 후보 계산에 사용하는 색인과 선택적인 대상 원문이다. */
 export interface ChangePlanContext {
   catalog: Catalog;
   source?: ChangePlanSource;
+  /**
+   * 변경 전후를 같은 표기로 비교할 코드 참조다. 후보가 기존에 확정된 코드 참조를 끊으면 거절한다.
+   * 섹션을 삭제하는 후보(`removedSections`)에서만 의미가 있으며 생략하면 코드 영향은 판단하지 않는다.
+   */
+  codeReferences?: readonly ChangePlanCodeReference[];
 }
 
 /** 저장 단계와 구분되는 단일 문서 후보 결과다. */
@@ -68,6 +88,8 @@ export type ChangePlanResult =
       raw: string;
       data: Document;
       baseRevision?: string;
+      /** 후보에서 사라지는 기존 섹션 이름이다. 코드 참조 보호 관측이 필요한지 판단하는 데 쓴다. */
+      removedSections: readonly string[];
       diagnostics: readonly Diagnostic<string>[];
     };
 
@@ -463,13 +485,13 @@ function nestedBlockText(
   return source[range.end - 1] === '\n' ? text + eol : text;
 }
 
-/** 기존 확인 상태를 유지한 임시 색인에서 후보 경로의 진단만 추출한다. */
-function candidateDiagnostics(
+/** 후보를 반영하고 기존 확인 상태를 유지한 임시 색인을 만든다. */
+function candidateCatalog(
   catalog: Catalog,
   path: string,
   raw: string,
-): readonly Diagnostic<string>[] {
-  const parsed = parseYaml(raw, path);
+  parsed: YamlParseResult = parseYaml(raw, path),
+): Catalog {
   const confirmed = [...catalog.documents.values()]
     .filter(
       (doc) =>
@@ -477,7 +499,7 @@ function candidateDiagnostics(
         doc.confirmation === catalogConfirmations.confirmed,
     )
     .map((doc) => doc.observation);
-  const temporary = buildCatalog(
+  return buildCatalog(
     {
       status: catalog.status,
       observations: [...confirmed, { path, parsed }],
@@ -485,10 +507,101 @@ function candidateDiagnostics(
     },
     catalog,
   );
-  return temporary.documents.get(path)?.diagnostics ?? parsed.diagnostics;
 }
 
-/** create/update 요청을 파일 IO 없이 검증하고 YAML 후보를 계산한다. */
+/** 임시 색인에서 후보 경로의 진단만 추출한다. */
+function candidateDiagnostics(
+  catalog: Catalog,
+  path: string,
+  raw: string,
+): readonly Diagnostic<string>[] {
+  const parsed = parseYaml(raw, path);
+  return (
+    candidateCatalog(catalog, path, raw, parsed).documents.get(path)
+      ?.diagnostics ?? parsed.diagnostics
+  );
+}
+
+/** replace 요청이 mode·id·revision·document 외의 속성을 담지 않았는지 확인한다. */
+function replaceRequest(input: Record<string, unknown>): boolean {
+  const allowed = new Set(['mode', 'id', 'revision', 'document']);
+  return Object.keys(input).every((key) => allowed.has(key));
+}
+
+/**
+ * 후보가 대상 문서를 가리키던 기존 확정 참조를 새로 끊는지 같은 출처 표기로 비교한다.
+ * 변경 전에 확정이었고 변경 후에 확정이 아닌 참조만 거절 근거다. 무관한 기존 오류는 보지 않는다.
+ * @param after 후보를 반영한 임시 색인이다.
+ * @param path 변경 대상 문서 경로다.
+ * @param codeReferences 변경하지 않는 코드 파일의 표기다.
+ * @returns 끊기는 참조마다 출처 경로와 위치를 담은 오류다. 없으면 빈 배열이다.
+ */
+function brokenReferences(
+  context: ChangePlanContext,
+  after: Catalog,
+  path: string,
+  codeReferences: readonly ChangePlanCodeReference[],
+): readonly Diagnostic<string>[] {
+  const result: Diagnostic<string>[] = [];
+  /** 끊기는 참조 하나를 출처 경로와 위치를 담은 오류로 만든다. */
+  const diagnostic = (
+    sourcePath: string,
+    range: Diagnostic<string>['range'],
+    fieldPath?: Diagnostic<string>['fieldPath'],
+  ): Diagnostic<string> => ({
+    code: changePlanDiagnosticCodes.brokenReference,
+    severity: diagnosticSeverities.error,
+    message: changePlanDiagnosticMessages.brokenReference,
+    path: sourcePath,
+    ...(fieldPath ? { fieldPath } : {}),
+    ...(range ? { range } : {}),
+  });
+  for (const [sourcePath, before] of context.catalog.documents) {
+    const next = after.documents.get(sourcePath);
+    if (
+      sourcePath === path ||
+      !next ||
+      before.confirmation !== catalogConfirmations.confirmed
+    )
+      continue;
+    before.occurrences.forEach(
+      /** 같은 순서의 변경 후 등장과 해석 결과를 비교한다. */ (item, index) => {
+        const now = next.occurrences[index];
+        if (
+          item.resolution.status !== referenceResolutionStatuses.resolved ||
+          item.resolution.target?.path !== path ||
+          !now ||
+          now.occurrence.offsetRange.start !== item.occurrence.offsetRange.start
+        )
+          return;
+        if (now.resolution.status !== referenceResolutionStatuses.resolved)
+          result.push(
+            diagnostic(
+              sourcePath,
+              item.occurrence.range,
+              item.occurrence.fieldPath,
+            ),
+          );
+      },
+    );
+  }
+  for (const { sourcePath, marker } of codeReferences) {
+    const was = resolveCodeReference(context.catalog, marker);
+    if (
+      was.status !== codeReferenceStatuses.resolved ||
+      was.target?.path !== path
+    )
+      continue;
+    if (
+      resolveCodeReference(after, marker).status !==
+      codeReferenceStatuses.resolved
+    )
+      result.push(diagnostic(sourcePath, marker.range));
+  }
+  return result;
+}
+
+/** create/update/replace 요청을 파일 IO 없이 검증하고 YAML 후보를 계산한다. */
 export function planDocumentChange(
   input: unknown,
   context: ChangePlanContext,
@@ -505,7 +618,12 @@ function planDocumentChangeInternal(
   input: unknown,
   context: ChangePlanContext,
 ): ChangePlanResult {
-  if (!record(input) || (input.mode !== 'create' && input.mode !== 'update'))
+  if (
+    !record(input) ||
+    (input.mode !== 'create' &&
+      input.mode !== 'update' &&
+      input.mode !== 'replace')
+  )
     return failure('invalidRequest');
   if (input.mode === 'create') {
     const path = input.path;
@@ -544,37 +662,57 @@ function planDocumentChangeInternal(
       id: validation.data._codocs.id,
       raw,
       data: validation.data,
+      removedSections: [],
       diagnostics,
     };
   }
   const id = input.id,
-    revision = input.revision,
-    set = input.set,
-    unset = input.unset;
+    revision = input.revision;
   if (
     typeof id !== 'string' ||
     !id ||
     typeof revision !== 'string' ||
-    !revision ||
-    (set !== undefined && !record(set)) ||
-    (unset !== undefined && !stringList(unset)) ||
-    (!set && !unset)
+    !revision
   )
     return failure('invalidRequest');
-  const changes = set ? Object.keys(set) : [],
-    removals = unset ?? [];
-  if (
-    (!changes.length && !removals.length) ||
-    new Set(removals).size !== removals.length ||
-    changes.some((key) => removals.includes(key)) ||
-    removals.some(
-      /** 메타데이터 `_codocs`는 unset할 수 없다. */
-      (key) => !key || key === codocsKey,
-    ) ||
-    (set !== undefined &&
-      !Object.values(set).every((value) => plainData(value)))
-  )
-    return failure('invalidRequest');
+  let replacement: Record<string, unknown> | undefined;
+  let set: Record<string, unknown> | undefined;
+  let removals: string[] = [];
+  if (input.mode === 'replace') {
+    const document = input.document;
+    if (
+      !replaceRequest(input) ||
+      !record(document) ||
+      !record(document[codocsKey]) ||
+      !plainData(document)
+    )
+      return failure('invalidRequest');
+    replacement = document;
+  } else {
+    const requestedSet = input.set,
+      requestedUnset = input.unset;
+    if (
+      (requestedSet !== undefined && !record(requestedSet)) ||
+      (requestedUnset !== undefined && !stringList(requestedUnset)) ||
+      (!requestedSet && !requestedUnset)
+    )
+      return failure('invalidRequest');
+    set = requestedSet;
+    removals = requestedUnset ?? [];
+    const changes = set ? Object.keys(set) : [];
+    if (
+      (!changes.length && !removals.length) ||
+      new Set(removals).size !== removals.length ||
+      changes.some((key) => removals.includes(key)) ||
+      removals.some(
+        /** 메타데이터 `_codocs`는 unset할 수 없다. */
+        (key) => !key || key === codocsKey,
+      ) ||
+      (set !== undefined &&
+        !Object.values(set).every((value) => plainData(value)))
+    )
+      return failure('invalidRequest');
+  }
   const paths = context.catalog.idPaths.get(id);
   const source = context.source;
   const target = source && context.catalog.documents.get(source.path);
@@ -597,7 +735,9 @@ function planDocumentChangeInternal(
       status: changePlanStatuses.failed,
       diagnostics: parsed.diagnostics,
     };
-  const requestedMetadata = set?.[codocsKey];
+  const requestedMetadata = replacement
+    ? replacement[codocsKey]
+    : set?.[codocsKey];
   const currentMetadata = parsed.data[codocsKey];
   if (
     record(requestedMetadata) &&
@@ -608,7 +748,9 @@ function planDocumentChangeInternal(
         : undefined)
   )
     return failure('nameChangeNotAllowed', source.path);
-  const expected: Record<string, unknown> = { ...parsed.data, ...(set ?? {}) };
+  const expected: Record<string, unknown> = replacement
+    ? { ...replacement }
+    : { ...parsed.data, ...(set ?? {}) };
   for (const key of removals) delete expected[key];
   const raw = editYaml(parsed, expected);
   if (raw === undefined) return failure('candidateMismatch', source.path);
@@ -620,7 +762,9 @@ function planDocumentChangeInternal(
     };
   if (!same(candidate.data, expected))
     return failure('candidateMismatch', source.path);
-  const diagnostics = candidateDiagnostics(context.catalog, source.path, raw);
+  const after = candidateCatalog(context.catalog, source.path, raw, candidate);
+  const diagnostics =
+    after.documents.get(source.path)?.diagnostics ?? candidate.diagnostics;
   if (diagnostics.some((d) => d.severity === diagnosticSeverities.error))
     return { status: changePlanStatuses.failed, diagnostics };
   if (context.catalog.status !== scanStatuses.complete)
@@ -639,6 +783,14 @@ function planDocumentChangeInternal(
       revision: source.revision,
       diagnostics,
     };
+  const broken = brokenReferences(
+    context,
+    after,
+    source.path,
+    context.codeReferences ?? [],
+  );
+  if (broken.length)
+    return { status: changePlanStatuses.failed, diagnostics: broken };
   return {
     status: changePlanStatuses.candidate,
     path: source.path,
@@ -646,6 +798,9 @@ function planDocumentChangeInternal(
     raw,
     data: validation.data,
     baseRevision: source.revision,
+    removedSections: getSectionNames(parsed).filter(
+      (section) => !Object.hasOwn(candidate.data, section),
+    ),
     diagnostics,
   };
 }

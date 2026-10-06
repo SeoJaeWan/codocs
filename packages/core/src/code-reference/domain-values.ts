@@ -27,3 +27,32 @@ export const codeReferenceStatuses = {
   /** 저장 대상 탐색이 불완전하다. */
   unconfirmed: 'unconfirmed',
 } as const;
+/** 코드 참조 진단의 고정 코드다. 상태 이름을 그대로 접미사로 쓴다. @domainValues */
+export const codeReferenceDiagnosticCodes = {
+  /** 이름 또는 전체 표기를 해석하지 못했다. */
+  [codeReferenceStatuses.invalid]: 'codocs.codeReference.invalid',
+  /** 대상 이름이 없다. */
+  [codeReferenceStatuses.missing]: 'codocs.codeReference.missing',
+  /** 대상 문서에 적은 섹션이 없다. */
+  [codeReferenceStatuses.missingSection]:
+    'codocs.codeReference.missing_section',
+  /** 대상 후보가 여러 개다. */
+  [codeReferenceStatuses.ambiguous]: 'codocs.codeReference.ambiguous',
+  /** 대상 탐색이 불완전하다. */
+  [codeReferenceStatuses.unconfirmed]: 'codocs.codeReference.unconfirmed',
+} as const;
+/** 코드 참조 진단의 고정 안내다. MCP와 VS Code가 같은 문구를 쓴다. @domainValues */
+export const codeReferenceDiagnosticMessages = {
+  /** 이름 또는 전체 표기를 해석하지 못했다. */
+  [codeReferenceStatuses.invalid]:
+    '명시적 코드 참조의 이름 또는 표기 형식이 올바르지 않습니다.',
+  /** 대상 이름이 없다. */
+  [codeReferenceStatuses.missing]: '선택한 프로젝트에 대상 문서가 없습니다.',
+  /** 대상 문서에 적은 섹션이 없다. */
+  [codeReferenceStatuses.missingSection]: '대상 문서에 해당 섹션이 없습니다.',
+  /** 대상 후보가 여러 개다. */
+  [codeReferenceStatuses.ambiguous]:
+    '이름과 도메인에 해당하는 문서가 여러 개입니다.',
+  /** 대상 탐색이 불완전하다. */
+  [codeReferenceStatuses.unconfirmed]: '대상 문서를 아직 확인하지 못했습니다.',
+} as const;

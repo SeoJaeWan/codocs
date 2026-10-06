@@ -143,6 +143,8 @@ export const changePlanDiagnosticCodes = {
   candidateMismatch: 'candidate_mismatch',
   /** 수정 요청의 name이 현재 이름과 달라 이름 변경이 필요하다. */
   nameChangeNotAllowed: 'name_change_not_allowed',
+  /** 이번 후보가 다른 문서나 코드의 확정된 참조를 새로 끊는다. */
+  brokenReference: 'reference_broken',
 } as const;
 /** 후보 계산의 고정 진단 문구다. */
 export const changePlanDiagnosticMessages = {
@@ -155,6 +157,8 @@ export const changePlanDiagnosticMessages = {
   candidateMismatch: '후보를 다시 읽은 데이터가 요청한 데이터와 다릅니다.',
   nameChangeNotAllowed:
     '문서 이름은 수정 요청으로 바꿀 수 없습니다. 이름 변경은 codocs_rename으로 참조와 함께 바꾸세요.',
+  brokenReference:
+    '이 변경은 다른 문서나 코드에서 확정된 참조를 끊습니다. 참조를 먼저 고치거나 해당 섹션을 유지하세요.',
 } as const;
 /** 변경 후보 계산의 오류 코드다. */
 export type ChangePlanDiagnosticCode =
