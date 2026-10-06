@@ -38,14 +38,17 @@ _codocs:
   - reference_not_found: 참조 대상이 없음
   - section_reference_not_found: 참조한 문서는 확정됐지만 `\[[이름:섹션]]`의 섹션이 그 문서에 없음. 참조 전체 위치를 가리키는 오류이며 문서 자체가 없으면 reference_not_found다.
   - reference_ambiguous: 참조 대상이 여러 개
-  - reference_broken: [[codocs_write]]의 update·replace가 이전에 확정되었던 다른 문서나 코드 파일의 참조를 새로 끊음. 참조를 쓴 파일과 위치를 진단에 담는다.
+  - reference_broken: [[codocs_write]]의 update·replace·delete·move가 이전에 확정되었던 다른 문서나 코드 파일의 참조를 새로 끊거나, 삭제·이동이 건드리지 않은 문서의 parent를 새로 끊음. 참조를 쓴 파일과 위치(parent는 자식 문서의 경로와 `_codocs`·`parent`·순번)를 진단에 담는다.
+  - name_change_not_allowed: [[codocs_write]]가 name을 바꾸는 변경을 받지 않음. [[이름 변경]]을 안내한다.
   - code_evidence_incomplete: 참조 보호에 필요한 코드 파일 확인을 끝내지 못해 저장하지 않음
   - codocs.codeReference.invalid·missing·missing_section·ambiguous: 코드 파일의 `@codocs` 표기를 해석하지 못했거나 대상 문서·섹션이 없거나 대상이 여러 개임. error이며 path는 코드 파일, range는 표기 위치다.
   - codocs.codeReference.unconfirmed: 대상 문서 탐색이 끝나지 않아 코드 참조를 확정하지 못함. 오류와 구분하는 warning이다.
   - section_not_found: [[codocs_get]]의 `이름:섹션` 주소에서 문서는 있지만 그 섹션이 없음
-  - revision_conflict: 읽은 뒤 파일이 바뀜
+  - change_revision_mismatch: [[codocs_write]]를 계획하는 시점에 요청의 revision이 현재 파일과 다름. changes에서는 다른 문서마다 진단한다.
+  - revision_conflict: 저장 직전 재확인에서 읽은 뒤 파일이 바뀐 것을 발견함
   - file_exists: 만들려는 파일이 이미 있음
   - file_write_failed: 파일 기록이나 반영 실패
+  - write_restore_failed: [[codocs_write]]의 changes나 delete·move를 반영하다 실패한 뒤 반영한 변경을 되돌리지 못함. 되돌리지 못한 항목의 변경은 디스크에 남는다.
   - index_not_ready: 색인을 구성하거나 갱신하는 중
   - index_build_failed: 색인 전체 구성 실패
   - index_update_failed: 저장 뒤 색인 반영 실패

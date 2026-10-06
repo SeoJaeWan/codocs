@@ -98,7 +98,7 @@ export function createCodocsServer(
       'codocs_write',
       {
         description:
-          '문서 하나를 생성(create), 부분 수정(update: set·unset), 전체 교체(replace: id·revision·document)하고 저장 결과와 색인 게시 상태를 반환합니다. replace의 document는 _codocs를 포함한 문서 전체이며 생략한 최상위 섹션은 삭제되고 set·unset과 함께 보낼 수 없으며 name은 바꿀 수 없습니다. update·replace가 새로 깨뜨리는 다른 문서나 코드 파일의 참조는 reference_broken으로 거절하고, 확인이 필요한 코드 근거를 읽지 못했으면 code_evidence_incomplete로 거절하며 이때 파일은 바뀌지 않습니다.',
+          '문서를 생성(create), 부분 수정(update: set·unset), 전체 교체(replace: id·revision·document), 삭제(delete: id·revision), 경로 이동(move: id·revision·path)하고 저장 결과와 색인 게시 상태를 반환합니다. 요청 하나는 단일 변경이거나 changes 배열(1개 이상, 항목은 단일 변경과 같은 형태)이며 다른 최상위 속성은 invalid_input입니다. changes는 모든 항목을 반영한 최종 상태를 한 번 검증해 전부 저장하거나 아무것도 저장하지 않고, 같은 문서 ID나 경로가 두 번 나오면 invalid_input이며 결과는 입력 순서의 changes[](state: changed·restored·restore_failed·unchanged)입니다. 저장 도중 실패하면 반영한 항목을 되돌리며 되돌리지 못하면 write_restore_failed입니다. replace의 document는 _codocs를 포함한 문서 전체이며 생략한 최상위 섹션은 삭제되고 set·unset과 함께 보낼 수 없으며 name은 바꿀 수 없습니다(name_change_not_allowed, codocs_rename 사용). 변경이 다른 문서나 코드 파일의 참조 또는 건드리지 않은 문서의 parent를 새로 끊으면 reference_broken으로 거절하고, 확인이 필요한 코드 근거를 읽지 못했으면 code_evidence_incomplete로 거절하며 이때 파일은 바뀌지 않습니다. delete·move로 비게 된 폴더는 .codocs 바로 아래까지 제거합니다.',
         execute: handlers.codocsWrite.bind(handlers),
       },
     ],
