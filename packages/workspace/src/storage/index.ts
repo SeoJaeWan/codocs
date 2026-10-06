@@ -30,11 +30,16 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { planWorkspaceChange } from '../change-plan/index.js';
+import { planProtectedWorkspaceChange } from '../change-plan/index.js';
 import { getIoErrorCode } from '../diagnostics/index.js';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
 import { loadWorkspace, type WorkspaceScanResult } from '../loader/index.js';
-import type { WorkspaceCodeRenameSources } from '../code-reference/index.js';
+import {
+  codeFileReasons,
+  collectWorkspaceCodeEvidence,
+  type WorkspaceCodeEvidence,
+  type WorkspaceCodeRenameSources,
+} from '../code-reference/index.js';
 import {
   computeCodeFilePolicy,
   readEligibleCodeFile,
@@ -85,6 +90,11 @@ export interface WorkspaceStorageOperations {
 export interface WorkspaceStorageOptions {
   operations?: Partial<WorkspaceStorageOperations>;
   beforeApply?: () => Promise<void>;
+  /**
+   * 섹션 삭제 보호에 쓰는 코드 저장 원문 증거의 수집을 대체한다. 기본값은 디스크를 새로 읽는 수집이다.
+   * IDE 편집 buffer나 색인의 보유 관측은 저장 보호의 근거가 될 수 없다.
+   */
+  collectCodeEvidence?: (projectRoot: string) => Promise<WorkspaceCodeEvidence>;
 }
 
 /** 저장 결과는 디스크 반영 여부와 변경 여부를 따로 전달한다. */
@@ -226,6 +236,29 @@ async function inspectTarget(
 }
 
 /**
+ * 호출 시점의 코드 저장 원문을 새로 수집하는 함수를 만든다.
+ * 프로젝트 루트를 모르면 코드 증거를 완전하다고 말할 수 없으므로 incomplete로 돌려준다.
+ */
+function codeEvidenceCollector(
+  projectRoot: string | undefined,
+  collect: (projectRoot: string) => Promise<WorkspaceCodeEvidence>,
+): () => Promise<WorkspaceCodeEvidence> {
+  return /** 요청마다 새로 읽은 코드 증거를 돌려준다. */ () =>
+    projectRoot === undefined
+      ? Promise.resolve({
+          complete: false,
+          files: [],
+          failures: [
+            {
+              reason: codeFileReasons.read,
+              message: '프로젝트 루트를 확인하지 못했습니다.',
+            },
+          ],
+        })
+      : collect(projectRoot);
+}
+
+/**
  * 검증된 단일 문서 후보를 같은 폴더의 배타적 임시 파일에 기록한 뒤 실제 파일에 반영한다.
  * update는 최신 바이트·ID·경로를 확인하고 rename하며 create는 비덮어쓰기 하드링크로 등록한다.
  * 파일 반영 뒤 임시 정리 실패는 저장 성공으로 반환한다. 색인 갱신과 프로세스 간 잠금은 수행하지 않는다.
@@ -235,7 +268,12 @@ export async function saveWorkspaceChange(
   scan: WorkspaceScanResult,
   options: WorkspaceStorageOptions = {},
 ): Promise<WorkspaceStorageResult> {
-  const planned = planWorkspaceChange(input, scan);
+  const projectRoot =
+    'root' in scan && scan.root ? scan.root.projectRoot : undefined;
+  const collectEvidence =
+    options.collectCodeEvidence ?? collectWorkspaceCodeEvidence;
+  const collect = codeEvidenceCollector(projectRoot, collectEvidence);
+  const planned = await planProtectedWorkspaceChange(input, scan, collect);
   if (planned.status === changePlanStatuses.failed)
     return failure(...planned.diagnostics);
   if (!('root' in scan) || !scan.root)
@@ -427,6 +465,27 @@ export async function saveWorkspaceChange(
             path: sourcePath,
             suggestion: '충돌한 문서 ID를 확인하고 다시 저장하세요.',
           },
+        ]);
+      // 최종 재탐색의 문서와 새로 읽은 코드 원문으로 후보와 참조 보호를 다시 증명한다. 재시도마다 반복한다.
+      const replanned = await planProtectedWorkspaceChange(
+        input,
+        current,
+        collect,
+        catalog,
+      );
+      if (replanned.status === changePlanStatuses.failed)
+        throw new StorageRejection(replanned.diagnostics);
+      if (
+        replanned.status !== changePlanStatuses.candidate ||
+        replanned.raw !== planned.raw
+      )
+        throw new StorageRejection([
+          storageDiagnostic(
+            storageDiagnosticCodes.revisionConflict,
+            storageDiagnosticMessages.revisionConflict,
+            sourcePath,
+            '최신 문서를 다시 읽고 변경을 검토하세요.',
+          ),
         ]);
       const latest = await inspectTarget(
         root,

@@ -3,6 +3,7 @@ import {
   WorkspaceCodeReferenceIndex,
   codeCollectionStatuses,
   codeFileReasons,
+  projectWorkspaceCodeDiagnostics,
   type WorkspaceCodeReferenceSnapshot,
   type WorkspaceCodeReferenceQuery,
   type WorkspaceCodeReferenceCaptureInput,
@@ -62,6 +63,7 @@ import {
 } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolveWorkspacePath } from '../paths/index.js';
+import type { CodeCollectionFailure } from '../paths/code-file-access.js';
 import { calculateRevision } from '../revision/index.js';
 import { pathToFileURL } from 'node:url';
 import {
@@ -263,8 +265,16 @@ export type WorkspaceIdPathResponse = RequestResult<
 /** 전체 또는 한 파일의 현재 색인 진단이며 문서 오류도 요청 성공이다. */
 export interface WorkspaceValidationSuccess {
   success: true;
+  /** 문서 탐색 상태다. 검증은 문서 탐색이 complete일 때만 수행한다. */
   scanStatus: typeof scanStatuses.complete;
-  diagnostics: readonly WorkspaceQueryDiagnostic[];
+  /** 코드 파일 수집 상태다. 문서 탐색 상태와 별개이며 complete가 아니면 코드 진단이 일부일 수 있다. */
+  codeScanStatus?: (typeof codeCollectionStatuses)[keyof typeof codeCollectionStatuses];
+  /** 문서와 코드 범위를 모두 확인한 진단이면 true다. false이면 diagnostics는 확인한 결과일 뿐이며 문제 없음의 증거가 아니다. */
+  diagnosticsComplete?: boolean;
+  /** 코드 수집이 확인하지 못한 범위다. */
+  codeFailures?: readonly CodeCollectionFailure[];
+  /** 문서 진단과 코드 참조 진단이다. 코드 진단은 코드 파일 경로와 표기 위치를 가진다. */
+  diagnostics: readonly (WorkspaceQueryDiagnostic | Diagnostic<string>)[];
   path?: string;
 }
 
@@ -326,10 +336,17 @@ export type WorkspaceRefreshResult = RequestResult<
     scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
     fileCount: number;
     itemCount: number;
+    /** 반환한 diagnostics 중 error 진단 수다. */
     errorCount: number;
+    /** 반환한 diagnostics 중 warning 진단 수다. */
     warningCount: number;
+    /** 문서와 코드 범위를 모두 확인한 집계이면 true다. partial·미완료 코드 수집이면 false다. */
     countsComplete: boolean;
-    diagnostics: readonly WorkspaceScanDiagnostic[];
+    /** 코드 파일 수집 상태다. scanStatus와 별개다. */
+    codeScanStatus?: (typeof codeCollectionStatuses)[keyof typeof codeCollectionStatuses];
+    /** 코드 수집이 확인하지 못한 범위다. */
+    codeFailures?: readonly CodeCollectionFailure[];
+    diagnostics: readonly (WorkspaceScanDiagnostic | Diagnostic<string>)[];
   },
   WorkspaceQueryFailure
 >;
@@ -449,6 +466,9 @@ export interface WorkspaceSectionDestination {
   range: SourceRange;
   markerText: string;
 }
+
+/** 명시 refresh가 문서 게시와 코드 관측을 같은 세대로 맞추려고 다시 얻는 횟수의 상한이며 계약 수치가 아니다. */
+const maxRefreshObservationPasses = 3;
 
 /** 적용할 수 없는 비동기 요청의 공통 결과다. */
 function superseded(): WorkspaceQueryFailure {
@@ -1125,8 +1145,10 @@ export class WorkspaceQuerySession {
     if (base.status === scanStatuses.failed) return scanFailure(base);
     const request = parseRenameRequest(input);
     if (!request) return invalidInput(base.status);
+    const before = this.#refreshPromise;
     const code = await this.#renameCodeSources();
     if (!code) return workspaceIndexNotReady();
+    await this.#settleSyncStartedSince(before);
     // 코드 수집을 기다린 사이 게시된 색인으로 계산하도록 문서 색인을 다시 확인한다.
     const scan = await this.#renameScan();
     if ('success' in scan) return scan;
@@ -1156,6 +1178,18 @@ export class WorkspaceQuerySession {
   }
 
   /**
+   * 코드 수집을 기다린 사이 새로 시작된 문서 색인 갱신이 있으면 끝나기를 기다린다.
+   * 코드 수집 전부터 진행 중이던 갱신은 기다리지 않아 기존의 준비 상태 판정을 바꾸지 않는다.
+   * @param before 코드 수집을 시작하기 전에 진행 중이던 문서 색인 갱신이다.
+   */
+  async #settleSyncStartedSince(
+    before: Promise<WorkspaceScanResult> | undefined,
+  ): Promise<void> {
+    while (this.#refreshPromise && this.#refreshPromise !== before)
+      await this.#refreshPromise;
+  }
+
+  /**
    * 이름 변경이 쓰는 코드 수집의 저장 관측을 돌려준다. 코드 색인이 아직 없으면 이 요청이 만들어
    * 최초 수집이 끝나기를 기다린다. 이미 시작된 수집이 진행 중이면 기다리지 않고 collecting으로 돌려준다.
    * @returns 세션이 닫혔거나 프로젝트 root를 확인하지 못하면 undefined다.
@@ -1165,6 +1199,10 @@ export class WorkspaceQuerySession {
     const index = await this.#codeReferences();
     if (!index) return undefined;
     if (!existing) await index.ready();
+    // 이미 있는 색인은 감시 신호가 도착하기 전의 변경을 놓칠 수 있으므로 저장 원문을 다시 확인한다.
+    // 진행 중인 수집은 기다리지 않고 collecting으로 돌려준다.
+    else if (index.renameSources().status !== codeCollectionStatuses.collecting)
+      await index.refresh();
     return index.renameSources();
   }
 
@@ -1176,8 +1214,10 @@ export class WorkspaceQuerySession {
   async applyRename(input: unknown): Promise<WorkspaceRenameResult> {
     const base = await this.#renameScan();
     if ('success' in base) return this.#renameFailure([base.error]);
+    const before = this.#refreshPromise;
     const code = await this.#renameCodeSources();
     if (!code) return this.#renameFailure([workspaceIndexNotReady().error]);
+    await this.#settleSyncStartedSince(before);
     // 코드 수집을 기다린 사이 게시된 색인으로 반영하도록 문서 색인을 다시 확인한다.
     const scan = await this.#renameScan();
     if ('success' in scan) return this.#renameFailure([scan.error]);
@@ -1601,15 +1641,30 @@ export class WorkspaceQuerySession {
       selectedPath = resolved.path;
       if (!catalog.documents.has(selectedPath)) return workspaceIndexNotReady();
     }
+    // 저장 원문 기준의 코드 관측을 대기 변경까지 반영해 얻는다. IDE 편집 buffer는 검증 근거가 아니다.
+    const existing = this.#codeIndex !== undefined;
+    const index = await this.#codeReferences();
+    if (!index) return workspaceIndexNotReady();
+    // 이미 있는 색인은 감시 신호 도착 전의 변경도 반영하도록 저장 원문을 다시 확인한다.
+    if (existing) await index.refresh();
+    const observation = await index.settledDiskObservation();
     const unavailable = changedState();
     if (unavailable) return unavailable;
     return {
       success: true,
       scanStatus: scanStatuses.complete,
+      codeScanStatus: observation.status,
+      diagnosticsComplete: observation.complete,
+      codeFailures: observation.failures,
       ...(selectedPath === undefined ? {} : { path: selectedPath }),
       diagnostics: [
         ...projectCatalogDiagnostics(catalog, selectedPath),
         ...(selectedPath === undefined ? scan.skippedLinks : []),
+        ...projectWorkspaceCodeDiagnostics(
+          catalog,
+          observation.files,
+          selectedPath,
+        ),
       ],
     };
   }
@@ -2344,33 +2399,64 @@ export class WorkspaceQuerySession {
       if (this.#closed) return scanFailure(this.#closedScan());
       if (this.#watcher) await this.#watcher.refresh();
       while (this.#refreshPromise) await this.#refreshPromise;
-      const scan = await this.#synchronize();
-      await this.#codeIndex?.refresh();
+      let scan = await this.#synchronize();
+      // 첫 refresh에서도 코드 색인을 만들어 문서 색인과 같은 시점에 처음부터 다시 수집한다.
+      const index =
+        scan.status === scanStatuses.failed
+          ? this.#codeIndex
+          : await this.#codeReferences();
+      await index?.refresh();
       if (this.#closed) return superseded();
       const watchFailure = this.#watchFailure();
       if (watchFailure) return this.#watchFailureResult(watchFailure);
-      return scan.status === scanStatuses.failed
-        ? scanFailure(scan)
-        : {
-            success: true,
-            scanStatus: scan.status,
-            fileCount:
-              scan.documents.length +
-              scan.failures.filter(
-                (failure) => failure.kind === workspaceTargetKinds.file,
-              ).length,
-            itemCount: countCatalogListItems(this.#catalog!),
-            errorCount: scan.diagnostics.filter(
-              (diagnostic) =>
-                diagnostic.severity === diagnosticSeverities.error,
-            ).length,
-            warningCount: scan.diagnostics.filter(
-              (diagnostic) =>
-                diagnostic.severity === diagnosticSeverities.warning,
-            ).length,
-            countsComplete: scan.status === scanStatuses.complete,
-            diagnostics: scan.diagnostics,
-          };
+      if (scan.status === scanStatuses.failed) return scanFailure(scan);
+      // 코드 대기 변경과 문서 게시가 섞인 관측은 같은 게시에서 확인될 때까지 다시 얻고, 끝내 못 맞추면 완전하다고 하지 않는다.
+      let observation:
+        | Awaited<
+            ReturnType<WorkspaceCodeReferenceIndex['settledDiskObservation']>
+          >
+        | undefined;
+      let stable = false;
+      for (let attempt = 0; attempt < maxRefreshObservationPasses; attempt++) {
+        const version = this.#catalogVersion;
+        scan = this.#scan ?? scan;
+        observation = await index?.settledDiskObservation();
+        if (this.#closed) return superseded();
+        if (this.#catalogVersion === version && this.#scan === scan) {
+          stable = true;
+          break;
+        }
+      }
+      if (scan.status === scanStatuses.failed) return scanFailure(scan);
+      const codeDiagnostics =
+        this.#catalog && observation
+          ? projectWorkspaceCodeDiagnostics(this.#catalog, observation.files)
+          : [];
+      const diagnostics = [...scan.diagnostics, ...codeDiagnostics];
+      return {
+        success: true,
+        scanStatus: scan.status,
+        fileCount:
+          scan.documents.length +
+          scan.failures.filter(
+            (failure) => failure.kind === workspaceTargetKinds.file,
+          ).length,
+        itemCount: countCatalogListItems(this.#catalog!),
+        errorCount: diagnostics.filter(
+          (diagnostic) => diagnostic.severity === diagnosticSeverities.error,
+        ).length,
+        warningCount: diagnostics.filter(
+          (diagnostic) => diagnostic.severity === diagnosticSeverities.warning,
+        ).length,
+        countsComplete:
+          scan.status === scanStatuses.complete &&
+          stable &&
+          observation?.complete === true,
+        codeScanStatus:
+          observation?.status ?? codeCollectionStatuses.incomplete,
+        codeFailures: observation?.failures ?? [],
+        diagnostics,
+      };
     };
     const operation = refreshOperation();
     this.#explicitRefreshPromise = operation;
