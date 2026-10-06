@@ -56,7 +56,8 @@ const listSchema = z.strictObject({ parent: z.string().optional() });
 const getSchema = z.strictObject({ addresses: z.array(z.string()) });
 const validateSchema = z.strictObject({ path: z.string().optional() });
 const guideSchema = z.strictObject({ topic: z.enum(guideTopics).optional() });
-const writeSchema = z.discriminatedUnion('mode', [
+/** 단일 요청과 changes 항목이 함께 쓰는 mode 구분 입력이다. */
+const writeItemSchema = z.discriminatedUnion('mode', [
   z.strictObject({
     mode: z.literal('create'),
     path: z.string(),
@@ -76,6 +77,24 @@ const writeSchema = z.discriminatedUnion('mode', [
     revision: z.string(),
     document: userFields,
   }),
+  /** 문서 파일을 삭제한다. 대상 문서의 revision이 필요하다. */
+  z.strictObject({
+    mode: z.literal('delete'),
+    id: z.string(),
+    revision: z.string(),
+  }),
+  /** 문서 파일을 새 경로로 옮긴다. 내용·ID·이름은 바꾸지 않는다. */
+  z.strictObject({
+    mode: z.literal('move'),
+    id: z.string(),
+    revision: z.string(),
+    path: z.string(),
+  }),
+]);
+/** 단일 요청 하나 또는 changes 항목 1개 이상을 받는다. 다른 최상위 속성은 거부한다. */
+const writeSchema = z.union([
+  writeItemSchema,
+  z.strictObject({ changes: z.array(writeItemSchema).min(1) }),
 ]);
 
 const renameBase = {

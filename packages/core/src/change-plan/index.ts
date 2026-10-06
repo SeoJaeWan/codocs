@@ -13,6 +13,7 @@ import {
   renameChangeKinds,
   scanStatuses,
   type Catalog,
+  type CatalogObservation,
   type RenameChange,
 } from '../catalog/index.js';
 import {
@@ -21,9 +22,12 @@ import {
   type CodeReferenceMarker,
 } from '../code-reference/index.js';
 import {
+  catalogDiagnosticCodes,
   changePlanDiagnosticCodes,
   changePlanDiagnosticMessages,
   diagnosticSeverities,
+  queryDiagnosticCodes,
+  queryDiagnosticMessages,
   type Diagnostic,
 } from '../diagnostics/index.js';
 import {
@@ -38,7 +42,11 @@ import {
   validateDocument,
   type Document,
 } from '../validator/index.js';
-import { changePlanStatuses } from './domain-values.js';
+import {
+  changePlanModes,
+  changePlanStatuses,
+  type ChangePlanMode,
+} from './domain-values.js';
 export * from './domain-values.js';
 
 /** 호출자가 같은 읽기에서 전달한 대상 원문과 revision이다. */
@@ -66,14 +74,88 @@ export interface ChangePlanContext {
    * 섹션을 삭제하는 후보(`removedSections`)에서만 의미가 있으며 생략하면 코드 영향은 판단하지 않는다.
    */
   codeReferences?: readonly ChangePlanCodeReference[];
+  /**
+   * 요청의 `/` 구분 문서 경로를 색인이 쓰는 경로 표기로 바꾼다. 생략하면 요청 표기 그대로 쓴다.
+   * 색인·원문의 경로가 OS 구분자인 환경에서 create·move 대상의 존재·중복 확인과 결과 경로를 색인 표기와 맞춘다.
+   */
+  catalogPath?: (requestPath: string) => string;
 }
+
+/** 요청이나 후보 검증이 실패한 결과다. 실패한 항목의 경로와 위치를 진단에 담는다. */
+export interface ChangePlanFailure {
+  status: typeof changePlanStatuses.failed;
+  diagnostics: readonly Diagnostic<string>[];
+}
+
+/** 다중 항목 계획에 쓰는 색인과 대상 문서 원문들이다. */
+export interface ChangePlansContext {
+  catalog: Catalog;
+  /**
+   * update/replace/delete/move 대상 문서의 같은 읽기 원문이다. 대상 ID의 유일한 경로와 같은 `path`의 원문이 있어야 한다.
+   * create만 있는 계획이면 생략할 수 있다.
+   */
+  sources?: readonly ChangePlanSource[];
+  /**
+   * 변경 전후를 같은 표기로 비교할 코드 참조다. 계획이 기존에 확정된 코드 참조를 끊으면 거절한다.
+   * 결과의 `requiresCodeEvidence`가 true일 때만 의미가 있으며 생략하면 코드 영향은 판단하지 않는다.
+   */
+  codeReferences?: readonly ChangePlanCodeReference[];
+  /**
+   * 요청의 `/` 구분 문서 경로를 색인이 쓰는 경로 표기로 바꾼다. 생략하면 요청 표기 그대로 쓴다.
+   * 색인·원문의 경로가 OS 구분자인 환경에서 create·move 대상의 존재·중복 확인과 결과 경로를 색인 표기와 맞춘다.
+   */
+  catalogPath?: (requestPath: string) => string;
+}
+
+/** 다중 항목 계획의 항목 하나가 입력 순서대로 돌려주는 후보다. */
+export interface PlannedChangeItem {
+  /** 입력 배열에서의 위치다. 결과 `items`는 입력 순서와 같다. */
+  index: number;
+  mode: ChangePlanMode;
+  /** 문서 ID다. */
+  id: string;
+  /** 반영 뒤 경로다. delete는 지워지는 경로, move는 새 경로다. */
+  path: string;
+  /** move의 원래 경로다. */
+  previousPath?: string;
+  /** false이면 update/replace가 원문을 바꾸지 않아 저장할 것이 없다. */
+  changed: boolean;
+  /** 후보 원문이다. create/update/replace의 새 원문, move는 원래와 같은 원문이며 delete와 변경 없음은 없다. */
+  raw?: string;
+  /** create/update/replace 후보의 검증된 데이터다. */
+  data?: Document;
+  /** 기존 문서를 대상으로 한 항목(update/replace/delete/move)이 읽은 원문 revision이다. */
+  baseRevision?: string;
+  /** 변경 없음 항목의 현재 revision이다. */
+  revision?: string;
+  /** 후보에서 사라지는 기존 섹션 이름이다. delete는 문서의 모든 섹션이다. */
+  removedSections: readonly string[];
+  /** 이 항목의 최종 색인 진단(경고 포함)이다. */
+  diagnostics: readonly Diagnostic<string>[];
+}
+
+/** 다중 항목 후보 결과다. */
+export type ChangesPlanResult =
+  | ChangePlanFailure
+  | {
+      status: typeof changePlanStatuses.unchanged;
+      items: readonly PlannedChangeItem[];
+      diagnostics: readonly Diagnostic<string>[];
+    }
+  | {
+      status: typeof changePlanStatuses.candidate;
+      items: readonly PlannedChangeItem[];
+      /**
+       * 코드 참조 보호에 코드 파일의 새 증거가 필요하다(섹션 제거 또는 delete가 있다).
+       * true이면 증거를 수집해 `codeReferences`와 함께 다시 계획해야 한다.
+       */
+      requiresCodeEvidence: boolean;
+      diagnostics: readonly Diagnostic<string>[];
+    };
 
 /** 저장 단계와 구분되는 단일 문서 후보 결과다. */
 export type ChangePlanResult =
-  | {
-      status: typeof changePlanStatuses.failed;
-      diagnostics: readonly Diagnostic<string>[];
-    }
+  | ChangePlanFailure
   | {
       status: typeof changePlanStatuses.unchanged;
       path: string;
@@ -161,7 +243,7 @@ function plainData(value: unknown, depth = 0): boolean {
 function failure(
   code: keyof typeof changePlanDiagnosticCodes,
   path?: string,
-): ChangePlanResult {
+): ChangePlanFailure {
   return {
     status: changePlanStatuses.failed,
     diagnostics: [
@@ -485,185 +567,105 @@ function nestedBlockText(
   return source[range.end - 1] === '\n' ? text + eol : text;
 }
 
-/** 후보를 반영하고 기존 확인 상태를 유지한 임시 색인을 만든다. */
-function candidateCatalog(
-  catalog: Catalog,
-  path: string,
-  raw: string,
-  parsed: YamlParseResult = parseYaml(raw, path),
-): Catalog {
-  const confirmed = [...catalog.documents.values()]
-    .filter(
-      (doc) =>
-        doc.path !== path &&
-        doc.confirmation === catalogConfirmations.confirmed,
-    )
-    .map((doc) => doc.observation);
-  return buildCatalog(
-    {
-      status: catalog.status,
-      observations: [...confirmed, { path, parsed }],
-      failures: catalog.failures,
-    },
-    catalog,
-  );
-}
-
-/** 임시 색인에서 후보 경로의 진단만 추출한다. */
-function candidateDiagnostics(
-  catalog: Catalog,
-  path: string,
-  raw: string,
-): readonly Diagnostic<string>[] {
-  const parsed = parseYaml(raw, path);
-  return (
-    candidateCatalog(catalog, path, raw, parsed).documents.get(path)
-      ?.diagnostics ?? parsed.diagnostics
-  );
-}
-
 /** replace 요청이 mode·id·revision·document 외의 속성을 담지 않았는지 확인한다. */
 function replaceRequest(input: Record<string, unknown>): boolean {
   const allowed = new Set(['mode', 'id', 'revision', 'document']);
   return Object.keys(input).every((key) => allowed.has(key));
 }
 
-/**
- * 후보가 대상 문서를 가리키던 기존 확정 참조를 새로 끊는지 같은 출처 표기로 비교한다.
- * 변경 전에 확정이었고 변경 후에 확정이 아닌 참조만 거절 근거다. 무관한 기존 오류는 보지 않는다.
- * @param after 후보를 반영한 임시 색인이다.
- * @param path 변경 대상 문서 경로다.
- * @param codeReferences 변경하지 않는 코드 파일의 표기다.
- * @returns 끊기는 참조마다 출처 경로와 위치를 담은 오류다. 없으면 빈 배열이다.
- */
-function brokenReferences(
-  context: ChangePlanContext,
-  after: Catalog,
-  path: string,
-  codeReferences: readonly ChangePlanCodeReference[],
-): readonly Diagnostic<string>[] {
-  const result: Diagnostic<string>[] = [];
-  /** 끊기는 참조 하나를 출처 경로와 위치를 담은 오류로 만든다. */
-  const diagnostic = (
-    sourcePath: string,
-    range: Diagnostic<string>['range'],
-    fieldPath?: Diagnostic<string>['fieldPath'],
-  ): Diagnostic<string> => ({
-    code: changePlanDiagnosticCodes.brokenReference,
-    severity: diagnosticSeverities.error,
-    message: changePlanDiagnosticMessages.brokenReference,
-    path: sourcePath,
-    ...(fieldPath ? { fieldPath } : {}),
-    ...(range ? { range } : {}),
-  });
-  for (const [sourcePath, before] of context.catalog.documents) {
-    const next = after.documents.get(sourcePath);
-    if (
-      sourcePath === path ||
-      !next ||
-      before.confirmation !== catalogConfirmations.confirmed
-    )
-      continue;
-    before.occurrences.forEach(
-      /** 같은 순서의 변경 후 등장과 해석 결과를 비교한다. */ (item, index) => {
-        const now = next.occurrences[index];
-        if (
-          item.resolution.status !== referenceResolutionStatuses.resolved ||
-          item.resolution.target?.path !== path ||
-          !now ||
-          now.occurrence.offsetRange.start !== item.occurrence.offsetRange.start
-        )
-          return;
-        if (now.resolution.status !== referenceResolutionStatuses.resolved)
-          result.push(
-            diagnostic(
-              sourcePath,
-              item.occurrence.range,
-              item.occurrence.fieldPath,
-            ),
-          );
-      },
-    );
-  }
-  for (const { sourcePath, marker } of codeReferences) {
-    const was = resolveCodeReference(context.catalog, marker);
-    if (
-      was.status !== codeReferenceStatuses.resolved ||
-      was.target?.path !== path
-    )
-      continue;
-    if (
-      resolveCodeReference(after, marker).status !==
-      codeReferenceStatuses.resolved
-    )
-      result.push(diagnostic(sourcePath, marker.range));
-  }
-  return result;
+/** 문서 경로 규칙이다. `.codocs` 아래 상대 경로, `/` 구분, `.yaml`/`.yml`, 빈·`.`·`..` 구간과 절대·역슬래시 금지. */
+function documentPath(path: unknown): path is string {
+  return (
+    typeof path === 'string' &&
+    path !== '' &&
+    !path.startsWith('/') &&
+    !path.includes('\\') &&
+    !path.split('/').some((part) => !part || part === '.' || part === '..') &&
+    /\.ya?ml$/u.test(path)
+  );
 }
 
-/** create/update/replace 요청을 파일 IO 없이 검증하고 YAML 후보를 계산한다. */
-export function planDocumentChange(
-  input: unknown,
-  context: ChangePlanContext,
-): ChangePlanResult {
-  try {
-    return planDocumentChangeInternal(input, context);
-  } catch {
-    return failure('invalidRequest');
-  }
+/** 경로 표기를 바꾸지 않는 기본 변환이다. */
+function keepPath(requestPath: string): string {
+  return requestPath;
 }
 
-/** 확인한 요청으로 한 문서의 후보만 계산한다. */
-function planDocumentChangeInternal(
+/** 파싱이 끝난 문서 하나의 후보 계산 중간 값이다. 최종 색인이 만들어진 뒤에 판정을 마친다. */
+interface PreparedItem {
+  index: number;
+  mode: ChangePlanMode;
+  /** 문서 ID다. create는 검증을 통과한 뒤에만 알 수 있다. */
+  id: string;
+  /** 변경 뒤 경로다. delete는 지워지는 경로다. */
+  path: string;
+  previousPath?: string;
+  source?: ChangePlanSource;
+  raw?: string;
+  parsed?: YamlParseResult;
+  data?: Document;
+  /** update/replace 후보가 요청 데이터와 같아 파일을 바꿀 필요가 없다. */
+  noop?: boolean;
+  removedSections: readonly string[];
+}
+
+type PrepareResult =
+  | { ok: true; item: PreparedItem }
+  | { ok: false; diagnostics: readonly Diagnostic<string>[] };
+
+/** 준비 단계의 요청 오류를 코드와 함께 반환한다. */
+function prepareFailure(
+  code: keyof typeof changePlanDiagnosticCodes,
+  path?: string,
+): PrepareResult {
+  return { ok: false, diagnostics: failure(code, path).diagnostics };
+}
+
+/** 항목 하나의 요청 형태와 원문 대조를 마치고 후보 원문을 계산한다. 최종 색인 판정은 하지 않는다. */
+function prepareItem(
   input: unknown,
-  context: ChangePlanContext,
-): ChangePlanResult {
+  index: number,
+  context: ChangePlansContext,
+): PrepareResult {
   if (
     !record(input) ||
-    (input.mode !== 'create' &&
-      input.mode !== 'update' &&
-      input.mode !== 'replace')
+    typeof input.mode !== 'string' ||
+    !Object.hasOwn(changePlanModes, input.mode)
   )
-    return failure('invalidRequest');
-  if (input.mode === 'create') {
-    const path = input.path;
-    if (
-      typeof path !== 'string' ||
-      !path ||
-      path.startsWith('/') ||
-      path.includes('\\') ||
-      path.split('/').some((part) => !part || part === '.' || part === '..') ||
-      !/\.ya?ml$/u.test(path)
-    )
-      return failure('invalidRequest');
-    if (context.catalog.documents.has(path)) return failure('pathExists', path);
-    if (!plainData(input.document)) return failure('invalidRequest');
+    return prepareFailure('invalidRequest');
+  const mode = input.mode as ChangePlanMode;
+  if (mode === changePlanModes.create) {
+    if (!documentPath(input.path)) return prepareFailure('invalidRequest');
+    const path = (context.catalogPath ?? keepPath)(input.path);
+    if (context.catalog.documents.has(path))
+      return prepareFailure('pathExists', path);
+    if (!plainData(input.document)) return prepareFailure('invalidRequest');
     const validation = validateDocument({
       data: input.document,
       path,
     });
     if (!validation.success)
       return {
-        status: changePlanStatuses.failed,
+        ok: false,
         diagnostics: [...validation.errors, ...validation.warnings],
       };
     if (context.catalog.status !== scanStatuses.complete)
-      return failure('incompleteCatalog', path);
+      return prepareFailure('incompleteCatalog', path);
     const raw = stringify(validation.data, { lineWidth: 0 });
     const parsed = parseYaml(raw, path);
     if (!parsed.success || !same(parsed.data, validation.data))
-      return failure('candidateMismatch', path);
-    const diagnostics = candidateDiagnostics(context.catalog, path, raw);
-    if (diagnostics.some((d) => d.severity === diagnosticSeverities.error))
-      return { status: changePlanStatuses.failed, diagnostics };
+      return prepareFailure('candidateMismatch', path);
     return {
-      status: changePlanStatuses.candidate,
-      path,
-      id: validation.data._codocs.id,
-      raw,
-      data: validation.data,
-      removedSections: [],
-      diagnostics,
+      ok: true,
+      item: {
+        index,
+        mode,
+        id: validation.data._codocs.id,
+        path,
+        raw,
+        parsed,
+        data: validation.data,
+        removedSections: [],
+      },
     };
   }
   const id = input.id,
@@ -674,11 +676,12 @@ function planDocumentChangeInternal(
     typeof revision !== 'string' ||
     !revision
   )
-    return failure('invalidRequest');
+    return prepareFailure('invalidRequest');
   let replacement: Record<string, unknown> | undefined;
   let set: Record<string, unknown> | undefined;
   let removals: string[] = [];
-  if (input.mode === 'replace') {
+  let newPath: string | undefined;
+  if (mode === changePlanModes.replace) {
     const document = input.document;
     if (
       !replaceRequest(input) ||
@@ -686,8 +689,18 @@ function planDocumentChangeInternal(
       !record(document[codocsKey]) ||
       !plainData(document)
     )
-      return failure('invalidRequest');
+      return prepareFailure('invalidRequest');
     replacement = document;
+  } else if (mode === changePlanModes.delete) {
+    if (!exactKeys(input, ['mode', 'id', 'revision']))
+      return prepareFailure('invalidRequest');
+  } else if (mode === changePlanModes.move) {
+    if (
+      !exactKeys(input, ['mode', 'id', 'revision', 'path']) ||
+      !documentPath(input.path)
+    )
+      return prepareFailure('invalidRequest');
+    newPath = (context.catalogPath ?? keepPath)(input.path);
   } else {
     const requestedSet = input.set,
       requestedUnset = input.unset;
@@ -696,7 +709,7 @@ function planDocumentChangeInternal(
       (requestedUnset !== undefined && !stringList(requestedUnset)) ||
       (!requestedSet && !requestedUnset)
     )
-      return failure('invalidRequest');
+      return prepareFailure('invalidRequest');
     set = requestedSet;
     removals = requestedUnset ?? [];
     const changes = set ? Object.keys(set) : [];
@@ -711,10 +724,11 @@ function planDocumentChangeInternal(
       (set !== undefined &&
         !Object.values(set).every((value) => plainData(value)))
     )
-      return failure('invalidRequest');
+      return prepareFailure('invalidRequest');
   }
   const paths = context.catalog.idPaths.get(id);
-  const source = context.source;
+  const onlyPath = paths?.size === 1 ? [...paths][0] : undefined;
+  const source = context.sources?.find((item) => item.path === onlyPath);
   const target = source && context.catalog.documents.get(source.path);
   if (
     !paths ||
@@ -725,16 +739,46 @@ function planDocumentChangeInternal(
     target.id !== id ||
     target.observation.parsed.source !== source.raw
   )
-    return failure('targetUnavailable');
+    return prepareFailure('targetUnavailable');
   if (revision !== source.revision)
-    return failure('revisionMismatch', source.path);
-  if (!source.utf8Lossless) return failure('sourceNotLossless', source.path);
-  const parsed = parseYaml(source.raw, source.path);
-  if (!parsed.success)
+    return prepareFailure('revisionMismatch', source.path);
+  if (mode === changePlanModes.delete || mode === changePlanModes.move) {
+    if (context.catalog.status !== scanStatuses.complete)
+      return prepareFailure('incompleteCatalog', source.path);
+    if (mode === changePlanModes.delete)
+      return {
+        ok: true,
+        item: {
+          index,
+          mode,
+          id,
+          path: source.path,
+          source,
+          removedSections: getSectionNames(target.observation.parsed),
+        },
+      };
+    if (newPath === undefined) return prepareFailure('invalidRequest');
+    if (context.catalog.documents.has(newPath))
+      return prepareFailure('pathExists', newPath);
     return {
-      status: changePlanStatuses.failed,
-      diagnostics: parsed.diagnostics,
+      ok: true,
+      item: {
+        index,
+        mode,
+        id,
+        path: newPath,
+        previousPath: source.path,
+        source,
+        raw: source.raw,
+        parsed: parseYaml(source.raw, newPath),
+        removedSections: [],
+      },
     };
+  }
+  if (!source.utf8Lossless)
+    return prepareFailure('sourceNotLossless', source.path);
+  const parsed = parseYaml(source.raw, source.path);
+  if (!parsed.success) return { ok: false, diagnostics: parsed.diagnostics };
   const requestedMetadata = replacement
     ? replacement[codocsKey]
     : set?.[codocsKey];
@@ -747,62 +791,523 @@ function planDocumentChangeInternal(
         ? currentMetadata[metadataFields.name]
         : undefined)
   )
-    return failure('nameChangeNotAllowed', source.path);
+    return prepareFailure('nameChangeNotAllowed', source.path);
   const expected: Record<string, unknown> = replacement
     ? { ...replacement }
     : { ...parsed.data, ...(set ?? {}) };
   for (const key of removals) delete expected[key];
   const raw = editYaml(parsed, expected);
-  if (raw === undefined) return failure('candidateMismatch', source.path);
+  if (raw === undefined)
+    return prepareFailure('candidateMismatch', source.path);
   const candidate = parseYaml(raw, source.path);
   if (!candidate.success)
-    return {
-      status: changePlanStatuses.failed,
-      diagnostics: candidate.diagnostics,
-    };
+    return { ok: false, diagnostics: candidate.diagnostics };
   if (!same(candidate.data, expected))
-    return failure('candidateMismatch', source.path);
-  const after = candidateCatalog(context.catalog, source.path, raw, candidate);
-  const diagnostics =
-    after.documents.get(source.path)?.diagnostics ?? candidate.diagnostics;
-  if (diagnostics.some((d) => d.severity === diagnosticSeverities.error))
-    return { status: changePlanStatuses.failed, diagnostics };
-  if (context.catalog.status !== scanStatuses.complete)
-    return failure('incompleteCatalog', source.path);
-  const validation = validateDocument({ data: candidate.data });
-  if (!validation.success)
+    return prepareFailure('candidateMismatch', source.path);
+  return {
+    ok: true,
+    item: {
+      index,
+      mode,
+      id,
+      path: source.path,
+      source,
+      raw,
+      parsed: candidate,
+      noop: raw === source.raw || same(expected, parsed.data),
+      removedSections: getSectionNames(parsed).filter(
+        (section) => !Object.hasOwn(candidate.data, section),
+      ),
+    },
+  };
+}
+
+/** 요청이 정확히 허용한 키만 가졌는지 확인한다. */
+function exactKeys(
+  input: Record<string, unknown>,
+  allowed: readonly string[],
+): boolean {
+  const keys = Object.keys(input);
+  return (
+    keys.length === allowed.length && keys.every((key) => allowed.includes(key))
+  );
+}
+
+/** 항목 사이에 같은 문서 ID나 같은 경로가 두 번 이상 나오는지 찾아 입력 오류로 만든다. */
+function duplicateInput(
+  items: readonly unknown[],
+  catalog: Catalog,
+  catalogPath: (requestPath: string) => string,
+): Diagnostic<string> | undefined {
+  const ids = new Set<string>(),
+    paths = new Set<string>();
+  /** 항목 하나가 쓰는 값들을 전체 집합과 비교한다. 같은 항목 안의 반복은 세지 않는다. */
+  const take = (
+    seen: Set<string>,
+    values: readonly (string | undefined)[],
+  ): string | undefined => {
+    const own = new Set(values.filter((v): v is string => v !== undefined));
+    for (const value of own) {
+      if (seen.has(value)) return value;
+      seen.add(value);
+    }
+    return undefined;
+  };
+  /** 중복 값을 입력 오류 진단으로 만든다. */
+  const invalid = (suggestion: string, path?: string): Diagnostic<string> => ({
+    code: queryDiagnosticCodes.invalidInput,
+    severity: diagnosticSeverities.error,
+    message: queryDiagnosticMessages.invalidInput,
+    suggestion,
+    ...(path === undefined ? {} : { path }),
+  });
+  for (const item of items) {
+    if (!record(item)) continue;
+    const created = item.mode === changePlanModes.create;
+    const document = item.document;
+    const metadata = record(document) ? document[codocsKey] : undefined;
+    const createdId = record(metadata)
+      ? metadata[metadataFields.id]
+      : undefined;
+    const id = created ? createdId : item.id;
+    const known =
+      typeof item.id === 'string' ? catalog.idPaths.get(item.id) : undefined;
+    const original = !created && known?.size === 1 ? [...known][0] : undefined;
+    const added =
+      typeof item.path === 'string' ? catalogPath(item.path) : undefined;
+    const duplicateId = take(ids, [typeof id === 'string' ? id : undefined]);
+    if (duplicateId !== undefined)
+      return invalid(`같은 문서 ID(${duplicateId})는 한 번만 지정하세요.`);
+    const duplicatePath = take(paths, [original, added]);
+    if (duplicatePath !== undefined)
+      return invalid(
+        `같은 경로(${duplicatePath})는 한 번만 지정하세요.`,
+        duplicatePath,
+      );
+  }
+  return undefined;
+}
+
+/** 변경하는 항목의 코드 확인이 필요한지 판단한다. 섹션 제거와 문서 삭제만 해당한다. */
+function needsCodeEvidence(item: PlannedChangeItem): boolean {
+  return (
+    item.changed &&
+    (item.mode === changePlanModes.delete || item.removedSections.length > 0)
+  );
+}
+
+/** 참조 하나가 끊겼음을 출처 경로와 위치로 알리는 오류다. */
+function brokenDiagnostic(
+  sourcePath: string,
+  range: Diagnostic<string>['range'],
+  fieldPath?: Diagnostic<string>['fieldPath'],
+): Diagnostic<string> {
+  return {
+    code: changePlanDiagnosticCodes.brokenReference,
+    severity: diagnosticSeverities.error,
+    message: changePlanDiagnosticMessages.brokenReference,
+    path: sourcePath,
+    ...(fieldPath ? { fieldPath } : {}),
+    ...(range ? { range } : {}),
+  };
+}
+
+/**
+ * 이번 계획이 대상으로 삼은 문서를 가리키던 기존 확정 참조를 새로 끊는지 같은 출처 표기로 비교한다.
+ * 변경 전에 확정이었고 변경 후에 확정이 아닌 참조만 거절 근거다. 무관한 기존 오류는 보지 않는다.
+ * 대상은 경로가 아니라 문서 ID로 비교한다. 이번 계획이 건드린 출처 문서는 자신의 최종 진단으로 판단하므로 건너뛴다.
+ * @param after 모든 항목을 반영한 최종 색인이다.
+ * @param changedIds 고치거나 지우거나 옮기는 문서의 ID다.
+ * @param touchedPaths 고치거나 지우거나 옮기는 문서의 원래 경로다.
+ * @param codeReferences 변경하지 않는 코드 파일의 표기다.
+ * @returns 끊기는 참조마다 출처 경로와 위치를 담은 오류다. 없으면 빈 배열이다.
+ */
+function brokenReferences(
+  context: ChangePlansContext,
+  after: Catalog,
+  changedIds: ReadonlySet<string>,
+  touchedPaths: ReadonlySet<string>,
+  codeReferences: readonly ChangePlanCodeReference[],
+): readonly Diagnostic<string>[] {
+  const result: Diagnostic<string>[] = [];
+  for (const [sourcePath, before] of context.catalog.documents) {
+    const next = after.documents.get(sourcePath);
+    if (
+      touchedPaths.has(sourcePath) ||
+      !next ||
+      before.confirmation !== catalogConfirmations.confirmed
+    )
+      continue;
+    before.occurrences.forEach(
+      /** 같은 순서의 변경 후 등장과 해석 결과를 비교한다. */ (item, index) => {
+        const now = next.occurrences[index];
+        const targetId = item.resolution.target?.id;
+        if (
+          item.resolution.status !== referenceResolutionStatuses.resolved ||
+          targetId === undefined ||
+          !changedIds.has(targetId) ||
+          !now ||
+          now.occurrence.offsetRange.start !== item.occurrence.offsetRange.start
+        )
+          return;
+        if (now.resolution.status !== referenceResolutionStatuses.resolved)
+          result.push(
+            brokenDiagnostic(
+              sourcePath,
+              item.occurrence.range,
+              item.occurrence.fieldPath,
+            ),
+          );
+      },
+    );
+  }
+  for (const { sourcePath, marker } of codeReferences) {
+    const was = resolveCodeReference(context.catalog, marker);
+    const targetId = was.target?.id;
+    if (
+      was.status !== codeReferenceStatuses.resolved ||
+      targetId === undefined ||
+      !changedIds.has(targetId)
+    )
+      continue;
+    if (
+      resolveCodeReference(after, marker).status !==
+      codeReferenceStatuses.resolved
+    )
+      result.push(brokenDiagnostic(sourcePath, marker.range));
+  }
+  return result;
+}
+
+/** parent 관계 오류 코드다. */
+const parentDiagnosticCodes: ReadonlySet<string> = new Set([
+  catalogDiagnosticCodes.parentNotFound,
+  catalogDiagnosticCodes.parentCycle,
+]);
+
+/**
+ * 이번 계획이 건드리지 않은 문서에 새로 생긴 parent 단절을 찾는다.
+ * 변경 전에도 있던 오류는 무관한 기존 오류이므로 같은 코드·parent 항목 위치로 비교해 제외한다.
+ * @returns 자식 문서 경로와 `_codocs.parent` 항목 위치를 담은 참조 단절 오류다.
+ */
+function brokenParents(
+  before: Catalog,
+  after: Catalog,
+  touchedPaths: ReadonlySet<string>,
+): readonly Diagnostic<string>[] {
+  const result: Diagnostic<string>[] = [];
+  /** 같은 parent 오류를 식별하는 키다. */
+  const key = (item: Diagnostic<string>): string =>
+    `${item.code}:${JSON.stringify(item.fieldPath ?? [])}`;
+  for (const [path, was] of before.documents) {
+    const next = after.documents.get(path);
+    if (touchedPaths.has(path) || !next) continue;
+    const known = new Set(
+      was.diagnostics
+        .filter((item) => parentDiagnosticCodes.has(item.code))
+        .map(key),
+    );
+    for (const item of next.diagnostics)
+      if (parentDiagnosticCodes.has(item.code) && !known.has(key(item)))
+        result.push(brokenDiagnostic(path, item.range, item.fieldPath));
+  }
+  return result;
+}
+
+/** 모든 항목을 반영한 최종 observation으로 색인을 한 번 만든다. */
+function finalCatalog(
+  catalog: Catalog,
+  prepared: readonly PreparedItem[],
+): Catalog {
+  const byPath = new Map<string, PreparedItem>();
+  for (const item of prepared)
+    if (item.source) byPath.set(item.source.path, item);
+  const observations = [...catalog.documents.values()]
+    .filter((doc) => doc.confirmation === catalogConfirmations.confirmed)
+    .flatMap(
+      /** 문서 하나를 변경 계획에 따라 그대로 두거나 교체·제거한 관측으로 바꾼다. */ (
+        doc,
+      ): CatalogObservation[] => {
+        const item = byPath.get(doc.path);
+        if (!item) return [doc.observation];
+        if (item.mode === changePlanModes.delete || !item.parsed) return [];
+        return [{ path: item.path, parsed: item.parsed }];
+      },
+    );
+  for (const item of prepared)
+    if (item.mode === changePlanModes.create && item.parsed)
+      observations.push({ path: item.path, parsed: item.parsed });
+  return buildCatalog(
+    {
+      status: catalog.status,
+      observations,
+      failures: catalog.failures,
+    },
+    catalog,
+  );
+}
+
+/** 최종 색인에서 확인한 항목 하나의 결과다. 요청이 실패하면 진단만 돌려준다. */
+function judgeItem(
+  item: PreparedItem,
+  after: Catalog,
+  context: ChangePlansContext,
+): {
+  diagnostics: readonly Diagnostic<string>[];
+  failed: boolean;
+  planned?: PlannedChangeItem;
+} {
+  if (item.mode === changePlanModes.delete)
     return {
-      status: changePlanStatuses.failed,
-      diagnostics: validation.errors,
+      diagnostics: [],
+      failed: false,
+      planned: {
+        index: item.index,
+        mode: item.mode,
+        id: item.id,
+        path: item.path,
+        changed: true,
+        ...(item.source ? { baseRevision: item.source.revision } : {}),
+        removedSections: item.removedSections,
+        diagnostics: [],
+      },
     };
-  if (raw === source.raw || same(expected, parsed.data))
+  const parsed = item.parsed;
+  const diagnostics =
+    after.documents.get(item.path)?.diagnostics ??
+    (parsed ? parsed.diagnostics : []);
+  if (diagnostics.some((d) => d.severity === diagnosticSeverities.error))
+    return { diagnostics, failed: true };
+  if (item.mode === changePlanModes.create) {
+    if (!item.data || item.raw === undefined)
+      return { diagnostics, failed: true };
+    return {
+      diagnostics,
+      failed: false,
+      planned: {
+        index: item.index,
+        mode: item.mode,
+        id: item.id,
+        path: item.path,
+        changed: true,
+        raw: item.raw,
+        data: item.data,
+        removedSections: [],
+        diagnostics,
+      },
+    };
+  }
+  if (item.mode === changePlanModes.move) {
+    return {
+      diagnostics,
+      failed: false,
+      planned: {
+        index: item.index,
+        mode: item.mode,
+        id: item.id,
+        path: item.path,
+        ...(item.previousPath === undefined
+          ? {}
+          : { previousPath: item.previousPath }),
+        changed: true,
+        ...(item.raw === undefined ? {} : { raw: item.raw }),
+        ...(item.source ? { baseRevision: item.source.revision } : {}),
+        removedSections: [],
+        diagnostics,
+      },
+    };
+  }
+  if (context.catalog.status !== scanStatuses.complete)
+    return {
+      diagnostics: failure('incompleteCatalog', item.path).diagnostics,
+      failed: true,
+    };
+  if (!parsed?.success || !item.source || item.raw === undefined)
+    return { diagnostics, failed: true };
+  const validation = validateDocument({ data: parsed.data });
+  if (!validation.success)
+    return { diagnostics: validation.errors, failed: true };
+  if (item.noop)
+    return {
+      diagnostics,
+      failed: false,
+      planned: {
+        index: item.index,
+        mode: item.mode,
+        id: validation.data._codocs.id,
+        path: item.source.path,
+        changed: false,
+        revision: item.source.revision,
+        removedSections: [],
+        diagnostics,
+      },
+    };
+  return {
+    diagnostics,
+    failed: false,
+    planned: {
+      index: item.index,
+      mode: item.mode,
+      id: validation.data._codocs.id,
+      path: item.source.path,
+      changed: true,
+      raw: item.raw,
+      data: validation.data,
+      baseRevision: item.source.revision,
+      removedSections: item.removedSections,
+      diagnostics,
+    },
+  };
+}
+
+/**
+ * create/update/replace/delete/move 항목 목록을 파일 IO 없이 한 번에 검증하고 항목별 후보를 계산한다.
+ * 모든 항목을 반영한 최종 observation으로 색인을 한 번만 만들어, 중간 상태 때문에 생기는 참조 오류를 피한다.
+ * 같은 문서 ID나 경로가 두 번 나오면 `invalid_input`이다. 한 항목이라도 error이면 전체가 failed다.
+ * 결과의 `requiresCodeEvidence`가 true이면 `context.codeReferences`를 채워 같은 입력으로 다시 호출해야 코드 참조까지 보호한다.
+ * @param input 항목 배열이다. 비어 있으면 안 된다.
+ * @param context 같은 스캔의 색인과 대상 문서 원문들이다.
+ */
+export function planDocumentChanges(
+  input: unknown,
+  context: ChangePlansContext,
+): ChangesPlanResult {
+  try {
+    return planDocumentChangesInternal(input, context);
+  } catch {
+    return failure('invalidRequest');
+  }
+}
+
+/** 확인한 요청 목록으로 최종 상태를 한 번 검증한다. */
+function planDocumentChangesInternal(
+  input: unknown,
+  context: ChangePlansContext,
+): ChangesPlanResult {
+  if (!Array.isArray(input) || !input.length) return failure('invalidRequest');
+  const items: unknown[] = Array.from(
+    { length: input.length },
+    /** 접근자를 실행하지 않고 항목의 자체 데이터 값만 읽는다. */ (
+      _,
+      index,
+    ): unknown => {
+      const descriptor = Object.getOwnPropertyDescriptor(input, index);
+      return descriptor && 'value' in descriptor
+        ? (descriptor.value as unknown)
+        : undefined;
+    },
+  );
+  const duplicate = duplicateInput(
+    items,
+    context.catalog,
+    context.catalogPath ?? keepPath,
+  );
+  if (duplicate)
+    return { status: changePlanStatuses.failed, diagnostics: [duplicate] };
+  const prepared: PreparedItem[] = [];
+  const failures: Diagnostic<string>[] = [];
+  for (const [index, item] of items.entries()) {
+    const result = prepareItem(item, index, context);
+    if (result.ok) prepared.push(result.item);
+    else failures.push(...result.diagnostics);
+  }
+  if (failures.length)
+    return { status: changePlanStatuses.failed, diagnostics: failures };
+  const after = finalCatalog(context.catalog, prepared);
+  const planned: PlannedChangeItem[] = [];
+  const judged = prepared.map((item) => judgeItem(item, after, context));
+  for (const result of judged) {
+    if (result.failed) failures.push(...result.diagnostics);
+    else if (result.planned) planned.push(result.planned);
+  }
+  if (failures.length)
+    return { status: changePlanStatuses.failed, diagnostics: failures };
+  const changed = planned.filter((item) => item.changed);
+  const changedIds = new Set(
+    changed
+      .filter((item) => item.mode !== changePlanModes.create)
+      .map((item) => item.id),
+  );
+  const touchedPaths = new Set(
+    prepared.flatMap((item, index) =>
+      item.source && planned[index]?.changed ? [item.source.path] : [],
+    ),
+  );
+  const diagnostics = planned.flatMap((item) => item.diagnostics);
+  if (!changed.length)
     return {
       status: changePlanStatuses.unchanged,
-      path: source.path,
-      id: validation.data._codocs.id,
-      revision: source.revision,
+      items: planned,
       diagnostics,
     };
-  const broken = brokenReferences(
-    context,
-    after,
-    source.path,
-    context.codeReferences ?? [],
-  );
+  const broken = [
+    ...brokenReferences(
+      context,
+      after,
+      changedIds,
+      touchedPaths,
+      context.codeReferences ?? [],
+    ),
+    ...brokenParents(context.catalog, after, touchedPaths),
+  ];
   if (broken.length)
     return { status: changePlanStatuses.failed, diagnostics: broken };
   return {
     status: changePlanStatuses.candidate,
-    path: source.path,
-    id: validation.data._codocs.id,
-    raw,
-    data: validation.data,
-    baseRevision: source.revision,
-    removedSections: getSectionNames(parsed).filter(
-      (section) => !Object.hasOwn(candidate.data, section),
-    ),
+    items: planned,
+    requiresCodeEvidence: planned.some(needsCodeEvidence),
     diagnostics,
   };
+}
+
+/** create/update/replace 요청을 파일 IO 없이 검증하고 YAML 후보를 계산한다. 항목 하나의 다중 항목 계획이다. */
+export function planDocumentChange(
+  input: unknown,
+  context: ChangePlanContext,
+): ChangePlanResult {
+  try {
+    const mode = record(input) ? input.mode : undefined;
+    if (
+      mode !== changePlanModes.create &&
+      mode !== changePlanModes.update &&
+      mode !== changePlanModes.replace
+    )
+      return failure('invalidRequest');
+    const result = planDocumentChanges([input], {
+      catalog: context.catalog,
+      ...(context.source ? { sources: [context.source] } : {}),
+      ...(context.codeReferences
+        ? { codeReferences: context.codeReferences }
+        : {}),
+      ...(context.catalogPath ? { catalogPath: context.catalogPath } : {}),
+    });
+    if (result.status === changePlanStatuses.failed) return result;
+    const item = result.items[0];
+    if (!item) return failure('invalidRequest');
+    if (result.status === changePlanStatuses.unchanged)
+      return {
+        status: changePlanStatuses.unchanged,
+        path: item.path,
+        id: item.id,
+        revision: item.revision ?? '',
+        diagnostics: item.diagnostics,
+      };
+    if (item.raw === undefined || !item.data) return failure('invalidRequest');
+    return {
+      status: changePlanStatuses.candidate,
+      path: item.path,
+      id: item.id,
+      raw: item.raw,
+      data: item.data,
+      ...(item.baseRevision === undefined
+        ? {}
+        : { baseRevision: item.baseRevision }),
+      removedSections: item.removedSections,
+      diagnostics: item.diagnostics,
+    };
+  } catch {
+    return failure('invalidRequest');
+  }
 }
 
 /** 이름 변경 수정안을 원문에 적용한 결과다. 성공은 재파싱으로 의도한 값만 바뀐 것을 확인했다. */
