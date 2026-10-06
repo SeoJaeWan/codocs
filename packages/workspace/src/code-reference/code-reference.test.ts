@@ -1585,3 +1585,94 @@ describe('WorkspaceCodeReferenceIndex.renameSources: 이름 변경 계산용 저
     expect(sources.failures).toMatchObject([{ path: 'legacy.ts' }]);
   });
 });
+
+describe('WorkspaceCodeReferenceIndex: .codocsignore 제외', () => {
+  it('추적된 파일이 제외 폴더에 있으면 출현과 진단 없이 완료로 게시한다', async () => {
+    await executeGit('git', ['init', project]);
+    await mkdir(path.join(project, 'docs'));
+    await writeFile(path.join(project, 'docs', 'a.md'), marker);
+    await writeFile(path.join(project, 'src'), marker);
+    await executeGit('git', ['-C', project, 'add', 'docs/a.md', 'src']);
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    const index = createIndex();
+    const result = await index.ready();
+    expect(result.status).toBe(codeCollectionStatuses.complete);
+    expect(result.occurrences.map((item) => item.sourcePath)).toEqual(['src']);
+    expect(result.failures).toEqual([]);
+  });
+  it('제외한 파일을 편집기에서 열면 buffer로 받지 않고 이전 진단도 지운다', async () => {
+    await writeFile(path.join(project, 'source'), marker);
+    const index = createIndex();
+    await index.ready();
+    expect(
+      await index.updateBuffer({
+        sourcePath: 'source',
+        text: markerSection('내용'),
+        documentVersion: 1,
+      }),
+    ).toBe(true);
+    const cleared = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 0,
+    );
+    await writeFile(path.join(project, '.codocsignore'), 'source\n');
+    await cleared;
+    expect(
+      await index.updateBuffer({
+        sourcePath: 'source',
+        text: markerSection('내용'),
+        documentVersion: 2,
+      }),
+    ).toBe(false);
+    expect((await index.ready()).occurrences).toEqual([]);
+  });
+  it('감시 중 .codocsignore에 경로를 더하고 빼면 출현이 사라지고 다시 수집되며 감시를 다시 등록한다', async () => {
+    await mkdir(path.join(project, 'docs'));
+    await writeFile(path.join(project, 'docs', 'source'), marker);
+    const watchers = countingWatchers();
+    const index = createIndex({ createWatcher: watchers.createWatcher });
+    await index.ready();
+    const removed = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 0,
+    );
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    await removed;
+    const restored = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 1,
+    );
+    await rm(path.join(project, '.codocsignore'));
+    await restored;
+    expect(watchers.created).toHaveLength(3);
+    expect(watchers.errors).toEqual([]);
+  });
+  it('제외한 폴더의 추적 파일을 수정해도 다시 읽거나 게시하지 않는다', async () => {
+    await executeGit('git', ['init', project]);
+    await mkdir(path.join(project, 'docs'));
+    await writeFile(path.join(project, 'docs', 'keep'), marker);
+    await executeGit('git', ['-C', project, 'add', 'docs/keep']);
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    const observed: string[] = [];
+    const index = createIndex({ observe: (kind) => observed.push(kind) });
+    await index.ready();
+    await writeFile(path.join(project, 'docs', 'keep'), marker + marker);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(observed).toEqual(['code-index-published']);
+  });
+  it('.codocsignore를 읽지 못하면 incomplete로 게시하고 .codocsignore 실패 경로를 남긴다', async () => {
+    await writeFile(path.join(project, 'source'), marker);
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    ioFailures.set(path.join(project, '.codocsignore'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const index = createIndex();
+    const result = await index.ready();
+    expect(result.status).toBe(codeCollectionStatuses.incomplete);
+    expect(result.failures.map((failure) => failure.path)).toContain(
+      '.codocsignore',
+    );
+    expect(result.occurrences).toEqual([]);
+  });
+});

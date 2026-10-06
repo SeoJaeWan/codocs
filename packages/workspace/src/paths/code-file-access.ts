@@ -25,6 +25,16 @@ export interface CodeCollectionFailure {
   reason: (typeof codeFileReasons)[keyof typeof codeFileReasons];
   message: string;
 }
+/** 프로젝트 root `.codocsignore`의 원문과 규칙이다. */
+interface CodocsIgnoreRules {
+  /** 감시 규칙 비교를 위해 원문을 보존한다. */
+  text: string;
+  matcher: Ignore;
+}
+/** 코드 수집에서만 적용하는 프로젝트 root 제외 규칙 파일 이름이다. */
+const codocsIgnoreFileName = '.codocsignore';
+/** ignore 규칙을 확인하지 못해 파일을 확정할 수 없을 때의 고정 메시지다. */
+const ignoreUnknownMessage = '프로젝트 ignore 규칙을 확인하지 못했습니다.';
 interface IgnoreLayer {
   directory: string;
   /** 감시 규칙 비교를 위해 규칙의 원문을 보존한다. */
@@ -40,6 +50,10 @@ export interface CodeFilePolicy {
   trackedDirectories: ReadonlySet<string>;
   layers: readonly IgnoreLayer[];
   unknownIgnoreDirectories: ReadonlySet<string>;
+  /** 프로젝트 root `.codocsignore`의 원문과 규칙이다. 파일이 없거나 읽지 못하면 없다. */
+  codocsIgnore?: CodocsIgnoreRules;
+  /** root `.codocsignore`를 읽지 못해 제외 범위를 확인하지 못했다. */
+  codocsIgnoreUnknown?: boolean;
 }
 /** 파일 원문을 읽지 않고 확인한 정책과 읽기 후보 파일이다. */
 export interface CodeFilePolicyComputation {
@@ -100,6 +114,7 @@ export function isCodeFileIgnored(
 ): boolean {
   if (writeTempFilePattern.test(relative.slice(relative.lastIndexOf('/') + 1)))
     return true;
+  if (isCodocsIgnored(policy, relative)) return true;
   if (policy.tracked.has(relative)) return false;
   const parts = relative.split('/');
   for (let end = 1; end <= parts.length; end++) {
@@ -120,6 +135,38 @@ export function isCodeFileIgnored(
     if (excluded) return true;
   }
   return false;
+}
+/**
+ * root `.codocsignore`가 Git 추적과 무관하게 제외하는 경로인지 판단한다.
+ * 규칙을 읽지 못했으면 제외를 확정하지 않으며, 상위 폴더가 제외되면 하위의 `!`로 되살리지 않는다.
+ */
+export function isCodocsIgnored(
+  policy: CodeFilePolicy,
+  relative: string,
+): boolean {
+  const matcher = policy.codocsIgnore?.matcher;
+  if (!matcher) return false;
+  const parts = relative.split('/');
+  for (let end = 1; end <= parts.length; end++) {
+    const candidate =
+      parts.slice(0, end).join('/') + (end < parts.length ? '/' : '');
+    if (matcher.test(candidate).ignored) return true;
+  }
+  return false;
+}
+/**
+ * 폴더 안으로 내려가지 않거나 감시하지 않는 폴더인지 판단한다.
+ * `.codocsignore` 제외는 추적 파일이 있어도 적용하고, 그 밖의 제외는 추적 파일이 없을 때만 적용한다.
+ */
+function isCodeDirectoryExcluded(
+  policy: CodeFilePolicy,
+  relative: string,
+): boolean {
+  return (
+    isCodocsIgnored(policy, relative + '/') ||
+    (isCodeFileIgnored(policy, relative + '/') &&
+      !hasTrackedDescendant(policy, relative))
+  );
 }
 /** 추적 파일이 하나라도 들어 있는 디렉터리인지 미리 계산한 집합에서 확인한다. */
 export function hasTrackedDescendant(
@@ -152,26 +199,40 @@ export function isCodeWatchIgnored(
   stats?: { isDirectory(): boolean },
 ): boolean {
   const relative = codeFileRelativePath(policy.projectRoot, input);
-  if (!relative || path.posix.basename(relative) === '.gitignore') return false;
+  if (
+    !relative ||
+    path.posix.basename(relative) === '.gitignore' ||
+    relative === codocsIgnoreFileName
+  )
+    return false;
   const asFile = isCodeFileIgnored(policy, relative);
-  const asDirectory =
-    isCodeFileIgnored(policy, relative + '/') &&
-    !hasTrackedDescendant(policy, relative);
+  const asDirectory = isCodeDirectoryExcluded(policy, relative);
   if (asFile === asDirectory) return asFile;
   if (!stats) return false;
   return stats.isDirectory() ? asDirectory : asFile;
 }
 /**
- * 감시 규칙은 .gitignore 계층의 원문과 추적 파일 때문에 감시하는 제외 폴더 집합이다.
- * 두 규칙이 같으면 감시 대상도 같다.
+ * 감시 규칙은 .gitignore 계층과 .codocsignore의 원문, 추적 파일 때문에 감시하는 제외 폴더 집합이다.
+ * 두 규칙이 같으면 감시 대상도 같다. .codocsignore가 없으면 키는 .gitignore만 쓰던 때와 같다.
  */
 export function codeWatchRuleKey(policy: CodeFilePolicy): string {
   return JSON.stringify([
     policy.layers.map((layer) => [layer.directory, layer.text]),
-    [...policy.trackedDirectories]
-      .filter((directory) => isCodeFileIgnored(policy, directory + '/'))
-      .sort(),
+    watchedTrackedDirectories(policy),
+    ...(policy.codocsIgnore || policy.codocsIgnoreUnknown
+      ? [[policy.codocsIgnore?.text ?? null, !!policy.codocsIgnoreUnknown]]
+      : []),
   ]);
+}
+/** 추적 파일 때문에 감시하는 제외 폴더이며 .codocsignore가 제외한 폴더는 감시하지 않는다. */
+function watchedTrackedDirectories(policy: CodeFilePolicy): string[] {
+  return [...policy.trackedDirectories]
+    .filter(
+      (directory) =>
+        !isCodocsIgnored(policy, directory + '/') &&
+        isCodeFileIgnored(policy, directory + '/'),
+    )
+    .sort();
 }
 /** 프로젝트와 모든 경로 성분의 링크·특수 파일을 열기 전에 거부한다. */
 async function regularFile(
@@ -206,6 +267,12 @@ export async function readEligibleCodeFile(
     policy.repositoryKind === codeRepositoryKinds.unknown
   )
     return undefined;
+  if (policy.codocsIgnoreUnknown)
+    return {
+      path: relative,
+      reason: codeFileReasons.read,
+      message: ignoreUnknownMessage,
+    };
   if (
     !policy.tracked.has(relative) &&
     [...policy.unknownIgnoreDirectories].some(
@@ -215,7 +282,7 @@ export async function readEligibleCodeFile(
     return {
       path: relative,
       reason: codeFileReasons.read,
-      message: '프로젝트 ignore 규칙을 확인하지 못했습니다.',
+      message: ignoreUnknownMessage,
     };
   try {
     const before = await regularFile(policy.projectRoot, relative);
@@ -457,6 +524,49 @@ export async function readCodeIgnoreLayer(
     };
   }
 }
+/** root `.codocsignore`를 읽은 결과이며 failure가 있으면 제외 범위는 미확인이다. */
+export interface CodocsIgnoreRead {
+  rules?: CodocsIgnoreRules;
+  failure?: CodeCollectionFailure;
+}
+/** root `.codocsignore`만 읽는다. 일반 파일이 아니거나 없으면 규칙이 없는 것으로 본다. */
+export async function readCodocsIgnore(
+  projectRoot: string,
+): Promise<CodocsIgnoreRead> {
+  const ignorePath = path.join(projectRoot, codocsIgnoreFileName);
+  try {
+    const ignoreStat = await lstat(ignorePath);
+    if (ignoreStat.isFile() && !ignoreStat.isSymbolicLink()) {
+      const text = await readFile(ignorePath, 'utf8');
+      return { rules: { text, matcher: ignore().add(text) } };
+    }
+    return {};
+  } catch (error: unknown) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    )
+      return {};
+    return {
+      failure: {
+        path: codocsIgnoreFileName,
+        reason: codeFileReasons.read,
+        message: String(error),
+      },
+    };
+  }
+}
+/** 읽은 .codocsignore 결과를 정책 필드로 바꾼다. 없으면 필드를 두지 않는다. */
+function codocsIgnorePolicyFields(
+  read: CodocsIgnoreRead,
+): Pick<CodeFilePolicy, 'codocsIgnore' | 'codocsIgnoreUnknown'> {
+  return {
+    ...(read.rules ? { codocsIgnore: read.rules } : {}),
+    ...(read.failure ? { codocsIgnoreUnknown: true } : {}),
+  };
+}
 /** 탐색이 폴더 안으로 내려가는 조건이며 상위 폴더가 모두 같은 조건을 만족해야 한다. */
 function isCodeDirectoryWalkable(
   policy: CodeFilePolicy,
@@ -465,11 +575,7 @@ function isCodeDirectoryWalkable(
   if (!directory) return true;
   const parts = directory.split('/');
   for (let end = 1; end <= parts.length; end++) {
-    const prefix = parts.slice(0, end).join('/');
-    if (
-      isCodeFileIgnored(policy, prefix + '/') &&
-      !hasTrackedDescendant(policy, prefix)
-    )
+    if (isCodeDirectoryExcluded(policy, parts.slice(0, end).join('/')))
       return false;
   }
   return true;
@@ -514,10 +620,7 @@ async function walkCodeDirectory(
       if (item.name === '.git' || item.isSymbolicLink()) continue;
       const relative = directory ? directory + '/' + item.name : item.name;
       if (item.isDirectory()) {
-        if (
-          !isCodeFileIgnored(policy, relative + '/') ||
-          hasTrackedDescendant(policy, relative)
-        )
+        if (!isCodeDirectoryExcluded(policy, relative))
           await walkCodeDirectory(walk, relative);
       } else if (
         item.isFile() &&
@@ -580,6 +683,7 @@ export async function computeCodeFilePolicy(
 ): Promise<CodeFilePolicyComputation> {
   projectRoot = path.resolve(projectRoot);
   const git = await readTrackedCodeFiles(projectRoot);
+  const codocsIgnore = await readCodocsIgnore(projectRoot);
   const walked = await walkCodeSubtree(
     {
       projectRoot,
@@ -588,12 +692,17 @@ export async function computeCodeFilePolicy(
       trackedDirectories: trackedAncestors(git.tracked),
       layers: [],
       unknownIgnoreDirectories: new Set(),
+      ...codocsIgnorePolicyFields(codocsIgnore),
     },
     '',
   );
   return {
     policy: walked.policy,
-    failures: [...(git.failure ? [git.failure] : []), ...walked.failures],
+    failures: [
+      ...(git.failure ? [git.failure] : []),
+      ...(codocsIgnore.failure ? [codocsIgnore.failure] : []),
+      ...walked.failures,
+    ],
     candidates: walked.candidates,
     ...(git.gitDirectory ? { gitDirectory: git.gitDirectory } : {}),
   };
@@ -701,7 +810,8 @@ function withoutSubtree(
     },
     policyFailures: state.policyFailures.filter(
       /** 제거할 폴더가 소유한 실패만 걸러낸다. */ (failure) =>
-        failure.reason === codeFileReasons.git
+        failure.reason === codeFileReasons.git ||
+        failure.path === codocsIgnoreFileName
           ? true
           : failure.path === undefined
             ? directory !== ''
@@ -789,6 +899,35 @@ async function refreshCodeIgnoreLayer(
   return {
     state: await rewalkCodeDirectory(state, directory, fresh),
     rewalked: true,
+  };
+}
+/** root .codocsignore를 다시 읽어 원문이나 확인 실패가 달라졌을 때만 정책과 실패를 교체한다. */
+async function refreshCodocsIgnore(
+  state: CodeFileState,
+): Promise<{ state: CodeFileState; changed: boolean }> {
+  const { policy } = state;
+  const read = await readCodocsIgnore(policy.projectRoot);
+  if (
+    policy.codocsIgnore?.text === read.rules?.text &&
+    !policy.codocsIgnore === !read.rules &&
+    !policy.codocsIgnoreUnknown === !read.failure
+  )
+    return { state, changed: false };
+  const rest: CodeFilePolicy = { ...policy };
+  delete rest.codocsIgnore;
+  delete rest.codocsIgnoreUnknown;
+  return {
+    state: {
+      ...state,
+      policy: { ...rest, ...codocsIgnorePolicyFields(read) },
+      policyFailures: [
+        ...state.policyFailures.filter(
+          (item) => item.path !== codocsIgnoreFileName,
+        ),
+        ...(read.failure ? [read.failure] : []),
+      ],
+    },
+    changed: true,
   };
 }
 /** 추적 해제나 추가가 없는 index 갱신은 같은 상태를 돌려주고, 달라진 경로만 다시 확인한다. */
@@ -919,9 +1058,7 @@ async function refreshCodePath(
   if (failure) {
     const removed = withoutSubtree(state, relative);
     const asFile = isCodeFileIgnored(policy, relative);
-    const asDirectory =
-      isCodeFileIgnored(policy, relative + '/') &&
-      !hasTrackedDescendant(policy, relative);
+    const asDirectory = isCodeDirectoryExcluded(policy, relative);
     if (asFile && asDirectory) return { state: removed, rewalked: false };
     return {
       state: {
@@ -980,7 +1117,13 @@ export async function applyCodeSignals(
   let current = state;
   if (git) current = await refreshCodeTrackedFiles(current, fresh);
   const rewalked: string[] = [];
-  if (root) {
+  let ignoreChanged = false;
+  if (root || relatives.has(codocsIgnoreFileName)) {
+    const refreshed = await refreshCodocsIgnore(current);
+    current = refreshed.state;
+    ignoreChanged = refreshed.changed;
+  }
+  if (root || ignoreChanged) {
     current = await rewalkCodeDirectory(current, '', fresh);
     rewalked.push('');
   }
@@ -1021,15 +1164,13 @@ export function diffCodeWatchRules(
     if (before.get(directory) !== text) changed.push(directory);
   for (const directory of before.keys())
     if (!after.has(directory)) changed.push(directory);
-  /** 추적 파일 때문에 감시하는 제외 폴더다. */
-  const watched = (policy: CodeFilePolicy): Set<string> =>
-    new Set(
-      [...policy.trackedDirectories].filter((directory) =>
-        isCodeFileIgnored(policy, directory + '/'),
-      ),
-    );
-  const oldWatched = watched(previous);
-  const newWatched = watched(next);
+  if (
+    previous.codocsIgnore?.text !== next.codocsIgnore?.text ||
+    !previous.codocsIgnoreUnknown !== !next.codocsIgnoreUnknown
+  )
+    changed.push('');
+  const oldWatched = new Set(watchedTrackedDirectories(previous));
+  const newWatched = new Set(watchedTrackedDirectories(next));
   for (const directory of newWatched)
     if (!oldWatched.has(directory)) changed.push(directory);
   for (const directory of oldWatched)

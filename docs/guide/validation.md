@@ -18,6 +18,7 @@ ID가 여러 발견 경로에 있으면 `duplicate_id`다. 같은 이름이 여�
 
 코드 파일의 `@codocs [[이름]]`·`@codocs [[이름:섹션]]`도 `codocs_validate`와 `codocs_refresh`가 진단한다. 진단의 `path`는 코드 파일이고 `range`는 표기 위치이며 편집기와 같은 코드 `codocs.codeReference.<상태>`를 쓴다.
 `invalid`·`missing`·`missing_section`·`ambiguous`는 오류이고, 문서 탐색이 끝나지 않아 확정하지 못한 `unconfirmed`는 경고다.
+프로젝트 root의 `.codocsignore`가 제외한 경로의 표기는 진단하지 않는다. `.codocsignore`를 읽지 못하면 `codeScanStatus`가 `incomplete`이고 `codeFailures`에 `.codocsignore` 경로가 남는다.
 `codocs_validate({"path":".codocs/order.yaml"})`는 그 YAML을 후보로 하는 코드 진단만 더하며 코드 파일 경로를 `path`로 주면 `invalid_path`다.
 `scanStatus`는 문서 탐색 상태이고 `codeScanStatus`(`collecting`·`complete`·`incomplete`)는 코드 수집 상태다. `diagnosticsComplete`가 `false`이면 확인한 결과만이며 오류가 없다는 뜻이 아니다. 읽지 못한 코드 파일은 `codeFailures`에 있다. 수집 중이면 잠시 뒤 다시 요청한다.
 

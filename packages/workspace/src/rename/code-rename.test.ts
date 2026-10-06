@@ -614,6 +614,19 @@ describe('applyWorkspaceRename: 코드 파일 쓰기 경계', () => {
     expect(await read('.codocs/refund.yaml')).toBe(refund);
   });
 
+  it('.codocsignore가 제외한 파일은 revision이 맞아도 쓰지 않는다', async () => {
+    const text = '// @codocs [[환불]]\n';
+    await writeProject({ '.codocsignore': 'secret.ts\n', 'secret.ts': text });
+    const result = await applyFor('secret.ts', text);
+
+    expect(result).toMatchObject({
+      success: false,
+      changed: false,
+      diagnostics: [{ code: 'file_access_failed', path: 'secret.ts' }],
+    });
+    expect(await read('secret.ts')).toBe(text);
+  });
+
   it('프로젝트 밖을 가리키는 경로는 쓰지 않는다', async () => {
     const text = '// @codocs [[환불]]\n';
     const outside = path.join(path.dirname(project), 'outside-code.ts');

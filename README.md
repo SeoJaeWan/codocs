@@ -70,6 +70,7 @@ Open the project folder containing `.codocs` to start using the extension.
 - **Document links:** Navigate to resolved `[[Document name]]` references, or `[[Document name:Section]]` references to a section of a document, in any section of a document.
 - **Document and section rename:** Rename a document or a section (F2 on a name, a section key, or a reference) and update the references that point to it, including `@codocs` references in code files.
 - **Explicit code links:** Write `@codocs [[Document name]]` or `@codocs [[Document name:Section]]` in project text to link to a document or to one of its sections. Text after the closing `]]`, such as `#L11`, is not part of the reference.
+- **Code reference scope:** Codocs collects `@codocs` references from files Git tracks and from untracked files that `.gitignore` does not exclude. Add a `.codocsignore` file (`.gitignore` syntax) at the project root to leave other paths out, even tracked ones; an `@codocs` mark placed in an excluded path is ignored.
 - **Reverse code references:** Hover a section key to list the code that references that section, or hover the `_codocs.name` value to list the code that references the whole document. Each item opens that code location, and `코드 N곳` next to the section key or on the first row shows only the count.
 - **Workspace support:** Use separate project knowledge for each folder in a multi-folder workspace. Document changes are reflected automatically.
 
