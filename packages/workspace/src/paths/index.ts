@@ -342,3 +342,76 @@ export async function ensureWorkspaceParent(
   }
   return { success: true, logicalPath: path.join(current, segments.at(-1)!) };
 }
+
+/** 부모 폴더 점검 결과다. 없는 폴더는 상위부터 만들 순서로 담는다. */
+export type WorkspaceParentInspection =
+  | { success: true; logicalPath: string; missingDirectories: string[] }
+  | { success: false; diagnostics: readonly WorkspaceDiagnostic[] };
+
+/**
+ * 저장 후보의 프로젝트 상대 경로를 검증하고 폴더를 만들지 않은 채 부모 폴더 상태를 점검한다.
+ * 존재하는 폴더는 연결·종류를 확인하고, 처음 없는 폴더부터 끝까지를 만들 순서대로 돌려준다.
+ */
+export async function inspectWorkspaceParent(
+  root: ProjectRoot,
+  input: string,
+): Promise<WorkspaceParentInspection> {
+  const segments = pathSegments(input);
+  if (
+    path.isAbsolute(input) ||
+    segments.length < 2 ||
+    segments[0] !== codocsDirectoryName ||
+    segments.some((segment) => segment === '.' || segment === '..') ||
+    !/\.ya?ml$/u.test(segments.at(-1) ?? '')
+  )
+    return failure(
+      root,
+      workspacePathFailureStatuses.denied,
+      workspaceDiagnosticCodes.invalidWorkspacePath,
+      workspaceDiagnosticMessages.invalidPath,
+    ) as WorkspaceParentInspection;
+  const selected = await resolveProjectRoot({
+    cwd: root.startCwd,
+    project: root.projectRoot,
+  });
+  if (!selected.success)
+    return { success: false, diagnostics: selected.diagnostics };
+  const missingDirectories: string[] = [];
+  let current = root.projectRoot;
+  for (const segment of segments.slice(0, -1)) {
+    current = path.join(current, segment);
+    if (missingDirectories.length) {
+      missingDirectories.push(current);
+      continue;
+    }
+    const checked = await checkTarget(
+      root,
+      current,
+      segment === codocsDirectoryName,
+    );
+    if ('success' in checked) {
+      if (
+        !checked.success &&
+        checked.status === workspacePathFailureStatuses.missing &&
+        segment !== codocsDirectoryName
+      ) {
+        missingDirectories.push(current);
+        continue;
+      }
+      return checked as WorkspaceParentInspection;
+    }
+    if (checked.kind !== workspaceTargetKinds.directory)
+      return failure(
+        root,
+        workspacePathFailureStatuses.unavailable,
+        workspaceDiagnosticCodes.notDirectory,
+        workspaceDiagnosticMessages.notDirectory,
+        current,
+      ) as WorkspaceParentInspection;
+  }
+  return {
+    success: true,
+    logicalPath: path.join(current, segments.at(-1)!),
+    missingDirectories,
+  };
+}

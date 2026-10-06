@@ -13,7 +13,7 @@ import {
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
 } from '../diagnostics/index.js';
-import { resolveWorkspacePath } from '../index.js';
+import { inspectWorkspaceParent, resolveWorkspacePath } from '../index.js';
 import type { ProjectRoot } from '../project-root/index.js';
 
 let fixture: string;
@@ -199,4 +199,50 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
       });
     },
   );
+});
+
+describe('inspectWorkspaceParent: 폴더를 만들지 않는 부모 점검', () => {
+  it('없는 폴더를 상위부터 만들 순서로 돌려주고 아무것도 만들지 않는다', async () => {
+    await mkdir(path.join(project, '.codocs', 'a'));
+    const result = await inspectWorkspaceParent(
+      selectedRoot,
+      '.codocs/a/b/c/doc.yaml',
+    );
+
+    expect(result).toEqual({
+      success: true,
+      logicalPath: path.join(project, '.codocs', 'a', 'b', 'c', 'doc.yaml'),
+      missingDirectories: [
+        path.join(project, '.codocs', 'a', 'b'),
+        path.join(project, '.codocs', 'a', 'b', 'c'),
+      ],
+    });
+    await expect(
+      realpath(path.join(project, '.codocs', 'a', 'b')),
+    ).rejects.toThrow();
+  });
+
+  it('폴더 자리에 일반 파일이 있으면 notDirectory 진단으로 거절한다', async () => {
+    await writeFile(path.join(project, '.codocs', 'a'), 'file');
+    const result = await inspectWorkspaceParent(
+      selectedRoot,
+      '.codocs/a/doc.yaml',
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      diagnostics: [{ code: workspaceDiagnosticCodes.notDirectory }],
+    });
+  });
+
+  it('.codocs 밖이거나 YAML 파일이 아닌 경로는 거절한다', async () => {
+    for (const input of [
+      'other/doc.yaml',
+      '.codocs/a/doc.txt',
+      '.codocs/../x.yaml',
+    ])
+      expect(await inspectWorkspaceParent(selectedRoot, input)).toMatchObject({
+        success: false,
+      });
+  });
 });

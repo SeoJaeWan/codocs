@@ -234,6 +234,8 @@ export const storageDiagnosticCodes = {
   fileAccessFailed: 'file_access_failed',
   /** 저장된 파일의 세션 색인 반영 또는 추가 복구가 실패했다. */
   indexUpdateFailed: 'index_update_failed',
+  /** 여러 파일 저장이 중간에 실패한 뒤 이미 반영한 변경을 원래 상태로 되돌리지 못했다. */
+  writeRestoreFailed: 'write_restore_failed',
 } as const;
 /** 저장 진단의 고정 문구다. 원인별 후속 안내는 suggestion에 둔다. */
 export const storageDiagnosticMessages = {
@@ -243,6 +245,7 @@ export const storageDiagnosticMessages = {
   cleanupFailed: '파일은 저장되었지만 요청 임시 파일 정리에 실패했습니다.',
   fileAccessFailed: '저장 전 파일 상태를 확인할 수 없습니다.',
   indexUpdateFailed: '파일은 저장되었지만 문서 색인을 갱신하지 못했습니다.',
+  writeRestoreFailed: '이미 반영한 변경을 원래 상태로 되돌리지 못했습니다.',
 } as const;
 /** 저장 진단 코드의 원본 값에서 도출한 타입이다. */
 export type StorageDiagnosticCode =
