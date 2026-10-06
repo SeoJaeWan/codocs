@@ -7,9 +7,16 @@ import {
 import { referenceResolutionStatuses } from '../catalog/domain-values.js';
 import { offsetToPosition } from '../parser/index.js';
 import { parseReferenceComponents } from '../references/index.js';
-import type { OffsetRange, SourceRange } from '../diagnostics/index.js';
+import {
+  diagnosticSeverities,
+  type Diagnostic,
+  type OffsetRange,
+  type SourceRange,
+} from '../diagnostics/index.js';
 import {
   codeReferenceDestinationKinds,
+  codeReferenceDiagnosticCodes,
+  codeReferenceDiagnosticMessages,
   codeReferenceStatuses,
   codeReferenceSyntaxes,
 } from './domain-values.js';
@@ -250,4 +257,28 @@ function unresolvedStatus(
     default:
       return codeReferenceStatuses.unconfirmed;
   }
+}
+/**
+ * 코드 참조 해석 결과를 MCP와 VS Code가 함께 쓰는 진단으로 바꾼다.
+ * 문법 오류·대상 없음·섹션 없음·모호함은 확정 오류이고, 저장 탐색이 불완전한 미확인은 경고다.
+ * 연결된 참조에는 진단이 없다.
+ * @param resolution 해석한 표기와 상태다.
+ * @param sourcePath 표기가 있는 코드 파일 경로다. 알면 진단에 담는다.
+ * @returns 진단이 필요 없으면 undefined다.
+ */
+export function projectCodeReferenceDiagnostic(
+  resolution: Pick<CodeReferenceResolution, 'marker' | 'status'>,
+  sourcePath?: string,
+): Diagnostic<string> | undefined {
+  if (resolution.status === codeReferenceStatuses.resolved) return undefined;
+  return {
+    code: codeReferenceDiagnosticCodes[resolution.status],
+    severity:
+      resolution.status === codeReferenceStatuses.unconfirmed
+        ? diagnosticSeverities.warning
+        : diagnosticSeverities.error,
+    message: codeReferenceDiagnosticMessages[resolution.status],
+    range: resolution.marker.range,
+    ...(sourcePath === undefined ? {} : { path: sourcePath }),
+  };
 }

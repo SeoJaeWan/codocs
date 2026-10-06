@@ -124,6 +124,7 @@ describe('명시 링크와 출처 확인', () => {
     const uri = await open('invalid', text);
     const diagnostic = await waitForDiagnostic(uri);
     expect(diagnostic.code).toBe(`codocs.codeReference.${status}`);
+    expect(diagnostic.severity).toBe(1);
     expect(diagnostic.message).toBeTruthy();
     expect(diagnostic.range).toEqual({
       start: { line: 0, character: 0 },
@@ -147,6 +148,7 @@ describe('명시 링크와 출처 확인', () => {
     const uri = await open('implementation', '@codocs [[대상:환불정책]]');
     const diagnostic = await waitForDiagnostic(uri);
     expect(diagnostic.code).toBe('codocs.codeReference.ambiguous');
+    expect(diagnostic.severity).toBe(1);
     expect(await session.documentLinks(uri)).toEqual([]);
   });
   it('출처 표기를 편집하거나 닫으면 화면에 남은 링크를 거부한다', async () => {
