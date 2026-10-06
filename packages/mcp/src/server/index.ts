@@ -81,7 +81,8 @@ export function createCodocsServer(
     [
       'codocs_refresh',
       {
-        description: '프로젝트 문서 색인 전체를 다시 구성합니다.',
+        description:
+          '프로젝트 문서 색인과 코드 참조 색인을 다시 구성합니다. 결과의 scanStatus·fileCount·itemCount는 문서 색인 기준이고, codeScanStatus(collecting·complete·incomplete)와 codeFailures는 코드 수집 상태를 따로 알리며, diagnostics와 errorCount·warningCount는 문서 진단과 코드 참조 진단을 함께 센 값입니다. countsComplete가 false이면 확인한 범위만 센 값입니다. 동시에 들어온 refresh는 한 번의 재구성을 공유합니다.',
         execute: handlers.codocsRefresh.bind(handlers),
       },
     ],
@@ -89,7 +90,7 @@ export function createCodocsServer(
       'codocs_validate',
       {
         description:
-          '프로젝트 전체 또는 .codocs YAML 파일 하나의 문서 진단을 조회합니다.',
+          '프로젝트 전체 또는 .codocs YAML 파일 하나의 진단을 저장된 디스크 기준으로 조회합니다. path는 .codocs YAML이어야 하며 아니면 invalid_path입니다. 결과의 scanStatus는 문서 색인 기준이고 codeScanStatus(collecting·complete·incomplete)는 코드 수집 상태입니다. diagnostics에는 문서 진단과 코드 파일의 @codocs 참조 진단(path는 코드 파일, range는 표기 위치)이 함께 담기며, path를 주면 그 YAML이 후보에 포함된 코드 참조 진단만 더합니다. diagnosticsComplete가 false이면 확인한 결과만이며 문제 없음이 아닙니다. 읽지 못한 코드 파일은 codeFailures에 담깁니다.',
         execute: handlers.codocsValidate.bind(handlers),
       },
     ],
@@ -97,7 +98,7 @@ export function createCodocsServer(
       'codocs_write',
       {
         description:
-          '문서 하나를 생성하거나 수정하고 저장 결과와 색인 게시 상태를 반환합니다.',
+          '문서 하나를 생성(create), 부분 수정(update: set·unset), 전체 교체(replace: id·revision·document)하고 저장 결과와 색인 게시 상태를 반환합니다. replace의 document는 _codocs를 포함한 문서 전체이며 생략한 최상위 섹션은 삭제되고 set·unset과 함께 보낼 수 없으며 name은 바꿀 수 없습니다. update·replace가 새로 깨뜨리는 다른 문서나 코드 파일의 참조는 reference_broken으로 거절하고, 확인이 필요한 코드 근거를 읽지 못했으면 code_evidence_incomplete로 거절하며 이때 파일은 바뀌지 않습니다.',
         execute: handlers.codocsWrite.bind(handlers),
       },
     ],
@@ -107,14 +108,6 @@ export function createCodocsServer(
         description:
           '문서 이름을 바꾸고 그 문서를 가리키던 참조를 함께 고칩니다. section(현재 섹션 이름)을 주면 그 문서의 최상위 섹션 이름을 바꾸고 그 섹션을 가리키던 [[문서:섹션]] 참조를 함께 고치며, 이때 newName은 새 섹션 이름이고 결과에 targetSection이 추가됩니다(section_conflict·section_not_found 등으로 blocked일 수 있음). section이 없으면 문서 이름 변경입니다. mode preview는 파일과 색인을 바꾸지 않고 상태(ready·unresolved·blocked), 변경 목록, 선택이 필요한 모호 참조의 후보, 충돌, 영향받는 파일별 revisions를 반환합니다. mode apply는 같은 id·newName·selections와 preview가 돌려준 revisions를 그대로 받아 다시 계산한 뒤 저장하며, blocked이거나 revision·영향 파일이 달라졌으면 파일을 바꾸지 않고 거절합니다. selections의 sourcePath·occurrenceIndex·targetPath는 preview 결과의 값을 그대로 사용합니다. 코드 파일의 @codocs [[이름]]·@codocs [[이름:섹션]] 표기도 함께 고칩니다. 문서 이름 변경은 이름이 그 문서로 확정된 표기의 이름 부분만, 섹션 이름 변경은 이름·섹션이 모두 그 대상으로 확정된 표기의 섹션 부분만 바꾸고 나머지 원문은 그대로 둡니다. 코드 파일의 변경·영향·파일 결과에는 fileKind: "code"가 붙고(.codocs 문서에는 없음) 모호한 코드 표기의 selections.sourcePath는 코드 파일 경로, occurrenceIndex는 그 파일의 표기 순번입니다. 코드 수집이 진행 중이면 blocked(blockingReason unconfirmed)이며 파일을 바꾸지 않으니 잠시 뒤 다시 요청하세요. 수집은 끝났지만 읽지 못한 코드 파일이 있으면 확인한 파일만 고치고 읽지 못한 경로를 reason unconfirmed 영향(occurrenceIndex -1)으로 보고하며 상태는 unresolved입니다.',
         execute: handlers.codocsRename.bind(handlers),
-      },
-    ],
-    [
-      'codocs_duplicates',
-      {
-        description:
-          '프로젝트 전체 또는 저장 전 초안(draft)의 반복 구절 후보와 양쪽 원문 위치를 조회합니다. 입력 없음은 전체 검토, draft는 codocs_write와 같은 create/update 입력의 초안 검토, cursor는 다음 페이지 요청이며 draft와 함께 보낼 수 없습니다. 결과는 검토 정보이며 저장을 막지 않고 파일이나 색인을 바꾸지 않습니다. status가 complete가 아니면 중복 없음이 아닙니다. 위치의 range 줄·문자는 0부터 시작하고 offsetRange는 원문 YAML의 UTF-16 오프셋입니다.',
-        execute: handlers.codocsDuplicates.bind(handlers),
       },
     ],
     [

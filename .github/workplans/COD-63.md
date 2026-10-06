@@ -8,55 +8,55 @@ h2. 범위
 
 h3. codocs_write
 
-* 새 문서 생성
-* 문서 metadata 수정
-* section 추가/수정
-* 전체 문서 수정
-* revision 충돌 처리 유지/정리
+- 새 문서 생성
+- 문서 metadata 수정
+- section 추가/수정
+- 전체 문서 수정
+- revision 충돌 처리 유지/정리
 
 h3. codocs_validate
 
-* duplicate id
-* duplicate name
-* missing parent
-* parent cycle
-* missing {{[[name]]}}
-* missing {{[[name:section]]}}
-* missing {{@codocs name:section}}
-* section 구조 오류
-* 새 모델에서 결정적으로 판정 가능한 오류를 중심으로 구성
+- duplicate id
+- duplicate name
+- missing parent
+- parent cycle
+- missing {{[[name]]}}
+- missing {{[[name:section]]}}
+- missing {{@codocs name:section}}
+- section 구조 오류
+- 새 모델에서 결정적으로 판정 가능한 오류를 중심으로 구성
 
 h3. codocs_refresh
 
-* documents
-* sections
-* parent/children
-* document references/backlinks
-* code references/backlinks
-를 현재 파일 상태에서 재구축
+- documents
+- sections
+- parent/children
+- document references/backlinks
+- code references/backlinks
+  를 현재 파일 상태에서 재구축
 
 h3. 정리
 
-* 실사용 효용이 낮았던 {{codocs_duplicates}} 제거
-* 새 모델과 중복되는 legacy 관리 로직 제거
-* 사용자 가이드와 MCP 도구 문서 갱신
+- 실사용 효용이 낮았던 {{codocs_duplicates}} 제거
+- 새 모델과 중복되는 legacy 관리 로직 제거
+- 사용자 가이드와 MCP 도구 문서 갱신
 
 h2. 범위 밖
 
-* 여러 문서를 한 요청에서 일괄 저장하는 batch write
-* fuzzy/semantic search
+- 여러 문서를 한 요청에서 일괄 저장하는 batch write
+- fuzzy/semantic search
 
 h2. 검증
 
-* 새 문서와 section을 MCP로 생성·수정할 수 있다.
-* 모든 새 주소/관계 오류를 validate가 감지한다.
-* refresh 후 현재 디스크 상태와 index가 일치한다.
-* duplicates 도구와 전용 계약이 제거된다.
-* typecheck, lint, test, format check를 통과한다.
+- 새 문서와 section을 MCP로 생성·수정할 수 있다.
+- 모든 새 주소/관계 오류를 validate가 감지한다.
+- refresh 후 현재 디스크 상태와 index가 일치한다.
+- duplicates 도구와 전용 계약이 제거된다.
+- typecheck, lint, test, format check를 통과한다.
 
 h2. 완료 기준
 
-* write/validate/refresh가 section 기반 모델과 동일한 주소·검증 계약을 사용한다.
+- write/validate/refresh가 section 기반 모델과 동일한 주소·검증 계약을 사용한다.
 
 ## Jira
 

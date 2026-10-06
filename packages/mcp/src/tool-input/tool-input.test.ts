@@ -3,15 +3,15 @@ import {
   acceptsToolInput,
   codocsInputSchemas,
   codocsJsonInputSchema,
-  parseDuplicatesInput,
+  parseWriteInput,
   parseGetInput,
   parseListInput,
   parseRenameInput,
   parseValidateInput,
 } from './index.js';
 
-describe('MCP 여덟 입력 계약', () => {
-  it('여덟 스키마를 정의하고 알 수 없는 최상위 속성을 거부한다', () => {
+describe('MCP 일곱 입력 계약', () => {
+  it('일곱 스키마를 정의하고 알 수 없는 최상위 속성을 거부한다', () => {
     expect([...codocsInputSchemas.keys()]).toEqual([
       'codocs_list',
       'codocs_get',
@@ -20,7 +20,6 @@ describe('MCP 여덟 입력 계약', () => {
       'codocs_guide',
       'codocs_write',
       'codocs_rename',
-      'codocs_duplicates',
     ]);
     for (const name of codocsInputSchemas.keys())
       expect(codocsJsonInputSchema(name)).toBeTruthy();
@@ -43,23 +42,33 @@ describe('MCP 여덟 입력 계약', () => {
     ).toBe(false);
   });
 
-  it('중복 검토 입력은 draft를 write 입력으로 풀고 draft와 cursor의 동시 지정을 거부한다', () => {
-    const draft = {
-      mode: 'update',
+  it('write replace는 id·revision·document만 받고 set·unset 혼합과 알 수 없는 속성을 거부한다', () => {
+    const replace = {
+      mode: 'replace',
       id: 'sample',
       revision: 'r1',
-      set: { definition: '본문' },
+      document: { _codocs: { id: 'sample', name: '샘플' }, definition: '본문' },
     };
-    expect(parseDuplicatesInput({})).toEqual({});
-    expect(parseDuplicatesInput({ cursor: 'abc' })).toEqual({ cursor: 'abc' });
-    expect(parseDuplicatesInput({ draft })).toEqual(draft);
-    expect(parseDuplicatesInput({ draft, cursor: 'abc' })).toBeUndefined();
-    expect(parseDuplicatesInput({ extra: 1 })).toBeUndefined();
-    expect(parseDuplicatesInput({ draft: { mode: 'other' } })).toBeUndefined();
-    expect(acceptsToolInput('codocs_duplicates', { draft, cursor: 'a' })).toBe(
-      false,
-    );
-    expect(acceptsToolInput('codocs_duplicates', { cursor: 1 })).toBe(false);
+    expect(parseWriteInput(replace)).toEqual(replace);
+    expect(parseWriteInput({ ...replace, set: { a: 1 } })).toBeUndefined();
+    expect(parseWriteInput({ ...replace, unset: ['a'] })).toBeUndefined();
+    expect(parseWriteInput({ ...replace, extra: 1 })).toBeUndefined();
+    expect(
+      parseWriteInput({ ...replace, document: undefined }),
+    ).toBeUndefined();
+    expect(parseWriteInput({ ...replace, document: [] })).toBeUndefined();
+    expect(parseWriteInput({ ...replace, revision: 1 })).toBeUndefined();
+    expect(
+      parseWriteInput({ mode: 'update', id: 'a', revision: 'r', document: {} }),
+    ).toBeUndefined();
+    expect(acceptsToolInput('codocs_write', replace)).toBe(true);
+    expect(
+      acceptsToolInput('codocs_write', { ...replace, set: { a: 1 } }),
+    ).toBe(false);
+  });
+
+  it('중단한 codocs_duplicates 이름은 입력 계약에 남지 않는다', () => {
+    expect(codocsInputSchemas.has('codocs_duplicates' as never)).toBe(false);
   });
 
   it('list 입력은 parent 하나만 허용하고 cursor와 필터는 거부한다', () => {

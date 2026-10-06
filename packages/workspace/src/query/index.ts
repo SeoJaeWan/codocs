@@ -20,7 +20,6 @@ import {
   parseYaml,
   getSectionKeyRange,
   referenceResolutionStatuses,
-  changePlanStatuses,
   projectCatalogGet,
   projectCatalogDiagnostics,
   projectCatalogList,
@@ -108,50 +107,29 @@ import {
   resolveProjectRoot,
   type ProjectRoot,
 } from '../project-root/index.js';
-import { planWorkspaceChange } from '../change-plan/index.js';
-import {
-  classifyDuplicateInput,
-  WorkspaceDuplicateChecker,
-  workspaceDuplicateDiagnosticCodes,
-  workspaceDuplicateDiagnosticMessages,
-  workspaceDuplicateExpiryReasons,
-  workspaceDuplicateStatuses,
-  type DuplicateCheckerOutcome,
-  type DuplicateDraftInput,
-  type DuplicateSnapshot,
-  type WorkspaceDuplicateCheckOptions,
-  type WorkspaceDuplicateFailure,
-  type WorkspaceDuplicateResponse,
-  type WorkspaceDuplicatesInput,
-  type WorkspaceDuplicatesOptions,
-  type WorkspaceDuplicateExpiryReason,
-} from '../duplicate-check/index.js';
 import { QueryObservations } from './observations.js';
 import {
   workspaceLifecycleStates,
   type WorkspaceReadiness,
 } from '../lifecycle/index.js';
 
-/** 중복 검사 커서가 현재 process 또는 snapshot에서 더 이상 유효하지 않을 때 사용하는 코드다. @domainValues */
+/** 조회 요청의 대체와 코드 매칭 catalog 불일치를 구분하는 코드다. @domainValues */
 export const workspaceQueryDiagnosticCodes = {
-  cursorExpired: 'cursor_expired',
   /** 닫기·취소·새 문서 버전 때문에 결과를 적용할 수 없다. */
   requestSuperseded: 'request_superseded',
   /** 요청한 코드 매칭 catalog와 현재 상세 조회 catalog가 다를 때 사용하는 코드다. */
   catalogVersionMismatch: 'catalog_version_mismatch',
 } as const;
 
-/** 중복 검사 커서와 요청 대체 오류의 고정 문구다. */
+/** 요청 대체와 catalog 불일치 오류의 고정 문구다. */
 export const workspaceQueryDiagnosticMessages = {
   requestSuperseded:
     '닫히거나 취소되었거나 최신 문서 버전으로 대체된 요청입니다.',
-  cursorExpired:
-    '중복 검사 커서가 만료되었습니다. 커서 없이 처음부터 다시 조회하세요.',
   catalogVersionMismatch:
     '코드 매칭에 사용한 문서 색인이 변경되었습니다. 최신 코드 매칭 결과로 다시 조회하세요.',
 } as const;
 
-/** 조회에서 core·workspace와 커서 계층이 반환할 수 있는 공통 진단이다. */
+/** 조회에서 core와 workspace가 반환할 수 있는 공통 진단이다. */
 export type WorkspaceQueryDiagnostic =
   | CatalogQueryDiagnostic
   | WorkspaceScanDiagnostic
@@ -244,8 +222,6 @@ export type WorkspaceRenameResult =
 export interface WorkspaceQuerySessionOptions {
   storage?: WorkspaceStorageOptions;
   beforeIndexUpdate?: (attempt: 1 | 2) => Promise<void>;
-  /** 중복 검사의 시간 제한·조각 시간과 테스트용 관측 지점을 주입한다. */
-  duplicateCheck?: WorkspaceDuplicateCheckOptions;
   /** 코드 수집의 실제 IO 경합·지연 지점을 주입한다. */
   codeReference?: WorkspaceCodeReferenceIndexOptions;
 }
@@ -718,7 +694,6 @@ export class WorkspaceQuerySession {
   >();
   readonly #liveDocuments = new Map<string, WorkspaceLiveReferenceInput>();
   readonly #selections = new Map<string, CandidateSelection>();
-  readonly #duplicateChecker: WorkspaceDuplicateChecker;
 
   /** 프로젝트 선택의 own data 값만 고정하고 IO는 각 요청 시 수행한다. */
   constructor(
@@ -729,9 +704,6 @@ export class WorkspaceQuerySession {
     this.#input = sessionInput(input);
     this.#observe = observe;
     this.#options = options;
-    this.#duplicateChecker = new WorkspaceDuplicateChecker(
-      options.duplicateCheck,
-    );
   }
 
   /** 문서 파일의 identity·크기·mtime·ctime으로 같은 상태 판별용 stamp를 만든다. 파일이 아니거나 읽을 수 없으면 undefined다. */
@@ -1792,178 +1764,6 @@ export class WorkspaceQuerySession {
         ...(watchFailure ? [{ message: watchFailure.message }] : []),
       ],
     };
-  }
-
-  /** 중복 검사 실패 응답을 공통 요청 실패에서 만든다. */
-  #duplicateFailure(
-    status: WorkspaceDuplicateFailure['status'],
-    failure: { scanStatus: ScanStatus; error: Diagnostic<string> },
-    extra: Partial<WorkspaceDuplicateFailure> = {},
-  ): WorkspaceDuplicateFailure {
-    return {
-      success: false,
-      status,
-      scanStatus: failure.scanStatus,
-      error: failure.error,
-      ...extra,
-    };
-  }
-
-  /** checker 결과를 세션 응답으로 바꾼다. 만료 이유별 안내와 취소·계산 오류의 진단을 붙인다. */
-  #duplicateResponse(
-    outcome: DuplicateCheckerOutcome,
-    snapshot: DuplicateSnapshot,
-  ): WorkspaceDuplicateResponse {
-    if (outcome.kind === 'page')
-      return {
-        ...outcome.page,
-        success: true,
-        refreshing: !!this.#refreshPromise,
-      };
-    if (outcome.kind === 'cancelled')
-      return this.#duplicateFailure(workspaceDuplicateStatuses.cancelled, {
-        ...superseded(),
-        scanStatus: snapshot.scanStatus,
-      });
-    if (outcome.kind === 'error')
-      return this.#duplicateFailure(workspaceDuplicateStatuses.failed, {
-        scanStatus: snapshot.scanStatus,
-        error: {
-          code: workspaceDuplicateDiagnosticCodes.checkFailed,
-          severity: diagnosticSeverities.error,
-          message: workspaceDuplicateDiagnosticMessages.checkFailed,
-        },
-      });
-    const messages: Record<WorkspaceDuplicateExpiryReason, string> = {
-      [workspaceDuplicateExpiryReasons.sourceChanged]:
-        workspaceDuplicateDiagnosticMessages.expiredSourceChanged,
-      [workspaceDuplicateExpiryReasons.resultReplaced]:
-        workspaceDuplicateDiagnosticMessages.expiredResultReplaced,
-      [workspaceDuplicateExpiryReasons.unrecognized]:
-        workspaceDuplicateDiagnosticMessages.expiredUnrecognized,
-    };
-    return this.#duplicateFailure(
-      workspaceDuplicateStatuses.expired,
-      {
-        scanStatus: snapshot.scanStatus,
-        error: {
-          code: workspaceQueryDiagnosticCodes.cursorExpired,
-          severity: diagnosticSeverities.error,
-          message: messages[outcome.reason],
-        },
-      },
-      { expiryReason: outcome.reason },
-    );
-  }
-
-  /**
-   * 현재 색인 전체(입력 없음) 또는 생성·수정 초안(mode 포함)의 본문 반복을 검사하거나 cursor로 보관한 결과의 다음 페이지를 제공한다.
-   * 파일을 쓰거나 색인에 초안을 반영하지 않고, 계산은 조각으로 나눠 다른 요청과 감시 반영을 처리한다.
-   * 취소하면 계산을 멈추고 cancelled를 반환한다. partial·failed 응답은 중복 없음이 아니다.
-   */
-  async duplicates(
-    input?: WorkspaceDuplicatesInput,
-    options: WorkspaceDuplicatesOptions = {},
-  ): Promise<WorkspaceDuplicateResponse> {
-    const signal = options.signal;
-    /** 취소 신호가 이미 발생했거나 세션이 닫힌 요청의 응답이다. */
-    const cancelled = (): WorkspaceDuplicateResponse =>
-      this.#duplicateFailure(
-        workspaceDuplicateStatuses.cancelled,
-        superseded(),
-      );
-    if (this.#closed || signal?.aborted) return cancelled();
-    if (this.#scan && this.#explicitRefreshPromise)
-      return this.#duplicateFailure(
-        workspaceDuplicateStatuses.notReady,
-        workspaceIndexNotReady(),
-      );
-    const scan = await this.#current();
-    if (this.#closed || signal?.aborted) return cancelled();
-    if (this.#explicitRefreshPromise)
-      return this.#duplicateFailure(
-        workspaceDuplicateStatuses.notReady,
-        workspaceIndexNotReady(),
-      );
-    if (scan.status === scanStatuses.failed)
-      return this.#duplicateFailure(
-        workspaceDuplicateStatuses.failed,
-        scanFailure(scan),
-      );
-    const watchFailure = this.#watchFailure();
-    if (watchFailure && !this.#completed)
-      return this.#duplicateFailure(
-        workspaceDuplicateStatuses.failed,
-        this.#watchFailureResult(watchFailure),
-      );
-    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
-    if (!catalog)
-      return this.#duplicateFailure(
-        workspaceDuplicateStatuses.failed,
-        scanFailure(scan),
-      );
-    const snapshot: DuplicateSnapshot = {
-      scanStatus: watchFailure ? scanStatuses.partial : scan.status,
-      catalog,
-      revisions: watchFailure ? this.#completed!.revisions : this.#revisions,
-      catalogVersion: watchFailure
-        ? this.#completed!.version
-        : this.#catalogVersion,
-    };
-    const classified = classifyDuplicateInput(input);
-    if (classified.kind === 'invalid')
-      return this.#duplicateFailure(
-        workspaceDuplicateStatuses.failed,
-        invalidInput(snapshot.scanStatus),
-      );
-    if (classified.kind === 'page')
-      return this.#duplicateResponse(
-        this.#duplicateChecker.page(classified.cursor, snapshot),
-        snapshot,
-      );
-    let draft: DuplicateDraftInput | undefined;
-    if (classified.kind === 'draft') {
-      if (watchFailure)
-        return this.#duplicateFailure(
-          workspaceDuplicateStatuses.failed,
-          this.#watchFailureResult(watchFailure),
-        );
-      const plan = planWorkspaceChange(classified.request, scan, catalog);
-      if (plan.status === changePlanStatuses.failed)
-        return this.#duplicateFailure(
-          workspaceDuplicateStatuses.failed,
-          {
-            scanStatus: snapshot.scanStatus,
-            error: plan.diagnostics[0] ?? workspaceIndexNotReady().error,
-          },
-          { diagnostics: plan.diagnostics },
-        );
-      const raw =
-        plan.status === changePlanStatuses.candidate
-          ? plan.raw
-          : scan.documents.find((item) => item.source.path === plan.path)?.raw;
-      if (raw === undefined)
-        return this.#duplicateFailure(
-          workspaceDuplicateStatuses.notReady,
-          workspaceIndexNotReady(),
-        );
-      draft = {
-        document: {
-          path: plan.path,
-          id: plan.id,
-          revision: plan.revision,
-          parsed: parseYaml(raw, plan.path),
-        },
-        excludedPath: plan.path,
-      };
-    }
-    return this.#duplicateResponse(
-      await this.#duplicateChecker.check(snapshot, draft, signal, () => ({
-        catalogVersion: this.#catalogVersion,
-        closed: this.#closed,
-      })),
-      snapshot,
-    );
   }
 
   /** 관측 게시 이후 알리고 반환한 함수로 구독을 해제한다. listener 오류는 게시를 되돌리지 않는다. */
