@@ -1,5 +1,14 @@
 import { discoveryPath } from './discovery-path.js';
 import {
+  classifyWorkspaceWriteInput,
+  readWorkspacePublishTargets,
+  saveWorkspaceChanges,
+  toSingleMoveDeleteResult,
+  workspaceWriteInputKinds,
+  type WorkspaceBatchWriteResult,
+  type WorkspaceMoveDeleteResult,
+} from '../batch-write/index.js';
+import {
   WorkspaceCodeReferenceIndex,
   codeCollectionStatuses,
   codeFileReasons,
@@ -88,7 +97,7 @@ import { WorkspaceWatcher } from '../watcher/index.js';
 import {
   applyWorkspaceRename,
   saveWorkspaceChange,
-  type WorkspaceStorageOptions,
+  type WorkspaceFileBatchOptions,
   type WorkspaceStorageResult,
 } from '../storage/index.js';
 import {
@@ -195,14 +204,20 @@ export type WorkspaceListResult = RequestResult<
   WorkspaceQueryFailure
 >;
 
-/** 저장 결과와 같은 세션에 게시된 색인 상태를 함께 전달한다. */
-export type WorkspaceWriteResult =
+/** 단일 create·update·replace 저장 결과와 같은 세션에 게시된 색인 상태다. 기존 계약 그대로다. */
+export type WorkspaceSingleWriteResult =
   | (Extract<WorkspaceStorageResult, { success: true }> & {
       indexUpdated?: boolean;
     })
   | (Extract<WorkspaceStorageResult, { success: false }> & {
       error: Diagnostic<string>;
     });
+
+/** 세션 write가 돌려줄 수 있는 모든 결과다. 단일 저장, 단일 delete/move, 여러 항목 저장을 포함한다. */
+export type WorkspaceWriteResult =
+  | WorkspaceSingleWriteResult
+  | WorkspaceMoveDeleteResult
+  | WorkspaceBatchWriteResult;
 
 /** 이름 변경 미리보기 결과다. 파일과 색인은 바뀌지 않았다. */
 export type WorkspaceRenamePreviewResult = RequestResult<
@@ -220,7 +235,7 @@ export type WorkspaceRenameResult =
 
 /** 실제 파일 연산과 저장 후 관측의 실패·지연만 주입하는 검사 경계다. */
 export interface WorkspaceQuerySessionOptions {
-  storage?: WorkspaceStorageOptions;
+  storage?: WorkspaceFileBatchOptions;
   beforeIndexUpdate?: (attempt: 1 | 2) => Promise<void>;
   /** 코드 수집의 실제 IO 경합·지연 지점을 주입한다. */
   codeReference?: WorkspaceCodeReferenceIndexOptions;
@@ -995,7 +1010,7 @@ export class WorkspaceQuerySession {
   /** 저장 경로만 무효화하고 해당 revision이 현재 세션에 게시될 때까지 기다린다. */
   async #publishSaved(
     pathName: string,
-    revision: string,
+    revision: string | undefined,
     attempt: 1 | 2,
   ): Promise<boolean> {
     await this.#options.beforeIndexUpdate?.(attempt);
@@ -1012,8 +1027,11 @@ export class WorkspaceQuerySession {
       if (this.#closed) return false;
       if (
         this.#scan?.status === scanStatuses.complete &&
-        this.#revisions.get(pathName) === revision &&
-        this.#catalog?.documents.has(pathName)
+        (revision === undefined
+          ? !this.#revisions.has(pathName) &&
+            !this.#catalog?.documents.has(pathName)
+          : this.#revisions.get(pathName) === revision &&
+            this.#catalog?.documents.has(pathName))
       )
         return true;
     }
@@ -1023,6 +1041,22 @@ export class WorkspaceQuerySession {
   /**
    * 저장은 한 번만 수행하고 색인 관측 실패에만 범위 재읽기를 추가 한 번 시도한다.
    */
+  write(input: {
+    mode: 'create' | 'update' | 'replace';
+    [key: string]: unknown;
+  }): Promise<WorkspaceSingleWriteResult>;
+  /** 단일 delete/move 요청이다. 입력 검증 실패나 게이트 거부는 write 실패 형태로 돌려준다. */
+  write(input: {
+    mode: 'delete' | 'move';
+    [key: string]: unknown;
+  }): Promise<WorkspaceMoveDeleteResult | WorkspaceSingleWriteResult>;
+  /** 여러 항목 요청이다. 입력 검증 실패나 게이트 거부는 write 실패 형태로 돌려준다. */
+  write(input: {
+    changes: unknown;
+  }): Promise<WorkspaceBatchWriteResult | WorkspaceSingleWriteResult>;
+  /** 형태를 모르는 입력이다. 모든 결과 형태가 가능하다. */
+  write(input: unknown): Promise<WorkspaceWriteResult>;
+  /** 입력 종류를 가려 단일 저장, 단일 delete/move, 여러 항목 저장 중 하나로 처리한다. */
   async write(input: unknown): Promise<WorkspaceWriteResult> {
     if (this.#closed || this.#explicitRefreshPromise)
       return this.#writeFailure([workspaceIndexNotReady().error]);
@@ -1044,6 +1078,13 @@ export class WorkspaceQuerySession {
           scan.diagnostics[0] ??
           workspaceIndexNotReady().error,
       ]);
+    const classified = classifyWorkspaceWriteInput(input);
+    if (classified.kind !== workspaceWriteInputKinds.single)
+      return this.#writeBatch(
+        classified.items,
+        scan,
+        classified.kind === workspaceWriteInputKinds.singleBatch,
+      );
     const saved = await saveWorkspaceChange(input, scan, this.#options.storage);
     if (!saved.success) return this.#writeFailure(saved.diagnostics);
     if (!saved.saved) return saved;
@@ -1059,11 +1100,42 @@ export class WorkspaceQuerySession {
   }
 
   /**
+   * 여러 항목(또는 단일 delete/move)을 계획·반영하고, 디스크가 바뀌었을 수 있는 경로를 실제 디스크 상태로 색인에 게시한다.
+   * 지운 문서와 옮긴 원래 경로는 색인에서 사라졌을 때, 나머지는 새 revision이 게시됐을 때 성공이다.
+   */
+  async #writeBatch(
+    items: unknown,
+    scan: WorkspaceScanResult,
+    single: boolean,
+  ): Promise<WorkspaceWriteResult> {
+    const outcome = await saveWorkspaceChanges(
+      items,
+      scan,
+      this.#options.storage,
+    );
+    let result: WorkspaceBatchWriteResult = outcome.result;
+    if (outcome.touchedPaths.length && 'root' in scan && scan.root) {
+      const targets = await readWorkspacePublishTargets(
+        scan.root,
+        outcome.touchedPaths,
+      );
+      const indexFailure = await this.#publishSavedFiles(targets);
+      const diagnostics = indexFailure
+        ? [...result.diagnostics, indexFailure]
+        : result.diagnostics;
+      result = result.saved
+        ? { ...result, indexUpdated: !indexFailure, diagnostics }
+        : { ...result, diagnostics };
+    }
+    return single ? toSingleMoveDeleteResult(result) : result;
+  }
+
+  /**
    * 저장한 파일들의 새 revision이 세션 색인에 게시되도록 기다린다. 관측 실패에만 범위 재읽기를 한 번 더 시도한다.
    * @returns 모두 반영되면 undefined, 아니면 codocs_refresh를 안내하는 색인 갱신 실패 진단이다.
    */
   async #publishSavedFiles(
-    files: readonly { path: string; revision: string }[],
+    files: readonly { path: string; revision?: string }[],
   ): Promise<Diagnostic<string> | undefined> {
     let indexError: unknown;
     for (const attempt of [1, 2] as const) {

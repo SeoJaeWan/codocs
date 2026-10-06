@@ -1,5 +1,8 @@
 import {
   planDocumentChange,
+  planDocumentChanges,
+  type ChangePlanSource,
+  type ChangesPlanResult,
   changePlanStatuses,
   diagnosticSeverities,
   type Catalog,
@@ -141,6 +144,132 @@ export async function planProtectedWorkspaceChange(
         /** 후보로 교체되는 대상 문서 자신의 이전 원문은 변경하지 않는 코드 증거가 아니다. */ (
           file,
         ) => file.path !== targetPath,
+      )
+      .flatMap(
+        /** 코드 파일마다 모든 표기를 같은 출처 경로와 함께 전달한다. */ (
+          file,
+        ) => file.markers.map((marker) => ({ sourcePath: file.path, marker })),
+      ),
+  );
+}
+
+/** 다중 항목 계획 결과다. 후보에는 항목별로 새 바이트 revision을 붙이지 않는다. 반영 뒤 디스크 revision을 쓴다. */
+export type WorkspaceChangesPlanResult = ChangesPlanResult;
+
+/** 항목 객체에서 자체 데이터 속성 값만 읽는다. 접근자는 실행하지 않는다. */
+function ownValue(input: unknown, key: string): unknown {
+  if (typeof input !== 'object' || input === null) return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(input, key);
+    return descriptor && 'value' in descriptor
+      ? (descriptor.value as unknown)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 기존 문서를 대상으로 하는 항목들의 같은 스캔 원문을 모은다. 유일한 경로로 정해지지 않는 ID는 core가 판정한다. */
+function batchSources(
+  items: unknown,
+  scan: WorkspaceScanResult,
+  catalog: Catalog,
+): ChangePlanSource[] {
+  if (!Array.isArray(items)) return [];
+  const sources = new Map<string, ChangePlanSource>();
+  for (let index = 0; index < items.length; index++) {
+    const item = ownValue(items, String(index));
+    const mode = ownValue(item, 'mode');
+    const id = ownValue(item, 'id');
+    if (mode === 'create' || typeof id !== 'string') continue;
+    const paths = catalog.idPaths.get(id);
+    const selected = paths?.size === 1 ? [...paths][0] : undefined;
+    if (selected === undefined || sources.has(selected)) continue;
+    const document = scan.documents.find(
+      (candidate) => candidate.source.path === selected,
+    );
+    if (document)
+      sources.set(selected, {
+        path: document.source.path,
+        raw: document.raw,
+        revision: document.revision,
+        utf8Lossless: document.utf8Lossless,
+      });
+  }
+  return [...sources.values()];
+}
+
+/**
+ * 같은 스캔의 원문으로 여러 항목의 순수 core 다중 계획을 연결한다. 디스크를 다시 읽거나 쓰지 않는다.
+ * @param items create·update·replace·delete·move 항목 배열이다.
+ * @param scan 계획의 기준이 되는 같은 스캔이다.
+ * @param catalog 스캔에서 만든 색인이다.
+ * @param codeReferences 이번 변경이 건드리지 않는 코드 파일의 표기다. 생략하면 코드 영향은 판단하지 않는다.
+ */
+export function planWorkspaceChanges(
+  items: unknown,
+  scan: WorkspaceScanResult,
+  catalog: Catalog = buildWorkspaceCatalog(scan),
+  codeReferences?: readonly ChangePlanCodeReference[],
+): WorkspaceChangesPlanResult {
+  const sources = batchSources(items, scan, catalog);
+  return planDocumentChanges(items, {
+    catalog,
+    ...(sources.length ? { sources } : {}),
+    ...(codeReferences ? { codeReferences } : {}),
+  });
+}
+
+/**
+ * 다중 계획을 만들되 코드 영향이 있는 계획(`requiresCodeEvidence`)에만 코드 저장 원문을 한 번 새로 수집한다.
+ * 증거가 완전하지 않으면 참조 보호를 증명하지 못한 것이므로 후보를 돌려주지 않고 실패한다.
+ * 이번 계획이 바꾸거나 지우거나 옮기는 문서 자신의 이전 원문은 변경하지 않는 코드 증거에서 제외한다.
+ * @param items 항목 배열이다.
+ * @param scan 계획의 기준이 되는 같은 스캔이다.
+ * @param collect 호출 시점의 코드 저장 원문을 새로 수집한다. IDE buffer나 보유 색인에 의존하지 않는다.
+ * @param catalog 스캔에서 만든 색인이다.
+ */
+export async function planProtectedWorkspaceChanges(
+  items: unknown,
+  scan: WorkspaceScanResult,
+  collect: WorkspaceCodeEvidenceCollector,
+  catalog: Catalog = buildWorkspaceCatalog(scan),
+): Promise<WorkspaceChangesPlanResult> {
+  const first = planWorkspaceChanges(items, scan, catalog);
+  if (
+    first.status !== changePlanStatuses.candidate ||
+    !first.requiresCodeEvidence
+  )
+    return first;
+  const evidence = await collect();
+  if (!evidence.complete) {
+    const changed = first.items.find((item) => item.changed);
+    return {
+      status: changePlanStatuses.failed,
+      diagnostics: [
+        incompleteEvidenceDiagnostic(evidence, changed?.path ?? ''),
+      ],
+    };
+  }
+  const touched = new Set(
+    first.items
+      .filter((item) => item.changed)
+      .flatMap((item) =>
+        item.previousPath === undefined
+          ? [item.path]
+          : [item.path, item.previousPath],
+      )
+      .map((item) => item.split(path.sep).join('/')),
+  );
+  return planWorkspaceChanges(
+    items,
+    scan,
+    catalog,
+    evidence.files
+      .filter(
+        /** 계획이 바꾸는 문서 자신의 이전 원문은 변경하지 않는 코드 증거가 아니다. */ (
+          file,
+        ) => !touched.has(file.path),
       )
       .flatMap(
         /** 코드 파일마다 모든 표기를 같은 출처 경로와 함께 전달한다. */ (
