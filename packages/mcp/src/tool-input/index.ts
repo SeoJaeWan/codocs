@@ -50,14 +50,14 @@ export type CodocsToolName =
   | 'codocs_validate'
   | 'codocs_guide'
   | 'codocs_write'
-  | 'codocs_rename'
-  | 'codocs_duplicates';
+  | 'codocs_rename';
 
 const listSchema = z.strictObject({ parent: z.string().optional() });
 const getSchema = z.strictObject({ addresses: z.array(z.string()) });
 const validateSchema = z.strictObject({ path: z.string().optional() });
 const guideSchema = z.strictObject({ topic: z.enum(guideTopics).optional() });
-const writeSchema = z.discriminatedUnion('mode', [
+/** 단일 요청과 changes 항목이 함께 쓰는 mode 구분 입력이다. */
+const writeItemSchema = z.discriminatedUnion('mode', [
   z.strictObject({
     mode: z.literal('create'),
     path: z.string(),
@@ -70,6 +70,31 @@ const writeSchema = z.discriminatedUnion('mode', [
     set: userFields.optional(),
     unset: z.array(z.string()).optional(),
   }),
+  /** 문서 전체를 교체한다. set·unset과 섞을 수 없고 알 수 없는 속성은 거부한다. */
+  z.strictObject({
+    mode: z.literal('replace'),
+    id: z.string(),
+    revision: z.string(),
+    document: userFields,
+  }),
+  /** 문서 파일을 삭제한다. 대상 문서의 revision이 필요하다. */
+  z.strictObject({
+    mode: z.literal('delete'),
+    id: z.string(),
+    revision: z.string(),
+  }),
+  /** 문서 파일을 새 경로로 옮긴다. 내용·ID·이름은 바꾸지 않는다. */
+  z.strictObject({
+    mode: z.literal('move'),
+    id: z.string(),
+    revision: z.string(),
+    path: z.string(),
+  }),
+]);
+/** 단일 요청 하나 또는 changes 항목 1개 이상을 받는다. 다른 최상위 속성은 거부한다. */
+const writeSchema = z.union([
+  writeItemSchema,
+  z.strictObject({ changes: z.array(writeItemSchema).min(1) }),
 ]);
 
 const renameBase = {
@@ -96,17 +121,6 @@ const renameSchema = z.discriminatedUnion('mode', [
   }),
 ]);
 
-const duplicatesSchema = z
-  .strictObject({
-    draft: writeSchema.optional(),
-    cursor: z.string().optional(),
-  })
-  .refine(
-    /** 초안 검토와 다음 페이지 요청을 한 호출에 함께 보내지 못하게 한다. */ (
-      value,
-    ) => !(value.draft !== undefined && value.cursor !== undefined),
-  );
-
 /** 형식만 확인해 문서 자체의 상세 검증 진단은 변경 계획에 맡긴다. */
 export function parseWriteInput(
   input: unknown,
@@ -125,7 +139,7 @@ export function parseRenameInput(
   return result.success ? result.data : undefined;
 }
 
-/** 여덟 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다.
+/** 일곱 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다.
  * */
 export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_list', listSchema],
@@ -135,7 +149,6 @@ export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_guide', guideSchema],
   ['codocs_write', writeSchema],
   ['codocs_rename', renameSchema],
-  ['codocs_duplicates', duplicatesSchema],
 ]);
 
 /** SDK에 제공하는 JSON Schema는 실행 검증과 동일한 Zod 원본에서 생성한다.
@@ -191,23 +204,6 @@ export function parseGuideInput(
   if (!dataOnly(input)) return undefined;
   const result = guideSchema.safeParse(input);
   return result.success ? result.data : undefined;
-}
-
-/** 중복 검토 입력을 세션 입력으로 바꾼다. draft는 write와 같은 객체로 풀고 cursor는 그대로 전달한다.
- * */
-export function parseDuplicatesInput(
-  input: unknown,
-):
-  | z.infer<typeof writeSchema>
-  | { cursor: string }
-  | Record<string, never>
-  | undefined {
-  if (!dataOnly(input)) return undefined;
-  const result = duplicatesSchema.safeParse(input);
-  if (!result.success) return undefined;
-  const { draft, cursor } = result.data;
-  if (draft !== undefined) return draft;
-  return cursor === undefined ? {} : { cursor };
 }
 
 /** 입력 형태만 확인하고 문서 내용 진단은 변경 계획에 맡긴다. */

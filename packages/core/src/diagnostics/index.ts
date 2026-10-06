@@ -143,6 +143,8 @@ export const changePlanDiagnosticCodes = {
   candidateMismatch: 'candidate_mismatch',
   /** 수정 요청의 name이 현재 이름과 달라 이름 변경이 필요하다. */
   nameChangeNotAllowed: 'name_change_not_allowed',
+  /** 이번 후보가 다른 문서나 코드의 확정된 참조를 새로 끊는다. */
+  brokenReference: 'reference_broken',
 } as const;
 /** 후보 계산의 고정 진단 문구다. */
 export const changePlanDiagnosticMessages = {
@@ -155,6 +157,8 @@ export const changePlanDiagnosticMessages = {
   candidateMismatch: '후보를 다시 읽은 데이터가 요청한 데이터와 다릅니다.',
   nameChangeNotAllowed:
     '문서 이름은 수정 요청으로 바꿀 수 없습니다. 이름 변경은 codocs_rename으로 참조와 함께 바꾸세요.',
+  brokenReference:
+    '이 변경은 다른 문서나 코드에서 확정된 참조를 끊습니다. 참조를 먼저 고치거나 해당 섹션을 유지하세요.',
 } as const;
 /** 변경 후보 계산의 오류 코드다. */
 export type ChangePlanDiagnosticCode =
@@ -230,6 +234,8 @@ export const storageDiagnosticCodes = {
   fileAccessFailed: 'file_access_failed',
   /** 저장된 파일의 세션 색인 반영 또는 추가 복구가 실패했다. */
   indexUpdateFailed: 'index_update_failed',
+  /** 여러 파일 저장이 중간에 실패한 뒤 이미 반영한 변경을 원래 상태로 되돌리지 못했다. */
+  writeRestoreFailed: 'write_restore_failed',
 } as const;
 /** 저장 진단의 고정 문구다. 원인별 후속 안내는 suggestion에 둔다. */
 export const storageDiagnosticMessages = {
@@ -239,6 +245,7 @@ export const storageDiagnosticMessages = {
   cleanupFailed: '파일은 저장되었지만 요청 임시 파일 정리에 실패했습니다.',
   fileAccessFailed: '저장 전 파일 상태를 확인할 수 없습니다.',
   indexUpdateFailed: '파일은 저장되었지만 문서 색인을 갱신하지 못했습니다.',
+  writeRestoreFailed: '이미 반영한 변경을 원래 상태로 되돌리지 못했습니다.',
 } as const;
 /** 저장 진단 코드의 원본 값에서 도출한 타입이다. */
 export type StorageDiagnosticCode =

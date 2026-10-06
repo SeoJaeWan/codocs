@@ -5,10 +5,8 @@ import {
   scanStatuses,
 } from '@codocs/core';
 import {
-  workspaceDuplicateStatuses,
   workspaceLifecycleStates,
   type WorkspaceReadiness,
-  type WorkspaceDuplicateResponse,
   type WorkspaceGetResponse,
   type WorkspaceListInput,
   type WorkspaceListResult,
@@ -23,7 +21,6 @@ import {
 } from '@codocs/workspace';
 import {
   acceptsToolInput,
-  parseDuplicatesInput,
   parseGetInput,
   parseListInput,
   parseRenameInput,
@@ -70,10 +67,6 @@ export type CodocsWriteResponse = WorkspaceWriteResult;
 export type CodocsRenameResponse =
   WorkspaceRenamePreviewResult | WorkspaceRenameResult;
 
-/** codocs_duplicates의 공통 결과이며 부분·실패 결과도 중복 없음이 아니다.
- * */
-export type CodocsDuplicatesResponse = WorkspaceDuplicateResponse;
-
 /** SDK 등록과 독립적으로 직접 호출할 수 있는 조회 handler 모음이다.
  * */
 export interface CodocsQueryHandlers {
@@ -84,10 +77,6 @@ export interface CodocsQueryHandlers {
   codocsRefresh(input?: unknown): Promise<WorkspaceRefreshResult>;
   codocsWrite(input: unknown): Promise<CodocsWriteResponse>;
   codocsRename(input: unknown): Promise<CodocsRenameResponse>;
-  codocsDuplicates(
-    input?: unknown,
-    options?: { signal?: AbortSignal },
-  ): Promise<CodocsDuplicatesResponse>;
   refresh(input?: unknown): Promise<WorkspaceRefreshResult>;
 }
 
@@ -240,23 +229,6 @@ export function createCodocsQueryHandlers(
       return apply
         ? session.applyRename(target)
         : session.previewRename(target);
-    },
-    /** draft는 write 입력으로 풀어 전달하고 취소 신호는 세션 검사까지 잇는다.
-     * */
-    async codocsDuplicates(
-      input?: unknown,
-      options: { signal?: AbortSignal } = {},
-    ): Promise<CodocsDuplicatesResponse> {
-      const parsed = parseDuplicatesInput(input === undefined ? {} : input);
-      if (!parsed)
-        return {
-          ...invalidInput(),
-          status: workspaceDuplicateStatuses.failed,
-        };
-      return session.duplicates(
-        parsed,
-        options.signal ? { signal: options.signal } : {},
-      );
     },
     /** 직접 호출자를 위한 codocsRefresh 별칭이다. */
     refresh,

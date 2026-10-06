@@ -60,18 +60,85 @@ ID를 바꿔도 과거 ID는 남기지 않는다. 이후 조회·수정은 새 I
 `set._codocs`는 `_codocs` 객체 전체를 교체한다. 일부 키만 병합하지 않으므로 `id`와 `name`을 포함해 전달하며, `id`·`parent`는 이 값으로 바뀌고 `name`이 현재 이름과 다르면 `name_change_not_allowed`다.
 `unset`에 `_codocs`를 지정하면 MCP는 `invalid_input`으로 거절한다. `_codocs`는 지울 수 없고 `set._codocs`로 교체만 할 수 있다. 같은 키를 set과 unset에 함께 지정하지 않는다.
 `set.id`는 `_codocs.id`를 바꾸지 않고 `id`라는 이름의 섹션을 만든다. ID를 바꾸려면 `set._codocs`를 쓴다.
-저장 전에 `codocs_duplicates({"draft":{...}})`로 같은 초안의 반복 구절 후보를 확인할 수 있다. `draft`에는 위와 같은 `codocs_write` 입력을 그대로 넣는다.
-이 결과는 검토 정보이며 저장을 막지 않는다. `codocs_write`는 중복 검토를 실행하지 않고, 파일이나 색인도 바꾸지 않는다.
-`status`가 `complete`가 아니면 중복이 없다는 뜻이 아니다. 후보가 여러 페이지면 `nextCursor`를 `{"cursor":"..."}`로 보내 다음 페이지를 읽고, 원문이 바뀌어 `cursor_expired`가 오면 처음부터 다시 요청한다. 위치의 줄·문자 번호는 0부터 시작한다.
 저장 뒤 `codocs_validate({"path":".codocs/order.yaml"})` 또는 `codocs_validate({})`로 진단을 읽는다.
 경고는 저장을 막지 않을 수 있으므로 성공 여부와 별도로 확인한다.
 
 `saved: true`는 파일 반영 완료다. `indexUpdated: false`여도 파일을 다시 저장하지 않고 [색인 복구](validation.md#저장-후-색인-복구)를 따른다.
 무변경이면 `saved: false`, `changed: false`이며 `indexUpdated`는 생략된다.
 
+## 문서 전체 교체와 참조 보호
+
+섹션을 여러 개 지우거나 문서를 크게 고쳐 쓸 때는 `mode: "replace"`로 문서 전체를 보낸다. `_codocs`를 포함한 새 문서 전체를 `document`에 넣으며 없는 최상위 섹션은 삭제된다.
+
+```json
+{
+  "mode": "replace",
+  "id": "sample-order",
+  "revision": "읽은 revision",
+  "document": {
+    "_codocs": { "id": "sample-order", "name": "주문" },
+    "개요": "가상 주문의 검토한 새 설명이다."
+  }
+}
+```
+
+- replace에는 `set`·`unset`을 섞지 않는다. 섞거나 알 수 없는 속성이 있으면 `invalid_input`이다.
+- `_codocs.name`은 바꿀 수 없다. 다르면 `name_change_not_allowed`이며 `codocs_rename`을 쓴다. `id`는 바꿀 수 있다.
+- 값이 같은 최상위 키와 문서 최상위 주석의 원문은 그대로 두며 내용이 같으면 `saved: false`, `changed: false`다.
+- update·replace·delete는 변경 뒤 다른 문서의 `[[이름]]`·`[[이름:섹션]]`이나 코드 파일의 `@codocs` 표기가 새로 깨지면 `reference_broken`으로 저장하지 않는다. 진단의 `path`·`range`가 참조를 쓴 곳이다. 이전부터 깨져 있던 참조는 막지 않는다.
+- 확인해야 하는 코드 파일을 아직 수집하지 못했거나 읽지 못했으면 `code_evidence_incomplete`로 저장하지 않는다. 깨지지 않았다는 뜻이 아니므로 코드 수집이 끝난 뒤 다시 요청한다. 같은 요청을 revision만 바꿔 반복하지 않는다.
+- 거절한 요청은 파일을 바꾸지 않는다. 지우려는 섹션을 가리키는 참조를 먼저 고친 뒤 다시 요청한다.
+
+## 문서 삭제와 이동
+
+문서 파일을 지우거나 다른 경로로 옮길 때도 `codocs_get`으로 읽은 `revision`을 보낸다.
+
+- 삭제: `codocs_write({"mode":"delete","id":"sample-order","revision":"읽은 revision"})`
+- 이동: `codocs_write({"mode":"move","id":"sample-order","revision":"읽은 revision","path":".codocs/orders/order.yaml"})`
+
+- 이동은 내용·`id`·`name`을 바꾸지 않으므로 같은 이름으로 조회되고 참조가 유지된다. 새 경로에 이미 파일이 있으면 `file_exists`로 거절한다.
+- 삭제한 문서를 다른 문서나 코드 파일의 `@codocs` 표기가 참조하면 `reference_broken`으로 거절한다. 참조를 먼저 고치거나 아래 changes로 함께 보낸다.
+- 삭제나 이동 때문에 건드리지 않은 문서의 `_codocs.parent`가 새로 끊기면 `reference_broken`으로 거절하며 진단에 자식 문서의 경로와 `parent` 항목 위치가 담긴다.
+- 삭제나 이동으로 비게 된 폴더는 `.codocs` 바로 아래 폴더까지 제거한다. `.codocs` 자체와 요청 전부터 비어 있던 폴더, 다른 파일이 남은 폴더는 그대로 둔다.
+- 같은 ID의 파일이 여럿이면 그 ID로 삭제하거나 옮기지 않는다.
+
+## 여러 문서를 한 번에 변경
+
+여러 문서를 함께 고쳐야 중간 상태에서 참조 오류가 나지 않을 때는 `changes`로 한 요청에 보낸다. 항목은 create·update·replace·delete·move 단일 요청과 같은 형태이고 최소 1개다.
+
+```json
+{
+  "changes": [
+    {
+      "mode": "create",
+      "path": ".codocs/a.yaml",
+      "document": {
+        "_codocs": { "id": "a", "name": "가상 A" },
+        "개요": "가상 A의 의미다."
+      }
+    },
+    {
+      "mode": "update",
+      "id": "b",
+      "revision": "B의 읽은 revision",
+      "set": { "개요": "[[가상 A]]를 사용하는 절차다." }
+    },
+    { "mode": "delete", "id": "old", "revision": "old의 읽은 revision" }
+  ]
+}
+```
+
+- 모든 항목을 반영한 최종 상태를 한 번 검증하고 전부 저장하거나 아무것도 저장하지 않는다. 한 항목의 오류가 전체의 실패이며 이때 파일은 바뀌지 않는다.
+- `changes`와 같은 층에 다른 속성을 두거나 `changes`가 비어 있으면 `invalid_input`이다. 같은 문서 `id`나 같은 경로(기존 경로와 move·create의 새 경로)가 두 항목에 나와도 `invalid_input`이며, 새 문서의 최종 내용은 create 하나에 담는다.
+- 항목에서도 `name`은 바꿀 수 없다(`name_change_not_allowed`, `codocs_rename` 사용). 코드 파일은 고치지 않는다.
+- revision이 오래된 문서가 여럿이면 문서마다 진단(`change_revision_mismatch`)을 돌려주고 저장하지 않는다.
+- 응답의 `changes[]`는 입력 순서로 `index`·`mode`·`id`·`path`·`state`와 있으면 `revision`을 담고 move는 `previousPath`도 담는다. `path`는 반영한 뒤의 경로다. `state`는 `changed`·`restored`·`restore_failed`·`unchanged`이며 계획·사전 검사 단계에서 실패하면 `changes`는 빈 배열이다.
+- 반영 도중 실패하면 반영한 항목을 역순으로 되돌려 `restored`로 알린다. 되돌리지 못하면 `restore_failed`와 `write_restore_failed` 진단이 오고 `saved: true`이므로 알려준 파일을 직접 확인한다.
+- 파일을 한 번에 바꾸는 원자적 연산은 아니며 프로세스 간 잠금이 없으므로 아래 충돌 한계가 같이 적용된다.
+
 ## 충돌 후 재조회와 검토
 
-`revision_conflict` 또는 변경 후보 단계의 `change_revision_mismatch`가 오면 저장되지 않은 요청이다.
+요청을 계획하는 시점에 revision이 다르면 `change_revision_mismatch`, 저장 직전 재확인에서 다르면 `revision_conflict`이며 둘 다 저장되지 않은 요청이다.
 최신 문서를 다시 get하고 다른 작성자의 변경과 내 수정 의도를 비교한다. 그 내용을 보존하거나 합의한 수정안을 만든 뒤 최신 revision으로 요청한다.
 revision 값만 바꿔 이전 set을 자동 재적용하지 않는다.
 

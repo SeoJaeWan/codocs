@@ -92,7 +92,6 @@ describe('소스 MCP stdio 서버', () => {
         'codocs_validate',
         'codocs_write',
         'codocs_rename',
-        'codocs_duplicates',
         'codocs_guide',
       ]);
       const listed = payload(

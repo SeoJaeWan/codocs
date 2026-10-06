@@ -1,7 +1,7 @@
 /** 작업 공간의 책임별 공개 진입점을 제공한다. */
 export * from './diagnostics/index.js';
-export * from './duplicate-check/index.js';
 export * from './code-reference/index.js';
+export * from './batch-write/index.js';
 export * from './change-plan/index.js';
 export * from './indexing/index.js';
 export * from './lifecycle/index.js';

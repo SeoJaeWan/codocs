@@ -224,7 +224,6 @@ export async function verifyMcp(archive, temporary, expectedVersion) {
       'codocs_validate',
       'codocs_write',
       'codocs_rename',
-      'codocs_duplicates',
       'codocs_guide',
     ]);
   } finally {

@@ -38,18 +38,17 @@ On Windows, use `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd` as the J
 
 ### Available tools
 
-| Tool                | Purpose                                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------- |
-| `codocs_list`       | Explore root documents and direct children with section names                                |
-| `codocs_get`        | Read a document or section by `name` or `name:section`, with references and revisions        |
-| `codocs_write`      | Create documents or update them using a read revision                                        |
-| `codocs_rename`     | Preview and apply a document or section rename together with the references that point to it |
-| `codocs_duplicates` | Review repeated passages in the project or in a draft before saving                          |
-| `codocs_validate`   | Check documents for errors and warnings                                                      |
-| `codocs_refresh`    | Rebuild the project's knowledge index                                                        |
-| `codocs_guide`      | Read guidance for writing, updating, and recovering documents                                |
+| Tool              | Purpose                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `codocs_list`     | Explore root documents and direct children with section names                                                       |
+| `codocs_get`      | Read a document or section by `name` or `name:section`, with references and revisions                               |
+| `codocs_write`    | Create documents, or update, replace, delete or move them using a read revision, singly or in one `changes` request |
+| `codocs_rename`   | Preview and apply a document or section rename together with the references that point to it                        |
+| `codocs_validate` | Check documents and `@codocs` references in code files for errors and warnings                                      |
+| `codocs_refresh`  | Rebuild the project's document and code reference indexes                                                           |
+| `codocs_guide`    | Read guidance for writing, updating, and recovering documents                                                       |
 
-For example, ask your assistant to “find the definition of an order,” “check the project documents for errors,” or “document this business rule.” When updating a document, the assistant first reads it with `codocs_get`, can review the draft with `codocs_duplicates` for repeated passages (review information only, it never blocks saving), then passes the revision to `codocs_write`. To rename a document or one of its sections (pass `section`), the assistant previews with `codocs_rename` and then applies the previewed result; `codocs_write` does not change a document's name.
+For example, ask your assistant to “find the definition of an order,” “check the project documents for errors,” or “document this business rule.” When updating a document, the assistant first reads it with `codocs_get`, then passes the revision to `codocs_write` to change parts of it (`update`) or to replace the whole document (`replace`, where sections you leave out are deleted); it can also delete (`delete`) or move (`move`) a document. To change several documents at once, send them as `changes`: the final state is validated once and everything is saved or nothing is, and a failure while saving is rolled back. A change that would newly break a reference from another document or from an `@codocs` mark in a code file is rejected without saving. To rename a document or one of its sections (pass `section`), the assistant previews with `codocs_rename` and then applies the previewed result; `codocs_write` does not change a document's name.
 
 ## VS Code
 
