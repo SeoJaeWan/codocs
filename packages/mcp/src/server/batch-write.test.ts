@@ -4,7 +4,6 @@ import {
   mkdtemp,
   readFile,
   readdir,
-  rm,
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,6 +11,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createSourceCli } from '../../test-support/source-cli.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 /** 요청의 `/` 구분 경로를 서버가 결과에 담는 OS 구분자 표기로 바꾼다. */
 const native = (requestPath: string): string =>
@@ -30,7 +30,7 @@ afterAll(async () => {
 afterEach(async () => {
   await client?.close();
   client = undefined;
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 /** 실제 파일을 가진 임시 프로젝트를 만들고 실제 stdio 서버에 연결한다. */
@@ -124,12 +124,15 @@ async function found(name: string): Promise<boolean> {
 
 /** 파일 구조가 바뀐 직후 감시기가 시작한 색인 재구성이 끝날 때까지 기다린 뒤 전체 검증 결과를 꺼낸다. */
 async function validateSettled(): Promise<Reply> {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  // 느린 CI에서 재구성이 늦어도 기다리고, 끝내 준비되지 않으면 다른 단정과 섞이지 않게 여기서 실패한다.
+  const deadline = Date.now() + 10_000;
+  for (;;) {
     const result = await call('codocs_validate', {});
     if (result.error?.code !== 'index_not_ready') return result;
+    if (Date.now() >= deadline)
+      throw new Error('색인 재구성이 10초 안에 끝나지 않았습니다.');
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  return call('codocs_validate', {});
 }
 
 const doc = (id: string, name: string, body: string, parent = ''): string =>

@@ -1,13 +1,19 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createWorkspaceQuerySession,
   type WorkspaceQuerySession,
 } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
-/** 감시 신호가 모두 가라앉을 때까지 기다리는 시간(ms)이다. */
+/**
+ * 반영을 확인한 뒤 같은 저장의 늦은 중복 신호가 추가 스캔을 만드는지 지켜보는 시간(ms)이다.
+ * 반영 자체는 이 시간으로 기다리지 않는다. 느린 CI에서 반영이 늦으면 고정 대기만으로는 0회로 잘못 실패한다.
+ */
 const settleMilliseconds = 1200;
+/** 감시 반영을 기다리는 최대 시간(ms)이다. */
+const reflectTimeout = 10_000;
 let project: string;
 let session: WorkspaceQuerySession | undefined;
 beforeEach(async () => {
@@ -19,7 +25,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await session?.close();
   session = undefined;
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 describe('문서 저장 한 번의 색인 갱신', () => {
@@ -49,6 +55,10 @@ describe('문서 저장 한 번의 색인 갱신', () => {
       target,
       '_codocs:\n  id: alpha\n  name: alpha\ndefinition: 최신 정의\n',
     );
+    await vi.waitFor(
+      () => expect(changes.length).toBeGreaterThan(baseline.changes),
+      { timeout: reflectTimeout },
+    );
     await new Promise((resolve) => setTimeout(resolve, settleMilliseconds));
     expect(starts.length - baseline.starts).toBe(1);
     expect(published.length - baseline.published).toBe(1);
@@ -77,10 +87,14 @@ describe('문서 저장 한 번의 색인 갱신', () => {
         target,
         `_codocs:\n  id: alpha\n  name: alpha\ndefinition: ${definition}\n`,
       );
+      await vi.waitFor(
+        async () =>
+          expect(await session!.get(['alpha'])).toMatchObject({
+            results: [{ document: { definition } }],
+          }),
+        { timeout: reflectTimeout },
+      );
       await new Promise((resolve) => setTimeout(resolve, settleMilliseconds));
-      expect(await session.get(['alpha'])).toMatchObject({
-        results: [{ document: { definition } }],
-      });
     }
     expect(starts.length - baseline).toBe(2);
   });

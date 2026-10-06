@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { renameRequestFailureCodes } from '../rename/index.js';
 import { LanguageServerSession } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 let session: LanguageServerSession;
@@ -51,7 +52,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await session.close();
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 describe('prepareRename 시작 위치 확인', () => {

@@ -1,18 +1,12 @@
 import { build } from 'esbuild';
 import { trackChildClosure } from '../../../../tools/test/support/child-process.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import {
-  access,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { workspaceRefreshRequestMethod } from '../server-session/index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 const childClosures = new WeakMap<
   ChildProcessWithoutNullStreams,
@@ -81,7 +75,8 @@ class StdioProtocolClient {
       const timer = setTimeout(() => {
         this.#pending.delete(id);
         reject(new Error(`LSP 응답 대기 시간이 지났습니다: ${method} (${id})`));
-      }, 5_000);
+        // 별도 프로세스 시작이 느린 Windows CI에서도 응답을 기다린다.
+      }, 15_000);
       this.#pending.set(id, {
         resolve: (response) => {
           clearTimeout(timer);
@@ -232,25 +227,27 @@ describe('language server stdio 프로세스', () => {
             uri: pathToFileURL(path.join(root, '.codocs/target.yaml')).href,
           });
         }
-        await vi.waitFor(() =>
-          expect(
-            client.notifications
-              .filter(
-                (item) => item.method === 'textDocument/publishDiagnostics',
-              )
-              .at(-1)?.params,
-          ).toMatchObject({
-            uri,
-            version: 1,
-            diagnostics: expect.arrayContaining([
-              expect.objectContaining({
-                code: ambiguous
-                  ? 'reference_ambiguous'
-                  : 'reference_target_error',
-                severity: ambiguous ? 1 : 2,
-              }),
-            ]) as unknown,
-          }),
+        await vi.waitFor(
+          () =>
+            expect(
+              client.notifications
+                .filter(
+                  (item) => item.method === 'textDocument/publishDiagnostics',
+                )
+                .at(-1)?.params,
+            ).toMatchObject({
+              uri,
+              version: 1,
+              diagnostics: expect.arrayContaining([
+                expect.objectContaining({
+                  code: ambiguous
+                    ? 'reference_ambiguous'
+                    : 'reference_target_error',
+                  severity: ambiguous ? 1 : 2,
+                }),
+              ]) as unknown,
+            }),
+          { timeout: 5_000 },
         );
         client.send('textDocument/didChange', {
           textDocument: { uri, version: 2 },
@@ -267,14 +264,16 @@ describe('language server stdio 프로세스', () => {
             })
           ).result,
         ).toEqual([]);
-        await vi.waitFor(() =>
-          expect(
-            client.notifications
-              .filter(
-                (item) => item.method === 'textDocument/publishDiagnostics',
-              )
-              .at(-1)?.params,
-          ).toMatchObject({ uri, version: 2, diagnostics: [] }),
+        await vi.waitFor(
+          () =>
+            expect(
+              client.notifications
+                .filter(
+                  (item) => item.method === 'textDocument/publishDiagnostics',
+                )
+                .at(-1)?.params,
+            ).toMatchObject({ uri, version: 2, diagnostics: [] }),
+          { timeout: 5_000 },
         );
         client.send('textDocument/didClose', { textDocument: { uri } });
         expect(
@@ -288,7 +287,7 @@ describe('language server stdio 프로세스', () => {
         client.send('exit');
       } finally {
         await stopChild(child);
-        await rm(root, { recursive: true, force: true });
+        await rmWithRetry(root, { recursive: true, force: true });
       }
     },
   );
@@ -378,7 +377,7 @@ describe('language server stdio 프로세스', () => {
       expect(client.unframedStdout).toHaveLength(0);
     } finally {
       await stopChild(child);
-      await rm(root, { recursive: true, force: true });
+      await rmWithRetry(root, { recursive: true, force: true });
     }
   });
 
@@ -619,7 +618,7 @@ describe('language server stdio 프로세스', () => {
       }
     } finally {
       await stopChild(firstChild);
-      await rm(root, { recursive: true, force: true });
+      await rmWithRetry(root, { recursive: true, force: true });
     }
   });
 
@@ -708,7 +707,7 @@ describe('language server stdio 프로세스', () => {
       child.stdin.end();
     } finally {
       await stopChild(child);
-      await rm(root, { recursive: true, force: true });
+      await rmWithRetry(root, { recursive: true, force: true });
     }
   });
 });

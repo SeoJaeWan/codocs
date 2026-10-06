@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -7,6 +7,7 @@ import {
   type WorkspaceQuerySession,
 } from '../query/index.js';
 import { parseRenameRequest } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 let session: WorkspaceQuerySession;
@@ -41,7 +42,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await session.close();
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 describe('parseRenameRequest: section 입력', () => {

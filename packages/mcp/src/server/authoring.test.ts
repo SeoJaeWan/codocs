@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -13,6 +13,7 @@ import {
   it,
 } from 'vitest';
 import { createSourceCli } from '../../test-support/source-cli.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let project: string;
 let client: Client;
@@ -40,7 +41,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await client.close();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 /** SDK 결과의 전송 포장과 JSON 본문의 일치를 확인한다. */
@@ -85,7 +86,8 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
       }),
     );
     const bytes = await readFile(path.join(project, '.codocs/a.yaml'));
-    expect(result).toMatchObject({
+    // 실패 시 응답 전체(오류 코드·진단 포함)를 남겨 OS별 원인을 바로 확인한다.
+    expect(result, JSON.stringify(result)).toMatchObject({
       success: true,
       saved: true,
       indexUpdated: true,
@@ -154,7 +156,7 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
         },
       }),
     );
-    expect(result).toMatchObject({
+    expect(result, JSON.stringify(result)).toMatchObject({
       success: true,
       saved: true,
       indexUpdated: true,
@@ -258,7 +260,7 @@ describe('가이드 작성 절차의 실제 MCP와 파일 반영', () => {
         },
       }),
     );
-    expect(result).toMatchObject({
+    expect(result, JSON.stringify(result)).toMatchObject({
       success: true,
       saved: true,
       indexUpdated: true,

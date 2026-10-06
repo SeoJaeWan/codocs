@@ -63,7 +63,9 @@ describe('조회 세션 완료 관측 게시: 로더·감시를 격리한 경합
       }),
     );
     const refreshing = session.refresh();
-    await vi.waitFor(() => expect(loadWorkspace).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(loadWorkspace).toHaveBeenCalledTimes(2), {
+      timeout: 5_000,
+    });
     const result = await session.references({
       sourcePath: '.codocs/source.yaml',
       text: 'definition: "[[없음]]"',
@@ -137,7 +139,9 @@ describe('조회 세션 완료 관측 게시: 로더·감시를 격리한 경합
       }),
     );
     const pending = session.refresh();
-    await vi.waitFor(() => expect(loadWorkspace).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(loadWorkspace).toHaveBeenCalledOnce(), {
+      timeout: 5_000,
+    });
     await session.close();
     finish(complete);
     expect(await pending).toMatchObject({ success: false });

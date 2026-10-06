@@ -7,12 +7,13 @@ import {
   vi,
   type MockInstance,
 } from 'vitest';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { LanguageServerSession } from './index.js';
 import { SourceSelections } from '../navigation/index.js';
 import { escapeMarkdown } from '../hover/index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 let session: LanguageServerSession;
@@ -34,7 +35,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await session.close();
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 /** 문서를 열고 링크와 각 링크에 발급된 선택을 함께 돌려준다. */

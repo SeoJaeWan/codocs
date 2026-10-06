@@ -9,7 +9,6 @@ import {
   mkdtemp,
   readFile,
   rename as renameFile,
-  rm,
   writeFile,
 } from 'node:fs/promises';
 import path from 'node:path';
@@ -29,6 +28,7 @@ import { loadWorkspace } from '../loader/index.js';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
 import { applyWorkspaceRename } from '../storage/index.js';
 import { prepareWorkspaceRename } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let project: string;
 let session: WorkspaceQuerySession;
@@ -82,7 +82,7 @@ afterEach(async () => {
   releaseGate = () => undefined;
   await session?.close();
   vi.unstubAllEnvs();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 describe('코드 파일 표기를 포함한 섹션 이름 변경', () => {
@@ -637,7 +637,7 @@ describe('applyWorkspaceRename: 코드 파일 쓰기 경계', () => {
       expect(result).toMatchObject({ success: false, changed: false });
       expect(await readFile(outside, 'utf8')).toBe(text);
     } finally {
-      await rm(outside, { force: true });
+      await rmWithRetry(outside, { force: true });
     }
   });
 

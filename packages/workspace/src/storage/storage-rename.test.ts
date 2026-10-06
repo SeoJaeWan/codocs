@@ -5,7 +5,6 @@ import {
   readdir,
   readFile,
   rename as renameFile,
-  rm,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,6 +14,7 @@ import { buildWorkspaceCatalog } from '../indexing/index.js';
 import { loadWorkspace } from '../loader/index.js';
 import { prepareWorkspaceRename } from '../rename/index.js';
 import { applyWorkspaceRename } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 const orderPath = path.join('.codocs', 'order.yaml');
@@ -66,7 +66,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 describe('applyWorkspaceRename: 이름 변경 반영', () => {
@@ -265,7 +265,7 @@ describe('applyWorkspaceRename: 이름 변경 반영', () => {
 
     it('영향 파일 중 하나가 사라졌으면 아무 파일도 쓰지 않고 이유를 알린다', async () => {
       const { scan, catalog, input } = await previewed();
-      await rm(path.join(root, '.codocs', 'source.yaml'));
+      await rmWithRetry(path.join(root, '.codocs', 'source.yaml'));
       const result = await applyWorkspaceRename(input, scan, catalog);
 
       expect(result).toMatchObject({ success: false, saved: false, files: [] });

@@ -1,9 +1,18 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { createSourceCli } from '../../test-support/source-cli.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let sourceCli: Awaited<ReturnType<typeof createSourceCli>>;
 let project: string;
@@ -18,7 +27,7 @@ afterAll(async () => {
 afterEach(async () => {
   await client?.close();
   client = undefined;
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 /** 문서 원문을 가진 임시 프로젝트를 만들고 실제 stdio 서버에 연결한다. */
@@ -302,11 +311,14 @@ describe('codocs_rename apply', () => {
     const added = doc('late', '늦은 문서', '[[주문]]을 쓴다.');
     await writeFile(path.join(project, '.codocs', 'late.yaml'), added);
     // 감시가 새 파일을 색인에 반영할 때까지 최신 상태를 조회로 확인한다.
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const seen = await call('codocs_get', { addresses: ['늦은 문서'] });
-      if (seen.results[0]!.found) break;
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
+    // 반영되지 않은 채 다음 단정으로 넘어가면 원인과 다른 실패가 나므로 반영을 단정한다.
+    await vi.waitFor(
+      async () => {
+        const seen = await call('codocs_get', { addresses: ['늦은 문서'] });
+        expect(seen.results[0]!.found).toBe(true);
+      },
+      { timeout: 10_000, interval: 50 },
+    );
     const result = await call('codocs_rename', {
       mode: 'apply',
       ...input,

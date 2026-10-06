@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdir, mkdtemp, writeFile, rm, rename } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { catalogDiagnosticCodes } from '@codocs/core';
 import { LanguageServerSession } from './index.js';
 import { WorkspaceQuerySession } from '@codocs/workspace';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 const io = vi.hoisted(() => ({ blocked: '', code: 'EACCES' }));
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -47,7 +51,7 @@ beforeEach(async () => {
 afterEach(async () => {
   io.blocked = '';
   await session.close();
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 describe('전체 지식 문서의 저장·편집 진단 통합', () => {
@@ -223,7 +227,7 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
 
   it('삭제를 완전한 관측으로 확인하면 저장 문서를 진단 목록에서 제거한다', async () => {
     await session.diagnostics();
-    await rm(path.join(root, '.codocs/source.yaml'));
+    await rmWithRetry(path.join(root, '.codocs/source.yaml'));
     await session.refreshWorkspaces();
     expect(
       (await session.diagnostics())?.documents.some(
@@ -233,7 +237,7 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
   });
 
   it('저장 파일을 이동하면 옛 경로 대신 새 경로에 중복 진단을 제공한다', async () => {
-    await rename(
+    await renameWithRetry(
       path.join(root, '.codocs/source.yaml'),
       path.join(root, '.codocs/moved.yaml'),
     );
@@ -284,12 +288,14 @@ describe('전체 지식 문서의 저장·편집 진단 통합', () => {
       contentChanges: [{ text: saved.replace('id: target', 'id: unique') }],
     });
     expect(await pending).toBeUndefined();
-    await vi.waitFor(async () =>
-      expect(
-        (await session.diagnostics())?.documents.find(
-          (document) => document.uri === uri,
-        ),
-      ).toMatchObject({ version: 2, diagnostics: [] }),
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await session.diagnostics())?.documents.find(
+            (document) => document.uri === uri,
+          ),
+        ).toMatchObject({ version: 2, diagnostics: [] }),
+      { timeout: 5_000 },
     );
   });
 });

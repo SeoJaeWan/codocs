@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -14,6 +14,7 @@ import {
 import type { WorkspaceCodeEvidence } from '../code-reference/index.js';
 import { loadWorkspace } from '../loader/index.js';
 import { planProtectedWorkspaceChange } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 const zoneText =
   '_codocs:\n  id: zone\n  name: 구역\ndefinition: 설명\n업무: 값\n내용: 값\n';
@@ -26,7 +27,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 /** 코드 파일 원문에서 표기를 추출해 완전한 증거로 만든다. */

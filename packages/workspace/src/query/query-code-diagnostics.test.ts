@@ -3,7 +3,6 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  rm,
   unlink,
   writeFile,
 } from 'node:fs/promises';
@@ -16,6 +15,7 @@ import {
   createWorkspaceQuerySession,
   type WorkspaceQuerySession,
 } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 const targetText =
   '_codocs:\n  id: target\n  name: 대상\ndefinition: 본문\n업무: 값\n내용: 값\n';
@@ -35,7 +35,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await Promise.all(sessions.splice(0).map((session) => session.close()));
   vi.unstubAllEnvs();
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 /** 같은 프로젝트를 선택한 새 세션을 만들고 정리 대상으로 등록한다. */

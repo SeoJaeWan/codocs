@@ -5,14 +5,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const { withIoFailures } = await import('../test-support/file-system.js');
   return withIoFailures(actual);
 });
-import {
-  mkdir,
-  mkdtemp,
-  rename,
-  rm,
-  writeFile,
-  symlink,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, symlink } from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -34,6 +27,10 @@ import {
   readEligibleCodeFile,
   type CodeFileState,
 } from './code-file-access.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 const execute = promisify(execFile);
 let project: string;
 beforeEach(async () => {
@@ -45,7 +42,7 @@ afterEach(async () => {
   ioFailures.clear();
   simulatedFileLinks.clear();
   vi.unstubAllEnvs();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 describe('discoverCodeFiles: 프로젝트 코드 읽기 적격성', () => {
@@ -404,7 +401,7 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
     ]);
     expect(restored.files.has('child/deep/b.txt')).toBe(true);
     await expectSameAsFullDiscovery(restored, '규칙 제거');
-    await rm(path.join(project, 'child', '.gitignore'));
+    await rmWithRetry(path.join(project, 'child', '.gitignore'));
     await expectSameAsFullDiscovery(
       await applyCodeSignals(restored, [
         path.join(project, 'child', '.gitignore'),
@@ -426,7 +423,7 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
       'top.txt',
     ]);
     await expectSameAsFullDiscovery(created, '폴더 생성');
-    await rm(path.join(project, 'made'), { recursive: true });
+    await rmWithRetry(path.join(project, 'made'), { recursive: true });
     const removed = await applyCodeSignals(created, [
       path.join(project, 'made'),
     ]);
@@ -494,7 +491,7 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
     expect(same.files.get('a')?.revision).toBe(state.files.get('a')?.revision);
     expect(same.files.get('b')).toBe(state.files.get('b'));
     await writeFile(path.join(project, 'a'), 'changed');
-    await rm(path.join(project, 'b'));
+    await rmWithRetry(path.join(project, 'b'));
     const changed = await applyCodeSignals(same, [
       path.join(project, 'a'),
       path.join(project, 'b'),
@@ -543,12 +540,14 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
           signals.push(path.dirname(absolute), absolute);
         } else if (operation === 2 && exists.size) {
           const target = pick([...exists]);
-          await rm(path.join(project, ...target.split('/')), { force: true });
+          await rmWithRetry(path.join(project, ...target.split('/')), {
+            force: true,
+          });
           exists.delete(target);
           trail.push(`rm ${target}`);
           signals.push(path.join(project, ...target.split('/')));
         } else if (operation === 3 && directory) {
-          await rm(path.join(project, ...directory.split('/')), {
+          await rmWithRetry(path.join(project, ...directory.split('/')), {
             recursive: true,
             force: true,
           });
@@ -576,7 +575,7 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
           const to = path.join(project, 'moved-' + step);
           const from = path.join(project, ...directory.split('/'));
           try {
-            await rename(from, to);
+            await renameWithRetry(from, to);
             for (const item of [...exists])
               if (item.startsWith(directory + '/')) exists.delete(item);
             trail.push(`move ${directory}`);
@@ -712,7 +711,7 @@ describe('.codocsignore: 프로젝트 root 제외 규칙', () => {
     expect(edited.files.has('docs/a.md')).toBe(true);
     expect(edited.files.has('top.txt')).toBe(false);
     await expectSameAsFullDiscovery(edited, '규칙 수정');
-    await rm(path.join(project, '.codocsignore'));
+    await rmWithRetry(path.join(project, '.codocsignore'));
     const removed = await applyCodeSignals(edited, signal);
     expect(removed.files.has('top.txt')).toBe(true);
     await expectSameAsFullDiscovery(removed, '규칙 삭제');

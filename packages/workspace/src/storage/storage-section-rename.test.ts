@@ -3,7 +3,6 @@ import {
   mkdtemp,
   readFile,
   rename as renameFile,
-  rm,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -13,6 +12,7 @@ import { buildWorkspaceCatalog } from '../indexing/index.js';
 import { loadWorkspace } from '../loader/index.js';
 import { prepareWorkspaceRename } from '../rename/index.js';
 import { applyWorkspaceRename } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 const refundPath = path.join('.codocs', 'refund.yaml');
@@ -47,7 +47,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 describe('applyWorkspaceRename: 섹션 이름 변경 반영', () => {
