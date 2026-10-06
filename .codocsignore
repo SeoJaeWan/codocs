@@ -1,0 +1,17 @@
+# Files that quote code reference marks as examples, not real references.
+# Product source folders must stay out of this list.
+
+# Tests
+*.test.*
+packages/vscode/src/integration/test-support/
+
+# Work plans and release records
+.github/workplans/
+.changeset/
+packages/vscode/CHANGELOG.md
+
+# Documentation and examples
+docs/guide/
+README.md
+README.ko.md
+examples/
