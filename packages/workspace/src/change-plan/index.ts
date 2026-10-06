@@ -18,6 +18,7 @@ import {
 import path from 'node:path';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
 import type { WorkspaceScanResult } from '../loader/index.js';
+import { discoveryPath } from '../query/discovery-path.js';
 import { calculateRevision } from '../revision/index.js';
 
 /** 미저장 후보의 새 바이트 revision을 포함한다. */
@@ -81,6 +82,7 @@ export function planWorkspaceChange(
         }
       : {}),
     ...(codeReferences ? { codeReferences } : {}),
+    catalogPath: discoveryPath,
   });
   if (result.status !== changePlanStatuses.candidate) return result;
   return {
@@ -217,6 +219,7 @@ export function planWorkspaceChanges(
     catalog,
     ...(sources.length ? { sources } : {}),
     ...(codeReferences ? { codeReferences } : {}),
+    catalogPath: discoveryPath,
   });
 }
 

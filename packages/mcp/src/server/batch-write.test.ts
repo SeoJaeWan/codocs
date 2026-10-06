@@ -13,6 +13,10 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createSourceCli } from '../../test-support/source-cli.js';
 
+/** 요청의 `/` 구분 경로를 서버가 결과에 담는 OS 구분자 표기로 바꾼다. */
+const native = (requestPath: string): string =>
+  path.join(...requestPath.split('/'));
+
 let sourceCli: Awaited<ReturnType<typeof createSourceCli>>;
 let project: string;
 let client: Client | undefined;
@@ -243,8 +247,8 @@ describe('codocs_write changes 저장', () => {
       (item) => item.code === 'change_revision_mismatch',
     );
     expect(mismatches.map((item) => item.path).sort()).toEqual([
-      '.codocs/b.yaml',
-      '.codocs/c.yaml',
+      native('.codocs/b.yaml'),
+      native('.codocs/c.yaml'),
     ]);
     expect(await read('.codocs/b.yaml')).toBe(b);
     expect(await read('.codocs/c.yaml')).toBe(c);
@@ -370,7 +374,12 @@ describe('codocs_write delete', () => {
       indexUpdated: true,
     });
     expect(result.changes).toMatchObject([
-      { mode: 'delete', id: 'a', path: '.codocs/a.yaml', state: 'changed' },
+      {
+        mode: 'delete',
+        id: 'a',
+        path: native('.codocs/a.yaml'),
+        state: 'changed',
+      },
       { mode: 'update', id: 'b', state: 'changed' },
     ]);
     expect(result.changes![0]!.revision).toBeUndefined();
@@ -413,7 +422,7 @@ describe('codocs_write delete', () => {
     });
     expect(rejected.diagnostics).toContainEqual(
       expect.objectContaining({
-        path: '.codocs/c.yaml',
+        path: native('.codocs/c.yaml'),
         fieldPath: ['_codocs', 'parent', 0],
       }),
     );
@@ -444,8 +453,8 @@ describe('codocs_write move', () => {
       success: true,
       saved: true,
       id: 'a',
-      previousPath: '.codocs/a.yaml',
-      source: { path: '.codocs/moved/a.yaml' },
+      previousPath: native('.codocs/a.yaml'),
+      source: { path: native('.codocs/moved/a.yaml') },
     });
     expect(await read('.codocs/moved/a.yaml')).toBe(a);
     expect(await exists('.codocs/a.yaml')).toBe(false);
@@ -471,8 +480,8 @@ describe('codocs_write move', () => {
       {
         mode: 'move',
         id: 'a',
-        path: '.codocs/sub/a.yaml',
-        previousPath: '.codocs/a.yaml',
+        path: native('.codocs/sub/a.yaml'),
+        previousPath: native('.codocs/a.yaml'),
         state: 'changed',
       },
     ]);

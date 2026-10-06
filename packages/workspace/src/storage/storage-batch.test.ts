@@ -579,7 +579,7 @@ describe('중간 실패의 역순 복구', () => {
       [move('a.yaml', a, 'new/a2.yaml')],
       {
         operations: {
-          unlink: failingUnlink((target) => target.endsWith('/a.yaml')),
+          unlink: failingUnlink((target) => path.basename(target) === 'a.yaml'),
         },
       },
     );
