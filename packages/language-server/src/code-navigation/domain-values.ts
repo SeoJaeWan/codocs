@@ -1,24 +1,6 @@
-import { codeReferenceStatuses } from '@codocs/core';
-/** 명시 표기 진단의 구별 가능한 안내다. @domainValues */
-export const codeReferenceMessages = {
-  /** 이름 또는 전체 표기를 해석하지 못했다. */
-  [codeReferenceStatuses.invalid]:
-    '명시적 코드 참조의 이름 또는 표기 형식이 올바르지 않습니다.',
-  /** 행 번호 문법이 잘못됐다. */
-  [codeReferenceStatuses.invalidRows]:
-    '행 번호는 1부터 시작하는 정수여야 합니다.',
-  /** 끝 행이 시작 행보다 앞선다. */
-  [codeReferenceStatuses.reversedRows]: '끝 행이 시작 행보다 앞섭니다.',
-  /** 저장 원문에 행이 없다. */
-  [codeReferenceStatuses.outOfBounds]: '저장된 문서에 지정한 행이 없습니다.',
-  /** 대상 이름이 없다. */
-  [codeReferenceStatuses.missing]: '선택한 프로젝트에 대상 문서가 없습니다.',
-  /** 대상 후보가 여러 개다. */
-  [codeReferenceStatuses.ambiguous]:
-    '이름과 도메인에 해당하는 문서가 여러 개입니다.',
-  /** 대상 탐색이 불완전하다. */
-  [codeReferenceStatuses.unconfirmed]: '대상 문서를 아직 확인하지 못했습니다.',
-} as const;
+import { codeReferenceDiagnosticMessages } from '@codocs/core';
+/** 명시 표기 진단 안내는 MCP와 같은 core 문구를 쓴다. */
+export const codeReferenceMessages = codeReferenceDiagnosticMessages;
 /** 코드 수집 상태 표시의 고정 안내다. @domainValues */
 export const codeCollectionMessages = {
   /** 최초 수집 중에는 링크 없이 이 안내만 보인다. */

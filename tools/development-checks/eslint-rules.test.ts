@@ -74,7 +74,7 @@ describe('자체 패키지 경계 규칙', () => {
   });
   it.each([
     ['workspace', "import '@codocs/core';"],
-    ['core', "import 'yaml'; import 'zod'; import 'pluralize';"],
+    ['core', "import 'yaml'; import 'zod';"],
   ])('%s의 허용된 의존 방향을 유지한다', async (folder, code) => {
     expect(
       await diagnostics(

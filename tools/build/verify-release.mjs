@@ -223,7 +223,7 @@ export async function verifyMcp(archive, temporary, expectedVersion) {
       'codocs_refresh',
       'codocs_validate',
       'codocs_write',
-      'codocs_duplicates',
+      'codocs_rename',
       'codocs_guide',
     ]);
   } finally {

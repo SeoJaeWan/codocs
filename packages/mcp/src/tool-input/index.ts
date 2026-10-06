@@ -1,4 +1,3 @@
-import { documentKinds, documentStatuses } from '@codocs/core';
 import type { WorkspaceListInput } from '@codocs/workspace';
 import { z } from 'zod';
 import { guideTopics } from '../guide/domain-values.js';
@@ -51,15 +50,10 @@ export type CodocsToolName =
   | 'codocs_validate'
   | 'codocs_guide'
   | 'codocs_write'
-  | 'codocs_duplicates';
+  | 'codocs_rename';
 
-const listSchema = z.strictObject({
-  cursor: z.string().optional(),
-  domain: z.string().optional(),
-  kind: z.enum(documentKinds).optional(),
-  status: z.enum(documentStatuses).optional(),
-});
-const getSchema = z.strictObject({ ids: z.array(z.string().min(1)) });
+const listSchema = z.strictObject({ parent: z.string().optional() });
+const getSchema = z.strictObject({ addresses: z.array(z.string()) });
 const validateSchema = z.strictObject({ path: z.string().optional() });
 const guideSchema = z.strictObject({ topic: z.enum(guideTopics).optional() });
 const writeSchema = z.discriminatedUnion('mode', [
@@ -75,18 +69,38 @@ const writeSchema = z.discriminatedUnion('mode', [
     set: userFields.optional(),
     unset: z.array(z.string()).optional(),
   }),
+  /** 문서 전체를 교체한다. set·unset과 섞을 수 없고 알 수 없는 속성은 거부한다. */
+  z.strictObject({
+    mode: z.literal('replace'),
+    id: z.string(),
+    revision: z.string(),
+    document: userFields,
+  }),
 ]);
 
-const duplicatesSchema = z
-  .strictObject({
-    draft: writeSchema.optional(),
-    cursor: z.string().optional(),
-  })
-  .refine(
-    /** 초안 검토와 다음 페이지 요청을 한 호출에 함께 보내지 못하게 한다. */ (
-      value,
-    ) => !(value.draft !== undefined && value.cursor !== undefined),
-  );
+const renameBase = {
+  id: z.string().min(1),
+  /** 있으면 이 문서의 최상위 섹션 이름 변경이며 newName은 새 섹션 이름이다. */
+  section: z.string().min(1).optional(),
+  newName: z.string(),
+  selections: z
+    .array(
+      z.strictObject({
+        sourcePath: z.string(),
+        occurrenceIndex: z.number().int().nonnegative(),
+        targetPath: z.string(),
+      }),
+    )
+    .optional(),
+};
+const renameSchema = z.discriminatedUnion('mode', [
+  z.strictObject({ mode: z.literal('preview'), ...renameBase }),
+  z.strictObject({
+    mode: z.literal('apply'),
+    ...renameBase,
+    revisions: z.record(z.string(), z.string().min(1)),
+  }),
+]);
 
 /** 형식만 확인해 문서 자체의 상세 검증 진단은 변경 계획에 맡긴다. */
 export function parseWriteInput(
@@ -97,9 +111,17 @@ export function parseWriteInput(
   return result.success ? result.data : undefined;
 }
 
+/** 이름 변경 입력의 형식만 확인한다. 이름 충돌과 선택의 유효성은 workspace 계산에 맡긴다. */
+export function parseRenameInput(
+  input: unknown,
+): z.infer<typeof renameSchema> | undefined {
+  if (!dataOnly(input)) return undefined;
+  const result = renameSchema.safeParse(input);
+  return result.success ? result.data : undefined;
+}
+
 /** 일곱 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다.
- * @codocs [[MCP:MCP 도구 호출]]
- * @codocs [[MCP:MCP 도구 호출]]#L22-L24 */
+ * */
 export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_list', listSchema],
   ['codocs_get', getSchema],
@@ -107,16 +129,18 @@ export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_validate', validateSchema],
   ['codocs_guide', guideSchema],
   ['codocs_write', writeSchema],
-  ['codocs_duplicates', duplicatesSchema],
+  ['codocs_rename', renameSchema],
 ]);
 
 /** SDK에 제공하는 JSON Schema는 실행 검증과 동일한 Zod 원본에서 생성한다.
- * @codocs [[MCP:MCP 도구 호출]]#L22-L24 */
+ * */
 export function codocsJsonInputSchema(
   name: CodocsToolName,
 ): Record<string, unknown> {
   return {
-    ...(name === 'codocs_write' ? { type: 'object' } : {}),
+    ...(name === 'codocs_write' || name === 'codocs_rename'
+      ? { type: 'object' }
+      : {}),
     ...z.toJSONSchema(codocsInputSchemas.get(name)!),
   };
 }
@@ -126,23 +150,22 @@ export function parseListInput(input: unknown): WorkspaceListInput | undefined {
   if (!dataOnly(input)) return undefined;
   const result = listSchema.safeParse(input);
   if (!result.success) return undefined;
-  const { cursor, domain, kind, status } = result.data;
-  return {
-    ...(cursor === undefined ? {} : { cursor }),
-    ...(domain === undefined ? {} : { domain }),
-    ...(kind === undefined ? {} : { kind }),
-    ...(status === undefined ? {} : { status }),
-  };
+  const { parent } = result.data;
+  return parent === undefined ? {} : { parent };
 }
 
-/** ID를 첫 등장 순서로 중복 제거한 뒤 1~20개를 허용한다.
- * @codocs [[MCP:조회]]#L26-L27 */
-export function parseGetInput(input: unknown): { ids: string[] } | undefined {
+/** 이름 주소를 첫 등장 순서로 중복 제거한 뒤 1~20개를 허용한다. 주소 문법은 조회에서 주소마다 판정한다.
+ * */
+export function parseGetInput(
+  input: unknown,
+): { addresses: string[] } | undefined {
   if (!dataOnly(input)) return undefined;
   const result = getSchema.safeParse(input);
   if (!result.success) return undefined;
-  const ids = [...new Set(result.data.ids)];
-  return ids.length >= 1 && ids.length <= 20 ? { ids } : undefined;
+  const addresses = [...new Set(result.data.addresses)];
+  return addresses.length >= 1 && addresses.length <= 20
+    ? { addresses }
+    : undefined;
 }
 
 /** 선택 경로를 입력 그대로 보존하며 알 수 없는 속성은 거부한다. */
@@ -162,23 +185,6 @@ export function parseGuideInput(
   if (!dataOnly(input)) return undefined;
   const result = guideSchema.safeParse(input);
   return result.success ? result.data : undefined;
-}
-
-/** 중복 검토 입력을 세션 입력으로 바꾼다. draft는 write와 같은 객체로 풀고 cursor는 그대로 전달한다.
- * @codocs [[MCP:본문 중복 검토 요청]] */
-export function parseDuplicatesInput(
-  input: unknown,
-):
-  | z.infer<typeof writeSchema>
-  | { cursor: string }
-  | Record<string, never>
-  | undefined {
-  if (!dataOnly(input)) return undefined;
-  const result = duplicatesSchema.safeParse(input);
-  if (!result.success) return undefined;
-  const { draft, cursor } = result.data;
-  if (draft !== undefined) return draft;
-  return cursor === undefined ? {} : { cursor };
 }
 
 /** 입력 형태만 확인하고 문서 내용 진단은 변경 계획에 맡긴다. */

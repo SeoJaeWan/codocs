@@ -1,9 +1,18 @@
 import {
   planDocumentChange,
   changePlanStatuses,
+  diagnosticSeverities,
   type Catalog,
+  type ChangePlanCodeReference,
   type ChangePlanResult,
+  type Diagnostic,
 } from '@codocs/core';
+import {
+  workspaceCodeEvidenceDiagnosticCodes,
+  workspaceCodeEvidenceDiagnosticMessages,
+  type WorkspaceCodeEvidence,
+} from '../code-reference/index.js';
+import path from 'node:path';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
 import type { WorkspaceScanResult } from '../loader/index.js';
 import { calculateRevision } from '../revision/index.js';
@@ -16,14 +25,22 @@ export type WorkspaceChangePlanResult =
       { status: typeof changePlanStatuses.candidate }
     > & { revision: string });
 
+/** 쓰기 직전 보호에 쓸 코드 파일의 저장 원문 증거를 새로 수집하는 경계다. */
+export type WorkspaceCodeEvidenceCollector =
+  () => Promise<WorkspaceCodeEvidence>;
+
 /**
  * 같은 스캔의 원문·revision·확인 상태로 순수 core 후보 계산을 연결한다. 디스크를 다시 읽거나 쓰지 않는다.
- * @codocs [[작업 공간:작업 공간 변경 계획]]
+ * @param input create·update·replace 요청이다.
+ * @param scan 후보 계산의 기준이 되는 같은 스캔이다.
+ * @param catalog 스캔에서 만든 색인이다.
+ * @param codeReferences 이번 변경이 건드리지 않는 코드 파일의 표기다. 생략하면 코드 영향은 판단하지 않는다.
  */
 export function planWorkspaceChange(
   input: unknown,
   scan: WorkspaceScanResult,
   catalog: Catalog = buildWorkspaceCatalog(scan),
+  codeReferences?: readonly ChangePlanCodeReference[],
 ): WorkspaceChangePlanResult {
   let id: unknown;
   try {
@@ -33,7 +50,7 @@ export function planWorkspaceChange(
       if (
         mode &&
         'value' in mode &&
-        mode.value === 'update' &&
+        (mode.value === 'update' || mode.value === 'replace') &&
         selected &&
         'value' in selected
       )
@@ -60,10 +77,75 @@ export function planWorkspaceChange(
           },
         }
       : {}),
+    ...(codeReferences ? { codeReferences } : {}),
   });
   if (result.status !== changePlanStatuses.candidate) return result;
   return {
     ...result,
     revision: calculateRevision(new TextEncoder().encode(result.raw)),
   };
+}
+
+/** 코드 참조 보호를 증명하지 못해 저장을 거절하는 진단이다. 확인하지 못한 범위를 안내에 담는다. */
+function incompleteEvidenceDiagnostic(
+  evidence: WorkspaceCodeEvidence,
+  sourcePath: string,
+): Diagnostic<string> {
+  const scopes = evidence.failures.map((failure) => failure.path ?? '전체');
+  return {
+    code: workspaceCodeEvidenceDiagnosticCodes.incomplete,
+    severity: diagnosticSeverities.error,
+    message: workspaceCodeEvidenceDiagnosticMessages.incomplete,
+    path: sourcePath,
+    suggestion: scopes.length
+      ? `확인하지 못한 범위(${[...new Set(scopes)].join(', ')})를 정리하고 다시 시도하세요.`
+      : '코드 수집이 끝난 뒤 다시 시도하세요.',
+  };
+}
+
+/**
+ * 후보를 계산하되 섹션을 삭제하는 후보에만 코드 파일의 새로 읽은 저장 원문으로 참조 단절을 확인한다.
+ * 먼저 코드 증거 없이 계산하고, 삭제된 섹션이 있을 때만 증거를 수집해 다시 계산한다.
+ * 생성·텍스트 수정·섹션 추가·변경 없음에는 코드 수집을 요구하지 않는다.
+ * 증거가 완전하지 않으면 참조 보호를 증명하지 못한 것이므로 후보를 돌려주지 않고 실패한다.
+ * @param input create·update·replace 요청이다.
+ * @param scan 후보 계산의 기준이 되는 같은 스캔이다.
+ * @param collect 호출 시점의 코드 저장 원문을 새로 수집한다. IDE buffer나 보유 색인에 의존하지 않는다.
+ * @param catalog 스캔에서 만든 색인이다.
+ */
+export async function planProtectedWorkspaceChange(
+  input: unknown,
+  scan: WorkspaceScanResult,
+  collect: WorkspaceCodeEvidenceCollector,
+  catalog: Catalog = buildWorkspaceCatalog(scan),
+): Promise<WorkspaceChangePlanResult> {
+  const first = planWorkspaceChange(input, scan, catalog);
+  if (
+    first.status !== changePlanStatuses.candidate ||
+    !first.removedSections.length
+  )
+    return first;
+  const evidence = await collect();
+  const targetPath = first.path.split(path.sep).join('/');
+  if (!evidence.complete)
+    return {
+      status: changePlanStatuses.failed,
+      diagnostics: [incompleteEvidenceDiagnostic(evidence, first.path)],
+    };
+  return planWorkspaceChange(
+    input,
+    scan,
+    catalog,
+    evidence.files
+      .filter(
+        /** 후보로 교체되는 대상 문서 자신의 이전 원문은 변경하지 않는 코드 증거가 아니다. */ (
+          file,
+        ) => file.path !== targetPath,
+      )
+      .flatMap(
+        /** 코드 파일마다 모든 표기를 같은 출처 경로와 함께 전달한다. */ (
+          file,
+        ) => file.markers.map((marker) => ({ sourcePath: file.path, marker })),
+      ),
+  );
 }

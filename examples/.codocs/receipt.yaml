@@ -1,10 +1,8 @@
-id: sample-receipt
-name: 가상 접수건
-domains:
-  - sample-sales
-status: deprecated
-definition: |
+_codocs:
+  id: sample-receipt
+  name: 가상 접수건
+개요: |
   가상 운영 화면에서 [[가상 주문]]을 부르던 이름의 사용 맥락이다.
   용어의 정의나 배송 접수 조건은 이 문서에 복제하지 않는다.
-  현재 화면에서는 가상 주문이라는 이름을 사용하므로 이 안내는 참고용으로 보존한다.
+  현재 화면에서는 가상 주문이라는 이름을 사용하므로 이 안내는 이전 이름의 맥락을 확인하는 용도다.
   이름·파일 위치를 바꾸거나 설명을 분리해도 기존 sample-receipt ID를 유지할 수 있다.

@@ -28,6 +28,7 @@ vi.mock('../paths/code-file-access.js', async (importOriginal) => {
   return countCodeAccess(actual);
 });
 import { ioFailures } from '../test-support/file-system.js';
+import { calculateRevision } from '../revision/index.js';
 import {
   codeAccessCounts,
   createFakeCodeWatch,
@@ -53,7 +54,7 @@ const indexes: WorkspaceCodeReferenceIndex[] = [];
 const sessions: WorkspaceQuerySession[] = [];
 const targetPath = '.codocs/target.yaml';
 const targetText =
-  'id: target\nname: 대상\ndomains: [업무]\ndefinition: 본문\n';
+  '_codocs:\n  id: target\n  name: 대상\ndefinition: 본문\n업무: 값\n내용: 값\n';
 beforeEach(async () => {
   resetCodeAccessCounts();
   await mkdir('.workbench/fixtures', { recursive: true });
@@ -87,7 +88,7 @@ function createIndex(
 }
 describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 통합', () => {
   it('저장 표기 하나가 있으면 확인한 출현과 실제 UTF-16 source 위치를 제공한다', async () => {
-    await writeFile(path.join(project, 'source'), '🙂 @codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '🙂 @codocs [[대상:업무]]');
     const index = createIndex();
     const result = await index.ready();
     expect(result).toMatchObject({
@@ -104,14 +105,13 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
       ],
     });
   });
-  /** @codocs [[작업 공간:코드 참조 색인]]#L35-L37 */
   it('적격 buffer를 편집하면 disk 출현을 대체하고 중복 집계하지 않는다', async () => {
-    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
     const index = createIndex();
     await index.ready();
     await index.updateBuffer({
       sourcePath: 'source',
-      text: '@codocs [[대상]]#L3 @codocs [[대상]]',
+      text: '@codocs [[대상:내용]] @codocs [[대상]]',
       documentVersion: 1,
     });
     expect(
@@ -119,17 +119,17 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     ).toEqual([codeObservationKinds.buffer, codeObservationKinds.buffer]);
   });
   it('buffer를 닫으면 저장 표기와 위치로 돌아간다', async () => {
-    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
     const index = createIndex();
     await index.updateBuffer({
       sourcePath: 'source',
-      text: '@codocs [[대상]]#L3',
+      text: '@codocs [[대상:내용]]',
       documentVersion: 1,
     });
     await index.closeBuffer('source');
     expect((await index.ready()).occurrences[0]).toMatchObject({
       observation: codeObservationKinds.disk,
-      marker: { text: '@codocs [[대상]]#L2' },
+      marker: { text: '@codocs [[대상:업무]]' },
     });
   });
   it('정책 제외 파일을 열면 buffer 출현도 수집하지 않는다', async () => {
@@ -139,7 +139,7 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     expect(
       await index.updateBuffer({
         sourcePath: 'excluded',
-        text: '@codocs [[대상]]#L3',
+        text: '@codocs [[대상:내용]]',
         documentVersion: 1,
       }),
     ).toBe(false);
@@ -150,13 +150,13 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     const index = createIndex();
     await index.updateBuffer({
       sourcePath: 'source',
-      text: '@codocs [[대상]]#L3',
+      text: '@codocs [[대상:내용]]',
       documentVersion: 2,
     });
     expect(
       await index.updateBuffer({
         sourcePath: 'source',
-        text: '@codocs [[대상]]#L2',
+        text: '@codocs [[대상:업무]]',
         documentVersion: 1,
       }),
     ).toBe(false);
@@ -201,17 +201,14 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
       first.occurrences[0]?.sourceRevision,
     );
   });
-  it('겹친 구간을 조회하면 정확한 출현 합집합이며 같은 행의 두 표기를 보존한다', async () => {
+  it('섹션을 조회하면 그 섹션 표기의 출현만 제공하고 문서 전체 조회에서는 제외한다', async () => {
     await writeFile(
       path.join(project, 'source'),
-      '@codocs [[대상]]#L2-L4 @codocs [[대상]]#L3 @codocs [[대상]]',
+      '@codocs [[대상:업무]] @codocs [[대상:내용]] @codocs [[대상:업무]] @codocs [[대상]]',
     );
     const index = createIndex();
     await index.ready();
-    const result = await index.reverse(targetPath, {
-      startLine: 2,
-      endLine: 3,
-    });
+    const result = await index.reverse(targetPath, '업무');
     expect(result.confirmedCount).toBe(2);
     expect(
       new Set(result.occurrences.map((item) => item.occurrenceId)).size,
@@ -219,10 +216,11 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     expect(result.unique).toBe(false);
     expect(
       result.occurrences.map((item) => item.marker.range.start.character),
-    ).toEqual([0, 21]);
+    ).toEqual([0, 36]);
+    expect((await index.reverse(targetPath, '내용')).unique).toBe(true);
     expect((await index.reverse(targetPath)).confirmedCount).toBe(1);
+    expect((await index.reverse(targetPath, '없음')).absent).toBe(true);
   });
-  /** @codocs [[작업 공간:코드 참조 색인]]#L54-L55 */
   it('개별 파일 읽기가 실패하면 확인한 다른 출현과 실패 사유를 유지하고 incomplete로 표시한다', async () => {
     await writeFile(path.join(project, 'source'), '@codocs [[대상]]');
     await writeFile(path.join(project, 'unreadable'), '@codocs [[대상]]');
@@ -276,21 +274,24 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     });
   });
   it('watch 등록 뒤 초기 reconciliation 동안 파일이 바뀌면 최신 원문으로 게시한다', async () => {
-    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
     let first = true;
     const index = createIndex({
       beforeRead: async () => {
         if (first) {
           first = false;
-          await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L3');
+          await writeFile(
+            path.join(project, 'source'),
+            '@codocs [[대상:내용]]',
+          );
         }
       },
     });
     const snapshot = await index.ready();
-    expect(snapshot.occurrences[0]?.marker.text).toBe('@codocs [[대상]]#L3');
+    expect(snapshot.occurrences[0]?.marker.text).toBe('@codocs [[대상:내용]]');
   });
   it('source와 owner 버전이 같으면 capture token으로 정확한 출현을 재확인한다', async () => {
-    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
     const index = createIndex();
     const snapshot = await index.ready();
     index.setOwner('source', 1);
@@ -304,11 +305,56 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
       await index.confirm(token!, { sourcePath: 'source', documentVersion: 1 }),
     ).toMatchObject({
       sourcePath: 'source',
-      marker: { text: '@codocs [[대상]]#L2' },
+      marker: { text: '@codocs [[대상:업무]]' },
     });
   });
+  it('섹션 표기를 확인하면 저장 문서의 섹션 키 위치를 목적지로 재확인한다', async () => {
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
+    const index = createIndex();
+    const snapshot = await index.ready();
+    expect(snapshot.occurrences[0]).toMatchObject({
+      status: codeReferenceStatuses.resolved,
+      section: '업무',
+    });
+    index.setOwner('source', 1);
+    const token = await index.capture({
+      occurrenceId: snapshot.occurrences[0]!.occurrenceId,
+      ownerPath: 'source',
+      ownerVersion: 1,
+    });
+    expect(
+      await index.confirm(token!, { sourcePath: 'source', documentVersion: 1 }),
+    ).toMatchObject({
+      destination: {
+        kind: 'section',
+        section: '업무',
+        markerText: '업무',
+        range: {
+          start: { line: 4, character: 0 },
+          end: { line: 4, character: 2 },
+        },
+      },
+    });
+  });
+  it('저장 문서에 없는 섹션 표기는 섹션 부재로 두고 조회와 capture에서 제외한다', async () => {
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:없음]]');
+    const index = createIndex();
+    const snapshot = await index.ready();
+    expect(snapshot.occurrences[0]?.status).toBe(
+      codeReferenceStatuses.missingSection,
+    );
+    expect((await index.reverse(targetPath, '없음')).occurrences).toEqual([]);
+    index.setOwner('source', 1);
+    expect(
+      await index.capture({
+        occurrenceId: snapshot.occurrences[0]!.occurrenceId,
+        ownerPath: 'source',
+        ownerVersion: 1,
+      }),
+    ).toBeUndefined();
+  });
   it('관련 없는 파일이 바뀌어 다시 수집되고 세대가 올라도 같은 token을 확인한다', async () => {
-    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
     const index = createIndex();
     const snapshot = await index.ready();
     index.setOwner('source', 1);
@@ -317,7 +363,7 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
       ownerPath: 'source',
       ownerVersion: 1,
     }))!;
-    await writeFile(path.join(project, 'unrelated'), '@codocs [[대상]]#L3');
+    await writeFile(path.join(project, 'unrelated'), '@codocs [[대상:내용]]');
     await index.refresh(['unrelated']);
     index.setCatalog(
       buildCatalog({
@@ -333,11 +379,11 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
       await index.confirm(token, { sourcePath: 'source', documentVersion: 1 }),
     ).toMatchObject({
       sourcePath: 'source',
-      marker: { text: '@codocs [[대상]]#L2' },
+      marker: { text: '@codocs [[대상:업무]]' },
     });
   });
   it('수집이 진행 중일 때 클릭하면 기다리지 않고 직접 읽어 확인한다', async () => {
-    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
     const gate: { wait?: Promise<void> } = {};
     const index = createIndex({
       beforeRead: async () => {
@@ -364,7 +410,7 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
         }),
       ).toMatchObject({
         sourcePath: 'source',
-        marker: { text: '@codocs [[대상]]#L2' },
+        marker: { text: '@codocs [[대상:업무]]' },
       });
     } finally {
       resume();
@@ -372,7 +418,7 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     }
   });
   it('source의 표기와 무관한 뒷줄만 편집해도 클릭을 확인한다', async () => {
-    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
     const index = createIndex();
     const snapshot = await index.ready();
     index.setOwner('source', 1);
@@ -383,14 +429,14 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     }))!;
     await writeFile(
       path.join(project, 'source'),
-      '@codocs [[대상]]#L2\n관련 없는 줄을 추가했다',
+      '@codocs [[대상:업무]]\n관련 없는 줄을 추가했다',
     );
     expect(
       await index.confirm(token, { sourcePath: 'source', documentVersion: 1 }),
     ).toMatchObject({ sourcePath: 'source' });
   });
   it('표기 위치가 실제로 이동하면 거부한다', async () => {
-    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
     const index = createIndex();
     const snapshot = await index.ready();
     index.setOwner('source', 1);
@@ -401,14 +447,14 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     }))!;
     await writeFile(
       path.join(project, 'source'),
-      '앞줄 추가\n@codocs [[대상]]#L2',
+      '앞줄 추가\n@codocs [[대상:업무]]',
     );
     expect(
       await index.confirm(token, { sourcePath: 'source', documentVersion: 1 }),
     ).toBeUndefined();
   });
   it('대상 문서가 실제로 바뀌어 새 catalog가 게시되어도 거부한다', async () => {
-    await writeFile(path.join(project, 'source'), '@codocs [[대상]]#L2');
+    await writeFile(path.join(project, 'source'), '@codocs [[대상:업무]]');
     const index = createIndex();
     const snapshot = await index.ready();
     index.setOwner('source', 1);
@@ -524,7 +570,7 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
     await index.ready();
     await index.reverse(targetPath);
     await index.reverse(targetPath);
-    await index.reverse(targetPath, { startLine: 2, endLine: 2 });
+    await index.reverse(targetPath, '업무');
     expect(observed).toEqual(['code-index-published']);
   });
 });
@@ -652,7 +698,7 @@ describe('WorkspaceCodeReferenceIndex: 실제 감시 갱신', () => {
     const index = createIndex();
     await index.updateBuffer({
       sourcePath: 'source',
-      text: '@codocs [[대상]]#L2',
+      text: '@codocs [[대상:업무]]',
       documentVersion: 1,
     });
     await rm(path.join(project, 'source'));
@@ -759,9 +805,12 @@ function countingWatchers(): {
   };
 }
 const marker = '@codocs [[대상]]';
+/** 섹션을 적은 표기를 만든다. */
+function markerSection(section: string): string {
+  return `@codocs [[대상:${section}]]`;
+}
 
 describe('WorkspaceCodeReferenceIndex: 수집 범위만 감시', () => {
-  /** @codocs [[작업 공간:작업 공간 파일 감시]]#L67 */
   it('제외한 dist 폴더를 삭제하고 다시 만들어도 감시 오류 없이 complete를 유지한다', async () => {
     await writeFile(path.join(project, '.gitignore'), 'dist/\n');
     await mkdir(path.join(project, 'dist'));
@@ -1025,7 +1074,7 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
   /** 최초 수집이 끝난 색인과 게시 목록을 만든다. */
   async function readyIndex(
     options: WorkspaceCodeReferenceIndexOptions = {},
-    text = marker + '#L2',
+    text = markerSection('업무'),
   ): Promise<{
     index: WorkspaceCodeReferenceIndex;
     seen: WorkspaceCodeReferenceSnapshot[];
@@ -1073,19 +1122,19 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
     const before = (await index.snapshot()).codeGeneration;
     await index.updateBuffer({
       sourcePath: 'source',
-      text: marker + '#L2',
+      text: markerSection('업무'),
       documentVersion: 1,
     });
     await index.updateBuffer({
       sourcePath: 'source',
-      text: marker + '#L2',
+      text: markerSection('업무'),
       documentVersion: 2,
     });
     expect(seen).toEqual([]);
     expect((await index.snapshot()).codeGeneration).toBe(before);
     await index.updateBuffer({
       sourcePath: 'source',
-      text: marker + '#L3',
+      text: markerSection('내용'),
       documentVersion: 3,
     });
     expect(seen).toHaveLength(1);
@@ -1104,7 +1153,7 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
     });
     await index.updateBuffer({
       sourcePath: 'source',
-      text: marker + '#L2',
+      text: markerSection('업무'),
       documentVersion: 1,
     });
     observed.length = 0;
@@ -1119,7 +1168,7 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
     });
     await index.updateBuffer({
       sourcePath: 'source',
-      text: marker + '#L3',
+      text: markerSection('내용'),
       documentVersion: 1,
     });
     seen.length = 0;
@@ -1128,13 +1177,13 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]!.occurrences[0]).toMatchObject({
       observation: codeObservationKinds.disk,
-      marker: { text: marker + '#L2' },
+      marker: { text: markerSection('업무') },
     });
     expect(observed).toEqual([]);
   });
   it('임계 시간 안에 끝난 재확인은 collecting 없이 달라진 최종 결과만 한 번 게시한다', async () => {
     const { index, seen } = await readyIndex({ collectingThreshold: 60_000 });
-    await writeFile(path.join(project, 'source'), marker + '#L3');
+    await writeFile(path.join(project, 'source'), markerSection('내용'));
     await index.refresh(['source']);
     expect(seen.map((item) => item.status)).toEqual([
       codeCollectionStatuses.complete,
@@ -1152,18 +1201,16 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
     gate.wait = new Promise<void>((resolve) => {
       resume = resolve;
     });
-    await writeFile(path.join(project, 'source'), marker + '#L3');
+    await writeFile(path.join(project, 'source'), markerSection('내용'));
     const operation = index.refresh(['source']);
     try {
       await vi.waitFor(() => expect(seen).toHaveLength(1));
       expect(seen[0]).toMatchObject({
         status: codeCollectionStatuses.collecting,
         hasCompletedCollection: true,
-        occurrences: [{ marker: { text: marker + '#L2' } }],
+        occurrences: [{ marker: { text: markerSection('업무') } }],
       });
-      expect(
-        await index.reverse(targetPath, { startLine: 2, endLine: 2 }),
-      ).toMatchObject({
+      expect(await index.reverse(targetPath, '업무')).toMatchObject({
         status: codeCollectionStatuses.collecting,
         unique: true,
         absent: false,
@@ -1176,7 +1223,7 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
       codeCollectionStatuses.collecting,
       codeCollectionStatuses.complete,
     ]);
-    expect(seen[1]!.occurrences[0]!.marker.text).toBe(marker + '#L3');
+    expect(seen[1]!.occurrences[0]!.marker.text).toBe(markerSection('내용'));
   });
   it('임계 시간을 넘겼어도 결과가 같으면 collecting 한 번과 complete 한 번만 게시한다', async () => {
     const gate: { wait?: Promise<void> } = {};
@@ -1263,7 +1310,6 @@ describe('WorkspaceCodeReferenceIndex: 변경 경로만 증분 수집', () => {
     );
     expect(snapshot.failures).toEqual(fresh.failures);
   }
-  /** @codocs [[작업 공간:코드 참조 색인]]#L35-L37 */
   it('파일 내용 변경과 같은 내용 저장과 mtime만 바뀐 변경은 정책 계산도 전체 탐색도 하지 않는다', async () => {
     const { index, signal, seen } = await incrementalIndex();
     await writeFile(path.join(project, 'source'), marker + '\n' + marker);
@@ -1473,5 +1519,69 @@ describe('WorkspaceCodeReferenceIndex: 겹치는 감시 재구성', () => {
     expect(fake.connections[0]!.closed).toBe(true);
     expect(fake.connections.at(-1)!.closed).toBe(false);
     expect(codeAccessCounts.discovery).toBeGreaterThan(0);
+  });
+});
+/** .codocs 문서를 제외한 코드 파일만 남긴다. 수집은 .codocs 안의 YAML도 일반 파일로 읽는다. */
+function codeOnly(
+  sources: ReturnType<WorkspaceCodeReferenceIndex['renameSources']>,
+) {
+  return sources.files.filter((file) => !file.path.startsWith('.codocs/'));
+}
+describe('WorkspaceCodeReferenceIndex.renameSources: 이름 변경 계산용 저장 관측', () => {
+  it('최초 수집이 끝나기 전에는 collecting이고 끝나면 경로 순서의 저장 원문·revision·표기를 제공한다', async () => {
+    await writeFile(path.join(project, 'b.ts'), '// @codocs [[대상]]');
+    await writeFile(path.join(project, 'a.ts'), '// @codocs [[대상:업무]]');
+    const index = createIndex();
+
+    expect(index.renameSources().status).toBe(
+      codeCollectionStatuses.collecting,
+    );
+
+    await index.ready();
+    const sources = index.renameSources();
+
+    expect(sources.status).toBe(codeCollectionStatuses.complete);
+    expect(codeOnly(sources).map((file) => file.path)).toEqual([
+      'a.ts',
+      'b.ts',
+    ]);
+    expect(codeOnly(sources)[0]).toMatchObject({
+      text: '// @codocs [[대상:업무]]',
+      markers: [{ name: '대상', section: '업무' }],
+    });
+    expect(codeOnly(sources)[0]?.revision).toBe(
+      calculateRevision(Buffer.from('// @codocs [[대상:업무]]', 'utf8')),
+    );
+  });
+
+  it('IDE buffer는 무시하고 저장된 디스크 원문과 revision만 제공한다', async () => {
+    await writeFile(path.join(project, 'source.ts'), '@codocs [[대상:업무]]');
+    const index = createIndex();
+    await index.ready();
+    const before = codeOnly(index.renameSources())[0]!;
+    await index.updateBuffer({
+      sourcePath: 'source.ts',
+      text: '@codocs [[대상:내용]] 편집 중',
+      documentVersion: 1,
+    });
+
+    expect(codeOnly(index.renameSources())[0]).toEqual(before);
+    expect(before.text).toBe('@codocs [[대상:업무]]');
+  });
+
+  it('읽지 못한 파일은 failures로 보고하고 읽은 파일은 계속 제공한다', async () => {
+    await writeFile(path.join(project, 'source.ts'), '@codocs [[대상]]');
+    await writeFile(path.join(project, 'legacy.ts'), '@codocs [[대상]]');
+    ioFailures.set(path.join(project, 'legacy.ts'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const index = createIndex();
+    await index.ready();
+    const sources = index.renameSources();
+
+    expect(sources.status).toBe(codeCollectionStatuses.incomplete);
+    expect(codeOnly(sources).map((file) => file.path)).toEqual(['source.ts']);
+    expect(sources.failures).toMatchObject([{ path: 'legacy.ts' }]);
   });
 });
