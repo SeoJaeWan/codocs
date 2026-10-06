@@ -6,8 +6,6 @@ import {
   open,
   readFile,
   readdir,
-  rename,
-  rm,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -19,6 +17,10 @@ import {
   saveWorkspaceChange,
   type WorkspaceStorageFileHandle,
 } from './index.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 let folder: string;
@@ -63,7 +65,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
@@ -105,7 +107,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
   });
 
   it('.codocs 자체가 없으면 허용 경계에 만들어 새 문서를 등록한다', async () => {
-    await rm(folder, { recursive: true });
+    await rmWithRetry(folder, { recursive: true });
     const scan = await loadWorkspace({ cwd: root });
     const result = await saveWorkspaceChange(
       { mode: 'create', path: '.codocs/created.yaml', document },
@@ -291,7 +293,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     await writeFile(path.join(external, 'first.yaml'), 'outside');
     const result = await saveWorkspaceChange(input, scan, {
       beforeApply: async () => {
-        await rename(folder, moved);
+        await renameWithRetry(folder, moved);
         await createLink(external, folder, 'junction');
       },
     });
@@ -341,7 +343,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
       });
       expect(await readdir(external)).toEqual([]);
     } finally {
-      await rm(external, { recursive: true, force: true });
+      await rmWithRetry(external, { recursive: true, force: true });
     }
   });
 
@@ -364,7 +366,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
             );
             expect(ownedName).toBeDefined();
             otherTemp = path.join(external, ownedName!);
-            await rename(parent, moved);
+            await renameWithRetry(parent, moved);
             await writeFile(otherTemp, 'another request');
             await createLink(external, parent, 'junction');
           },
@@ -384,7 +386,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
         ),
       ).toBe(true);
     } finally {
-      await rm(external, { recursive: true, force: true });
+      await rmWithRetry(external, { recursive: true, force: true });
     }
   });
 

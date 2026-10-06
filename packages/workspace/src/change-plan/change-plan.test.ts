@@ -1,10 +1,11 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { changePlanStatuses } from '@codocs/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadWorkspace } from '../loader/index.js';
 import { planWorkspaceChange } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 const original =
   '# 그대로 보존\r\n_codocs:\r\n  id: zone\r\n  name: 구역\r\ndefinition: 설명\r\n';
@@ -30,7 +31,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 describe('planWorkspaceChange: 읽은 파일을 바탕으로 변경 계획 작성', () => {

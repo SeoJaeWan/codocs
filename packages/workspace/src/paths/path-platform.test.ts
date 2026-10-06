@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,6 +6,7 @@ import { createLink } from '../test-support/links.js';
 import { ioFailures } from '../test-support/file-system.js';
 import { resolveProjectRoot } from '../project-root/index.js';
 import { resolveWorkspacePath } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
@@ -35,7 +36,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   ioFailures.clear();
-  await rm(temporary, { recursive: true, force: true });
+  await rmWithRetry(temporary, { recursive: true, force: true });
 });
 
 describe('현재 OS의 실제 경로·링크와 오류 처리', () => {
@@ -78,7 +79,7 @@ describe('현재 OS의 실제 경로·링크와 오류 처리', () => {
   it('연결 대상이 삭제되어도 미지원 연결로 구분한다', async () => {
     const selected = await resolveProjectRoot({ cwd: root });
     if (!selected.success) throw new Error('root');
-    await rm(target, { recursive: true });
+    await rmWithRetry(target, { recursive: true });
     expect(
       await resolveWorkspacePath(selected.root, '.codocs/연결/한글.yaml'),
     ).toMatchObject({

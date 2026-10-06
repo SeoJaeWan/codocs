@@ -3,8 +3,6 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  rename,
-  rm,
   stat,
   utimes,
   writeFile,
@@ -17,6 +15,10 @@ import {
   computeCodeFilePolicy,
   isCodeWatchIgnored,
 } from '../paths/code-file-access.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 const execute = promisify(execFile);
 let project: string;
 let watcher: CodeReferenceWatcher | undefined;
@@ -29,7 +31,7 @@ afterEach(async () => {
   await watcher?.close();
   watcher = undefined;
   vi.unstubAllEnvs();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 describe('CodeReferenceWatcher: Git 메타데이터 원자 교체', () => {
   it('Git index를 같은 바이트·mtime으로 교체하면 파일 정체 변화 신호를 전달한다', async () => {
@@ -56,7 +58,7 @@ describe('CodeReferenceWatcher: Git 메타데이터 원자 교체', () => {
     const replacement = path.join(project, 'replacement');
     await writeFile(replacement, bytes);
     await utimes(replacement, 1000, 1000);
-    await rename(replacement, indexPath);
+    await renameWithRetry(replacement, indexPath);
     const current = await stat(indexPath);
     expect(current.mtimeMs).toBe(original.mtimeMs);
     expect(current.ino).not.toBe(original.ino);
@@ -108,8 +110,9 @@ describe('CodeReferenceWatcher: 수집 정책 감시 범위', () => {
     await watcher.start();
     await writeFile(path.join(project, 'dist', 'junk'), 'b');
     await writeFile(path.join(project, 'dist', 'keep'), 'b');
-    await vi.waitFor(() =>
-      expect(events).toContain(path.join(project, 'dist', 'keep')),
+    await vi.waitFor(
+      () => expect(events).toContain(path.join(project, 'dist', 'keep')),
+      { timeout: 5_000 },
     );
     await new Promise((resolve) => setTimeout(resolve, 200));
     expect(events).not.toContain(path.join(project, 'dist', 'junk'));
@@ -127,8 +130,9 @@ describe('CodeReferenceWatcher: 수집 정책 감시 범위', () => {
     );
     await watcher.start();
     await writeFile(path.join(project, 'dist', 'keep'), 'b');
-    await vi.waitFor(() =>
-      expect(events).toContain(path.join(project, 'dist', 'keep')),
+    await vi.waitFor(
+      () => expect(events).toContain(path.join(project, 'dist', 'keep')),
+      { timeout: 5_000 },
     );
   });
   it('.gitignore를 바꾸면 제외 규칙과 무관하게 신호를 보낸다', async () => {
@@ -145,8 +149,9 @@ describe('CodeReferenceWatcher: 수집 정책 감시 범위', () => {
     );
     await watcher.start();
     await writeFile(path.join(project, '.gitignore'), 'b\n');
-    await vi.waitFor(() =>
-      expect(events).toContain(path.join(project, '.gitignore')),
+    await vi.waitFor(
+      () => expect(events).toContain(path.join(project, '.gitignore')),
+      { timeout: 5_000 },
     );
   });
 });

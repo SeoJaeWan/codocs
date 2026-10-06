@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { PassThrough } from 'node:stream';
@@ -11,6 +11,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startCodocsStdio } from './index.js';
 import { createSourceCli } from '../../test-support/source-cli.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let sourceCli: Awaited<ReturnType<typeof createSourceCli>>;
 let cli: string;
@@ -39,7 +40,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await rm(fixture, { recursive: true, force: true });
+  await rmWithRetry(fixture, { recursive: true, force: true });
   await sourceCli.close();
 });
 

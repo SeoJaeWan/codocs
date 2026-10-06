@@ -4,14 +4,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const { withIoFailures } = await import('../test-support/file-system.js');
   return withIoFailures(actual);
 });
-import {
-  mkdir,
-  mkdtemp,
-  rename,
-  rm,
-  utimes,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, utimes, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
@@ -48,6 +41,10 @@ import {
   createWorkspaceQuerySession,
   type WorkspaceQuerySession,
 } from '../query/index.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 const executeGit = promisify(execFile);
 let project: string;
 const indexes: WorkspaceCodeReferenceIndex[] = [];
@@ -68,7 +65,7 @@ afterEach(async () => {
   await Promise.all(indexes.splice(0).map((index) => index.close()));
   await Promise.all(sessions.splice(0).map((session) => session.close()));
   vi.unstubAllEnvs();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 /** 실제 catalog·disk·watch 연결을 검증하는 통합 fixture다. */
@@ -534,7 +531,7 @@ describe('WorkspaceCodeReferenceIndex: 저장 원문·IDE 편집과 역참조 �
         path.join(project, 'replacement'),
         replaced === 'source' ? '@codocs [[대상]]' : targetText,
       );
-      await rename(
+      await renameWithRetry(
         path.join(project, 'replacement'),
         path.join(project, replaced),
       );
@@ -701,7 +698,7 @@ describe('WorkspaceCodeReferenceIndex: 실제 감시 갱신', () => {
       text: '@codocs [[대상:업무]]',
       documentVersion: 1,
     });
-    await rm(path.join(project, 'source'));
+    await rmWithRetry(path.join(project, 'source'));
     await index.refresh(['source']);
     expect((await index.ready()).occurrences).toEqual([]);
   });
@@ -775,6 +772,22 @@ function published(
     });
   });
 }
+/**
+ * 제외 경로의 변경이 수집 pass에 들어가지 않았는지 확인한다.
+ * 고정 시간 대기는 느린 감시에서 늦은 신호를 놓치므로, 수집 대상 파일을 하나 더 써서 그 출현이 게시될 때까지를 경계로 삼는다.
+ */
+async function expectExcludedChangeIgnored(
+  index: WorkspaceCodeReferenceIndex,
+  passes: { affected: string[] }[],
+  excluded: string,
+): Promise<void> {
+  const barrier = published(index, (snapshot) =>
+    snapshot.occurrences.some((item) => item.sourcePath === 'barrier'),
+  );
+  await writeFile(path.join(project, 'barrier'), marker);
+  await barrier;
+  expect(passes.flatMap((pass) => pass.affected)).not.toContain(excluded);
+}
 /** 실제 감시를 만들면서 생성 횟수와 전달된 오류를 기록한다. */
 function countingWatchers(): {
   created: CodeReferenceWatcher[];
@@ -818,7 +831,7 @@ describe('WorkspaceCodeReferenceIndex: 수집 범위만 감시', () => {
     const watchers = countingWatchers();
     const index = createIndex({ createWatcher: watchers.createWatcher });
     await index.ready();
-    await rm(path.join(project, 'dist'), { recursive: true });
+    await rmWithRetry(path.join(project, 'dist'), { recursive: true });
     await mkdir(path.join(project, 'dist'));
     await writeFile(path.join(project, 'dist', 'out.js'), 'text');
     const later = published(index, (snapshot) =>
@@ -856,12 +869,18 @@ describe('WorkspaceCodeReferenceIndex: 수집 범위만 감시', () => {
     await writeFile(path.join(project, 'dist', 'junk'), marker);
     await writeFile(path.join(project, '.gitignore'), 'dist/\n');
     await executeGit('git', ['-C', project, 'add', '-f', 'dist/keep']);
-    const observed: string[] = [];
-    const index = createIndex({ observe: (kind) => observed.push(kind) });
+    const passes: { affected: string[] }[] = [];
+    const index = createIndex({
+      observe: (_kind, detail) =>
+        passes.push({ affected: (detail['affected'] as string[]) ?? [] }),
+    });
     await index.ready();
     await writeFile(path.join(project, 'dist', 'junk'), marker + marker);
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    expect(observed).toEqual(['code-index-published']);
+    await expectExcludedChangeIgnored(
+      index,
+      passes,
+      path.join(project, 'dist', 'junk'),
+    );
   });
 });
 
@@ -928,7 +947,9 @@ describe('WorkspaceCodeReferenceIndex: 감시 규칙이 바뀔 때만 재구성'
     });
     await index.ready();
     await executeGit('git', ['-C', project, 'add', 'source']);
-    await vi.waitFor(() => expect(observed.length).toBeGreaterThan(1));
+    await vi.waitFor(() => expect(observed.length).toBeGreaterThan(1), {
+      timeout: 5_000,
+    });
     expect(watchers.created).toHaveLength(1);
   });
 });
@@ -987,7 +1008,9 @@ describe('WorkspaceCodeReferenceIndex: 감시 오류 자동 복구', () => {
     fake.connections[0]!.failed(new Error('EPERM: watch'));
     const delays: number[] = [];
     for (let attempt = 0; attempt < 7; attempt++) {
-      await vi.waitFor(() => expect(fake.schedules).toHaveLength(attempt + 1));
+      await vi.waitFor(() => expect(fake.schedules).toHaveLength(attempt + 1), {
+        timeout: 5_000,
+      });
       delays.push(fake.schedules[attempt]!.delay);
       fake.schedules[attempt]!.run();
     }
@@ -999,9 +1022,13 @@ describe('WorkspaceCodeReferenceIndex: 감시 오류 자동 복구', () => {
     const { index, fake } = await startedIndex();
     fake.behavior.failRegistrations = 2;
     fake.connections[0]!.failed(new Error('EPERM: watch'));
-    await vi.waitFor(() => expect(fake.schedules).toHaveLength(1));
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(1), {
+      timeout: 5_000,
+    });
     fake.schedules[0]!.run();
-    await vi.waitFor(() => expect(fake.schedules).toHaveLength(2));
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(2), {
+      timeout: 5_000,
+    });
     const recovered = published(
       index,
       (snapshot) => snapshot.status === codeCollectionStatuses.complete,
@@ -1011,7 +1038,9 @@ describe('WorkspaceCodeReferenceIndex: 감시 오류 자동 복구', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     fake.behavior.failRegistrations = 1;
     fake.connections.at(-1)!.failed(new Error('EPERM: watch'));
-    await vi.waitFor(() => expect(fake.schedules).toHaveLength(3));
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(3), {
+      timeout: 5_000,
+    });
     expect(fake.schedules.map((item) => item.delay)).toEqual([
       1_000, 2_000, 1_000,
     ]);
@@ -1020,7 +1049,9 @@ describe('WorkspaceCodeReferenceIndex: 감시 오류 자동 복구', () => {
     const { index, fake } = await startedIndex();
     fake.behavior.failRegistrations = 1;
     fake.connections[0]!.failed(new Error('EPERM: watch'));
-    await vi.waitFor(() => expect(fake.schedules).toHaveLength(1));
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(1), {
+      timeout: 5_000,
+    });
     const result = await index.refresh();
     expect(result).toMatchObject({
       status: codeCollectionStatuses.complete,
@@ -1033,7 +1064,9 @@ describe('WorkspaceCodeReferenceIndex: 감시 오류 자동 복구', () => {
     const { index, fake } = await startedIndex();
     fake.behavior.failRegistrations = 1;
     fake.connections[0]!.failed(new Error('EPERM: watch'));
-    await vi.waitFor(() => expect(fake.schedules).toHaveLength(1));
+    await vi.waitFor(() => expect(fake.schedules).toHaveLength(1), {
+      timeout: 5_000,
+    });
     await index.close();
     fake.schedules[0]!.run();
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -1045,7 +1078,7 @@ describe('WorkspaceCodeReferenceIndex: 감시 오류 자동 복구', () => {
     await writeFile(path.join(project, 'nested', 'source'), marker);
     const index = createIndex();
     await index.ready();
-    await rm(path.join(project, 'nested'), { recursive: true });
+    await rmWithRetry(path.join(project, 'nested'), { recursive: true });
     await mkdir(path.join(project, 'nested'));
     await writeFile(path.join(project, 'nested', 'source'), marker);
     const edited = published(
@@ -1071,7 +1104,11 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
     index.onDidChange((snapshot) => seen.push(snapshot));
     return seen;
   }
-  /** 최초 수집이 끝난 색인과 게시 목록을 만든다. */
+  /**
+   * 최초 수집이 끝난 색인과 게시 목록을 만든다.
+   * 이 그룹은 refresh 호출로만 재수집을 일으키므로 가짜 감시를 쓴다. 실제 감시는 테스트의 파일 쓰기를 늦게 보고
+   * 별도 pass를 더해 게시 횟수와 순서를 OS 타이밍에 따라 바꾼다.
+   */
   async function readyIndex(
     options: WorkspaceCodeReferenceIndexOptions = {},
     text = markerSection('업무'),
@@ -1080,7 +1117,12 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
     seen: WorkspaceCodeReferenceSnapshot[];
   }> {
     await writeFile(path.join(project, 'source'), text);
-    const index = createIndex(options);
+    const fake = createFakeCodeWatch();
+    const index = createIndex({
+      createWatcher: fake.createWatcher,
+      schedule: fake.schedule,
+      ...options,
+    });
     await index.ready();
     return { index, seen: collect(index) };
   }
@@ -1204,7 +1246,7 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
     await writeFile(path.join(project, 'source'), markerSection('내용'));
     const operation = index.refresh(['source']);
     try {
-      await vi.waitFor(() => expect(seen).toHaveLength(1));
+      await vi.waitFor(() => expect(seen).toHaveLength(1), { timeout: 5_000 });
       expect(seen[0]).toMatchObject({
         status: codeCollectionStatuses.collecting,
         hasCompletedCollection: true,
@@ -1239,7 +1281,7 @@ describe('WorkspaceCodeReferenceIndex: 변경이 있을 때만 게시', () => {
     });
     const operation = index.refresh();
     try {
-      await vi.waitFor(() => expect(seen).toHaveLength(1));
+      await vi.waitFor(() => expect(seen).toHaveLength(1), { timeout: 5_000 });
     } finally {
       resume();
     }
@@ -1289,7 +1331,10 @@ describe('WorkspaceCodeReferenceIndex: 변경 경로만 증분 수집', () => {
         fake.connections
           .at(-1)!
           .changed(relatives.map((item) => path.join(project, item)));
-        await vi.waitFor(() => expect(observed.length).toBeGreaterThan(before));
+        await vi.waitFor(
+          () => expect(observed.length).toBeGreaterThan(before),
+          { timeout: 5_000 },
+        );
       },
     };
   }
@@ -1332,7 +1377,7 @@ describe('WorkspaceCodeReferenceIndex: 변경 경로만 증분 수집', () => {
     await writeFile(path.join(project, 'added'), marker);
     await signal('added');
     expect((await index.snapshot()).occurrences).toHaveLength(2);
-    await rm(path.join(project, 'source'));
+    await rmWithRetry(path.join(project, 'source'));
     await signal('source');
     expect(
       (await index.snapshot()).occurrences.map((item) => item.sourcePath),
@@ -1354,7 +1399,7 @@ describe('WorkspaceCodeReferenceIndex: 변경 경로만 증분 수집', () => {
     await signal('made');
     expect((await index.snapshot()).occurrences).toHaveLength(2);
     await expectSameAsFullDiscovery(index);
-    await rm(path.join(project, 'made'), { recursive: true });
+    await rmWithRetry(path.join(project, 'made'), { recursive: true });
     await signal('made');
     await expectSameAsFullDiscovery(index);
     await executeGit('git', ['-C', project, 'add', '-f', 'ignored/a']);
@@ -1456,7 +1501,9 @@ describe('WorkspaceCodeReferenceIndex: 겹치는 감시 재구성', () => {
     fake.behavior.holdStart = true;
     await writeFile(path.join(project, '.gitignore'), '');
     fake.connections[0]!.changed([path.join(project, '.gitignore')]);
-    await vi.waitFor(() => expect(fake.events).toEqual(['start:1']));
+    await vi.waitFor(() => expect(fake.events).toEqual(['start:1']), {
+      timeout: 5_000,
+    });
     // 겹치는 동안 두 감시가 같은 경로를 보내도 한 경로로 합쳐진다.
     await writeFile(path.join(project, 'included', 'during'), marker);
     const during = path.join(project, 'included', 'during');
@@ -1479,8 +1526,12 @@ describe('WorkspaceCodeReferenceIndex: 겹치는 감시 재구성', () => {
     const { index, fake } = await rebuildIndex();
     await writeFile(path.join(project, '.gitignore'), '');
     fake.connections[0]!.changed([path.join(project, '.gitignore')]);
-    await vi.waitFor(() => expect(fake.connections).toHaveLength(2));
-    await vi.waitFor(() => expect(fake.connections[0]!.closed).toBe(true));
+    await vi.waitFor(() => expect(fake.connections).toHaveLength(2), {
+      timeout: 5_000,
+    });
+    await vi.waitFor(() => expect(fake.connections[0]!.closed).toBe(true), {
+      timeout: 5_000,
+    });
     const edited = published(
       index,
       (snapshot) => snapshot.occurrences.length === 2,
@@ -1583,5 +1634,102 @@ describe('WorkspaceCodeReferenceIndex.renameSources: 이름 변경 계산용 저
     expect(sources.status).toBe(codeCollectionStatuses.incomplete);
     expect(codeOnly(sources).map((file) => file.path)).toEqual(['source.ts']);
     expect(sources.failures).toMatchObject([{ path: 'legacy.ts' }]);
+  });
+});
+
+describe('WorkspaceCodeReferenceIndex: .codocsignore 제외', () => {
+  it('추적된 파일이 제외 폴더에 있으면 출현과 진단 없이 완료로 게시한다', async () => {
+    await executeGit('git', ['init', project]);
+    await mkdir(path.join(project, 'docs'));
+    await writeFile(path.join(project, 'docs', 'a.md'), marker);
+    await writeFile(path.join(project, 'src'), marker);
+    await executeGit('git', ['-C', project, 'add', 'docs/a.md', 'src']);
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    const index = createIndex();
+    const result = await index.ready();
+    expect(result.status).toBe(codeCollectionStatuses.complete);
+    expect(result.occurrences.map((item) => item.sourcePath)).toEqual(['src']);
+    expect(result.failures).toEqual([]);
+  });
+  it('제외한 파일을 편집기에서 열면 buffer로 받지 않고 이전 진단도 지운다', async () => {
+    await writeFile(path.join(project, 'source'), marker);
+    const index = createIndex();
+    await index.ready();
+    expect(
+      await index.updateBuffer({
+        sourcePath: 'source',
+        text: markerSection('내용'),
+        documentVersion: 1,
+      }),
+    ).toBe(true);
+    const cleared = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 0,
+    );
+    await writeFile(path.join(project, '.codocsignore'), 'source\n');
+    await cleared;
+    expect(
+      await index.updateBuffer({
+        sourcePath: 'source',
+        text: markerSection('내용'),
+        documentVersion: 2,
+      }),
+    ).toBe(false);
+    expect((await index.ready()).occurrences).toEqual([]);
+  });
+  it('감시 중 .codocsignore에 경로를 더하고 빼면 출현이 사라지고 다시 수집되며 감시를 다시 등록한다', async () => {
+    await mkdir(path.join(project, 'docs'));
+    await writeFile(path.join(project, 'docs', 'source'), marker);
+    const watchers = countingWatchers();
+    const index = createIndex({ createWatcher: watchers.createWatcher });
+    await index.ready();
+    const removed = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 0,
+    );
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    await removed;
+    const restored = published(
+      index,
+      (snapshot) => snapshot.occurrences.length === 1,
+    );
+    await rmWithRetry(path.join(project, '.codocsignore'));
+    await restored;
+    expect(watchers.created).toHaveLength(3);
+    expect(watchers.errors).toEqual([]);
+  });
+  it('제외한 폴더의 추적 파일을 수정해도 다시 읽거나 게시하지 않는다', async () => {
+    await executeGit('git', ['init', project]);
+    await mkdir(path.join(project, 'docs'));
+    await writeFile(path.join(project, 'docs', 'keep'), marker);
+    await executeGit('git', ['-C', project, 'add', 'docs/keep']);
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    const passes: { affected: string[] }[] = [];
+    const index = createIndex({
+      observe: (_kind, detail) =>
+        passes.push({ affected: (detail['affected'] as string[]) ?? [] }),
+    });
+    await index.ready();
+    await writeFile(path.join(project, 'docs', 'keep'), marker + marker);
+    await expectExcludedChangeIgnored(
+      index,
+      passes,
+      path.join(project, 'docs', 'keep'),
+    );
+  });
+  it('.codocsignore를 읽지 못하면 incomplete로 게시하고 .codocsignore 실패 경로를 남긴다', async () => {
+    await writeFile(path.join(project, 'source'), marker);
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    ioFailures.set(path.join(project, '.codocsignore'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const index = createIndex();
+    const result = await index.ready();
+    expect(result.status).toBe(codeCollectionStatuses.incomplete);
+    expect(result.failures.map((failure) => failure.path)).toContain(
+      '.codocsignore',
+    );
+    expect(result.occurrences).toEqual([]);
   });
 });

@@ -10,7 +10,7 @@ export type WorkspaceRenameFileState = WorkspaceFileState;
 
 /** 이름 변경 변경·영향·파일 결과가 .codocs 문서가 아닌 파일일 때 붙이는 구분이다. 문서(YAML) 항목에는 붙이지 않는다. @domainValues */
 export const workspaceRenameFileKinds = {
-  /** 코드 파일의 `@codocs [[ ]]` 표기이다. 이름 변경 반영 경로에서만 쓰기를 허용한다. */
+  /** 코드 파일의 `@codocs` 문서·섹션 참조 표기이다. 이름 변경 반영 경로에서만 쓰기를 허용한다. */
   code: 'code',
 } as const;
 /** 원본 상수에서 도출한 이름 변경 파일 구분 타입이다. */

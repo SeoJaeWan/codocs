@@ -1,9 +1,10 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createSourceCli } from '../../test-support/source-cli.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let sourceCli: Awaited<ReturnType<typeof createSourceCli>>;
 let project: string;
@@ -18,7 +19,7 @@ afterAll(async () => {
 afterEach(async () => {
   await client?.close();
   client = undefined;
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 /** 실제 파일을 가진 임시 프로젝트를 만들고 실제 stdio 서버에 연결한다. */

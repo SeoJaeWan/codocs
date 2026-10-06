@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,6 +16,7 @@ import {
   collectWorkspaceCodeEvidence,
   projectWorkspaceCodeDiagnostics,
 } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let project: string;
 const indexes: WorkspaceCodeReferenceIndex[] = [];
@@ -33,7 +34,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await Promise.all(indexes.splice(0).map((index) => index.close()));
   vi.unstubAllEnvs();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 describe('collectWorkspaceCodeEvidence: 디스크 원문의 쓰기 보호 근거', () => {

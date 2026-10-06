@@ -1,15 +1,7 @@
 import { createLink as symlink } from '../test-support/links.js';
 import { ioFailures, simulatedFileLinks } from '../test-support/file-system.js';
 import { parseYaml } from '@codocs/core';
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  readdir,
-  rename,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -18,6 +10,10 @@ import {
   WorkspaceObservationCache,
 } from './index.js';
 import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
@@ -69,7 +65,7 @@ afterEach(async () => {
   simulatedFileLinks.clear();
   vi.mocked(readFile).mockReset();
   vi.mocked(readdir).mockReset();
-  await rm(fixture, { recursive: true, force: true });
+  await rmWithRetry(fixture, { recursive: true, force: true });
 });
 
 describe('loadWorkspacePath: 지정 경로의 관측과 재사용', () => {
@@ -143,7 +139,7 @@ describe('loadWorkspacePath: 지정 경로의 관측과 재사용', () => {
     await writeFile(path.join(nested, 'a.yaml'), rawA);
     const cache = new WorkspaceObservationCache();
     const first = await loadWorkspacePath(root, nested, { cache });
-    await rename(nested, path.join(fixture, 'old'));
+    await renameWithRetry(nested, path.join(fixture, 'old'));
     await mkdir(nested);
     await writeFile(path.join(nested, 'a.yaml'), rawB);
     cache.invalidate(nested);
@@ -288,7 +284,7 @@ describe('loadWorkspacePath: 부재와 접근 실패', () => {
     await writeFile(a, rawA);
     const cache = new WorkspaceObservationCache();
     await loadWorkspacePath(root, a, { cache });
-    await rm(a);
+    await rmWithRetry(a);
     const result = await loadWorkspacePath(root, a, { cache });
     expect(result.documents).toEqual([]);
     expect(result.absent).toEqual([
@@ -422,7 +418,7 @@ describe('열거 뒤 항목 부재의 직접 확인', () => {
     vi.mocked(readdir).mockImplementationOnce(
       async (...args: Parameters<typeof original.readdir>) => {
         const entries = await original.readdir(...args);
-        await rm(target);
+        await rmWithRetry(target);
         return entries;
       },
     );

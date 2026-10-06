@@ -5,7 +5,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const { withIoFailures } = await import('../test-support/file-system.js');
   return withIoFailures(actual);
 });
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,6 +14,7 @@ import {
   workspaceDiagnosticMessages,
 } from '../diagnostics/index.js';
 import { resolveProjectRoot } from '../index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let fixture: string;
 beforeEach(
@@ -23,7 +24,7 @@ beforeEach(
 );
 afterEach(async () => {
   ioFailures.clear();
-  await rm(fixture, { recursive: true, force: true });
+  await rmWithRetry(fixture, { recursive: true, force: true });
 });
 
 describe('resolveProjectRoot: 프로젝트 루트 선택', () => {

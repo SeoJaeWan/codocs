@@ -1,11 +1,4 @@
-import {
-  chmod,
-  readFile,
-  readdir,
-  rm,
-  stat,
-  writeFile,
-} from 'node:fs/promises';
+import { chmod, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { diagnosticSeverities } from '@codocs/core';
@@ -28,6 +21,7 @@ import {
   workspaceFileStates,
   type WorkspaceFileOperation,
 } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let dir: string;
 let root: ProjectRoot;
@@ -102,7 +96,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(dir, { recursive: true, force: true });
+  await rmWithRetry(dir, { recursive: true, force: true });
 });
 
 describe('applyWorkspaceFileBatch: 연산 반영', () => {
@@ -345,8 +339,8 @@ describe('비게 된 폴더 제거', () => {
   });
 
   it('.codocs 바로 아래 파일만 지워 .codocs가 비어도 .codocs 자체는 제거하지 않는다', async () => {
-    await rm(path.join(dir, '.codocs', 'sub'), { recursive: true });
-    await rm(path.join(dir, '.codocs', 'b.yaml'));
+    await rmWithRetry(path.join(dir, '.codocs', 'sub'), { recursive: true });
+    await rmWithRetry(path.join(dir, '.codocs', 'b.yaml'));
     const result = await applyWorkspaceFileBatch(root, [remove('a.yaml', a)]);
 
     expect(result.success).toBe(true);

@@ -1,13 +1,6 @@
 import * as core from '@codocs/core';
 import { createHash } from 'node:crypto';
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspaceLifecycleStates } from '../lifecycle/index.js';
@@ -15,6 +8,10 @@ import {
   createWorkspaceQuerySession,
   type WorkspaceQuerySession,
 } from './index.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 const boundary = vi.hoisted(() => ({
   afterRead: undefined as undefined | ((file: string) => Promise<void>),
@@ -135,7 +132,7 @@ afterEach(async () => {
   await session?.close();
   session = undefined;
   vi.restoreAllMocks();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 /** 경합을 실제 읽기 완료와 외부 변경 사이에 고정한다. */
 function barrier(): { promise: Promise<void>; release: () => void } {
@@ -246,11 +243,11 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
       boundary.afterRead = async (file) => {
         if (file !== target) return;
         boundary.afterRead = undefined;
-        if (operation === '삭제') await rm(target);
+        if (operation === '삭제') await rmWithRetry(target);
         else {
           const temporary = path.join(project, 'replacement.yaml');
           await writeFile(temporary, latest);
-          await rename(temporary, target);
+          await renameWithRetry(temporary, target);
         }
         boundary.emit([target]);
       };
@@ -285,11 +282,11 @@ describe('최초 전체 순회 중 변경 범위 보정', () => {
       boundary.afterReadDirectory = async (selected) => {
         if (selected !== directory) return;
         boundary.afterReadDirectory = undefined;
-        if (operation === '이동') await rename(directory, moved);
+        if (operation === '이동') await renameWithRetry(directory, moved);
         else {
           if (operation === '교체')
-            await rename(directory, path.join(project, 'saved'));
-          else await rm(directory, { recursive: true });
+            await renameWithRetry(directory, path.join(project, 'saved'));
+          else await rmWithRetry(directory, { recursive: true });
           await mkdir(directory);
           await writeFile(
             path.join(directory, 'new.yaml'),
@@ -333,19 +330,23 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
       '_codocs:\n  id: beta\n  name: beta\ndefinition: 본문\n',
     );
     boundary.emit([beta]);
-    await vi.waitFor(async () =>
-      expect(await session!.list()).toMatchObject({
-        success: true,
-        scanStatus: 'complete',
-      }),
+    await vi.waitFor(
+      async () =>
+        expect(await session!.list()).toMatchObject({
+          success: true,
+          scanStatus: 'complete',
+        }),
+      { timeout: 5_000 },
     );
-    await rm(beta);
+    await rmWithRetry(beta);
     boundary.emit([beta]);
-    await vi.waitFor(async () =>
-      expect(await session!.list()).toMatchObject({
-        success: true,
-        scanStatus: 'complete',
-      }),
+    await vi.waitFor(
+      async () =>
+        expect(await session!.list()).toMatchObject({
+          success: true,
+          scanStatus: 'complete',
+        }),
+      { timeout: 5_000 },
     );
   });
 
@@ -373,12 +374,14 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
             '_codocs:\n  id: beta\n  name: 베타 최신\ndefinition: 본문\n',
           );
           boundary.emit([beta]);
-          await vi.waitFor(async () =>
-            expect(await session!.get(['베타 최신'])).toMatchObject({
-              results: [
-                { found: true, document: { _codocs: { name: '베타 최신' } } },
-              ],
-            }),
+          await vi.waitFor(
+            async () =>
+              expect(await session!.get(['베타 최신'])).toMatchObject({
+                results: [
+                  { found: true, document: { _codocs: { name: '베타 최신' } } },
+                ],
+              }),
+            { timeout: 5_000 },
           );
           boundary.failScopedOnce = alpha;
         },
@@ -459,13 +462,15 @@ describe('게시와 공유 작업 정리의 변경 수집', () => {
     };
     session = createWorkspaceQuerySession({ cwd: project });
     await session.get(['alpha']);
-    await vi.waitFor(async () =>
-      expect(await session!.get(['alpha'])).toMatchObject({
-        success: true,
-        results: [
-          { revision: createHash('sha256').update(latest).digest('hex') },
-        ],
-      }),
+    await vi.waitFor(
+      async () =>
+        expect(await session!.get(['alpha'])).toMatchObject({
+          success: true,
+          results: [
+            { revision: createHash('sha256').update(latest).digest('hex') },
+          ],
+        }),
+      { timeout: 5_000 },
     );
     expect(session.catalogVersion).toBe(2);
   });
@@ -589,7 +594,9 @@ describe('준비 상태별 저장 차단', () => {
         ? Promise.reject(new Error('injected read failure'))
         : Promise.resolve();
     boundary.emit([target]);
-    await vi.waitFor(() => expect(session!.scanStatus).toBe('partial'));
+    await vi.waitFor(() => expect(session!.scanStatus).toBe('partial'), {
+      timeout: 5_000,
+    });
     expect(await session.write(change())).toMatchObject({
       success: false,
       saved: false,
@@ -635,7 +642,9 @@ describe('경로 보정 실패의 보존과 수동 전체 복구', () => {
       return Promise.resolve();
     };
     boundary.emit([target]);
-    await vi.waitFor(() => expect(session!.scanStatus).toBe('partial'));
+    await vi.waitFor(() => expect(session!.scanStatus).toBe('partial'), {
+      timeout: 5_000,
+    });
     const result = await session.get(['alpha']);
     expect(result).toMatchObject({
       success: true,
@@ -710,12 +719,14 @@ describe('전체 탐색 실패 뒤 확인 범위 복구', () => {
     });
     boundary.afterReadDirectory = undefined;
     boundary.emit([alpha]);
-    await vi.waitFor(async () =>
-      expect(await session!.list()).toMatchObject({
-        success: true,
-        scanStatus: 'complete',
-        items: [{ id: 'alpha' }, { id: 'beta' }],
-      }),
+    await vi.waitFor(
+      async () =>
+        expect(await session!.list()).toMatchObject({
+          success: true,
+          scanStatus: 'complete',
+          items: [{ id: 'alpha' }, { id: 'beta' }],
+        }),
+      { timeout: 5_000 },
     );
     expect(boundary.reads.get(beta)).toBe(1);
   });

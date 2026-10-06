@@ -5,14 +5,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const { withIoFailures } = await import('../test-support/file-system.js');
   return withIoFailures(actual);
 });
-import {
-  mkdir,
-  mkdtemp,
-  rename,
-  rm,
-  writeFile,
-  symlink,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, symlink } from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -24,13 +17,20 @@ import {
 import {
   applyCodeSignals,
   codeFileFailures,
+  codeFileStatus,
+  codeWatchRuleKey,
   computeCodeFilePolicy,
   discoverCodeFileState,
+  diffCodeWatchRules,
   discoverCodeFiles,
   isCodeWatchIgnored,
   readEligibleCodeFile,
   type CodeFileState,
 } from './code-file-access.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 const execute = promisify(execFile);
 let project: string;
 beforeEach(async () => {
@@ -42,7 +42,7 @@ afterEach(async () => {
   ioFailures.clear();
   simulatedFileLinks.clear();
   vi.unstubAllEnvs();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 describe('discoverCodeFiles: 프로젝트 코드 읽기 적격성', () => {
@@ -401,7 +401,7 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
     ]);
     expect(restored.files.has('child/deep/b.txt')).toBe(true);
     await expectSameAsFullDiscovery(restored, '규칙 제거');
-    await rm(path.join(project, 'child', '.gitignore'));
+    await rmWithRetry(path.join(project, 'child', '.gitignore'));
     await expectSameAsFullDiscovery(
       await applyCodeSignals(restored, [
         path.join(project, 'child', '.gitignore'),
@@ -423,7 +423,7 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
       'top.txt',
     ]);
     await expectSameAsFullDiscovery(created, '폴더 생성');
-    await rm(path.join(project, 'made'), { recursive: true });
+    await rmWithRetry(path.join(project, 'made'), { recursive: true });
     const removed = await applyCodeSignals(created, [
       path.join(project, 'made'),
     ]);
@@ -491,7 +491,7 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
     expect(same.files.get('a')?.revision).toBe(state.files.get('a')?.revision);
     expect(same.files.get('b')).toBe(state.files.get('b'));
     await writeFile(path.join(project, 'a'), 'changed');
-    await rm(path.join(project, 'b'));
+    await rmWithRetry(path.join(project, 'b'));
     const changed = await applyCodeSignals(same, [
       path.join(project, 'a'),
       path.join(project, 'b'),
@@ -540,12 +540,14 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
           signals.push(path.dirname(absolute), absolute);
         } else if (operation === 2 && exists.size) {
           const target = pick([...exists]);
-          await rm(path.join(project, ...target.split('/')), { force: true });
+          await rmWithRetry(path.join(project, ...target.split('/')), {
+            force: true,
+          });
           exists.delete(target);
           trail.push(`rm ${target}`);
           signals.push(path.join(project, ...target.split('/')));
         } else if (operation === 3 && directory) {
-          await rm(path.join(project, ...directory.split('/')), {
+          await rmWithRetry(path.join(project, ...directory.split('/')), {
             recursive: true,
             force: true,
           });
@@ -573,7 +575,7 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
           const to = path.join(project, 'moved-' + step);
           const from = path.join(project, ...directory.split('/'));
           try {
-            await rename(from, to);
+            await renameWithRetry(from, to);
             for (const item of [...exists])
               if (item.startsWith(directory + '/')) exists.delete(item);
             trail.push(`move ${directory}`);
@@ -591,4 +593,168 @@ describe('applyCodeSignals: 경로 범위 증분 갱신은 전체 탐색과 같�
     },
     120_000,
   );
+});
+
+describe('.codocsignore: 프로젝트 root 제외 규칙', () => {
+  const file = { isDirectory: () => false };
+  const directory = { isDirectory: () => true };
+  /** Git 저장소에 파일을 만들어 추적 상태로 둔다. */
+  async function trackFile(relative: string, text: string): Promise<void> {
+    await mkdir(path.dirname(path.join(project, relative)), {
+      recursive: true,
+    });
+    await writeFile(path.join(project, relative), text);
+    await gitIn('add', '-f', relative);
+  }
+  it('제외 폴더에 추적 파일이 있어도 하위 파일을 수집하지 않고 완료로 남긴다', async () => {
+    await execute('git', ['init', project]);
+    await trackFile('docs/a.md', '@codocs [[대상]]');
+    await trackFile('src/b.ts', '@codocs [[대상]]');
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    const result = await discoverCodeFiles(project);
+    expect(result.status).toBe(codeCollectionStatuses.complete);
+    expect(result.files.map((item) => item.path)).toEqual([
+      '.codocsignore',
+      'src/b.ts',
+    ]);
+  });
+  it('추적 파일이 .gitignore의 재포함 규칙과 일치해도 .codocsignore가 제외한다', async () => {
+    await execute('git', ['init', project]);
+    await trackFile('keep.ts', '@codocs [[대상]]');
+    await writeFile(path.join(project, '.gitignore'), '*.ts\n!keep.ts\n');
+    await writeFile(path.join(project, '.codocsignore'), 'keep.ts\n');
+    const result = await discoverCodeFiles(project);
+    expect(result.files.map((item) => item.path)).not.toContain('keep.ts');
+  });
+  it('.codocsignore의 재포함 규칙은 .gitignore가 제외한 미추적 파일을 되살리지 않는다', async () => {
+    await writeFile(path.join(project, '.gitignore'), 'hidden.ts\n');
+    await writeFile(
+      path.join(project, '.codocsignore'),
+      'other.ts\n!hidden.ts\n',
+    );
+    await writeFile(path.join(project, 'hidden.ts'), '@codocs [[대상]]');
+    const result = await discoverCodeFiles(project);
+    expect(result.files.map((item) => item.path)).not.toContain('hidden.ts');
+  });
+  it('.codocsignore 안에서 앞선 규칙을 되돌리면 그 파일은 다시 수집한다', async () => {
+    await writeFile(path.join(project, '.codocsignore'), '*.ts\n!keep.ts\n');
+    await writeFile(path.join(project, 'keep.ts'), '@codocs [[대상]]');
+    await writeFile(path.join(project, 'drop.ts'), '@codocs [[대상]]');
+    const result = await discoverCodeFiles(project);
+    expect(result.files.map((item) => item.path)).toContain('keep.ts');
+    expect(result.files.map((item) => item.path)).not.toContain('drop.ts');
+  });
+  it('제외한 폴더는 하위의 재포함 규칙으로 되살리지 않는다', async () => {
+    await mkdir(path.join(project, 'docs'));
+    await writeFile(path.join(project, 'docs', 'a.md'), '@codocs [[대상]]');
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n!docs/a.md\n');
+    const result = await discoverCodeFiles(project);
+    expect(result.files.map((item) => item.path)).not.toContain('docs/a.md');
+  });
+  it('하위 폴더의 .codocsignore는 규칙 파일로 읽지 않는다', async () => {
+    await mkdir(path.join(project, 'sub'));
+    await writeFile(path.join(project, 'sub', '.codocsignore'), '*\n');
+    await writeFile(path.join(project, 'sub', 'a.ts'), '@codocs [[대상]]');
+    const result = await discoverCodeFiles(project);
+    expect(result.files.map((item) => item.path)).toContain('sub/a.ts');
+  });
+  it('.codocsignore가 일반 파일이 아니면 규칙이 없는 것으로 본다', async () => {
+    await mkdir(path.join(project, '.codocsignore'));
+    await writeFile(path.join(project, 'a.ts'), '@codocs [[대상]]');
+    const result = await discoverCodeFiles(project);
+    expect(result.status).toBe(codeCollectionStatuses.complete);
+    expect(result.files.map((item) => item.path)).toEqual(['a.ts']);
+  });
+  it('.codocsignore가 없으면 감시 규칙 키는 .gitignore 규칙만 담는다', async () => {
+    const { policy } = await computeCodeFilePolicy(project);
+    expect(codeWatchRuleKey(policy)).toBe(JSON.stringify([[], []]));
+  });
+  it('추적 파일이 있는 제외 폴더도 .codocsignore가 제외하면 감시하지 않는다', async () => {
+    await execute('git', ['init', project]);
+    await trackFile('docs/a.md', 'text');
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    const { policy } = await computeCodeFilePolicy(project);
+    expect(
+      isCodeWatchIgnored(policy, path.join(project, 'docs'), directory),
+    ).toBe(true);
+    expect(
+      isCodeWatchIgnored(policy, path.join(project, 'docs', 'a.md'), file),
+    ).toBe(true);
+  });
+  it('.codocsignore 자신은 모든 패턴에 일치해도 감시한다', async () => {
+    await writeFile(path.join(project, '.codocsignore'), '*\n');
+    const { policy } = await computeCodeFilePolicy(project);
+    expect(
+      isCodeWatchIgnored(policy, path.join(project, '.codocsignore'), file),
+    ).toBe(false);
+  });
+  it('.codocsignore 규칙이 달라지면 감시 규칙 키와 달라진 감시 폴더가 바뀐다', async () => {
+    const before = (await computeCodeFilePolicy(project)).policy;
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    const after = (await computeCodeFilePolicy(project)).policy;
+    expect(codeWatchRuleKey(after)).not.toBe(codeWatchRuleKey(before));
+    expect(diffCodeWatchRules(before, after)).toEqual(['']);
+    expect(diffCodeWatchRules(after, after)).toEqual([]);
+  });
+  it('.codocsignore를 만들고 고치고 지우면 전체 탐색과 같은 결과로 갱신한다', async () => {
+    await mkdir(path.join(project, 'docs'));
+    await writeFile(path.join(project, 'docs', 'a.md'), 'a');
+    await writeFile(path.join(project, 'top.txt'), 't');
+    const state = await discoverCodeFileState(project);
+    const signal = [path.join(project, '.codocsignore')];
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    const created = await applyCodeSignals(state, signal);
+    expect(created.files.has('docs/a.md')).toBe(false);
+    await expectSameAsFullDiscovery(created, '규칙 생성');
+    await writeFile(path.join(project, '.codocsignore'), 'top.txt\n');
+    const edited = await applyCodeSignals(created, signal);
+    expect(edited.files.has('docs/a.md')).toBe(true);
+    expect(edited.files.has('top.txt')).toBe(false);
+    await expectSameAsFullDiscovery(edited, '규칙 수정');
+    await rmWithRetry(path.join(project, '.codocsignore'));
+    const removed = await applyCodeSignals(edited, signal);
+    expect(removed.files.has('top.txt')).toBe(true);
+    await expectSameAsFullDiscovery(removed, '규칙 삭제');
+  });
+  it('내용이 같은 .codocsignore 신호는 관측을 바꾸지 않는다', async () => {
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    const state = await discoverCodeFileState(project);
+    const next = await applyCodeSignals(state, [
+      path.join(project, '.codocsignore'),
+    ]);
+    expect(summarize(next)).toEqual(summarize(state));
+  });
+  it('.codocsignore를 읽지 못하면 incomplete이고 추적 파일도 확정하지 않는다', async () => {
+    await execute('git', ['init', project]);
+    await trackFile('src/a.ts', '@codocs [[대상]]');
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    ioFailures.set(path.join(project, '.codocsignore'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const result = await discoverCodeFiles(project);
+    expect(result.status).toBe(codeCollectionStatuses.incomplete);
+    expect(result.failures.map((failure) => failure.path)).toContain(
+      '.codocsignore',
+    );
+    expect(result.files).toEqual([]);
+    expect(await readEligibleCodeFile(result.policy, 'src/a.ts')).toMatchObject(
+      { path: 'src/a.ts', reason: codeFileReasons.read },
+    );
+  });
+  it('.codocsignore 읽기 실패가 해소되면 증분 갱신이 완료 수집으로 돌아간다', async () => {
+    await writeFile(path.join(project, '.codocsignore'), 'docs/\n');
+    await writeFile(path.join(project, 'a.ts'), 'a');
+    ioFailures.set(path.join(project, '.codocsignore'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const failed = await discoverCodeFileState(project);
+    ioFailures.clear();
+    const healed = await applyCodeSignals(failed, [
+      path.join(project, '.codocsignore'),
+    ]);
+    expect(codeFileStatus(healed)).toBe(codeCollectionStatuses.complete);
+    expect([...healed.files.keys()]).toContain('a.ts');
+  });
 });

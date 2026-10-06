@@ -1,13 +1,6 @@
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  stat,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -21,6 +14,7 @@ import {
   expect,
   it,
 } from 'vitest';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 type Result = {
   success: boolean;
@@ -106,7 +100,7 @@ afterEach(async (context) => {
     path.join(output, context.task.id + '.json'),
     JSON.stringify({ title: context.task.name, evidence }, null, 2),
   );
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
   expect(cleanup.every((result) => result.status === 'fulfilled')).toBe(true);
 });
 afterAll(() => {

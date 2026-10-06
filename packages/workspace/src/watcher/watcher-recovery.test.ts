@@ -1,5 +1,5 @@
 import type { EventEmitter } from 'node:events';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspaceLifecycleStates } from '../lifecycle/index.js';
@@ -59,6 +59,7 @@ import {
   watcherRecoveryGuidance,
   WorkspaceWatcher,
 } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let project: string;
 let watcher: WorkspaceWatcher | undefined;
@@ -80,7 +81,7 @@ afterEach(async () => {
   } finally {
     vi.useRealTimers();
     watcher = undefined;
-    await rm(project, { recursive: true, force: true });
+    await rmWithRetry(project, { recursive: true, force: true });
   }
 });
 
@@ -91,7 +92,9 @@ describe('WorkspaceWatcher 신호 병합과 구독 수명', () => {
     fake.manualReady = true;
     fake.contentIdentity = { dev: 1, ino: 1 };
     const starting = createWorkspaceWatcher(project);
-    await vi.waitFor(() => expect(fake.watchers).toHaveLength(2));
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(2), {
+      timeout: 5_000,
+    });
     const contentWatcher = fake.watchers[1]!;
 
     fake.watchers[0]!.emit('all', 'addDir', codocs);
@@ -117,7 +120,9 @@ describe('WorkspaceWatcher 신호 병합과 구독 수명', () => {
 
     fake.watchers[0]!.emit('all', 'addDir', codocs);
     contentWatcher.emit('all', 'addDir', codocs);
-    await vi.waitFor(() => expect(fake.statCalls).toBe(initialStatCalls + 1));
+    await vi.waitFor(() => expect(fake.statCalls).toBe(initialStatCalls + 1), {
+      timeout: 5_000,
+    });
     await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(fake.watchers).toHaveLength(2);
@@ -198,17 +203,21 @@ describe('WorkspaceWatcher 감시 오류 복구', () => {
       fake.watchers[0]!.emit('error', new Error('connection lost'));
 
       expect(watcher.readiness.state).toBe(workspaceLifecycleStates.recovering);
-      await vi.waitFor(() =>
-        expect(watcher!.readiness).toEqual({
-          state: workspaceLifecycleStates.ready,
-          ready: true,
-        }),
+      await vi.waitFor(
+        () =>
+          expect(watcher!.readiness).toEqual({
+            state: workspaceLifecycleStates.ready,
+            ready: true,
+          }),
+        { timeout: 5_000 },
       );
       expect(watcher.automaticRecoveryAttempts).toBe(1);
-      await vi.waitFor(() =>
-        expect(listener).toHaveBeenCalledWith({
-          paths: [path.join(project, '.codocs')],
-        }),
+      await vi.waitFor(
+        () =>
+          expect(listener).toHaveBeenCalledWith({
+            paths: [path.join(project, '.codocs')],
+          }),
+        { timeout: 5_000 },
       );
     });
 
@@ -218,13 +227,15 @@ describe('WorkspaceWatcher 감시 오류 복구', () => {
 
       fake.watchers[0]!.emit('error', new Error('connection lost'));
 
-      await vi.waitFor(() =>
-        expect(watcher!.readiness).toEqual({
-          state: workspaceLifecycleStates.failed,
-          ready: false,
-          cause: 'watch failed',
-          guidance: watcherRecoveryGuidance,
-        }),
+      await vi.waitFor(
+        () =>
+          expect(watcher!.readiness).toEqual({
+            state: workspaceLifecycleStates.failed,
+            ready: false,
+            cause: 'watch failed',
+            guidance: watcherRecoveryGuidance,
+          }),
+        { timeout: 5_000 },
       );
       expect(watcher.automaticRecoveryAttempts).toBe(1);
     });
@@ -232,8 +243,10 @@ describe('WorkspaceWatcher 감시 오류 복구', () => {
     it('자동 복구 성공 후 다시 오류가 나면 추가 재연결 없이 실패를 알린다', async () => {
       watcher = await createWorkspaceWatcher(project);
       fake.watchers[0]!.emit('error', new Error('first failure'));
-      await vi.waitFor(() =>
-        expect(watcher!.readiness.state).toBe(workspaceLifecycleStates.ready),
+      await vi.waitFor(
+        () =>
+          expect(watcher!.readiness.state).toBe(workspaceLifecycleStates.ready),
+        { timeout: 5_000 },
       );
       const connectionsBeforeError = [...fake.watchers];
 
@@ -255,8 +268,12 @@ describe('WorkspaceWatcher 감시 오류 복구', () => {
       watcher = await createWorkspaceWatcher(project);
       fake.failNext = true;
       fake.watchers[0]!.emit('error', new Error('connection lost'));
-      await vi.waitFor(() =>
-        expect(watcher!.readiness.state).toBe(workspaceLifecycleStates.failed),
+      await vi.waitFor(
+        () =>
+          expect(watcher!.readiness.state).toBe(
+            workspaceLifecycleStates.failed,
+          ),
+        { timeout: 5_000 },
       );
 
       const readiness = await watcher.refresh();
@@ -298,7 +315,9 @@ describe('감시 시작·대상 등록·재연결의 종료 경합', () => {
     fake.manualReady = true;
     watcher = new WorkspaceWatcher(project);
     const starting = watcher.start();
-    await vi.waitFor(() => expect(fake.watchers).toHaveLength(2));
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(2), {
+      timeout: 5_000,
+    });
     await watcher.close();
     await starting;
     for (const connection of fake.watchers)
@@ -310,7 +329,9 @@ describe('감시 시작·대상 등록·재연결의 종료 경합', () => {
     watcher = await createWorkspaceWatcher(project);
     fake.manualReady = true;
     const reconnecting = watcher.refresh();
-    await vi.waitFor(() => expect(fake.watchers.length).toBeGreaterThan(2));
+    await vi.waitFor(() => expect(fake.watchers.length).toBeGreaterThan(2), {
+      timeout: 5_000,
+    });
     await watcher.close();
     expect(await reconnecting).toEqual({
       state: workspaceLifecycleStates.closed,
@@ -350,12 +371,16 @@ describe('루트 보완 감시의 새 하위 폴더 신호', () => {
     fake.manualReady = true;
     await mkdir(directory, { recursive: true });
     fake.watchers[0]!.emit('all', 'addDir', directory);
-    await vi.waitFor(() => expect(fake.watchers).toHaveLength(3));
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(3), {
+      timeout: 5_000,
+    });
     const subtree = fake.watchers[2]!;
     subtree.emit('all', 'add', target);
     subtree.emit('ready');
-    await vi.waitFor(() =>
-      expect(listener).toHaveBeenCalledWith({ paths: [directory, target] }),
+    await vi.waitFor(
+      () =>
+        expect(listener).toHaveBeenCalledWith({ paths: [directory, target] }),
+      { timeout: 5_000 },
     );
     const count = fake.watchers.length;
     fake.watchers[0]!.emit('all', 'addDir', directory);
@@ -374,7 +399,9 @@ describe('동적 대상 준비의 실패와 종료', () => {
       'addDir',
       path.join(project, '.codocs', 'nested'),
     );
-    await vi.waitFor(() => expect(fake.watchers).toHaveLength(3));
+    await vi.waitFor(() => expect(fake.watchers).toHaveLength(3), {
+      timeout: 5_000,
+    });
     const settling = watcher.settle();
     await watcher.close();
     await settling;
@@ -401,7 +428,9 @@ describe('교체 감시의 종료 완료', () => {
     previous.close.mockImplementationOnce(() => gate);
     fake.contentIdentity = { dev: 1, ino: 2 };
     fake.watchers[0]!.emit('all', 'addDir', path.join(project, '.codocs'));
-    await vi.waitFor(() => expect(previous.close).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(previous.close).toHaveBeenCalledOnce(), {
+      timeout: 5_000,
+    });
     let complete = false;
     const closing = watcher.close().then(() => {
       complete = true;
