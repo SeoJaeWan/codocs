@@ -14,6 +14,13 @@ ID가 여러 발견 경로에 있으면 `duplicate_id`다. 같은 이름이 여�
 
 참조 진단은 문서 이름과 섹션을 구분한다. 문서가 없으면 `reference_not_found`, 문서가 여럿이면 `reference_ambiguous`, 문서는 확정됐지만 `[[이름:섹션]]`의 섹션이 없으면 `section_reference_not_found`다. 섹션은 문서가 확정된 참조에서만 확인한다.
 
+## 코드 파일의 참조 진단
+
+코드 파일의 `@codocs [[이름]]`·`@codocs [[이름:섹션]]`도 `codocs_validate`와 `codocs_refresh`가 진단한다. 진단의 `path`는 코드 파일이고 `range`는 표기 위치이며 편집기와 같은 코드 `codocs.codeReference.<상태>`를 쓴다.
+`invalid`·`missing`·`missing_section`·`ambiguous`는 오류이고, 문서 탐색이 끝나지 않아 확정하지 못한 `unconfirmed`는 경고다.
+`codocs_validate({"path":".codocs/order.yaml"})`는 그 YAML을 후보로 하는 코드 진단만 더하며 코드 파일 경로를 `path`로 주면 `invalid_path`다.
+`scanStatus`는 문서 탐색 상태이고 `codeScanStatus`(`collecting`·`complete`·`incomplete`)는 코드 수집 상태다. `diagnosticsComplete`가 `false`이면 확인한 결과만이며 오류가 없다는 뜻이 아니다. 읽지 못한 코드 파일은 `codeFailures`에 있다. 수집 중이면 잠시 뒤 다시 요청한다.
+
 ## 진단 읽기
 
 `codocs_validate({})`는 프로젝트 전체를, `{"path":".codocs/order.yaml"}`은 파일 하나를 검사한다.
@@ -34,10 +41,10 @@ ID가 여러 발견 경로에 있으면 `duplicate_id`다. 같은 이름이 여�
 이미 저장된 파일을 다시 쓰거나 자동 롤백하지 않는다. 원인을 확인하고 `codocs_refresh({})`로 재구성한다.
 refresh도 실패하면 오류에 맞는 파일 접근 수정이나 서버 재시작을 검토하고 무한 재시도하지 않는다.
 
-## refresh 결과와 커서
+## refresh 결과
 
 `codocs_refresh({})`는 원문을 수정하지 않고 전체 색인을 다시 구성한다. 알 수 없는 입력 속성은 거부한다.
-동시에 들어온 refresh는 진행 중인 작업과 결과를 공유한다.
+동시에 들어온 refresh는 진행 중인 작업과 결과를 공유하며, 첫 refresh는 코드 참조 색인도 만든다.
 
 | 필드                      | 의미                                                |
 | ------------------------- | --------------------------------------------------- |
@@ -45,7 +52,10 @@ refresh도 실패하면 오류에 맞는 파일 접근 수정이나 서버 재�
 | itemCount                 | 문서 항목 수. 충돌 ID는 하나, 식별 불가 파일은 제외 |
 | errorCount / warningCount | 파일 수가 아닌 진단 개수                            |
 | countsComplete            | 집계가 전체 범위를 확인했는지 여부                  |
-| scanStatus                | complete / partial / failed의 탐색 상태             |
+| scanStatus                | complete / partial / failed의 문서 탐색 상태        |
+| codeScanStatus            | collecting / complete / incomplete의 코드 수집 상태 |
+| codeFailures              | 읽지 못한 코드 파일의 경로와 이유                   |
+| diagnostics               | 문서 진단과 코드 참조 진단. 개수는 이 목록과 일치   |
 
 partial은 확인한 범위와 이전 미확인 문서를 포함할 수 있으며 완전한 집계가 아니다. write·validate는 complete가 될 때까지 차단한다.
 failed 결과와 원인을 확인하고 오래된 결과를 최신 전체 결과나 빈 목록으로 해석하지 않는다.

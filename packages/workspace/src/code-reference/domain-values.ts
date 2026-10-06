@@ -40,3 +40,8 @@ export const codeRepositoryKinds = {
   /** Git 실행 전제 또는 상태를 확인하지 못했다. */
   unknown: 'unknown',
 } as const;
+/** 저장 보호가 코드 참조 영향을 증명하지 못했을 때 쓰는 진단 코드다. @domainValues */
+export const workspaceCodeEvidenceDiagnosticCodes = {
+  /** 섹션 삭제가 코드 참조를 끊는지 완전한 코드 수집으로 확인하지 못하면 반환한다. */
+  incomplete: 'code_evidence_incomplete',
+} as const;

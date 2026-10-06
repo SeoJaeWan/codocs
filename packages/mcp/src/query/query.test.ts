@@ -19,7 +19,6 @@ const backend = vi.hoisted(
       previewRename: vi.fn(),
       applyRename: vi.fn(),
       refresh: vi.fn(),
-      duplicates: vi.fn(),
       readiness,
       scanStatus,
       limitedReadAvailable: false,
@@ -32,7 +31,6 @@ vi.mock(
   /** 실제 IO 대신 workspace 공개 결과 경계를 제어한다. */ () => ({
     /** 같은 조회 backend를 반환한다. */
     createWorkspaceQuerySession: () => backend,
-    workspaceDuplicateStatuses: { failed: 'failed' },
     workspaceDiagnosticCodes: { readFailed: 'workspace_read_failed' },
     workspaceLifecycleStates: {
       starting: 'starting',
@@ -771,28 +769,5 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     expect(serialized).toContain(large);
     expect(serialized).not.toContain('response_too_large');
     expect(serialized).not.toContain('truncated');
-  });
-
-  it('중복 검토는 draft를 write 입력으로 풀고 cursor·signal을 세션에 전달하며 잘못된 조합은 거부한다', async () => {
-    const handlers = createCodocsQueryHandlers(
-      backend as unknown as WorkspaceQuerySession,
-    );
-    const draft = { mode: 'create', path: 'a.yaml', document: {} };
-    const signal = new AbortController().signal;
-    backend.duplicates.mockResolvedValue({ success: true });
-    await handlers.codocsDuplicates({ draft }, { signal });
-    await handlers.codocsDuplicates({ cursor: 'c' });
-    await handlers.codocsDuplicates();
-    expect(backend.duplicates.mock.calls).toEqual([
-      [draft, { signal }],
-      [{ cursor: 'c' }, {}],
-      [{}, {}],
-    ]);
-    backend.duplicates.mockClear();
-    expect(await handlers.codocsDuplicates({ draft, cursor: 'c' })).toEqual({
-      ...invalidInput(),
-      status: 'failed',
-    });
-    expect(backend.duplicates).not.toHaveBeenCalled();
   });
 });

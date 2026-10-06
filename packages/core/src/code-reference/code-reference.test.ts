@@ -4,10 +4,14 @@ import {
   catalogConfirmations,
   scanStatuses,
 } from '../catalog/domain-values.js';
+import { diagnosticSeverities } from '../diagnostics/index.js';
 import { parseYaml } from '../parser/index.js';
 import {
   extractCodeReferences,
+  codeReferenceDiagnosticCodes,
+  codeReferenceDiagnosticMessages,
   getCodeReferencePartRanges,
+  projectCodeReferenceDiagnostic,
   replaceCodeReferencePart,
   resolveCodeReference,
   codeReferenceDestinationKinds,
@@ -271,4 +275,40 @@ describe('코드 표기의 이름·섹션 부분 범위', () => {
       ).toBeUndefined();
     },
   );
+});
+
+describe('projectCodeReferenceDiagnostic', () => {
+  const marker = extractCodeReferences('@codocs [[대상:섹션]]')[0]!;
+
+  it.each([
+    [codeReferenceStatuses.invalid],
+    [codeReferenceStatuses.missing],
+    [codeReferenceStatuses.missingSection],
+    [codeReferenceStatuses.ambiguous],
+  ])('%s 상태는 고정 코드와 문구의 오류 진단이다', (status) => {
+    expect(
+      projectCodeReferenceDiagnostic({ marker, status }, 'src/a.ts'),
+    ).toEqual({
+      code: codeReferenceDiagnosticCodes[status],
+      severity: diagnosticSeverities.error,
+      message: codeReferenceDiagnosticMessages[status],
+      range: marker.range,
+      path: 'src/a.ts',
+    });
+  });
+
+  it('미확인은 확정 오류가 아닌 경고이고 연결된 참조는 진단이 없다', () => {
+    expect(
+      projectCodeReferenceDiagnostic({
+        marker,
+        status: codeReferenceStatuses.unconfirmed,
+      })?.severity,
+    ).toBe(diagnosticSeverities.warning);
+    expect(
+      projectCodeReferenceDiagnostic({
+        marker,
+        status: codeReferenceStatuses.resolved,
+      }),
+    ).toBeUndefined();
+  });
 });

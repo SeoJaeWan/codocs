@@ -4,9 +4,10 @@ _codocs:
   parent:
     - MCP 도구
 개요: |
-  문서를 새로 만들거나 수정하는 [[MCP 도구]]다. 요청 하나는 문서 하나를 다룬다.
-  저장 전에 변경 후의 문서 전체를 [[문서 검증]]과 프로젝트의 ID·이름 충돌, 참조 기준으로 검사하며 오류가 남으면 저장하지 않는다.
-  create가 실패했다고 update로 바꾸거나, 없는 문서의 update를 새 문서로 만들지 않는다.
+  문서를 새로 만들거나 일부를 수정하거나 문서 전체를 교체하거나 삭제하거나 다른 경로로 옮기는 [[MCP 도구]]다.
+  요청 하나는 단일 변경 하나이거나 변경 여러 개를 담은 changes다.
+  저장 전에 변경 후의 문서 전체를 [[문서 검증]]과 프로젝트의 ID·이름 충돌, 참조 기준으로 검사하며 오류가 남으면 저장하지 않는다. 다른 문서와 코드 파일의 참조를 새로 끊는 변경도 저장하지 않는다.
+  create가 실패했다고 update로 바꾸거나 update가 실패했다고 replace로 바꾸거나, 없는 문서의 update를 새 문서로 만들지 않는다.
 create: |
   .codocs 아래의 상대 path와 전체 document를 받아 새 파일을 만든다. 경로는 `/`로 구분하고 `.yaml` 또는 `.yml`로 끝나야 한다.
   절대 경로, `.`·`..` 구간, 빈 구간, 역슬래시는 보정하지 않고 거부한다. 이미 있는 파일은 덮어쓰지 않으며(file_exists), 필요한 .codocs와 상위 폴더는 만든다.
@@ -16,12 +17,43 @@ update: |
   섹션은 `set: { 개요: "..." }`처럼 이름을 키로 지정해 그 섹션만 바꾸고 나머지 섹션의 원문은 그대로 둔다. unset에 섹션 이름을 넣으면 그 섹션을 지우며, 마지막 섹션을 지우면 검증 오류다.
   `set._codocs`는 `_codocs` 객체 전체를 교체하며 일부 키만 병합하지 않는다. id·parent도 이 값으로 바뀌며, id와 name을 빼면 검증 오류다. 이때 `_codocs` 안의 주석·따옴표는 다시 쓰인다.
   `unset`에 `_codocs`를 넣으면 invalid_input이다. set과 unset의 같은 키 지정, 빈 변경도 거부한다.
-  `set._codocs`의 name이 현재 이름과 다르면 name_change_not_allowed로 저장하지 않고 `codocs_rename`으로 [[이름 변경]]을 하도록 안내한다. name을 바꾸면 다른 문서의 참조도 함께 고쳐야 하는데 이 도구는 문서 하나만 다루기 때문이다.
+  `set._codocs`의 name이 현재 이름과 다르면 name_change_not_allowed로 저장하지 않고 `codocs_rename`으로 [[이름 변경]]을 하도록 안내한다. name을 바꾸면 다른 문서의 참조와 코드 파일의 표기도 함께 고쳐야 하는데 이 도구는 그렇게 하지 않기 때문이다.
   `set._codocs`의 name이 현재 이름과 같으면 이름은 바뀌지 않은 것으로 처리한다.
   `set._codocs`의 id로 ID를 바꾸면 이전 ID를 남기지 않는다. ID를 바꿔도 다른 문서의 참조나 사용자의 코드는 자동으로 고치지 않는다.
   `set.id`는 `_codocs.id`를 바꾸지 않고 `id`라는 이름의 섹션을 만든다.
+replace: |
+  현재 ID, [[codocs_get]]으로 읽은 [[revision]], `_codocs`를 포함한 문서 전체 document를 받아 파일의 문서 전체를 새 값으로 바꾼다. 파일 위치는 그대로 둔다.
+  document에 없는 최상위 섹션은 삭제한다. 지우려는 섹션을 가리키던 다른 문서와 코드 파일의 참조가 새로 깨지면 아래 참조 보호가 거절한다.
+  set·unset은 함께 보낼 수 없고 id·revision·document 외의 속성이 있으면 invalid_input이다. mode를 보고 update나 create 입력으로 바꿔 해석하지 않는다.
+  `_codocs.name`이 현재 이름과 다르면 update와 같이 name_change_not_allowed로 거절하며, `_codocs.id`는 바꿀 수 있다.
+  새 값과 현재 값이 같으면 파일을 쓰지 않고 changed:false로 알린다. 값이 같은 최상위 키의 주석·따옴표·형식은 그대로 두고 순서만 다른 요청도 변경으로 보지 않는다. 문서 최상위의 주석은 보존한다.
+delete: |
+  현재 ID와 [[codocs_get]]으로 읽은 [[revision]]을 받아 그 문서의 파일을 지운다.
+  지운 문서를 가리키던 다른 문서의 참조와 코드 파일의 [[코드 참조]]가 새로 끊기면 아래 참조 보호가 거절한다.
+  같은 ID의 파일이 여러 개이면 대상을 하나로 정할 수 없으므로 그 ID로 삭제하지 않는다.
+  삭제로 비게 된 폴더의 제거는 아래 빈 폴더 정리를 따른다.
+move: |
+  현재 ID, [[codocs_get]]으로 읽은 [[revision]], 새 path를 받아 문서의 파일을 그 경로로 옮긴다. path는 create의 경로 규칙을 따르고 이미 있는 파일은 덮어쓰지 않는다(file_exists).
+  문서의 내용·ID·name은 바꾸지 않으므로 옮긴 뒤에도 같은 이름으로 조회되고 참조가 유지된다. 새 경로에 필요한 상위 폴더는 만든다.
+  같은 ID의 파일이 여러 개이면 그 ID로 옮기지 않는다. 옮기고 비게 된 폴더의 제거는 아래 빈 폴더 정리를 따른다.
+changes: |
+  `{changes: [...]}`는 최소 1개의 항목을 받으며 각 항목은 create·update·replace·delete·move 단일 요청과 같은 형태다. changes와 같은 층에 다른 속성을 두면 invalid_input이다.
+  비어 있는 changes, 항목의 알 수 없는 속성, 항목 안에 중첩한 changes도 invalid_input이다.
+  같은 문서 ID가 두 항목에 나오거나 같은 경로(기존 파일의 경로와 move·create의 새 경로)가 두 항목에 나오면 invalid_input으로 전체를 거부한다. 같은 새 문서를 create하고 곧바로 update하는 요청도 같은 규칙으로 거부하며 최종 내용을 create에 담는다.
+  모든 항목을 반영한 최종 상태를 한 번만 검증한다. 그래서 새 문서를 만들면서 기존 문서가 그 문서를 참조하게 고치는 요청처럼 중간 상태로는 오류인 변경도 저장할 수 있다.
+  새로 만들거나 고치거나 옮긴 문서에 오류가 남거나, 참조 보호나 parent 보호에 걸리거나, name을 바꾸는 항목이 있으면 아무것도 저장하지 않는다. 한 항목의 실패가 요청 전체의 실패다.
+  이번 요청이 건드리지 않은 문서의 기존 오류는 실패 사유로 쓰지 않는다.
+  이 도구는 changes로도 코드 파일을 고치지 않는다.
+참조 보호: |
+  update·replace·delete는 이번 변경으로 새로 끊어지는 참조만 막는다. 다른 문서의 `\[[이름]]`·`\[[이름:섹션]]`과 코드 파일의 [[코드 참조]]가 이전에는 확정되었는데 변경 뒤 확정되지 않으면 reference_broken으로 저장하지 않고 진단에 참조를 쓴 파일과 위치를 담는다.
+  delete로 문서가 사라져 그 문서를 가리키던 참조가 끊기는 경우도 같다. 같은 changes에서 참조하던 문서를 함께 고치면 최종 상태에서 끊어지지 않으므로 저장한다.
+  이번 요청이 건드리지 않은 문서의 `_codocs.parent`가 삭제나 이동 때문에 새로 끊기면(parent_not_found가 새로 생기면) reference_broken으로 저장하지 않고, 진단에 자식 문서의 경로와 parent 항목 위치(`_codocs`·`parent`·순번)를 담는다. 같은 changes에서 자식의 parent를 고치거나 자식도 삭제하면 저장한다.
+  이전부터 깨져 있던 참조나 이번 변경과 무관한 오류는 실패 사유로 쓰지 않는다.
+  코드 파일의 참조를 확인해야 하는데 코드 수집이 끝나지 않았거나 일부 파일을 읽지 못해 확인할 수 없으면 확정하지 못한 것을 없다고 보지 않고 code_evidence_incomplete로 저장하지 않는다. 확인이 필요하지 않은 변경은 이 이유로 막지 않는다.
+  이 도구는 코드 파일을 고치지 않는다.
 충돌과 원문 보존: |
-  저장 직전 실제 파일의 revision이 요청과 다르면 revision_conflict로 실패하고 파일을 바꾸지 않는다. 최신 문서를 다시 읽고 수정안을 검토한 뒤 새 revision으로 요청한다. 서버가 수정안을 새 revision에 자동으로 다시 적용하지는 않는다.
+  update·replace·delete·move는 요청의 revision을 현재 파일의 revision과 비교한다. 요청을 계획하는 시점에 다르면 change_revision_mismatch이고, 저장 직전에 다시 확인해 다르면 revision_conflict다. 어느 쪽이든 파일을 바꾸지 않는다.
+  changes에서 revision이 다른 문서가 여럿이면 그 문서마다 change_revision_mismatch 진단을 돌려주며 하나라도 다르면 아무것도 저장하지 않는다. 최신 문서를 다시 읽고 수정안을 검토한 뒤 새 revision으로 요청한다. 서버가 수정안을 새 revision에 자동으로 다시 적용하지는 않는다.
   바꾸지 않은 최상위 키의 공백·주석·따옴표·줄바꿈·순서는 유지하며 문서 전체를 다시 포맷하지 않는다.
   새 키는 마지막 키 뒤에 주변 들여쓰기에 맞춰 추가하고, 지운 키는 그 키의 원문만 지운다.
   읽는 과정에서 글자가 깨지는 파일(UTF-8로 해석할 수 없는 내용이 있는 파일)은 수정하지 않는다. 깨진 글자로 저장하면 고치지 않은 부분까지 손상되기 때문이다.
@@ -31,13 +63,28 @@ update: |
   `_codocs.parent`에 적은 이름의 문서가 없거나 parent를 따라가 순환하면 저장하지 않는다.
   수정한 문서는 기존 문서를 대체한 상태로 검사하므로 자기 자신과 충돌하지 않는다.
   이번 변경과 관계없는 다른 문서의 오류는 실패 사유로 쓰지 않는다. 오류가 남은 문서에 같은 값을 다시 보내는 요청은 실패하고, 경고만 있으면 저장한다.
+빈 폴더 정리: |
+  delete나 move로 파일이 사라져 비게 된 폴더는 `.codocs` 바로 아래 폴더까지 안쪽부터 제거한다.
+  `.codocs` 자체와 요청 전부터 비어 있던 폴더, 다른 파일이 남은 폴더는 제거하지 않는다.
+  create와 move의 새 경로에 필요한 상위 폴더는 만든다.
+되돌리기: |
+  changes의 항목을 반영하는 도중 실패하면 이미 반영한 항목을 역순으로 되돌린다. 만든 파일은 지우고 지운 파일은 원래 내용으로 다시 만들며 옮긴 파일은 원래 경로로 돌려놓고 고친 파일은 원래 내용으로 되돌리며, 이번 요청이 만들거나 지운 폴더도 원래대로 되돌린다.
+  되돌리기는 파일이 이번 요청이 쓴 그대로일 때만 한다. 그사이 다른 쪽이 바꾼 파일은 덮어쓰지 않고 되돌리지 못한 것으로 남긴다.
+  되돌리지 못한 항목이 있으면 write_restore_failed 진단과 원인을 돌려주고, 그 항목의 변경은 디스크에 남았으므로 saved:true·changed:true다.
+  단일 delete·move 요청의 실패도 같은 방식으로 되돌린다.
 동시 수정: |
   저장은 임시 파일에 먼저 기록한 뒤 교체하므로 저장 도중 실패해도 원래 파일은 비지 않는다.
+  changes의 파일 반영은 항목 순서대로 하나씩 하며 각 파일 연산 직전에 revision을 다시 확인한다. 여러 파일을 한 번에 바꾸는 원자적 연산은 아니며 실패하면 위 되돌리기를 시도한다.
   revision 확인과 파일 교체는 한 번의 연산이 아니며 저장 순서를 정하는 잠금도 없다. 두 작성자가 같은 revision을 확인한 뒤 차례로 저장하면 뒤의 저장이 앞의 변경을 덮어쓸 수 있고, 이 경우 revision_conflict가 나오지 않을 수 있다.
   실제로 동시 저장 때문에 변경이 사라지는 사례가 생기면 잠금이나 조건부 저장을 다시 검토한다.
 결과: |
   success·saved·changed로 요청 처리, 파일 저장, 내용 변경 여부를 구분하고, 저장했으면 id·source.path·새 revision·경고와 색인 반영 결과(indexUpdated)를 돌려준다. 문서 본문은 다시 돌려주지 않는다.
+  단일 delete 결과에는 revision이 없고, 단일 move 결과에는 새 경로를 source.path로, 원래 경로를 previousPath로 담는다.
+  changes 결과는 입력 순서의 changes 배열에 항목마다 index·mode·id·path·state를 담고, 새 revision은 있으면 revision에, move는 원래 경로를 previousPath에 담는다. path는 반영한 뒤의 경로이며 delete는 지운 경로, move는 새 경로다. 지운 문서의 revision은 없다.
+  항목의 state는 changed(반영함), restored(반영했다가 되돌림), restore_failed(되돌리지 못함), unchanged(바뀐 내용이 없거나 반영하지 않음)다. 계획이나 사전 검사에서 실패하면 changes는 빈 배열이고, 반영 중 실패하면 모든 항목의 state를 입력 순서로 담는다.
+  changes의 saved·changed는 이번 요청의 변경이 디스크에 남아 있으면 true다. 실패했어도 되돌리지 못한 항목이 있으면 true이며, 항목이 모두 unchanged이면 success:true·saved:false·changed:false다. indexUpdated는 저장한 변경이 있을 때만 담는다. 폴더의 반영 결과는 알리지 않는다.
+  실패 결과의 오류 코드는 invalid_input, change_revision_mismatch, revision_conflict, reference_broken, name_change_not_allowed, code_evidence_incomplete, file_exists, file_access_failed, file_write_failed, write_restore_failed 등이며 [[진단]]에서 설명한다. 탐색이 끝나지 않았거나 명시적 refresh 중이거나 감시가 실패한 상태의 거부는 단일 요청과 같다.
   바뀐 내용이 없으면 파일을 쓰지 않고 success:true·saved:false·changed:false로 알린다.
+  changes에서 변경이 있는 문서는 반영한 뒤 모두 강제로 다시 읽으며, 삭제와 옮긴 원래 경로는 색인에서 사라졌는지 확인한다.
   저장은 됐지만 색인 반영이 실패하면 한 번 더 다시 읽어 복구하고, 그래도 실패하면 saved:true·indexUpdated:false로 알리며 [[codocs_refresh]]를 안내한다. 이미 저장한 파일을 다시 쓰거나 되돌리지 않으므로 같은 요청을 다시 보내지 않는다.
   저장 뒤 임시 파일 정리만 실패한 경우도 저장은 성공이며 정리 실패를 진단으로 따로 알린다.
-  저장 전에 같은 입력으로 [[codocs_duplicates]]의 초안 검토를 요청해 반복 설명을 확인할 수 있다.

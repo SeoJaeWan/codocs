@@ -7,8 +7,10 @@ import {
   codeReferenceStatuses,
   extractCodeReferences,
   getSectionKeyRange,
+  diagnosticSeverities,
   getSectionNames,
   parseYaml,
+  projectCodeReferenceDiagnostic,
 } from '@codocs/core';
 import { codeCollectionStatuses, codeFileReasons } from '@codocs/workspace';
 import type {
@@ -263,14 +265,17 @@ export class CodeNavigation {
           `${snapshot.codeGeneration}/${snapshot.documentGeneration}`,
         );
         if (target) links.push({ range: item.marker.range, target });
-      } else
-        diagnostics.push({
-          range: item.marker.range,
-          severity: 2,
-          source: 'codocs',
-          code: `codocs.codeReference.${item.status}`,
-          message: codeReferenceMessages[item.status],
-        });
+      } else {
+        const projected = projectCodeReferenceDiagnostic(item);
+        if (projected?.range)
+          diagnostics.push({
+            range: projected.range,
+            severity: projected.severity === diagnosticSeverities.error ? 1 : 2,
+            source: 'codocs',
+            code: projected.code,
+            message: projected.message,
+          });
+      }
     }
     return { links, diagnostics };
   }

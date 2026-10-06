@@ -21,3 +21,4 @@ _codocs:
   문서 감시가 끊긴 상태의 응답은 [[탐색 상태]]에서 설명한다.
 저장 결과: |
   [[codocs_write]]는 saved·changed와 색인 반영 결과 indexUpdated를 따로 돌려준다. success나 오류 코드 하나로 저장 여부를 추측하지 않는다.
+  changes 요청은 항목마다 state(changed·restored·restore_failed·unchanged)를 입력 순서의 changes 배열로 돌려주며 실패한 요청에서도 항목의 저장 여부는 이 state로 확인한다.
