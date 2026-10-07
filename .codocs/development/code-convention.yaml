@@ -12,7 +12,7 @@ _codocs:
   - 선언 함수·메서드·변수에 할당한 함수에는 한국어 JSDoc을 작성한다.
 
   JSDoc은 역할과 필요한 매개변수 의미·반환·오류·부수 효과를 설명하며 TypeScript 타입을 반복하지 않는다.
-  짧은 map 콜백과 테스트 인라인 콜백은 제외하고, 복잡한 콜백은 이름 있는 함수로 분리한다.
+  함수 인자로 넘기는 4줄 이하 콜백과 테스트 파일의 함수는 제외하고, 복잡한 콜백은 이름 있는 함수로 분리한다.
   주석은 한국어로 의도를 설명한다.
 입력과 타입: |
   외부 프로젝트 입력은 unknown으로 받고 구조와 의미를 확인한 뒤 내부 타입으로 사용한다.
@@ -45,14 +45,19 @@ _codocs:
   - no-misused-promises: Promise를 받지 않는 자리에 Promise를 넘기는 것을 거부한다.
   - explicit-module-boundary-types: 공개 함수의 반환 타입 명시를 요구한다.
   - naming-convention: 변수·함수·속성은 camelCase, 타입과 enum 멤버는 PascalCase를 요구한다. 앞 밑줄과 따옴표가 필요한 속성 이름은 예외이며 import 이름은 camelCase·PascalCase를 허용한다.
-  - jsdoc/require-jsdoc: 선언 함수·메서드·변수에 할당한 함수·클래스 속성 함수·객체 속성 함수에 JSDoc을 요구한다.
-  - codocs/korean-jsdoc(자체 규칙): 위 JSDoc이 한국어로 쓰였는지 검사한다. 짧은 인라인 콜백은 허용하며 .js·.mjs·.cjs 파일에도 적용한다.
-  - codocs/package-boundaries(자체 규칙): TypeScript 모듈 해석으로 import의 실제 경로를 따라가, 다른 패키지를 공개 진입점과 허용된 의존 방향으로만 사용하는지 검사한다.
+  - jsdoc/require-jsdoc: 선언 함수·메서드·변수에 할당한 함수·클래스 속성 함수·객체 속성 함수와 반환값·생성자 인자 같은 그 밖의 자리에 쓴 함수에 JSDoc을 요구한다. 함수 인자로 넘기는 콜백은 5줄 이상일 때만 요구한다.
+  - jsdoc/require-description·jsdoc/match-description: JSDoc의 주 설명을 비워 두지 않고 한국어로 쓰도록 요구한다. 태그 설명에만 한국어를 쓴 JSDoc은 허용하지 않는다.
+  - boundaries/dependencies(eslint-plugin-boundaries): 다른 패키지를 공개 진입점과 허용된 의존 방향으로만 사용하는지 검사한다. workspace는 core를, language-server와 mcp는 core와 workspace를 가져올 수 있으며 core와 vscode는 다른 내부 패키지를 가져오지 않는다. subpath·상대 경로·tsconfig 별칭으로 다른 패키지의 내부 파일에 접근하는 것도 거부한다.
+    core에서는 Node 내장 모듈, vscode와 VS Code 언어 서버·클라이언트 패키지, MCP SDK 같은 호스트 의존성을 거부한다.
+    두 검사 모두 정적 import·export from·동적 import·require·타입 import에 적용한다.
   - codocs/no-raw-domain-value(자체 규칙): @domainValues 원본 상수와 연결된 자리에 문자열을 직접 쓰는 것을 거부한다. 아래에서 자세히 설명한다.
 
-  *.test.ts에는 jsdoc/require-jsdoc과 codocs/korean-jsdoc을 적용하지 않는다.
+  JSDoc 규칙은 .js·.mjs·.cjs 파일에도 적용하고 *.test.ts에는 적용하지 않는다.
   코드 안의 eslint-disable 같은 줄 단위 해제 주석은 허용하지 않는다. 예외가 꼭 필요하면 eslint.config.mjs에 파일 단위로 이유와 함께 둔다.
-  자체 규칙은 tools/development-checks에 있으며 구현 옆 테스트로 입력과 진단을 검증한다.
+
+  일반 컨벤션과 아키텍처 규칙은 ESLint 기본 규칙과 검증된 오픈소스 플러그인으로 검사한다.
+  자체 규칙은 그런 도구로 표현하기 어렵고, 단순한 스타일이 아니라 Codocs 고유의 의미나 불변 조건을 검사할 때만 추가한다.
+  자체 규칙은 tools/development-checks에 있으며 구현 옆 테스트로 입력과 진단을 검증한다. 외부 플러그인으로 검사하는 규칙도 실제 eslint.config.mjs 설정으로 같은 입력과 진단을 검증한다.
   커밋 훅은 스테이징한 파일에 `eslint --fix`를, CI는 `pnpm lint`를 경고 0개 기준으로 실행한다.
 no-raw-domain-value의 판단 범위: |
   TypeScript의 타입 별칭·속성·매개변수 선언을 따라 @domainValues 원본을 찾는다.
