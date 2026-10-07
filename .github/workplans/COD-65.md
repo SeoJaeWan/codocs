@@ -1,140 +1,102 @@
 # COD-65 — Codocs Preflight 기반 관련 문서 자동 컨텍스트 주입 설계
 
-h2. 배경
+## 배경
 
 Codocs 문서에 제약사항, 조건, 도메인 규칙을 작성하더라도 Codex/Claude가 해당 문서를 조회하지 않으면 실질적인 효과가 없다.
 
-현재 MCP 기반 접근은 Agent가 필요하다고 판단할 때만 {{list/get/section}} 등을 호출하는 구조이므로, 관련 문서가 존재해도 조회가 누락될 수 있다.
+현재 MCP 기반 접근은 Agent가 필요하다고 판단할 때만 `list`/`get` 등을 호출하는 구조이므로, 관련 문서가 존재해도 조회가 누락될 수 있다.
 
-이를 보완하기 위해 사용자의 프롬프트가 Agent에 전달되기 전에 관련 Codocs 문서를 자동 탐색하고, 필요한 컨텍스트를 먼저 주입하는 *Codocs Preflight / Context Hook* 개념을 검토한다.
+이를 보완하기 위해 사용자의 프롬프트가 Agent에 전달되기 전에 관련 Codocs 문서를 자동 탐색하고, 관련 섹션을 먼저 제시하는 Codocs Preflight / Context Hook을 만든다.
 
-h2. 목표
+## 목표
 
 사용자가 Codex 또는 Claude에 작업 요청을 입력했을 때:
 
-# 사용자 프롬프트를 Hook/Preflight 단계에서 가로챈다.
-# 프롬프트와 관련된 Codocs 문서/섹션을 자동 검색한다.
-# 관련성이 높은 최소한의 컨텍스트만 Agent에 주입한다.
-# Agent는 주입된 Codocs 컨텍스트를 기반으로 작업을 시작한다.
-# 필요한 경우 기존 MCP {{get/list/section}}을 통해 추가 탐색할 수 있다.
+1. Hook이 사용자 프롬프트를 받는다.
+2. 프롬프트와 관련된 Codocs 섹션을 자동 검색한다.
+3. 관련성이 높은 섹션 주소만 `관련 문서 : 문서:섹션, …` 형태로 제시한다.
+4. 관련 문서가 없으면 아무것도 출력하지 않는다.
+5. Agent는 필요하면 기존 MCP `get`/`list`로 원문을 조회한다.
 
-h2. 기본 흐름
+## 진행 방식
 
-{noformat}User Prompt
-  ↓
-Codocs Preflight / Context Hook
-  ↓
-context(query)
-  ↓
-관련 Codocs 검색
-  ↓
-관련 section 3~5개 선정
-  ↓
-User Prompt + Relevant Codocs Context
-  ↓
-Codex / Claude
-  ↓
-필요 시 Codocs MCP로 추가 조회{noformat}
+1. 프로토타입으로 검색 방식을 비교해 고른다(`.test/preflight-search`, git 추적 제외).
+2. 프로토타입 결과를 바탕으로 실행 경로·연동 방식을 정하고 실구현한다.
 
-h2. 검색 전략 검토
+## 합의한 결정 (2026-10-07)
 
-단순 embedding Top-K만으로 구현하지 않고 다음 신호를 결합하는 방향을 검토한다.
+- 주입 내용은 섹션 주소 목록만 쓴다. 본문이나 `codocs_get` 안내 문구는 넣지 않는다. 최대 5개다.
+- 특정 모델(e5 등)에 매이지 않고, 기존 사례 조사 → 후보 → 같은 기준으로 측정을 여러 차수 반복해 고른다.
+- 프로토타입 단계에서는 검색 품질을 우선한다. 용량·설치 방식·응답 시간은 기록만 하고 실구현 단계에서 판단한다.
+- 정밀도를 재현율보다 우선한다.
+- 채점은 필수 정답(expected)과 허용(acceptable)을 나눈다. Precision@5는 반환 주소 중 정답·허용 비율, Recall@5는 필수 정답 중 찾은 비율이다. 문서가 필요 없는 프롬프트(F)는 빈 결과만 정답, 판단이 필요한 프롬프트(G)는 빈 결과 또는 허용 후보만 정답이다.
+- 질문은 한국어·영어·혼합을 고르게 넣고, 임계값은 tune 케이스로만 정하고 test 케이스로 판정한다.
 
-* exact name / section match
-* keyword / full-text search
-* semantic similarity
-* {{[[link]]}} 기반 관계 그래프
-* 필요 시 query rewriting
+## 프로토타입 결과 (1·2차 차수)
 
-개념적으로:
+### 벤치마크
 
-{noformat}Developer Prompt
-  ↓
-Query rewriting
-  ↓
-Exact + Keyword + Semantic
-  ↓
-Reranking
-  ↓
-[[link]] graph 0~1 depth 확장
-  ↓
-Top 3~5 sections{noformat}
+- 케이스 310개: 정답이 있는 질문 192개, 문서 불필요(F) 78개, 판단 필요(G) 40개. tune 167 / test 143으로 고정했다.
+- 코퍼스 두 개: 이 저장소 `.codocs`(문서 42, 섹션 217)와 가상 쇼핑몰 문서(문서 41, 섹션 165, 영어 문서 13개, 섹션 링크 150개).
+- 모든 정답에 원문 근거 문장을 붙였고, 문서 작성자와 케이스 작성자를 나눴다.
 
-Codocs의 {{name}}, {{section}}, {{[[link]]}} 정보를 일반 RAG보다 강한 구조적 신호로 활용한다.
+### 결론
 
-h2. 신규 API 후보
+정밀도 우선 기준으로는 **BM25 + e5-small 혼합(`hybrid-wsum`)** 이 가장 실용적이다. 2차에서 30개 변형을 더 시험했지만 이보다 통계적으로 확실히 나은 방식은 없었다.
 
-{noformat}context(query){noformat}
+| 방식                                   | Precision@5 | Recall@5 | F 정답률 | G 정답률 | 응답(새 프로세스) | 추가 용량                         |
+| -------------------------------------- | ----------- | -------- | -------- | -------- | ----------------- | --------------------------------- |
+| hybrid-wsum (추천)                     | 88.7        | 64.6     | 91.7     | 83.3     | 약 0.65초         | onnxruntime 약 437MB + 모델 118MB |
+| bge-reranker-v2-m3 재순위(재현율 설정) | 79.2        | 88.2     | 94.4     | 66.7     | 4.8~7초           | 위 + 모델 약 1.1GB                |
+| BM25만                                 | 71.9        | 66.9     | 91.7     | 77.8     | 약 0.05초         | 없음                              |
 
-예시:
+수치는 test 케이스 기준(%)이다.
 
-{noformat}context("ProductCard에 쿠폰 할인 넣어줘"){noformat}
+- 재순위 모델은 재현율을 +23.6%p(95% 구간 +15.1~+32.6) 올리지만 정밀도가 약 10%p 떨어지고 hook으로 쓰기에는 느리고 무겁다.
+- 효과가 없었던 것: 더 큰 임베딩(e5-base·large, bge-m3), 한국어 형태소 분석(kiwi, 프롬프트당 +2.5~4초), `[[link]]` 점수 전파, 학습형 질의 판정.
+- 학습형 섹션 재순위는 "개요" 섹션을 고르는 편향을 없앴지만 전체 점수는 기준과 차이가 없었다.
 
-반환 예시:
+### 한계
 
-{noformat}ProductCard:constraints
-ProductPrice:display
-CouponPolicy:stacking{noformat}
+- test 규모(정답 89, F 36, G 18)로는 3%p 이하 차이를 구분하지 못한다.
+- 1위 정확도(약 65%)가 병목이고, 신경망 후보는 관련 없음 판정이 tune에 과적합됐다.
+- jina-reranker-v2는 CC-BY-NC-4.0, mmarco ONNX는 arm64 전용이라 제품 후보에서 제외해야 한다. Windows·x64는 검증하지 않았다.
 
-기존 MCP 역할:
+## 남은 결정 (실구현 전)
 
-* {{list()}}: 능동 탐색
-* {{get(name)}}: 문서 조회
-* {{get(name:section)}}: 특정 section 조회
-* {{section(name)}}: section 탐색
-* {{context(query)}}: 자동 컨텍스트 탐색
+- 정밀도 우선(`hybrid-wsum`, 약 0.65초)과 재현율 우선(재순위, 수 초·1GB 이상) 중 선택과 용량·설치 방식(npm 포함 여부, 첫 실행 다운로드).
+- 실행 경로: `codocs` bin 하위 명령, 별도 패키지, MCP 도구, Claude Code `mcp_tool` hook 중 선택.
+- 출력 노출: Claude Code `UserPromptSubmit`의 `additionalContext`는 모델에게만 보이고, 사용자 화면에 보이려면 `systemMessage`가 필요하다.
+- 대상 agent(Claude Code만 또는 Codex 포함)와 색인 생성·갱신 시점.
+- 3차 차수 여부: 케이스 100~150개 추가, 애매한 경우에만 재순위를 부르는 2단계 호출, 상주 프로세스 기준 응답 시간 측정.
 
-h2. 검색 품질 검증
+## 범위
 
-Hook 구현보다 먼저 {{context(query)}}의 검색 품질을 검증할 수 있어야 한다.
+### 포함
 
-테스트 query와 기대 section을 정의하고 아래 지표를 측정하는 방안을 검토한다.
+- 관련 섹션 검색(`context(query)`)의 책임과 반환 형식
+- 검색 방식 비교와 선택(exact / keyword / semantic / `[[link]]` 신호)
+- 검색 품질 benchmark
+- Codex / Claude Preflight Hook 연동
+- 관련 문서가 없는 경우 빈 결과
 
-* Precision@K
-* Recall@K
-* MRR
+### 이번 이슈에서 제외
 
-예시:
+- Codocs 기반 post-hook / semantic validation
+- git diff 기반 규칙 위반 검사
+- Codex/Claude 전체 실행을 감싸는 별도 Agent wrapper
+- Codocs 규칙을 ESLint 규칙으로 자동 변환
 
-{code:yaml}- query: "ProductCard에 쿠폰 할인 넣어줘"
-  expected:
-    - ProductCard:constraints
-    - ProductPrice:display
-    - CouponPolicy:stacking{code}
+## 완료 조건
 
-관련 없는 문서를 과도하게 주입하면 Agent 성능과 토큰 효율을 떨어뜨릴 수 있으므로, 초기 목표는 Recall보다 Precision을 우선한다.
-
-h2. 범위
-
-h3. 포함
-
-* {{context(query)}} 인터페이스 설계
-* Codocs 문서/section 검색 방식 검토
-* exact / keyword / semantic / graph 기반 ranking 설계
-* {{[[link]]}} 관계를 검색 ranking에 활용
-* Codex / Claude Preflight Hook 연동 가능성 검토
-* 검색 품질 benchmark 구성
-* 관련 문서가 없는 경우 빈 context 반환
-
-h3. 이번 이슈에서 제외
-
-* Codocs 기반 post-hook / semantic validation
-* git diff 기반 규칙 위반 검사
-* Codex/Claude 전체 실행을 감싸는 별도 Agent wrapper
-* Codocs 규칙을 ESLint 규칙으로 자동 변환
-
-위 항목들은 Preflight의 검색 품질 및 실제 사용성을 확인한 뒤 별도 이슈로 분리한다.
-
-h2. 완료 조건
-
-* [ ] {{context(query)}}의 책임과 반환 형식이 정의되어 있다.
-* [ ] 최소 1개의 검색 전략 프로토타입이 구현되어 있다.
-* [ ] section 단위 검색이 가능하다.
-* [ ] {{[[link]]}} 관계가 ranking 또는 확장 과정에 반영된다.
-* [ ] 관련성이 낮은 결과를 제한할 수 있다.
-* [ ] benchmark query set으로 retrieval 품질을 측정할 수 있다.
-* [ ] Claude/Codex에서 사용자 프롬프트 입력 시 자동 컨텍스트 주입이 가능한 연동 방식을 조사/검증한다.
-* [ ] 기존 {{list/get/section}} MCP 흐름과 충돌하지 않는다.
+- [x] 검색 결과의 책임과 반환 형식이 정의되어 있다(섹션 주소 최대 5개, 관련 없으면 출력 없음).
+- [x] 최소 1개의 검색 전략 프로토타입이 구현되어 있다.
+- [x] section 단위 검색이 가능하다.
+- [x] `[[link]]` 관계를 ranking·확장에 반영해 측정했다(효과가 없어 채택하지 않음).
+- [x] 관련성이 낮은 결과를 제한할 수 있다.
+- [x] benchmark query set으로 retrieval 품질을 측정할 수 있다.
+- [ ] Claude/Codex에서 사용자 프롬프트 입력 시 자동 컨텍스트 주입이 가능한 연동 방식을 검증한다(Claude Code hook 계약은 조사함, Codex는 미확인).
+- [ ] 기존 `list`/`get` MCP 흐름과 충돌하지 않는다.
 
 ## Jira
 
