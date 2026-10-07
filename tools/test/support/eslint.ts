@@ -45,12 +45,17 @@ export function fixtureEslintConfig(): string {
 
 /** 같은 경로의 메모리 소스를 반복 검사해도 전체 타입 정보를 유지한다. */
 export function createFixtureEslint(
-  options: Pick<ESLint.Options, 'cwd' | 'fix'> = {},
+  options: Pick<ESLint.Options, 'cwd' | 'fix'> & {
+    /** 실제 설정의 settings 위에 덮어쓸 시험용 설정이다. */
+    settings?: Record<string, unknown>;
+  } = {},
 ): ESLint {
+  const { settings, ...eslintOptions } = options;
   return new ESLint({
     cwd: process.cwd(),
-    ...options,
+    ...eslintOptions,
     overrideConfig: {
+      ...(settings ? { settings } : {}),
       languageOptions: {
         parserOptions: {
           project: [project],
