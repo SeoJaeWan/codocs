@@ -6,7 +6,7 @@ import {
 } from '../catalog/index.js';
 import { referenceResolutionStatuses } from '../catalog/domain-values.js';
 import { offsetToPosition } from '../parser/index.js';
-import { parseReferenceComponents } from '../references/index.js';
+import { encodeColon, parseReferenceComponents } from '../references/index.js';
 import {
   diagnosticSeverities,
   type Diagnostic,
@@ -153,7 +153,7 @@ export function replaceCodeReferencePart(
   const ranges = getCodeReferencePartRanges(marker);
   const target = part === 'name' ? ranges?.name : ranges?.section;
   if (!ranges || !target || marker.name === undefined) return undefined;
-  const newText = value.replace(/:/gu, '\\:');
+  const newText = encodeColon(value);
   const local = {
     start: target.start - marker.offsetRange.start,
     end: target.end - marker.offsetRange.start,

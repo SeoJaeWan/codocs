@@ -1,4 +1,5 @@
 import { compareText, type Catalog } from '../catalog/index.js';
+import { encodeColon } from '../references/index.js';
 import { tokenize } from './tokenize.js';
 
 /** BM25F 포화 계수다. 출처: COD-65 프로토타입의 튜닝값(k1 4)이다. */
@@ -70,11 +71,6 @@ export interface SearchResult {
   items: SearchItem[];
   /** 0보다 큰 점수가 하나도 없는 검색어 원문이다. 입력 순서를 따른다. */
   emptyQueries: string[];
-}
-
-/** 참조 구성 안의 콜론을 구분자와 구분되도록 `\:`로 쓴다. 카탈로그의 참조 표기 규칙과 같다. */
-function encodeColon(value: string): string {
-  return value.replace(/:/gu, '\\:');
 }
 
 /** 문서 이름과 섹션 이름으로 codocs_get 주소를 만든다. 섹션이 없으면 문서 주소다. */

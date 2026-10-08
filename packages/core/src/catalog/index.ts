@@ -21,6 +21,7 @@ import {
 import { referenceSyntaxStatuses } from '../references/domain-values.js';
 import type { ReferenceOccurrence } from '../references/index.js';
 import {
+  encodeColon,
   extractReferences,
   getReferencePartRanges,
 } from '../references/index.js';
@@ -1339,10 +1340,6 @@ export function planRename(
   };
 }
 
-/** 참조 구성 안의 콜론을 구분자와 구분되도록 `\:`로 쓴다. */
-function encodeColon(value: string): string {
-  return value.replace(/:/gu, '\\:');
-}
 /**
  * 섹션 이름 변경의 새 이름이 쓸 수 없는 이름인지 확인한다.
  * 비어 있거나 `_`로 시작하거나 대괄호를 포함하면 쓸 수 없다.
