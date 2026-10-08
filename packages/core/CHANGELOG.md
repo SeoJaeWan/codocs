@@ -1,6 +1,6 @@
-# @codocs/workspace
+# @codocs/core
 
-## 0.0.3
+## 0.0.2
 
 ### Patch Changes
 
@@ -43,31 +43,3 @@
 - 69dd5b0: Add batch changes, document deletion and document moves to `codocs_write`. A request is either one change or `{"changes":[...]}` with at least one item, each item shaped like a single request (`create`, `update`, `replace`, `delete` with `id` and `revision`, or `move` with `id`, `revision` and `path`); other top-level properties, an empty `changes`, and the same document ID or path appearing twice are `invalid_input`. All items are applied to a virtual final state that is validated once, and everything is saved or nothing is, so a new document and the documents that reference it can be sent together. Deleting a document that another document or an `@codocs` marker in a code file still references is rejected with `reference_broken` unless the same request fixes the reference, and deleting or moving a document that would newly break the `_codocs.parent` of an untouched document is rejected with `reference_broken` (the diagnostic carries the child path and the parent entry). Changing a document name inside `changes` is still `name_change_not_allowed`, and every stale revision is reported as `change_revision_mismatch`. Folders left empty by a delete or move are removed up to just below `.codocs`. If saving fails midway, the applied items are rolled back in reverse order; the response lists `changes[]` in input order with `index`, `mode`, `id`, `path`, `previousPath` (move), `revision` and a `state` of `changed`, `restored`, `restore_failed` or `unchanged`, and a rollback that could not finish is reported as `write_restore_failed` with `saved: true`. Single create, update and replace requests and their responses are unchanged, and `codocs_write` still never edits code files.
 
   `codocs_write`에 여러 변경(`changes`), 문서 삭제, 문서 이동을 추가합니다. 요청은 변경 하나이거나 항목이 1개 이상인 `{"changes":[...]}`이며, 항목은 단일 요청과 같은 형태(`create`, `update`, `replace`, `id`와 `revision`을 받는 `delete`, `id`·`revision`·`path`를 받는 `move`)입니다. 다른 최상위 속성, 빈 `changes`, 같은 문서 ID나 경로가 두 번 나오는 요청은 `invalid_input`입니다. 모든 항목을 반영한 가상 최종 상태를 한 번 검증해 전부 저장하거나 아무것도 저장하지 않으므로 새 문서와 그 문서를 참조하는 문서를 함께 보낼 수 있습니다. 다른 문서나 코드 파일의 `@codocs` 표기가 참조하는 문서의 삭제는 같은 요청에서 참조를 고치지 않으면 `reference_broken`으로 거절하고, 건드리지 않은 문서의 `_codocs.parent`를 새로 끊는 삭제·이동도 `reference_broken`으로 거절합니다(진단에 자식 문서의 경로와 parent 항목이 담김). `changes` 안에서 문서 name을 바꾸면 여전히 `name_change_not_allowed`이고, revision이 오래된 문서는 모두 `change_revision_mismatch`로 알립니다. 삭제나 이동으로 비게 된 폴더는 `.codocs` 바로 아래까지 제거합니다. 저장 도중 실패하면 반영한 항목을 역순으로 되돌리며, 응답은 입력 순서의 `changes[]`에 `index`·`mode`·`id`·`path`·`previousPath`(move)·`revision`과 `changed`·`restored`·`restore_failed`·`unchanged` 중 하나인 `state`를 담고, 되돌리기를 마치지 못하면 `saved: true`와 `write_restore_failed`로 알립니다. 기존 단일 create·update·replace 요청과 응답은 그대로이며 `codocs_write`는 여전히 코드 파일을 고치지 않습니다.
-
-- c661b05: A `.codocsignore` file in the project root (gitignore syntax) now excludes matching paths from code reference collection, even when Git tracks them. The rule applies to validate and refresh, the editor, write protection, and rename.
-
-  프로젝트 루트의 `.codocsignore` 파일(gitignore 문법)에 맞는 경로는 Git이 추적하는 파일이어도 코드 참조 수집에서 제외한다. 이 규칙은 validate·refresh, 에디터, 쓰기 보호, 이름 변경에 모두 적용된다.
-
-- Updated dependencies [020bc1b]
-- Updated dependencies [adb49f5]
-- Updated dependencies [284c323]
-- Updated dependencies [a0a135f]
-- Updated dependencies [53dcc55]
-- Updated dependencies [3dc9422]
-- Updated dependencies [3b5f1ad]
-- Updated dependencies [2ff86d0]
-- Updated dependencies [7701301]
-- Updated dependencies [69dd5b0]
-  - @codocs/core@0.0.2
-
-## 0.0.2
-
-### Patch Changes
-
-- fa61fc1: Code reference watching now follows the collection rules (Git-tracked files and the project `.gitignore`) instead of the whole project, rebuilds only when those rules change, and recovers automatically from watch errors such as EPERM when a folder is deleted and recreated, instead of staying incomplete. The IDE shows "감시 재연결 중" while it reconnects.
-
-  코드 참조 감시가 프로젝트 전체 대신 수집 규칙(Git 추적 파일과 프로젝트 `.gitignore`)을 따르고, 해당 규칙이 바뀔 때만 다시 구성하며, 폴더 삭제 후 재생성 시 발생하는 EPERM 같은 감시 오류에서 자동으로 복구되어 "수집 불완전" 상태에 머물지 않는다. 재연결하는 동안 IDE에는 "감시 재연결 중"이 표시된다.
-
-- a4f2418: Code reference links no longer underline whitespace, and code links stay visible and clickable while references are re-collected. Refreshes now check only the changed paths instead of the whole project, and hover no longer re-requests after unrelated changes.
-
-  코드 참조 링크가 공백에 밑줄을 긋지 않고, 코드 연결을 다시 수집하는 동안에도 링크가 계속 보이고 클릭할 수 있다. 갱신은 프로젝트 전체 대신 바뀐 경로만 확인하며, 관련 없는 변경 뒤에는 hover가 다시 요청되지 않는다.
