@@ -4,14 +4,18 @@ import {
   mkdtemp,
   readFile,
   readdir,
-  rm,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { changePlanDiagnosticCodes } from '@codocs/core';
-import { rename } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
+});
+import { ioFailures } from '../test-support/file-system.js';
 import {
   collectWorkspaceCodeEvidence,
   workspaceCodeEvidenceDiagnosticCodes,
@@ -19,6 +23,10 @@ import {
 import { loadWorkspace } from '../loader/index.js';
 import { calculateRevision } from '../revision/index.js';
 import { saveWorkspaceChange } from './index.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 const zoneText =
   '_codocs:\n  id: zone\n  name: 구역\ndefinition: 설명\n업무: 값\n내용: 값\n';
@@ -41,8 +49,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  ioFailures.clear();
   vi.unstubAllEnvs();
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 /** 실제 원문 바이트에서 독립적으로 계산한 전체 교체 요청을 만든다. */
@@ -223,7 +232,7 @@ describe('saveWorkspaceChange: 임시 파일 기록과 반영 사이 늦게 생�
               setImmediate(restorePlatform);
               throw Object.assign(new Error('EPERM'), { code: 'EPERM' });
             }
-            await rename(source, destination);
+            await renameWithRetry(source, destination);
           },
         },
       });
@@ -264,5 +273,28 @@ describe('saveWorkspaceChange: 임시 파일 기록과 반영 사이 늦게 생�
       },
     );
     expect(result).toMatchObject({ success: true, saved: true });
+  });
+});
+
+describe('saveWorkspaceChange: .codocsignore 제외 코드의 보호 경계', () => {
+  it('.codocsignore가 제외한 코드가 삭제할 섹션을 참조해도 보호하지 않고 저장한다', async () => {
+    await writeFile(path.join(root, 'source.ts'), '// @codocs [[구역:내용]]');
+    await writeFile(path.join(root, '.codocsignore'), 'source.ts\n');
+    const scan = await loadWorkspace({ cwd: root });
+    const result = await saveWorkspaceChange(replaceRequest(), scan);
+    expect(result).toMatchObject({ success: true, saved: true });
+  });
+
+  it('.codocsignore를 읽지 못하면 코드 증거를 확정하지 못해 섹션 삭제를 거절하고 원문을 보존한다', async () => {
+    await writeFile(path.join(root, 'source.ts'), '// 참조 없음');
+    await writeFile(path.join(root, '.codocsignore'), 'other.ts\n');
+    ioFailures.set(path.join(root, '.codocsignore'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const scan = await loadWorkspace({ cwd: root });
+    const result = await saveWorkspaceChange(replaceRequest(), scan);
+    expect(result).toMatchObject({ success: false, saved: false });
+    expect(await readFile(zoneFile, 'utf8')).toBe(zoneText);
   });
 });

@@ -24,6 +24,7 @@ import {
   discoverCodeFileState,
   hasTrackedDescendant,
   isCodeFileIgnored,
+  isCodocsIgnored,
   isCodeWatchIgnored,
   readEligibleCodeFile,
   recheckCodeDirectories,
@@ -791,9 +792,11 @@ export class WorkspaceCodeReferenceIndex {
           !relative ||
           !this.#state ||
           this.#rebuilding ||
-          path.basename(input) === '.gitignore'
+          path.basename(input) === '.gitignore' ||
+          relative === '.codocsignore'
         )
           return true;
+        if (isCodocsIgnored(this.#state.policy, relative)) return false;
         return (
           !isCodeFileIgnored(this.#state.policy, relative) ||
           hasTrackedDescendant(this.#state.policy, relative)

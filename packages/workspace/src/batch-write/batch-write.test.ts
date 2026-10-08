@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -18,6 +18,7 @@ import {
   snapshotProjectTree,
   writeProjectTree,
 } from '../test-support/storage-faults.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 /** 요청의 `/` 구분 경로를 결과가 담는 OS 구분자 표기로 바꾼다. */
 function native(requestPath: string): string {
@@ -42,7 +43,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await Promise.all(sessions.map((session) => session.close()));
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 /** 실제 프로젝트를 쓰는 세션을 연다. */

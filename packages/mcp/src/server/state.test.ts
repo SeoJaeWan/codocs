@@ -28,7 +28,7 @@ vi.mock('node:fs/promises', async (original) => {
   };
 });
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -39,6 +39,7 @@ import {
 } from '@codocs/workspace';
 import { createCodocsServer } from './index.js';
 import { createCodocsGuideHandler } from '../guide/index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let project: string;
 /** 실제 IO 경계의 도달과 해제를 따로 제어한다. */
@@ -72,7 +73,7 @@ afterEach(async () => {
   await client?.close();
   await server?.close();
   await session?.close();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 /** 실제 세션과 SDK 서버를 메모리 전송으로 연결해 IO 제어 경계를 유지한다. */

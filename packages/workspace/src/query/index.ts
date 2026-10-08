@@ -33,6 +33,8 @@ import {
   projectCatalogDiagnostics,
   projectCatalogList,
   countCatalogListItems,
+  buildSearchIndex,
+  searchCatalog,
   projectCatalogPaths,
   projectLiveReferences,
   resolveReference,
@@ -51,6 +53,8 @@ import {
   type CatalogPathMissingResult,
   type CatalogPathResult,
   type CatalogQueryDiagnostic,
+  type SearchIndex,
+  type SearchResult,
   type Diagnostic,
   type RequestFailure,
   type RequestResult,
@@ -138,6 +142,9 @@ export const workspaceQueryDiagnosticMessages = {
     '코드 매칭에 사용한 문서 색인이 변경되었습니다. 최신 코드 매칭 결과로 다시 조회하세요.',
 } as const;
 
+/** 카탈로그 객체마다 지연 생성한 검색 색인이다. 카탈로그가 바뀌면 새 객체라 색인도 다시 만든다. */
+const searchIndexes = new WeakMap<Catalog, SearchIndex>();
+
 /** 조회에서 core와 workspace가 반환할 수 있는 공통 진단이다. */
 export type WorkspaceQueryDiagnostic =
   | CatalogQueryDiagnostic
@@ -160,6 +167,19 @@ export interface WorkspaceListInput {
 export type WorkspaceListItem = CatalogListItem & {
   diagnostics?: readonly WorkspaceQueryDiagnostic[];
 };
+
+/** 성공한 검색은 현재 scan 상태와 core 검색 결과를 그대로 담는다. partial이면 결과 없음을 문서 없음으로 단정하지 않는다. */
+export interface WorkspaceSearchSuccess extends SearchResult {
+  success: true;
+  scanStatus: Exclude<ScanStatus, typeof scanStatuses.failed>;
+  diagnostics?: readonly WorkspaceQueryDiagnostic[];
+}
+
+/** 검색 결과다. */
+export type WorkspaceSearchResult = RequestResult<
+  WorkspaceSearchSuccess,
+  WorkspaceQueryFailure
+>;
 
 /** 성공한 목록은 현재 scan 상태와 페이지 없는 전체 항목을 함께 반환한다. */
 export interface WorkspaceListSuccess {
@@ -1484,6 +1504,46 @@ export class WorkspaceQuerySession {
       scanStatus,
       items,
       ...(unreachable ? { unreachable } : {}),
+      ...(diagnostics.length ? { diagnostics } : {}),
+    };
+  }
+
+  /**
+   * 최신 실제 scan의 카탈로그에서 검색어별 후보 문서·섹션을 찾는다.
+   * 입력 개수·길이 검증은 호출 경계(MCP 스키마)가 맡는다.
+   */
+  async search(queries: readonly string[]): Promise<WorkspaceSearchResult> {
+    if (this.#scan && this.#explicitRefreshPromise)
+      return workspaceIndexNotReady();
+    const scan = await this.#current();
+    const watchFailure = this.#watchFailure();
+    if (scan.status === scanStatuses.failed) return scanFailure(scan);
+    if (watchFailure && !this.#completed)
+      return this.#watchFailureResult(watchFailure);
+    const catalog = watchFailure ? this.#completed?.catalog : this.#catalog;
+    if (!catalog) return scanFailure(scan);
+    const scanStatus = watchFailure ? scanStatuses.partial : scan.status;
+    let index = searchIndexes.get(catalog);
+    if (!index) {
+      index = buildSearchIndex(catalog);
+      searchIndexes.set(catalog, index);
+    }
+    const diagnostics: WorkspaceQueryDiagnostic[] = [
+      ...(scanStatus === scanStatuses.partial
+        ? [
+            {
+              code: catalogDiagnosticCodes.unconfirmedReference,
+              severity: diagnosticSeverities.warning,
+              message: catalogDiagnosticMessages.unconfirmedReference,
+            },
+          ]
+        : []),
+      ...(watchFailure ? [watchFailure] : []),
+    ];
+    return {
+      success: true,
+      scanStatus,
+      ...searchCatalog(index, queries),
       ...(diagnostics.length ? { diagnostics } : {}),
     };
   }

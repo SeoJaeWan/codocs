@@ -1,5 +1,9 @@
 import { createLink as symlink } from '../test-support/links.js';
-import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -47,7 +51,7 @@ afterEach(async () => {
   await session?.close();
   session = undefined;
   vi.restoreAllMocks();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 describe('최초 조회와 실제 파일 감시 연결', () => {
   it('첫 readFile 반환 전에 수정하면 완료 알림과 live 참조가 같은 최신 원문을 사용한다', async () => {
@@ -77,7 +81,7 @@ describe('최초 조회와 실제 파일 감시 연결', () => {
       );
       await vi.waitFor(
         () => expect(watchers[0]?.hasPendingChanges).toBe(true),
-        { interval: 1 },
+        { interval: 1, timeout: 5_000 },
       );
     };
     session = createWorkspaceQuerySession({ cwd: project });
@@ -163,38 +167,36 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
             path.join(directory, 'beta.yaml'),
             '_codocs:\n  id: beta\n  name: beta\ndefinition: 추가\n',
           );
-        else if (operation === '삭제') await rm(target);
+        else if (operation === '삭제') await rmWithRetry(target);
         else if (operation === '교체 저장') {
           const temporary = path.join(project, 'temporary.yaml');
           await writeFile(
             temporary,
             '_codocs:\n  id: beta\n  name: beta\ndefinition: 교체\n',
           );
-          await rename(temporary, target);
-        } else if (operation === '폴더 이동') await rename(directory, moved);
+          await renameWithRetry(temporary, target);
+        } else if (operation === '폴더 이동')
+          await renameWithRetry(directory, moved);
         else {
           if (operation === '폴더 교체')
-            await rename(directory, path.join(project, 'saved'));
-          else await rm(directory, { recursive: true });
+            await renameWithRetry(directory, path.join(project, 'saved'));
+          else await rmWithRetry(directory, { recursive: true });
           await mkdir(directory);
           await writeFile(
             path.join(directory, 'beta.yaml'),
             '_codocs:\n  id: beta\n  name: beta\ndefinition: 재생성\n',
           );
         }
+        // 변경 중 앞선 신호(예: 옮긴 폴더의 사라짐)만으로 넘어가면 최종 파일이 반영되기 전 목록을 본다.
+        // 최종 상태를 만드는 파일의 신호를 기다린다.
+        const finalPath =
+          operation === '삭제' || operation === '교체 저장'
+            ? target
+            : operation === '폴더 이동'
+              ? path.join(moved, 'alpha.yaml')
+              : path.join(directory, 'beta.yaml');
         await vi.waitFor(
-          () =>
-            expect(
-              operation === '추가'
-                ? events
-                    .slice(beforeMutation)
-                    .includes(path.join(directory, 'beta.yaml'))
-                : events.some(
-                    (event) =>
-                      event === directory ||
-                      event.startsWith(directory + path.sep),
-                  ),
-            ).toBe(true),
+          () => expect(events.slice(beforeMutation)).toContain(finalPath),
           { timeout: 5_000 },
         );
       };
@@ -217,7 +219,7 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
 
   it('감시 시작 시 .codocs가 없어도 이후 생성한 문서를 조회한다', async () => {
     const codocs = path.join(project, '.codocs');
-    await rm(codocs, { recursive: true });
+    await rmWithRetry(codocs, { recursive: true });
     session = createWorkspaceQuerySession({ cwd: project });
     expect(await session.list()).toMatchObject({
       success: true,
@@ -260,12 +262,15 @@ describe('실제 감시와 초기 열거·대상 준비 경계', () => {
       path.join(nested, 'ordinary.yaml'),
       '_codocs:\n  id: ordinary\n  name: ordinary\ndefinition: inside\n',
     );
-    await vi.waitFor(async () => {
-      expect(await session!.get(['ordinary', 'ignored'])).toMatchObject({
-        success: true,
-        results: [{ found: true }, { found: false }],
-      });
-    });
+    await vi.waitFor(
+      async () => {
+        expect(await session!.get(['ordinary', 'ignored'])).toMatchObject({
+          success: true,
+          results: [{ found: true }, { found: false }],
+        });
+      },
+      { timeout: 5_000 },
+    );
   });
 });
 

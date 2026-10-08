@@ -41,6 +41,10 @@ export function wrapCodocsResult(result: CodocsToolResult): CallToolResult {
   };
 }
 
+/** 초기화 결과로 클라이언트에 전달하는 서버 사용 안내다. 검색 도구의 사용 시점과 방법을 알린다. */
+export const codocsServerInstructions =
+  '이 서버는 프로젝트의 .codocs 문서를 조회하고 관리합니다. 작업을 시작할 때와 작업 범위가 바뀔 때마다 codocs_search를 호출해 관련 문서를 먼저 찾으세요. 대화 맥락에서 주제·용어·식별자를 뽑아 짧은 검색어 여러 개로 호출하고, 사용자 요청 원문을 통째로 검색어에 넣지 마세요. 결과의 address는 codocs_get에 그대로 넘겨 함께 읽고, 본문에 있는 [[링크]]도 확인하세요. emptyQueries에 담긴 검색어는 걸린 문서가 없다는 뜻이므로 해당 문서가 없을 수 있습니다. scanStatus가 partial이면 확인하지 못한 문서가 있어 결과 없음을 문서 없음으로 단정하지 마세요.';
+
 /** 한 세션을 공유하는 SDK 서버와 실행 handler를 연결한다. 세션 종료는 호출자가 소유한다.
  * @param session 조회와 변경이 공유할 프로젝트 세션이다.
  * @param guide 가이드 원문 경계다. 생략하면 배포된 자산을 읽는다.
@@ -79,6 +83,14 @@ export function createCodocsServer(
       },
     ],
     [
+      'codocs_search',
+      {
+        description:
+          '검색어(queries, 1~10개, 각 1~200자)로 문서와 섹션을 찾아 codocs_get에 바로 넘길 수 있는 address를 점수 순서로 돌려줍니다. 작업을 시작할 때와 범위가 바뀔 때 호출하고, 대화 맥락에서 뽑은 주제·용어·식별자를 짧은 검색어 여러 개로 나누어 넣으세요(원문 통째로 넣지 마세요). 항목마다 address, score(0 초과 1 이하), queries(걸린 검색어), sections(같은 문서의 섹션 여럿을 문서 주소로 묶었을 때 걸린 섹션 이름)를 담습니다. 결과 주소는 codocs_get으로 함께 읽고 본문의 [[링크]]도 확인하세요. 걸린 것이 없는 검색어는 emptyQueries에 담기며 그 주제의 문서가 없을 수 있다는 뜻입니다. scanStatus가 partial이면 diagnostics에 미확인 표시가 붙으며 결과 없음을 문서 없음으로 단정할 수 없습니다.',
+        execute: handlers.codocsSearch.bind(handlers),
+      },
+    ],
+    [
       'codocs_refresh',
       {
         description:
@@ -106,7 +118,7 @@ export function createCodocsServer(
       'codocs_rename',
       {
         description:
-          '문서 이름을 바꾸고 그 문서를 가리키던 참조를 함께 고칩니다. section(현재 섹션 이름)을 주면 그 문서의 최상위 섹션 이름을 바꾸고 그 섹션을 가리키던 [[문서:섹션]] 참조를 함께 고치며, 이때 newName은 새 섹션 이름이고 결과에 targetSection이 추가됩니다(section_conflict·section_not_found 등으로 blocked일 수 있음). section이 없으면 문서 이름 변경입니다. mode preview는 파일과 색인을 바꾸지 않고 상태(ready·unresolved·blocked), 변경 목록, 선택이 필요한 모호 참조의 후보, 충돌, 영향받는 파일별 revisions를 반환합니다. mode apply는 같은 id·newName·selections와 preview가 돌려준 revisions를 그대로 받아 다시 계산한 뒤 저장하며, blocked이거나 revision·영향 파일이 달라졌으면 파일을 바꾸지 않고 거절합니다. selections의 sourcePath·occurrenceIndex·targetPath는 preview 결과의 값을 그대로 사용합니다. 코드 파일의 @codocs [[이름]]·@codocs [[이름:섹션]] 표기도 함께 고칩니다. 문서 이름 변경은 이름이 그 문서로 확정된 표기의 이름 부분만, 섹션 이름 변경은 이름·섹션이 모두 그 대상으로 확정된 표기의 섹션 부분만 바꾸고 나머지 원문은 그대로 둡니다. 코드 파일의 변경·영향·파일 결과에는 fileKind: "code"가 붙고(.codocs 문서에는 없음) 모호한 코드 표기의 selections.sourcePath는 코드 파일 경로, occurrenceIndex는 그 파일의 표기 순번입니다. 코드 수집이 진행 중이면 blocked(blockingReason unconfirmed)이며 파일을 바꾸지 않으니 잠시 뒤 다시 요청하세요. 수집은 끝났지만 읽지 못한 코드 파일이 있으면 확인한 파일만 고치고 읽지 못한 경로를 reason unconfirmed 영향(occurrenceIndex -1)으로 보고하며 상태는 unresolved입니다.',
+          '문서 이름을 바꾸고 그 문서를 가리키던 참조를 함께 고칩니다. section(현재 섹션 이름)을 주면 그 문서의 최상위 섹션 이름을 바꾸고 그 섹션을 가리키던 [[문서:섹션]] 참조를 함께 고치며, 이때 newName은 새 섹션 이름이고 결과에 targetSection이 추가됩니다(section_conflict·section_not_found 등으로 blocked일 수 있음). section이 없으면 문서 이름 변경입니다. mode preview는 파일과 색인을 바꾸지 않고 상태(ready·unresolved·blocked), 변경 목록, 선택이 필요한 모호 참조의 후보, 충돌, 영향받는 파일별 revisions를 반환합니다. mode apply는 같은 id·newName·selections와 preview가 돌려준 revisions를 그대로 받아 다시 계산한 뒤 저장하며, blocked이거나 revision·영향 파일이 달라졌으면 파일을 바꾸지 않고 거절합니다. selections의 sourcePath·occurrenceIndex·targetPath는 preview 결과의 값을 그대로 사용합니다. 코드 파일의 `@codocs` 문서 참조(`[[이름]]`)·섹션 참조(`[[이름:섹션]]`) 표기도 함께 고칩니다. 문서 이름 변경은 이름이 그 문서로 확정된 표기의 이름 부분만, 섹션 이름 변경은 이름·섹션이 모두 그 대상으로 확정된 표기의 섹션 부분만 바꾸고 나머지 원문은 그대로 둡니다. 코드 파일의 변경·영향·파일 결과에는 fileKind: "code"가 붙고(.codocs 문서에는 없음) 모호한 코드 표기의 selections.sourcePath는 코드 파일 경로, occurrenceIndex는 그 파일의 표기 순번입니다. 코드 수집이 진행 중이면 blocked(blockingReason unconfirmed)이며 파일을 바꾸지 않으니 잠시 뒤 다시 요청하세요. 수집은 끝났지만 읽지 못한 코드 파일이 있으면 확인한 파일만 고치고 읽지 못한 경로를 reason unconfirmed 영향(occurrenceIndex -1)으로 보고하며 상태는 unresolved입니다.',
         execute: handlers.codocsRename.bind(handlers),
       },
     ],
@@ -121,7 +133,7 @@ export function createCodocsServer(
   ]);
   const server = new Server(
     { name: 'co-documentation', version: getMcpVersion() },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {} }, instructions: codocsServerInstructions },
   );
   server.setRequestHandler(
     ListToolsRequestSchema,

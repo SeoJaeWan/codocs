@@ -1,15 +1,12 @@
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspaceLifecycleStates } from '../lifecycle/index.js';
 import { createWorkspaceWatcher, type WorkspaceWatcher } from './index.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 let project: string;
 let watcher: WorkspaceWatcher | undefined;
@@ -25,7 +22,7 @@ afterEach(async () => {
     await watcher?.close();
   } finally {
     watcher = undefined;
-    await rm(project, { recursive: true, force: true });
+    await rmWithRetry(project, { recursive: true, force: true });
   }
 });
 
@@ -91,7 +88,7 @@ describe('createWorkspaceWatcher 파일 변화 신호', () => {
       const paths: string[] = [];
       watcher.subscribe((batch) => paths.push(...batch.paths));
 
-      await rm(target);
+      await rmWithRetry(target);
 
       await vi.waitFor(() => expect(paths).toContain(target), {
         timeout: 5_000,
@@ -108,7 +105,7 @@ describe('createWorkspaceWatcher 파일 변화 신호', () => {
       const paths: string[] = [];
       watcher.subscribe((batch) => paths.push(...batch.paths));
 
-      await rename(source, destination);
+      await renameWithRetry(source, destination);
 
       await vi.waitFor(
         () =>
@@ -159,7 +156,7 @@ describe('createWorkspaceWatcher 파일 변화 신호', () => {
       const paths: string[] = [];
       watcher.subscribe((batch) => paths.push(...batch.paths));
 
-      await rm(codocs, { recursive: true });
+      await rmWithRetry(codocs, { recursive: true });
 
       await vi.waitFor(() => expect(paths).toContain(codocs), {
         timeout: 5_000,
@@ -173,7 +170,7 @@ describe('createWorkspaceWatcher 파일 변화 신호', () => {
       watcher = await createWorkspaceWatcher(project);
       const paths: string[] = [];
       watcher.subscribe((batch) => paths.push(...batch.paths));
-      await rename(codocs, path.join(project, 'saved'));
+      await renameWithRetry(codocs, path.join(project, 'saved'));
       await vi.waitFor(() => expect(paths).toContain(codocs), {
         timeout: 5_000,
       });

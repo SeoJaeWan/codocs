@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { LanguageServerSession } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 let root: string;
 let session: LanguageServerSession;
 const target =
@@ -70,7 +71,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await session.close();
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 describe('명시 링크와 출처 확인', () => {
   it('섹션 표기를 클릭하면 대상 문서의 섹션 키로 이동하는 목적지를 확인한다', async () => {

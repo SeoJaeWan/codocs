@@ -57,7 +57,7 @@ export interface WorkspaceRenameChange {
   /** 섹션 키 이름을 바꾸는 수정이면 key다. 이때 range는 따옴표를 포함한 키 위치이고 newText는 따옴표 없는 새 이름이다. */
   kind?: RenameChangeKind;
   /**
-   * 코드 파일의 `@codocs [[ ]]` 표기 수정이면 code다. .codocs 문서 수정에는 없다.
+   * 코드 파일의 `@codocs` 참조 표기 수정이면 code다. .codocs 문서 수정에는 없다.
    * 이때 path는 프로젝트 상대 코드 경로(`/` 구분), range는 고칠 이름 또는 섹션 부분의 위치,
    * oldText·newText는 그 부분의 원문(콜론은 `\:`)이며 occurrenceIndex는 그 파일에서 표기의 순번이다.
    */
@@ -313,7 +313,7 @@ function blocked(
 /**
  * 같은 스캔의 색인으로 이름 변경을 계산하고 파일별 새 원문까지 만든다. 디스크와 색인은 바꾸지 않는다.
  * 새 원문을 안전하게 만들 수 없는 파일이 하나라도 있으면 전체를 blocked로 돌려준다.
- * code를 주면 코드 파일의 `@codocs [[ ]]` 표기도 같은 계산에 합류한다. 코드 수집이 진행 중(collecting)이면 blocked다.
+ * code를 주면 코드 파일의 `@codocs` 참조 표기도 같은 계산에 합류한다. 코드 수집이 진행 중(collecting)이면 blocked다.
  * @param request 대상·새 이름·선택이다. section이 있으면 그 섹션의 이름 변경이다. 선택의 sourcePath가 코드 파일이면 그 파일의 표기 순번을 가리킨다.
  * @param scan 색인을 만든 같은 스캔이며 파일별 원문과 revision을 제공한다.
  * @param catalog 같은 스캔에서 만든 색인이다.

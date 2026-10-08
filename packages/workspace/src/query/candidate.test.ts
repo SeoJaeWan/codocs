@@ -1,11 +1,4 @@
-import {
-  mkdir,
-  mkdtemp,
-  rename,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as workspacePaths from '../paths/index.js';
@@ -13,6 +6,10 @@ import * as loader from '../loader/index.js';
 import { scanStatuses } from '@codocs/core';
 import { workspaceTargetKinds } from '../paths/domain-values.js';
 import { WorkspaceQuerySession } from './index.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 /** 단일 문서로 확정되는 이름 참조 출처다. */
 const referenceOrigin = {
@@ -36,7 +33,7 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.restoreAllMocks();
   await session.close();
-  await rm(project, { recursive: true, force: true });
+  await rmWithRetry(project, { recursive: true, force: true });
 });
 
 describe('후보 개별 파일 확인의 비동기 경합', () => {
@@ -66,7 +63,9 @@ describe('후보 개별 파일 확인의 비동기 경합', () => {
         );
       const controller = new AbortController();
       const pending = session.confirmCandidate(token, controller.signal);
-      await vi.waitFor(() => expect(check).toHaveBeenCalled());
+      await vi.waitFor(() => expect(check).toHaveBeenCalled(), {
+        timeout: 5_000,
+      });
       if (change === '취소') controller.abort();
       else if (change === '세션 종료') await session.close();
       else if (change === '출처 닫기')
@@ -83,7 +82,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
     await session.refresh();
     const codocs = path.join(project, '.codocs');
     const saved = path.join(project, 'saved');
-    await rename(codocs, saved);
+    await renameWithRetry(codocs, saved);
     await symlink(
       saved,
       codocs,
@@ -110,7 +109,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
       session.catalogVersion,
     )!;
     expect(token).toBeTypeOf('string');
-    await rm(path.join(project, '.codocs/target.yaml'));
+    await rmWithRetry(path.join(project, '.codocs/target.yaml'));
     await session.refresh();
     expect(await session.confirmCandidate(token)).toBeUndefined();
   });
@@ -434,7 +433,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
       );
       const pending = session.confirmCandidate(token);
       await started;
-      if (removed) await rm(path.join(project, '.codocs/target.yaml'));
+      if (removed) await rmWithRetry(path.join(project, '.codocs/target.yaml'));
       await session.refresh();
       resume();
       const result = await pending;
@@ -494,7 +493,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
-    await rm(path.join(project, '.codocs/target.yaml'));
+    await rmWithRetry(path.join(project, '.codocs/target.yaml'));
     await writeFile(
       path.join(project, '.codocs/target.yaml'),
       '_codocs:\n  id: target\n  name: 대상\ndefinition: 다른 문서\n',

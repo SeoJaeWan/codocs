@@ -14,7 +14,7 @@ import {
 } from '@codocs/core';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -25,6 +25,10 @@ import {
 } from './index.js';
 import type { WorkspaceQuerySession } from './index.js';
 import { WorkspaceWatcher, watcherRecoveryGuidance } from '../watcher/index.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 let project: string;
 const sessions: WorkspaceQuerySession[] = [];
@@ -50,7 +54,7 @@ afterEach(
   /** 해당 사례가 만든 fixture만 정리한다. */ async () => {
     ioFailures.clear();
     await Promise.all(sessions.splice(0).map((session) => session.close()));
-    await rm(project, { recursive: true, force: true });
+    await rmWithRetry(project, { recursive: true, force: true });
   },
 );
 
@@ -857,7 +861,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
     expect(await session.get(['alpha'])).toMatchObject({ success: true });
     const codocs = path.join(project, '.codocs');
     const saved = path.join(project, 'saved-codocs');
-    await rename(codocs, saved);
+    await renameWithRetry(codocs, saved);
     await symlink(saved, codocs, 'junction');
 
     await session.refresh();
@@ -1440,7 +1444,10 @@ describe('live 참조와 선택 최신 확인', () => {
       )!;
       expect(token).toBeTypeOf('string');
       if (moved)
-        await rename(original, path.join(project, '.codocs/새 경로.yaml'));
+        await renameWithRetry(
+          original,
+          path.join(project, '.codocs/새 경로.yaml'),
+        );
       await file(
         moved ? '새 경로.yaml' : 'target.yaml',
         '_codocs:\n  id: target\n  name: 대상\ndefinition: 최신\n',
@@ -1471,7 +1478,7 @@ describe('live 참조와 선택 최신 확인', () => {
       '.codocs/target.yaml',
       session.catalogVersion,
     )!;
-    await rename(original, path.join(project, '.codocs/moved.yaml'));
+    await renameWithRetry(original, path.join(project, '.codocs/moved.yaml'));
     await session.refresh();
     expect(await session.confirmCandidate(token)).toMatchObject({
       result: { path: path.join('.codocs', 'moved.yaml') },
@@ -1502,7 +1509,7 @@ describe('live 참조와 선택 최신 확인', () => {
         '.codocs/target.yaml',
         session.catalogVersion,
       )!;
-      if (raw === undefined) await rm(original);
+      if (raw === undefined) await rmWithRetry(original);
       else await writeFile(original, raw);
       expect(await session.confirmCandidate(token)).toBeUndefined();
     },

@@ -5,7 +5,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const { withIoFailures } = await import('../test-support/file-system.js');
   return withIoFailures(actual);
 });
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +15,7 @@ import {
 } from '../diagnostics/index.js';
 import { inspectWorkspaceParent, resolveWorkspacePath } from '../index.js';
 import type { ProjectRoot } from '../project-root/index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let fixture: string;
 let project: string;
@@ -36,7 +37,7 @@ beforeEach(async () => {
 afterEach(async () => {
   ioFailures.clear();
   simulatedFileLinks.clear();
-  await rm(fixture, { recursive: true, force: true });
+  await rmWithRetry(fixture, { recursive: true, force: true });
 });
 
 describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
@@ -78,7 +79,7 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
   });
 
   it('없는 .codocs만 missing으로 확인한다', async () => {
-    await rm(path.join(project, '.codocs'), { recursive: true });
+    await rmWithRetry(path.join(project, '.codocs'), { recursive: true });
     expect(await resolveWorkspacePath(selectedRoot, '.codocs')).toEqual({
       success: false,
       status: 'missing',
@@ -99,7 +100,7 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
   it('선택한 .codocs가 정션이면 대상이 내부여도 unavailable이다', async () => {
     const target = path.join(project, 'ordinary');
     await mkdir(target);
-    await rm(path.join(project, '.codocs'), { recursive: true });
+    await rmWithRetry(path.join(project, '.codocs'), { recursive: true });
     await createLink(target, path.join(project, '.codocs'), 'junction');
     expect(await resolveWorkspacePath(selectedRoot, '.codocs')).toMatchObject({
       success: false,

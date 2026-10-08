@@ -220,6 +220,7 @@ export async function verifyMcp(archive, temporary, expectedVersion) {
     assert.deepEqual(tools, [
       'codocs_list',
       'codocs_get',
+      'codocs_search',
       'codocs_refresh',
       'codocs_validate',
       'codocs_write',

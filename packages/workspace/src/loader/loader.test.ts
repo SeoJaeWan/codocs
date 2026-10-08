@@ -11,20 +11,14 @@ import {
   yamlDiagnosticCodes,
 } from '@codocs/core';
 import { createHash } from 'node:crypto';
-import {
-  link,
-  mkdir,
-  mkdtemp,
-  realpath,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
+import { link, mkdir, mkdtemp, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { workspaceDiagnosticCodes } from '../diagnostics/index.js';
 import { loadWorkspace } from './index.js';
 import { workspaceDocumentStatuses } from './domain-values.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let fixture: string;
 let project: string;
@@ -46,7 +40,7 @@ afterEach(
   /** 오류 주입과 각 테스트의 fixture를 정리한다. */ async () => {
     ioFailures.clear();
     simulatedFileLinks.clear();
-    await rm(fixture, { recursive: true, force: true });
+    await rmWithRetry(fixture, { recursive: true, force: true });
   },
 );
 
@@ -196,7 +190,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
   });
 
   it('.codocs 자체가 정션이면 전체 실패다', async () => {
-    await rm(codocs, { recursive: true });
+    await rmWithRetry(codocs, { recursive: true });
     await writeFile(path.join(outside, 'term.yaml'), raw);
     await symlink(outside, codocs, 'junction');
     expect(await loadWorkspace({ cwd: project })).toMatchObject({
@@ -405,7 +399,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     });
 
     it('.codocs가 파일이면 디렉터리 오류와 함께 전체 실패를 반환한다', async () => {
-      await rm(codocs, { recursive: true });
+      await rmWithRetry(codocs, { recursive: true });
       await writeFile(codocs, raw);
       const result = await loadWorkspace({ cwd: project });
       expect(result).toMatchObject({
@@ -421,7 +415,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
   });
   it('깨진 .codocs 정션이면 부재가 아니라 미지원 전체 실패다', async () => {
     const target = path.join(outside, 'missing');
-    await rm(codocs, { recursive: true });
+    await rmWithRetry(codocs, { recursive: true });
     await symlink(target, codocs, 'junction');
     expect(await loadWorkspace({ cwd: project })).toMatchObject({
       status: 'failed',

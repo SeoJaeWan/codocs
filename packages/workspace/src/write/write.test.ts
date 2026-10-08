@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -8,6 +8,7 @@ import {
   type WorkspaceQuerySession,
   type WorkspaceQuerySessionOptions,
 } from '../query/index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 let source: string;
@@ -30,7 +31,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await Promise.all(sessions.map((session) => session.close()));
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 /** 선택적 실제 IO 실패 지점 외에는 프로젝트 파일을 그대로 사용한다. */

@@ -4,7 +4,7 @@ import {
   scanStatuses,
   type Document,
 } from '@codocs/core';
-import { link, mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { link, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   afterEach,
@@ -22,6 +22,10 @@ import { buildWorkspaceCatalog, toCatalogScan } from './index.js';
 import { loadWorkspace, type WorkspaceScanResult } from '../loader/index.js';
 import { workspaceDocumentStatuses } from '../loader/domain-values.js';
 import { workspaceTargetKinds } from '../paths/domain-values.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 let project: string;
 beforeEach(
@@ -34,7 +38,7 @@ beforeEach(
 );
 afterEach(
   /** 이 테스트의 검증된 fixture만 정리한다. */ async () => {
-    await rm(project, { recursive: true, force: true });
+    await rmWithRetry(project, { recursive: true, force: true });
   },
 );
 /** 발견 경로 표기를 임의로 보정하지 않는다. */
@@ -313,8 +317,11 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
         first.documents.get(discovered('source.yaml'))?.occurrences[0]
           ?.resolution.status,
       ).toBe('ambiguous');
-      await rm(duplicate);
-      await rename(target, path.join(project, discovered('moved.yaml')));
+      await rmWithRetry(duplicate);
+      await renameWithRetry(
+        target,
+        path.join(project, discovered('moved.yaml')),
+      );
 
       const result = buildWorkspaceCatalog(
         await loadSuccessfulWorkspaceScan(),
@@ -372,7 +379,7 @@ describe('workspace 스캔의 core 색인 연결', /** 실제 IO와 중립 관�
         "_codocs:\n  id: target\n  name: 대상\ndefinition: '정의'\n",
       );
       const first = buildWorkspaceCatalog(await loadSuccessfulWorkspaceScan());
-      await rm(target);
+      await rmWithRetry(target);
 
       const result = buildWorkspaceCatalog(
         await loadSuccessfulWorkspaceScan(),

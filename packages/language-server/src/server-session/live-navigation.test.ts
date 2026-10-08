@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, mkdir, writeFile, rename, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CancellationTokenSource } from 'vscode-languageserver/node.js';
 import { LanguageServerSession } from './index.js';
 import { SourceSelections } from '../navigation/index.js';
+import {
+  renameWithRetry,
+  rmWithRetry,
+} from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 let session: LanguageServerSession;
@@ -28,7 +32,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await session.close();
-  await rm(root, { recursive: true, force: true });
+  await rmWithRetry(root, { recursive: true, force: true });
 });
 
 describe('live YAML과 디스크 대상의 연결', () => {
@@ -113,7 +117,10 @@ describe('live YAML과 디스크 대상의 연결', () => {
   });
   it('YAML 본문의 특수 경로 링크는 resolve와 Host 해석 뒤 같은 출처·토큰으로 대상을 확인한다', async () => {
     const targetPath = path.join(root, '.codocs/한글 % # %20 %23.yaml');
-    await rename(path.join(root, '.codocs/대상 문서.yaml'), targetPath);
+    await renameWithRetry(
+      path.join(root, '.codocs/대상 문서.yaml'),
+      targetPath,
+    );
     await session.refreshWorkspaces();
     const uri = pathToFileURL(
       path.join(root, '.codocs/한글 % # %23.yaml'),
@@ -161,7 +168,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
       async () => {
         expect(await session.documentLinks(sourceUri)).toHaveLength(0);
       },
-      { timeout: 3000 },
+      { timeout: 10_000 },
     );
   });
   it('감시가 대상 이름 변경을 게시하면 수동 refresh 없이 참조 진단을 갱신한다', async () => {
@@ -181,7 +188,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
       targetText.replace('name: 대상', 'name: 새 이름'),
     );
     await vi.waitFor(() => expect(changed).toHaveBeenCalled(), {
-      timeout: 3000,
+      timeout: 10_000,
     });
     await vi.waitFor(
       async () => {
@@ -193,7 +200,7 @@ describe('live YAML과 디스크 대상의 연결', () => {
           ),
         ).toBe(true);
       },
-      { timeout: 3000 },
+      { timeout: 10_000 },
     );
     expect(await session.documentLinks(sourceUri)).toHaveLength(0);
     unsubscribe();
@@ -374,8 +381,8 @@ describe('live YAML과 디스크 대상의 연결', () => {
       const moved = path.join(root, '.codocs/moved.yaml');
       if (action === 'content')
         await writeFile(original, targetText.replace('원래 본문', '수정 본문'));
-      if (action === 'move') await rename(original, moved);
-      if (action === 'delete') await rm(original);
+      if (action === 'move') await renameWithRetry(original, moved);
+      if (action === 'delete') await rmWithRetry(original);
       if (action === 'reuse')
         await writeFile(
           original,

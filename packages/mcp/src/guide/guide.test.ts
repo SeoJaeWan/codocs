@@ -1,8 +1,9 @@
-import { readFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, mkdir, mkdtemp } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { createCodocsGuideHandler, guideTopics } from './index.js';
+import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 const assets = pathToFileURL(path.resolve('docs/guide') + path.sep);
 
@@ -79,7 +80,7 @@ describe('createCodocsGuideHandler', () => {
         },
       });
     } finally {
-      await rm(directory, { recursive: true, force: true });
+      await rmWithRetry(directory, { recursive: true, force: true });
     }
   });
 });
