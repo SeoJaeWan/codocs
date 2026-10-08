@@ -1,104 +1,65 @@
-# COD-65 — Codocs Preflight 기반 관련 문서 자동 컨텍스트 주입 설계
+# COD-65 — Codocs MCP 검색 도구(codocs_search) 추가
 
 ## 배경
 
 Codocs 문서에 제약사항, 조건, 도메인 규칙을 작성하더라도 Codex/Claude가 해당 문서를 조회하지 않으면 실질적인 효과가 없다.
 
-현재 MCP 기반 접근은 Agent가 필요하다고 판단할 때만 `list`/`get` 등을 호출하는 구조이므로, 관련 문서가 존재해도 조회가 누락될 수 있다.
+현재 MCP 기반 접근은 Agent가 필요하다고 판단할 때만 `list`/`get`을 호출하는 구조다. 문서 이름을 모르면 `list`로 이름을 따라 내려가야 하므로 관련 문서가 있어도 놓칠 수 있다.
 
-이를 보완하기 위해 사용자의 프롬프트가 Agent에 전달되기 전에 관련 Codocs 문서를 자동 탐색하고, 관련 섹션을 먼저 제시하는 Codocs Preflight / Context Hook을 만든다.
+## 범위가 바뀐 이유
 
-## 목표
+처음에는 사용자 프롬프트가 Agent에 전달되기 전에 관련 문서를 자동 주입하는 Preflight Hook을 설계하려 했다. 프로토타입을 측정한 결과 다음 이유로 방향을 바꿨다.
 
-사용자가 Codex 또는 Claude에 작업 요청을 입력했을 때:
+- Hook은 사용자가 입력한 원문 프롬프트만 볼 수 있고, 이를 검색에 알맞은 주제·용어로 쪼갤 수 없다. 원문을 그대로 검색하면 정밀도가 낮다(1위 정확도 약 65%).
+- 정밀도를 올린 후보(BM25 + e5-small 혼합)는 용량 약 550MB와 응답 약 0.65초를 감수해야 하고, 재현율을 올린 재순위 후보는 4.8~7초와 1GB 이상이 필요해 Hook으로 쓰기 어렵다.
+- 반면 Agent가 직접 호출하는 검색에서는 AI가 대화 전체를 보고 짧은 검색어 여러 개를 직접 뽑을 수 있다. 이 방식은 모델이나 색인 없이 어휘 일치만으로도 문서를 찾을 수 있음을 프로토타입 근거로 확인했다.
 
-1. Hook이 사용자 프롬프트를 받는다.
-2. 프롬프트와 관련된 Codocs 섹션을 자동 검색한다.
-3. 관련성이 높은 섹션 주소만 `관련 문서 : 문서:섹션, …` 형태로 제시한다.
-4. 관련 문서가 없으면 아무것도 출력하지 않는다.
-5. Agent는 필요하면 기존 MCP `get`/`list`로 원문을 조회한다.
+그래서 이번 이슈는 MCP 도구 `codocs_search`를 추가하는 것으로 범위를 바꿨다. 프로토타입 측정 기록은 배경 근거로 남긴다([COD-65-results/prototype-report.md](./COD-65-results/prototype-report.md), 케이스별 결과 [COD-65-results/cases.md](./COD-65-results/cases.md)).
 
-## 진행 방식
+## 합의한 결정
 
-1. 프로토타입으로 검색 방식을 비교해 고른다(`.test/preflight-search`, git 추적 제외).
-2. 프로토타입 결과를 바탕으로 실행 경로·연동 방식을 정하고 실구현한다.
-
-## 합의한 결정 (2026-10-07)
-
-- 주입 내용은 섹션 주소 목록만 쓴다. 본문이나 `codocs_get` 안내 문구는 넣지 않는다. 최대 5개다.
-- 특정 모델(e5 등)에 매이지 않고, 기존 사례 조사 → 후보 → 같은 기준으로 측정을 여러 차수 반복해 고른다.
-- 프로토타입 단계에서는 검색 품질을 우선한다. 용량·설치 방식·응답 시간은 기록만 하고 실구현 단계에서 판단한다.
-- 정밀도를 재현율보다 우선한다.
-- 채점은 필수 정답(expected)과 허용(acceptable)을 나눈다. Precision@5는 반환 주소 중 정답·허용 비율, Recall@5는 필수 정답 중 찾은 비율이다. 문서가 필요 없는 프롬프트(F)는 빈 결과만 정답, 판단이 필요한 프롬프트(G)는 빈 결과 또는 허용 후보만 정답이다.
-- 질문은 한국어·영어·혼합을 고르게 넣고, 임계값은 tune 케이스로만 정하고 test 케이스로 판정한다.
-
-## 프로토타입 결과 (1·2차 차수)
-
-시험한 케이스 구성, 측정 방법, 후보 설계와 결과 전체는 [COD-65-results/prototype-report.md](./COD-65-results/prototype-report.md)에, 케이스 310개와 추천 후보 두 개(`hybrid-wsum`, `r2-rerank-bge-v2-m3@recall`)의 케이스별 결과는 [COD-65-results/cases.md](./COD-65-results/cases.md)에 있다. 아래는 그 요약이다.
-
-### 벤치마크
-
-- 케이스 310개: 정답이 있는 질문 192개, 문서 불필요(F) 78개, 판단 필요(G) 40개. tune 167 / test 143으로 고정했다.
-- 코퍼스 두 개: 이 저장소 `.codocs`(문서 42, 섹션 217)와 가상 쇼핑몰 문서(문서 41, 섹션 165, 영어 문서 13개, 섹션 링크 150개).
-- 모든 정답에 원문 근거 문장을 붙였고, 문서 작성자와 케이스 작성자를 나눴다.
-
-### 결론
-
-정밀도 우선 기준으로는 **BM25 + e5-small 혼합(`hybrid-wsum`)** 이 가장 실용적이다. 2차에서 후보 20개와 재현율 운영점 6개를 더 시험했지만(1차 후보 3개를 포함해 29개 변형 비교) 이보다 통계적으로 확실히 나은 방식은 없었다.
-
-| 방식                                   | Precision@5 | Recall@5 | F 정답률 | G 정답률 | 응답(새 프로세스) | 추가 용량                         |
-| -------------------------------------- | ----------- | -------- | -------- | -------- | ----------------- | --------------------------------- |
-| hybrid-wsum (추천)                     | 88.7        | 64.6     | 91.7     | 83.3     | 약 0.65초         | onnxruntime 약 437MB + 모델 118MB |
-| bge-reranker-v2-m3 재순위(재현율 설정) | 79.2        | 88.2     | 94.4     | 66.7     | 4.8~7초           | 위 + 모델 약 1.1GB                |
-| BM25만                                 | 71.9        | 66.9     | 91.7     | 77.8     | 약 0.05초         | 없음                              |
-
-수치는 test 케이스 기준(%)이다.
-
-- 재순위 모델은 재현율을 +23.6%p(95% 구간 +15.1~+32.6) 올리지만 정밀도가 약 10%p 떨어지고 hook으로 쓰기에는 느리고 무겁다.
-- 효과가 없었던 것: 더 큰 임베딩(e5-base·large, bge-m3), 한국어 형태소 분석(kiwi, 프롬프트당 +2.5~4초), `[[link]]` 점수 전파, 학습형 질의 판정.
-- 학습형 섹션 재순위는 "개요" 섹션을 고르는 편향을 없앴지만 전체 점수는 기준과 차이가 없었다.
-
-### 한계
-
-- test 규모(정답 89, F 36, G 18)로는 3%p 이하 차이를 구분하지 못한다.
-- 1위 정확도(약 65%)가 병목이고, 신경망 후보는 관련 없음 판정이 tune에 과적합됐다.
-- jina-reranker-v2는 CC-BY-NC-4.0, mmarco ONNX는 arm64 전용이라 제품 후보에서 제외해야 한다. Windows·x64는 검증하지 않았다.
-
-## 남은 결정 (실구현 전)
-
-- 정밀도 우선(`hybrid-wsum`, 약 0.65초)과 재현율 우선(재순위, 수 초·1GB 이상) 중 선택과 용량·설치 방식(npm 포함 여부, 첫 실행 다운로드).
-- 실행 경로: `codocs` bin 하위 명령, 별도 패키지, MCP 도구, Claude Code `mcp_tool` hook 중 선택.
-- 출력 노출: Claude Code `UserPromptSubmit`의 `additionalContext`는 모델에게만 보이고, 사용자 화면에 보이려면 `systemMessage`가 필요하다.
-- 대상 agent(Claude Code만 또는 Codex 포함)와 색인 생성·갱신 시점.
-- 3차 차수 여부: 케이스 100~150개 추가, 애매한 경우에만 재순위를 부르는 2단계 호출, 상주 프로세스 기준 응답 시간 측정.
+- 입력은 `queries` 배열이며 1~10개, 각 200자 이하다. 원문을 통째로 넣지 않고 AI가 뽑은 주제·용어·식별자를 준다.
+- 점수는 검색어마다 따로 정규화해 그 검색어의 최고 섹션을 1.0으로 맞춘다. 섹션 점수는 검색어별 점수의 최댓값이다.
+- 점수 순 상위 섹션 10개를 고른다. 같은 문서의 섹션이 둘 이상이면 문서 주소 하나로 묶고 걸린 섹션 이름을 `sections`에 담는다. 줄어든 자리는 채우지 않는다(backfill 없음).
+- 항목은 `address`, `score`, `queries`, `sections`만 담고 본문은 돌려주지 않는다. 걸린 섹션이 없는 검색어는 `emptyQueries`에 담는다.
+- YAML을 해석할 수 있는 문서는 규칙 위반이나 이름 충돌이 있어도 검색 대상에 포함한다. 오류와 충돌은 `codocs_get`이 알린다. 이름이 충돌하는 문서는 같은 주소가 항목에 중복될 수 있으며 의도된 동작이다.
+- `scanStatus`와 `partial`은 `list`/`get`과 같은 규칙을 따른다. partial이면 `unconfirmed_reference` 경고를 최상위 `diagnostics`에 담는다.
+- 사용 방법은 MCP 서버 instructions와 도구 설명으로 AI에게 안내한다.
+- 결과 형태: `{success, scanStatus, items[{address, score, queries, sections?}], emptyQueries, diagnostics?}`.
 
 ## 범위
 
 ### 포함
 
-- 관련 섹션 검색(`context(query)`)의 책임과 반환 형식
-- 검색 방식 비교와 선택(exact / keyword / semantic / `[[link]]` 신호)
-- 검색 품질 benchmark
-- Codex / Claude Preflight Hook 연동
-- 관련 문서가 없는 경우 빈 결과
+- `@codocs/core` 섹션 단위 어휘 검색(한국어 부분 문자열, 영문·숫자 대소문자 무시, 식별자 분리)
+- `@codocs/workspace` 검색 질의와 MCP 도구 `codocs_search`, 서버 instructions·도구 설명
+- 검색 도달률 benchmark
+- 개념 문서(`search-tool.yaml`), README(영문·한국어), 사용 가이드, changeset
 
 ### 이번 이슈에서 제외
 
-- Codocs 기반 post-hook / semantic validation
-- git diff 기반 규칙 위반 검사
-- Codex/Claude 전체 실행을 감싸는 별도 Agent wrapper
-- Codocs 규칙을 ESLint 규칙으로 자동 변환
+- Preflight / Context Hook(원문 프롬프트 기반 자동 주입)
+- 의미 기반 모델(임베딩, 재순위)
+- Codex Hook 연동
+- Codocs 기반 post-hook / semantic validation, git diff 기반 규칙 위반 검사
+
+## 검증
+
+- `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm exec prettier --check .`
+- 합성 쇼핑몰 코퍼스 benchmark(`packages/core/src/search/benchmark.test.ts`): 38개 케이스에서 정답 문서에 도달한 케이스 36/38(94.7%), 정답 섹션 75/77(97.4%).
+- 놓친 두 케이스는 모두 영어 문서를 한국어 검색어로 찾은 경우다. 어휘 일치 방식의 한계이므로 영어 문서가 있는 프로젝트에서는 검색어에 영어 동의어를 함께 넣도록 안내하는 것을 후속으로 고려한다(이번에는 적용하지 않음).
+- 개념 문서, README, 가이드의 결과 형태가 구현과 같은지 대조했다.
 
 ## 완료 조건
 
-- [x] 검색 결과의 책임과 반환 형식이 정의되어 있다(섹션 주소 최대 5개, 관련 없으면 출력 없음).
-- [x] 최소 1개의 검색 전략 프로토타입이 구현되어 있다.
+- [x] 검색 결과의 책임과 반환 형식이 정의되어 있다(`search-tool.yaml`).
 - [x] section 단위 검색이 가능하다.
-- [x] `[[link]]` 관계를 ranking·확장에 반영해 측정했다(효과가 없어 채택하지 않음).
-- [x] 관련성이 낮은 결과를 제한할 수 있다.
-- [x] benchmark query set으로 retrieval 품질을 측정할 수 있다.
-- [ ] Claude/Codex에서 사용자 프롬프트 입력 시 자동 컨텍스트 주입이 가능한 연동 방식을 검증한다(Claude Code hook 계약은 조사함, Codex는 미확인).
-- [ ] 기존 `list`/`get` MCP 흐름과 충돌하지 않는다.
+- [x] 관련성이 낮은 결과를 제한할 수 있다(상위 10개, 걸리지 않은 검색어는 `emptyQueries`).
+- [x] benchmark query set으로 검색 품질을 측정할 수 있다.
+- [x] MCP 도구 `codocs_search`와 서버 instructions가 추가되어 있다.
+- [x] 기존 `list`/`get` MCP 흐름과 충돌하지 않는다(전체 테스트 통과).
+- [x] README와 사용 가이드, changeset이 갱신되어 있다.
+- [ ] Windows에서 테스트를 검증한다(push 전 필요).
 
 ## Jira
 
