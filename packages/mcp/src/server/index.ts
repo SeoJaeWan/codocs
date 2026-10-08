@@ -41,6 +41,10 @@ export function wrapCodocsResult(result: CodocsToolResult): CallToolResult {
   };
 }
 
+/** 초기화 결과로 클라이언트에 전달하는 서버 사용 안내다. 검색 도구의 사용 시점과 방법을 알린다. */
+export const codocsServerInstructions =
+  '이 서버는 프로젝트의 .codocs 문서를 조회하고 관리합니다. 작업을 시작할 때와 작업 범위가 바뀔 때마다 codocs_search를 호출해 관련 문서를 먼저 찾으세요. 대화 맥락에서 주제·용어·식별자를 뽑아 짧은 검색어 여러 개로 호출하고, 사용자 요청 원문을 통째로 검색어에 넣지 마세요. 결과의 address는 codocs_get에 그대로 넘겨 함께 읽고, 본문에 있는 [[링크]]도 확인하세요. emptyQueries에 담긴 검색어는 걸린 문서가 없다는 뜻이므로 해당 문서가 없을 수 있습니다. scanStatus가 partial이면 확인하지 못한 문서가 있어 결과 없음을 문서 없음으로 단정하지 마세요.';
+
 /** 한 세션을 공유하는 SDK 서버와 실행 handler를 연결한다. 세션 종료는 호출자가 소유한다.
  * @param session 조회와 변경이 공유할 프로젝트 세션이다.
  * @param guide 가이드 원문 경계다. 생략하면 배포된 자산을 읽는다.
@@ -76,6 +80,14 @@ export function createCodocsServer(
         description:
           '문서 이름 주소(addresses)로 문서 전체나 섹션 하나를 최대 20개 조회합니다. 주소는 "이름" 또는 "이름:섹션"이며 이름이나 섹션에 콜론이 있으면 \:로 적습니다. 중복 주소는 첫 등장만 사용합니다. 결과마다 address를 담고, references와 referencedBy는 문서 이름입니다. 주소 하나의 형식 오류·부재(not_found, section_not_found)·중복(conflict)은 그 결과에만 표시합니다.',
         execute: handlers.codocsGet.bind(handlers),
+      },
+    ],
+    [
+      'codocs_search',
+      {
+        description:
+          '검색어(queries, 1~10개, 각 1~200자)로 문서와 섹션을 찾아 codocs_get에 바로 넘길 수 있는 address를 점수 순서로 돌려줍니다. 작업을 시작할 때와 범위가 바뀔 때 호출하고, 대화 맥락에서 뽑은 주제·용어·식별자를 짧은 검색어 여러 개로 나누어 넣으세요(원문 통째로 넣지 마세요). 항목마다 address, score(0 초과 1 이하), queries(걸린 검색어), sections(같은 문서의 섹션 여럿을 문서 주소로 묶었을 때 걸린 섹션 이름)를 담습니다. 결과 주소는 codocs_get으로 함께 읽고 본문의 [[링크]]도 확인하세요. 걸린 것이 없는 검색어는 emptyQueries에 담기며 그 주제의 문서가 없을 수 있다는 뜻입니다. scanStatus가 partial이면 diagnostics에 미확인 표시가 붙으며 결과 없음을 문서 없음으로 단정할 수 없습니다.',
+        execute: handlers.codocsSearch.bind(handlers),
       },
     ],
     [
@@ -121,7 +133,7 @@ export function createCodocsServer(
   ]);
   const server = new Server(
     { name: 'co-documentation', version: getMcpVersion() },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {} }, instructions: codocsServerInstructions },
   );
   server.setRequestHandler(
     ListToolsRequestSchema,

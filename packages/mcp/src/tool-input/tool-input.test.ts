@@ -7,14 +7,16 @@ import {
   parseGetInput,
   parseListInput,
   parseRenameInput,
+  parseSearchInput,
   parseValidateInput,
 } from './index.js';
 
-describe('MCP 일곱 입력 계약', () => {
-  it('일곱 스키마를 정의하고 알 수 없는 최상위 속성을 거부한다', () => {
+describe('MCP 여덟 입력 계약', () => {
+  it('여덟 스키마를 정의하고 알 수 없는 최상위 속성을 거부한다', () => {
     expect([...codocsInputSchemas.keys()]).toEqual([
       'codocs_list',
       'codocs_get',
+      'codocs_search',
       'codocs_refresh',
       'codocs_validate',
       'codocs_guide',
@@ -144,6 +146,25 @@ describe('MCP 일곱 입력 계약', () => {
     expect(parseGetInput({ ids: ['sample'] })).toBeUndefined();
     expect(parseGetInput({ addresses: ['a'], extra: 1 })).toBeUndefined();
     expect(parseGetInput({ addresses: [1] })).toBeUndefined();
+  });
+
+  it('search 입력은 검색어 1~10개, 각 1~200자만 받고 순서와 중복을 보존한다', () => {
+    expect(parseSearchInput({ queries: ['b', 'a', 'b'] })).toEqual({
+      queries: ['b', 'a', 'b'],
+    });
+    expect(parseSearchInput({ queries: ['x'.repeat(200)] })).toBeDefined();
+    expect(parseSearchInput({ queries: [] })).toBeUndefined();
+    expect(parseSearchInput({ queries: Array(11).fill('a') })).toBeUndefined();
+    expect(parseSearchInput({ queries: [''] })).toBeUndefined();
+    expect(parseSearchInput({ queries: ['x'.repeat(201)] })).toBeUndefined();
+    expect(parseSearchInput({ queries: [1] })).toBeUndefined();
+    expect(parseSearchInput({ query: 'a' })).toBeUndefined();
+    expect(parseSearchInput({ queries: ['a'], extra: 1 })).toBeUndefined();
+    expect(parseSearchInput({})).toBeUndefined();
+    expect(codocsJsonInputSchema('codocs_search')).toMatchObject({
+      properties: { queries: { minItems: 1, maxItems: 10 } },
+      additionalProperties: false,
+    });
   });
 
   it('write 입력은 사용자 속성을 삭제하지 않는다', () => {

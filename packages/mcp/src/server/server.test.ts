@@ -82,6 +82,93 @@ function payload(response: unknown): Record<string, unknown> {
 }
 
 describe('소스 MCP stdio 서버', () => {
+  it('codocs_search를 도구 목록과 서버 instructions로 노출하고 실제 문서를 검색한다', async () => {
+    const { client, transport } = await clientFor(projectA);
+    try {
+      const instructions = client.getInstructions();
+      expect(instructions).toContain('codocs_search');
+      expect(instructions).toContain('codocs_get');
+      expect(instructions).toContain('[[링크]]');
+      expect(instructions).toContain('emptyQueries');
+      const search = (await client.listTools()).tools.find(
+        (tool) => tool.name === 'codocs_search',
+      );
+      expect(search?.description).toContain('codocs_get');
+      expect(search?.inputSchema).toMatchObject({
+        type: 'object',
+        properties: { queries: { minItems: 1, maxItems: 10 } },
+        required: ['queries'],
+        additionalProperties: false,
+      });
+      const found = payload(
+        await client.callTool({
+          name: 'codocs_search',
+          arguments: { queries: ['alpha', 'zzzqqq'] },
+        }),
+      );
+      expect(found).toMatchObject({
+        success: true,
+        scanStatus: 'complete',
+        emptyQueries: ['zzzqqq'],
+      });
+      const items = found.items as { address: string; queries: string[] }[];
+      expect(items.map((item) => item.address)).toContain('alpha:definition');
+      expect(items[0]?.queries).toEqual(['alpha']);
+      const fetched = payload(
+        await client.callTool({
+          name: 'codocs_get',
+          arguments: { addresses: items.map((item) => item.address) },
+        }),
+      );
+      expect(
+        (fetched.results as { found: boolean }[]).every((item) => item.found),
+      ).toBe(true);
+      expect(
+        payload(
+          await client.callTool({
+            name: 'codocs_search',
+            arguments: { queries: ['zzzqqq'] },
+          }),
+        ),
+      ).toEqual({
+        success: true,
+        scanStatus: 'complete',
+        items: [],
+        emptyQueries: ['zzzqqq'],
+      });
+    } finally {
+      await transport.close();
+    }
+  });
+
+  it('codocs_search의 입력 위반은 invalid_input으로 거부한다', async () => {
+    const { client, transport } = await clientFor(projectA);
+    try {
+      for (const args of [
+        {},
+        { queries: [] },
+        { queries: Array(11).fill('a') },
+        { queries: [''] },
+        { queries: ['x'.repeat(201)] },
+        { queries: 'alpha' },
+        { queries: ['alpha'], extra: true },
+      ])
+        expect(
+          payload(
+            await client.callTool({
+              name: 'codocs_search',
+              arguments: args,
+            }),
+          ),
+        ).toMatchObject({
+          success: false,
+          error: { code: 'invalid_input' },
+        });
+    } finally {
+      await transport.close();
+    }
+  });
+
   it('초기화 후 쓰기를 포함한 도구를 제공하고 실제 문서를 목록·상세·검증·갱신한다', async () => {
     const { client, transport } = await clientFor(projectA);
     try {
@@ -89,6 +176,7 @@ describe('소스 MCP stdio 서버', () => {
       expect(names).toEqual([
         'codocs_list',
         'codocs_get',
+        'codocs_search',
         'codocs_refresh',
         'codocs_validate',
         'codocs_write',

@@ -16,6 +16,7 @@ import {
   type WorkspaceRefreshResult,
   type WorkspaceRenamePreviewResult,
   type WorkspaceRenameResult,
+  type WorkspaceSearchResult,
   type WorkspaceValidationResult,
   type WorkspaceWriteResult,
 } from '@codocs/workspace';
@@ -24,6 +25,7 @@ import {
   parseGetInput,
   parseListInput,
   parseRenameInput,
+  parseSearchInput,
   parseValidateInput,
   parseWriteInput,
 } from '../tool-input/index.js';
@@ -55,6 +57,9 @@ export type CodocsListResponse = WorkspaceListResult;
 /** codocs_get의 공통 success 응답이다. */
 export type CodocsGetResponse = WorkspaceGetResponse;
 
+/** codocs_search의 공통 success 응답이다. */
+export type CodocsSearchResponse = WorkspaceSearchResult;
+
 /** codocs_validate의 공통 결과이며 문서 오류 진단도 요청 성공이다.
  * */
 export type CodocsValidationResponse = WorkspaceValidationResult;
@@ -73,6 +78,7 @@ export interface CodocsQueryHandlers {
   readonly access: CodocsAccessState;
   codocsList(input?: unknown): Promise<CodocsListResponse>;
   codocsGet(input: unknown): Promise<CodocsGetResponse>;
+  codocsSearch(input: unknown): Promise<CodocsSearchResponse>;
   codocsValidate(input?: unknown): Promise<CodocsValidationResponse>;
   codocsRefresh(input?: unknown): Promise<WorkspaceRefreshResult>;
   codocsWrite(input: unknown): Promise<CodocsWriteResponse>;
@@ -172,6 +178,12 @@ export function createCodocsQueryHandlers(
       const parsed = parseGetInput(input);
       if (!parsed) return invalidInput();
       return session.get(parsed.addresses);
+    },
+    /** 유효한 검색어 입력만 workspace 검색으로 전달한다. */
+    async codocsSearch(input: unknown): Promise<CodocsSearchResponse> {
+      const parsed = parseSearchInput(input);
+      if (!parsed) return invalidInput();
+      return session.search(parsed.queries);
     },
     /** 같은 세션의 완료 색인과 경로 검사로 검증 범위를 결정한다.
      * */

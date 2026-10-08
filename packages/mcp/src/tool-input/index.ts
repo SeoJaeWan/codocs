@@ -46,6 +46,7 @@ function dataOnly(input: unknown, ancestors = new Set<object>()): boolean {
 export type CodocsToolName =
   | 'codocs_list'
   | 'codocs_get'
+  | 'codocs_search'
   | 'codocs_refresh'
   | 'codocs_validate'
   | 'codocs_guide'
@@ -54,6 +55,10 @@ export type CodocsToolName =
 
 const listSchema = z.strictObject({ parent: z.string().optional() });
 const getSchema = z.strictObject({ addresses: z.array(z.string()) });
+/** 검색어 1~10개, 각 1~200자다. 순서·중복은 그대로 보존한다. */
+const searchSchema = z.strictObject({
+  queries: z.array(z.string().min(1).max(200)).min(1).max(10),
+});
 const validateSchema = z.strictObject({ path: z.string().optional() });
 const guideSchema = z.strictObject({ topic: z.enum(guideTopics).optional() });
 /** 단일 요청과 changes 항목이 함께 쓰는 mode 구분 입력이다. */
@@ -139,11 +144,12 @@ export function parseRenameInput(
   return result.success ? result.data : undefined;
 }
 
-/** 일곱 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다.
+/** 여덟 도구의 공개 입력 계약이다. 등록 여부와 별개로 같은 원본을 검증에 사용한다.
  * */
 export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
   ['codocs_list', listSchema],
   ['codocs_get', getSchema],
+  ['codocs_search', searchSchema],
   ['codocs_refresh', z.strictObject({})],
   ['codocs_validate', validateSchema],
   ['codocs_guide', guideSchema],
@@ -185,6 +191,15 @@ export function parseGetInput(
   return addresses.length >= 1 && addresses.length <= 20
     ? { addresses }
     : undefined;
+}
+
+/** 검색어 배열을 입력 순서 그대로 보존하며 개수·길이 위반과 알 수 없는 속성은 거부한다. */
+export function parseSearchInput(
+  input: unknown,
+): { queries: string[] } | undefined {
+  if (!dataOnly(input)) return undefined;
+  const result = searchSchema.safeParse(input);
+  return result.success ? { queries: result.data.queries } : undefined;
 }
 
 /** 선택 경로를 입력 그대로 보존하며 알 수 없는 속성은 거부한다. */

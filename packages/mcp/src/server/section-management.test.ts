@@ -93,7 +93,7 @@ describe('도구 목록과 폐기된 duplicates', () => {
     await start({ '.codocs/refund.yaml': refund });
     const names = (await client!.listTools()).tools.map((tool) => tool.name);
     expect(names).not.toContain('codocs_duplicates');
-    expect(names).toHaveLength(7);
+    expect(names).toHaveLength(8);
     await expect(
       client!.callTool({ name: 'codocs_duplicates', arguments: {} }),
     ).rejects.toThrow(/Unknown tool: codocs_duplicates/u);
