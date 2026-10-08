@@ -75,6 +75,12 @@ function splitSection(
   };
 }
 /**
+ * 참조 구성 안의 콜론을 구분자와 구분되도록 `\:`로 쓴다. unescapeColon의 역변환이다.
+ */
+export function encodeColon(value: string): string {
+  return value.replace(/:/gu, '\\:');
+}
+/**
  * 문서 이름과 섹션 이름에 `\:`로 쓴 콜론을 콜론 글자로 되돌린다.
  */
 function unescapeColon(text: string): string {
