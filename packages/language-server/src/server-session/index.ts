@@ -5,6 +5,7 @@ import {
 } from '@codocs/core';
 import {
   createWorkspaceQuerySession,
+  locateOwningCodocs,
   type WorkspaceQuerySession,
   type WorkspaceLiveReferenceSuccess,
   type WorkspaceSectionDestination,
@@ -656,7 +657,9 @@ export class LanguageServerSession {
   /** 프로젝트 지식 폴더 안의 YAML만 편집 중 지식 문서로 취급한다. */
   #isKnowledgeDocument(uri: string, workspace: WorkspaceBinding): boolean {
     const relative = this.#sourcePath(uri, workspace);
-    return relative.startsWith('.codocs/') && /\.ya?ml$/iu.test(relative);
+    return (
+      locateOwningCodocs(relative) !== undefined && /\.ya?ml$/iu.test(relative)
+    );
   }
 
   /** 최신 출처 소유권·버전·선택 근거를 확인하고 file URI만 반환한다. */

@@ -55,6 +55,38 @@ afterEach(async () => {
   await rmWithRetry(root, { recursive: true, force: true });
 });
 
+describe('prepareRename 하위 .codocs 문서 판별', () => {
+  it('하위 .codocs 안의 YAML은 지식 문서로 보고 .codocs 밖의 YAML은 거부한다', async () => {
+    await mkdir(path.join(root, 'packages', 'core', '.codocs'), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(root, 'packages', 'core', '.codocs', 'n.yaml'),
+      document('n', '하위', '설명'),
+    );
+    await writeFile(
+      path.join(root, 'packages', 'core', 'plain.yaml'),
+      document('p', '일반', '설명'),
+    );
+    await open('packages/core/.codocs/n.yaml');
+    await open('packages/core/plain.yaml');
+    const position = { line: 2, character: 9 };
+
+    expect(
+      await session.prepareRename({
+        textDocument: { uri: uriOf('packages/core/.codocs/n.yaml') },
+        position,
+      }),
+    ).toMatchObject({ kind: 'document', placeholder: '하위' });
+    expect(
+      await session.prepareRename({
+        textDocument: { uri: uriOf('packages/core/plain.yaml') },
+        position,
+      }),
+    ).toBeNull();
+  });
+});
+
 describe('prepareRename 시작 위치 확인', () => {
   it('문서의 name 값 위에서는 그 문서의 현재 이름과 name 값 범위를 반환한다', async () => {
     const text = await open('.codocs/order.yaml');
