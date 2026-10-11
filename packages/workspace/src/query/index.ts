@@ -764,6 +764,8 @@ export class WorkspaceQuerySession {
   #locations: CodocsLocations | undefined;
   /** 하위 .codocs 생성·삭제와 규칙 파일 변경을 알리는 프로젝트 감시다. .gitignore·루트 .codocsignore가 제외하지 않은 범위만 보며 Git은 실행하지 않는다. */
   #locationWatcher: CodocsLocationWatcher | undefined;
+  /** 하위 .codocs 찾기에서 제외하는 프로젝트 상대 폴더다. 다른 작업 공간 폴더로 열린 하위 폴더가 해당한다. */
+  #excludedDirectories: readonly string[] = [];
   /** 위치 감시를 등록한 규칙의 지문이다. 규칙이 바뀌면 다시 등록한다. */
   #locationRules: string | undefined;
   #locationRegistering = false;
@@ -788,6 +790,25 @@ export class WorkspaceQuerySession {
     this.#input = sessionInput(input);
     this.#observe = observe;
     this.#options = options;
+  }
+
+  /**
+   * 하위 .codocs를 인정하지 않을 하위 폴더를 정한다. 그 폴더 아래의 .codocs는 찾기·감시·저장 위치 판정에서 제외된다.
+   * 이미 시작한 세션이면 위치를 다시 확인해 더 이상 인정하지 않는 .codocs의 문서를 색인에서 뺀다.
+   * @param directories 프로젝트 상대 폴더이며 `/`로 구분한다. 프로젝트 루트 자체와 중복은 무시한다.
+   */
+  setExcludedDirectories(directories: readonly string[]): void {
+    const next = [
+      ...new Set(
+        directories
+          .map((directory) => directory.replace(/\/+$/u, ''))
+          .filter(Boolean),
+      ),
+    ].sort();
+    if (JSON.stringify(next) === JSON.stringify(this.#excludedDirectories))
+      return;
+    this.#excludedDirectories = next;
+    if (this.#root && !this.#closed) this.#requestLocations();
   }
 
   /** 문서 파일의 identity·크기·mtime·ctime으로 같은 상태 판별용 stamp를 만든다. 파일이 아니거나 읽을 수 없으면 undefined다. */
@@ -912,7 +933,10 @@ export class WorkspaceQuerySession {
     const root = this.#root;
     if (!root || this.#closed)
       return { added: [], removed: [], changed: false };
-    const discovered = await discoverCodocsLocations(root.projectRoot);
+    const discovered = await discoverCodocsLocations(
+      root.projectRoot,
+      this.#excludedDirectories,
+    );
     if (this.#closed) return { added: [], removed: [], changed: false };
     const rules = codeWatchRuleKey(discovered.policy);
     let registered = false;

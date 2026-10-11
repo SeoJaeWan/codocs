@@ -72,6 +72,9 @@ import {
 } from '../navigation/index.js';
 /** 작업 공간 색인 수동 갱신 요청의 메서드 이름이다. */
 export const workspaceRefreshRequestMethod = 'codocs/refresh';
+/** 클라이언트가 별도 서버로 맡긴 중첩 workspace 폴더 목록을 알리는 알림의 메서드 이름이다. */
+export const nestedWorkspaceFoldersNotificationMethod =
+  'codocs/nestedWorkspaceFolders';
 
 /** 색인을 명시적으로 다시 읽을 작업 공간 선택이다. */
 export interface WorkspaceRefreshRequest {
@@ -95,6 +98,7 @@ export interface WorkspaceSessionBoundary extends Partial<
     | 'confirmCandidate'
     | 'releaseCandidate'
     | 'closeDocument'
+    | 'setExcludedDirectories'
     | 'diagnostics'
     | 'closeCodeBuffer'
     | 'setCodeReferenceOwner'
@@ -148,6 +152,8 @@ export class LanguageServerSession {
     Promise<WorkspaceLiveReferenceSuccess | undefined>
   >();
   readonly #referenceFailures = new Map<string, WorkspaceQueryDiagnostic>();
+  /** 클라이언트가 알려 준, 다른 서버가 맡는 중첩 workspace 폴더의 경로다. */
+  #clientNested: readonly string[] = [];
   #closed = false;
   #diagnosticEpoch = 0;
   readonly #diagnosticHistory = new Map<
@@ -167,7 +173,20 @@ export class LanguageServerSession {
   /** initialize의 작업 공간 목록을 각각 독립된 조회 세션으로 만든다. */
   async initialize(params: InitializeParams): Promise<void> {
     const folders = initialWorkspaceFolders(params);
+    this.#clientNested = nestedFolderPaths(
+      (params.initializationOptions as ClientNestedFolders | undefined)
+        ?.nestedWorkspaceFolderUris,
+    );
     await this.#replaceWorkspaces(folders);
+  }
+
+  /**
+   * 클라이언트가 다른 서버로 맡긴 중첩 workspace 폴더를 알려 주면 바깥 작업 공간의 하위 .codocs 찾기에서 그 폴더를 제외한다.
+   * @param uris 이 서버의 작업 공간 안에 있으면서 별도 workspace 폴더로 열린 폴더의 file URI다. 잘못된 값은 무시한다.
+   */
+  setNestedWorkspaceFolders(uris: unknown): void {
+    this.#clientNested = nestedFolderPaths(uris);
+    this.#syncNestedExclusions();
   }
 
   /** 동적 workspace folder 변경을 세션 생성·종료에 반영한다. */
@@ -177,6 +196,7 @@ export class LanguageServerSession {
   ): Promise<void> {
     for (const folder of removed) await this.#removeWorkspace(folder.uri);
     for (const folder of added) this.#addWorkspace(folder);
+    this.#syncNestedExclusions();
     for (const document of this.documents.all())
       this.#documentChanged(document.uri);
   }
@@ -1017,6 +1037,33 @@ export class LanguageServerSession {
     this.#workspaces.clear();
     await Promise.all(previous.map((workspace) => workspace.session.close()));
     for (const folder of folders) this.#addWorkspace(folder);
+    this.#syncNestedExclusions();
+  }
+
+  /**
+   * 다른 작업 공간 폴더로 열린 하위 폴더를 바깥 작업 공간의 하위 .codocs 찾기에서 제외한다.
+   * 그 폴더의 .codocs는 가장 가까운 작업 공간인 안쪽 세션만 인정한다.
+   * 이 서버가 함께 가진 작업 공간과 클라이언트가 알려 준 중첩 폴더를 모두 대상으로 한다.
+   */
+  #syncNestedExclusions(): void {
+    for (const outer of this.#workspaces.values()) {
+      const inners = [
+        ...[...this.#workspaces.values()]
+          .filter((inner) => inner !== outer)
+          .map((inner) => inner.rootPath),
+        ...this.#clientNested,
+      ];
+      const nested: string[] = [];
+      for (const inner of inners) {
+        if (!containsPath(outer.rootPath, inner)) continue;
+        const relative = path
+          .relative(path.resolve(outer.rootPath), path.resolve(inner))
+          .split(path.sep)
+          .join('/');
+        if (relative) nested.push(relative);
+      }
+      outer.session.setExcludedDirectories?.(nested);
+    }
   }
 
   /** 유효한 file URI 작업 공간 하나를 중복 없이 추가한다. */
@@ -1104,6 +1151,26 @@ export class LanguageServerSession {
       this.#workspaceForDocument(uri) === workspace
     );
   }
+}
+
+/** 클라이언트가 initialize의 initializationOptions로 넘기는 중첩 workspace 폴더 목록이다. */
+interface ClientNestedFolders {
+  nestedWorkspaceFolderUris?: unknown;
+}
+
+/** 중첩 workspace 폴더 URI 목록에서 유효한 file URI만 절대 경로로 바꾼다. 목록이 아니거나 잘못된 항목은 무시한다. */
+function nestedFolderPaths(uris: unknown): string[] {
+  if (!Array.isArray(uris)) return [];
+  const paths: string[] = [];
+  for (const uri of uris as unknown[]) {
+    if (typeof uri !== 'string') continue;
+    try {
+      paths.push(path.resolve(fileURLToPath(uri)));
+    } catch {
+      continue;
+    }
+  }
+  return paths;
 }
 
 /** initialize의 현대·이전 단일 루트 표현을 작업 공간 목록으로 통합한다. */

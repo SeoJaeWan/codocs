@@ -24,11 +24,16 @@ export interface CodocsLocations {
  * .gitignore 계층과 루트 .codocsignore로 제외되지 않은 하위 .codocs를 찾는다. 루트 .codocs는 결과에 넣지 않는다.
  * Git 명령을 실행하지 않고 파일 원문도 읽지 않으며 ignore 확인 실패는 failures로 돌려준다.
  * @param projectRoot 프로젝트 루트 절대 경로다.
+ * @param excludedDirectories 통째로 제외할 하위 폴더이며 프로젝트 상대 경로를 `/`로 구분한다. 다른 작업 공간 폴더로 열린 폴더가 해당한다.
  */
 export async function discoverCodocsLocations(
   projectRoot: string,
+  excludedDirectories: readonly string[] = [],
 ): Promise<CodocsLocations> {
-  const discovered = await discoverCodocsOwners(projectRoot);
+  const discovered = await discoverCodocsOwners(
+    projectRoot,
+    excludedDirectories,
+  );
   return {
     owners: discovered.owners,
     policy: discovered.policy,

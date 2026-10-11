@@ -55,6 +55,8 @@ export interface CodeFilePolicy {
   codocsIgnore?: CodocsIgnoreRules;
   /** root `.codocsignore`를 읽지 못해 제외 범위를 확인하지 못했다. */
   codocsIgnoreUnknown?: boolean;
+  /** 하위 .codocs 찾기에서 통째로 제외하는 프로젝트 상대 폴더다. 다른 작업 공간 폴더로 열린 하위 폴더이며 `/`로 구분한다. */
+  excludedDirectories?: readonly string[];
 }
 /** 파일 원문을 읽지 않고 확인한 정책과 읽기 후보 파일이다. */
 export interface CodeFilePolicyComputation {
@@ -165,6 +167,11 @@ export function isCodeDirectoryExcluded(
   relative: string,
 ): boolean {
   return (
+    (policy.excludedDirectories?.some(
+      /** 제외 폴더 자신이나 그 아래면 제외다. */ (directory) =>
+        relative === directory || relative.startsWith(directory + '/'),
+    ) ??
+      false) ||
     isCodocsIgnored(policy, relative + '/') ||
     (isCodeFileIgnored(policy, relative + '/') &&
       !hasTrackedDescendant(policy, relative))
@@ -221,6 +228,9 @@ export function codeWatchRuleKey(policy: CodeFilePolicy): string {
   return JSON.stringify([
     policy.layers.map((layer) => [layer.directory, layer.text]),
     watchedTrackedDirectories(policy),
+    ...(policy.excludedDirectories?.length
+      ? [[...policy.excludedDirectories].sort()]
+      : []),
     ...(policy.codocsIgnore || policy.codocsIgnoreUnknown
       ? [[policy.codocsIgnore?.text ?? null, !!policy.codocsIgnoreUnknown]]
       : []),
@@ -734,6 +744,7 @@ export interface CodocsOwnerDiscovery {
  */
 export async function discoverCodocsOwners(
   projectRoot: string,
+  excludedDirectories: readonly string[] = [],
 ): Promise<CodocsOwnerDiscovery> {
   projectRoot = path.resolve(projectRoot);
   const codocsIgnore = await readCodocsIgnore(projectRoot);
@@ -750,6 +761,7 @@ export async function discoverCodocsOwners(
     layers,
     unknownIgnoreDirectories: unknown,
     ...codocsIgnorePolicyFields(codocsIgnore),
+    ...(excludedDirectories.length ? { excludedDirectories } : {}),
   };
   await walkCodeDirectory(
     {

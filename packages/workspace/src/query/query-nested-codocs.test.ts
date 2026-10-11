@@ -356,6 +356,87 @@ describe('WorkspaceQuerySession.write: 하위 .codocs 저장', () => {
   });
 });
 
+describe('WorkspaceQuerySession.setExcludedDirectories: 별도로 열린 하위 폴더의 .codocs 제외', () => {
+  it('제외한 하위 폴더의 .codocs는 색인하지 않고 제외하지 않은 하위 폴더의 .codocs는 색인한다', async () => {
+    await file('packages/core/.codocs/a.yaml', documentText('core-a', '코어'));
+    await file('packages/web/.codocs/b.yaml', documentText('web-b', '웹'));
+    await file(
+      'packages/core/deep/.codocs/c.yaml',
+      documentText('core-c', '깊은'),
+    );
+    const session = newSession();
+    session.setExcludedDirectories(['packages/core']);
+
+    const core = await session.get(['코어']);
+    const deep = await session.get(['깊은']);
+    const web = await session.get(['웹']);
+
+    expect(core).toMatchObject({ results: [{ found: false }] });
+    expect(deep).toMatchObject({ results: [{ found: false }] });
+    expect(web).toMatchObject({ results: [{ found: true }] });
+  });
+
+  it('제외한 하위 폴더의 .codocs에 create하면 invalid_workspace_path로 거부하고 폴더를 만들지 않는다', async () => {
+    const session = newSession();
+    session.setExcludedDirectories(['packages/core']);
+    const rejected = await session.write({
+      mode: 'create',
+      path: 'packages/core/.codocs/a.yaml',
+      document: {
+        _codocs: { id: 'core-a', name: '코어' },
+        definition: '본문',
+      },
+    });
+
+    expect(rejected).toMatchObject({
+      success: false,
+      saved: false,
+      error: { code: workspaceDiagnosticCodes.invalidWorkspacePath },
+    });
+    expect(await exists('packages')).toBe(false);
+  });
+
+  it('제외한 하위 폴더의 .codocs 문서 경로로 검증하면 제외된 위치를 알리는 invalid_path로 거부한다', async () => {
+    await file('packages/core/.codocs/a.yaml', documentText('core-a', '코어'));
+    const session = newSession();
+    session.setExcludedDirectories(['packages/core']);
+    const result = await session.validate('packages/core/.codocs/a.yaml');
+
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: queryDiagnosticCodes.invalidPath },
+    });
+  });
+
+  it('실행 중 하위 폴더를 제외하면 재시작 없이 그 문서를 색인에서 지우고 제외를 풀면 다시 색인한다', async () => {
+    await file('packages/core/.codocs/a.yaml', documentText('core-a', '코어'));
+    const session = newSession();
+    expect(await session.get(['코어'])).toMatchObject({
+      results: [{ found: true }],
+    });
+
+    session.setExcludedDirectories(['packages/core']);
+    await vi.waitFor(
+      async () =>
+        expect(await session.get(['코어'])).toMatchObject({
+          scanStatus: 'complete',
+          results: [{ found: false }],
+        }),
+      { timeout: 10_000, interval: 100 },
+    );
+
+    session.setExcludedDirectories([]);
+    await vi.waitFor(
+      async () =>
+        expect(await session.get(['코어'])).toMatchObject({
+          scanStatus: 'complete',
+          results: [{ found: true }],
+        }),
+      { timeout: 10_000, interval: 100 },
+    );
+  });
+});
+
 describe('WorkspaceQuerySession: 실행 중 하위 .codocs 변경 반영', () => {
   it('실행 중 새 하위 .codocs가 생기면 재시작 없이 그 문서를 색인에 반영한다', async () => {
     const session = newSession();
