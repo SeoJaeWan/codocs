@@ -163,6 +163,27 @@ export const changePlanDiagnosticMessages = {
 /** 변경 후보 계산의 오류 코드다. */
 export type ChangePlanDiagnosticCode =
   (typeof changePlanDiagnosticCodes)[keyof typeof changePlanDiagnosticCodes];
+/** 문서 경로 규칙에 맞는 올바른 경로 예시다. 경로 형식 오류 문구의 끝에 붙는다. */
+export const documentPathExample = '.codocs/orders/order.yaml';
+/** 문서 경로 형식 오류의 원인별 고정 문구다. 어느 문구든 끝에 올바른 예시가 붙는다. */
+export const documentPathMessages = {
+  /** `/`로 시작하거나 드라이브 문자로 시작하는 절대 경로다. */
+  absolute: `경로는 프로젝트 루트 기준 상대 경로여야 하며 절대 경로는 쓸 수 없습니다. 올바른 예: ${documentPathExample}`,
+  /** 경로에 `.` 또는 `..` 구간이 있다. */
+  dotSegment: `경로에는 '.'와 '..' 구간을 쓸 수 없습니다. 올바른 예: ${documentPathExample}`,
+  /** 경로에 역슬래시가 남아 있다. 작업 공간 계층은 core에 넘기기 전에 `/`로 바꾼다. */
+  backslash: `경로는 '/'로 구분해야 합니다. 올바른 예: ${documentPathExample}`,
+  /** 경로가 `/`로 끝나거나 소유 .codocs 아래에 파일명이 없다. */
+  missingFileName: `경로의 끝에 파일명이 있어야 합니다. 올바른 예: ${documentPathExample}`,
+  /** 경로 중간에 빈 구간이 있다. */
+  emptySegment: `경로에 빈 구간이 있습니다. 올바른 예: ${documentPathExample}`,
+  /** 파일명이 .yaml 또는 .yml로 끝나지 않는다. */
+  extension: `파일명은 .yaml 또는 .yml로 끝나야 합니다. 올바른 예: ${documentPathExample}`,
+  /** 경로에 .codocs 폴더 구간이 없다. */
+  missingCodocs: `경로에 .codocs 폴더 구간이 있어야 합니다. 올바른 예: ${documentPathExample}`,
+} as const;
+/** 문서 경로 형식 오류의 원인이다. */
+export type DocumentPathProblem = keyof typeof documentPathMessages;
 /** 이름 변경 반영이 반환하는 오류 코드다. @domainValues */
 export const renameDiagnosticCodes = {
   /** 이름 변경을 진행할 수 없는 상태라 아무 파일도 바꾸지 않았다. */
@@ -203,7 +224,7 @@ export const queryDiagnosticCodes = {
 } as const;
 /** 조회 투영이 추가하는 고정 진단 문구다. */
 export const queryDiagnosticMessages = {
-  invalidPath: '프로젝트 상대 .codocs YAML 파일 경로 하나를 지정하세요.',
+  invalidPath: `프로젝트 상대 .codocs YAML 파일 경로 하나를 지정하세요. 올바른 예: ${documentPathExample}`,
   fileNotFound: '검증할 파일이 없습니다.',
   fileAccessFailed: '검증할 파일을 읽을 수 없습니다.',
   /** 배포 가이드 파일 접근에 실패한 경우다. 색인 준비 상태와 무관하다. */

@@ -5,6 +5,7 @@ import { constants, type Stats } from 'node:fs';
 import path from 'node:path';
 import ignore, { type Ignore } from 'ignore';
 import { calculateRevision } from '../revision/index.js';
+import { codocsDirectoryName } from '../project-root/index.js';
 import {
   codeCollectionStatuses,
   codeFileReasons,
@@ -54,6 +55,8 @@ export interface CodeFilePolicy {
   codocsIgnore?: CodocsIgnoreRules;
   /** root `.codocsignore`를 읽지 못해 제외 범위를 확인하지 못했다. */
   codocsIgnoreUnknown?: boolean;
+  /** 하위 .codocs 찾기에서 통째로 제외하는 프로젝트 상대 폴더다. 다른 작업 공간 폴더로 열린 하위 폴더이며 `/`로 구분한다. */
+  excludedDirectories?: readonly string[];
 }
 /** 파일 원문을 읽지 않고 확인한 정책과 읽기 후보 파일이다. */
 export interface CodeFilePolicyComputation {
@@ -155,14 +158,20 @@ export function isCodocsIgnored(
   return false;
 }
 /**
- * 폴더 안으로 내려가지 않거나 감시하지 않는 폴더인지 판단한다.
+ * 폴더 안으로 내려가지 않거나 감시하지 않는 폴더인지 판단한다. 하위 .codocs 위치 판정에도 같은 규칙을 쓴다.
  * `.codocsignore` 제외는 추적 파일이 있어도 적용하고, 그 밖의 제외는 추적 파일이 없을 때만 적용한다.
+ * @param relative 프로젝트 상대 폴더 경로이며 `/`로 구분한다.
  */
-function isCodeDirectoryExcluded(
+export function isCodeDirectoryExcluded(
   policy: CodeFilePolicy,
   relative: string,
 ): boolean {
   return (
+    (policy.excludedDirectories?.some(
+      /** 제외 폴더 자신이나 그 아래면 제외다. */ (directory) =>
+        relative === directory || relative.startsWith(directory + '/'),
+    ) ??
+      false) ||
     isCodocsIgnored(policy, relative + '/') ||
     (isCodeFileIgnored(policy, relative + '/') &&
       !hasTrackedDescendant(policy, relative))
@@ -219,6 +228,9 @@ export function codeWatchRuleKey(policy: CodeFilePolicy): string {
   return JSON.stringify([
     policy.layers.map((layer) => [layer.directory, layer.text]),
     watchedTrackedDirectories(policy),
+    ...(policy.excludedDirectories?.length
+      ? [[...policy.excludedDirectories].sort()]
+      : []),
     ...(policy.codocsIgnore || policy.codocsIgnoreUnknown
       ? [[policy.codocsIgnore?.text ?? null, !!policy.codocsIgnoreUnknown]]
       : []),
@@ -588,6 +600,11 @@ interface CodeWalk {
   unknown: Set<string>;
   failures: CodeCollectionFailure[];
   candidates: string[];
+  /**
+   * 있으면 하위 .codocs 찾기다. 만난 가장 바깥 .codocs의 소유 폴더를 모으고 그 안으로 내려가지 않으며 파일 후보는 모으지 않는다.
+   * 루트 .codocs는 항상 인정하므로 모으지 않는다.
+   */
+  codocsOwners?: string[];
 }
 /** 추적 파일이 있는 ignored 폴더만 내려가며 각 폴더 규칙을 순서대로 보존한다. */
 async function walkCodeDirectory(
@@ -620,9 +637,14 @@ async function walkCodeDirectory(
       if (item.name === '.git' || item.isSymbolicLink()) continue;
       const relative = directory ? directory + '/' + item.name : item.name;
       if (item.isDirectory()) {
-        if (!isCodeDirectoryExcluded(policy, relative))
-          await walkCodeDirectory(walk, relative);
+        if (isCodeDirectoryExcluded(policy, relative)) continue;
+        if (walk.codocsOwners && item.name === codocsDirectoryName) {
+          if (directory) walk.codocsOwners.push(directory);
+          continue;
+        }
+        await walkCodeDirectory(walk, relative);
       } else if (
+        !walk.codocsOwners &&
         item.isFile() &&
         policy.repositoryKind !== codeRepositoryKinds.unknown
       )
@@ -705,6 +727,61 @@ export async function computeCodeFilePolicy(
     ],
     candidates: walked.candidates,
     ...(git.gitDirectory ? { gitDirectory: git.gitDirectory } : {}),
+  };
+}
+/** 하위 .codocs 찾기 결과다. 정책은 Git 추적 집합 없이 ignore 규칙만 담으며 위치 판정과 감시 제외에 쓴다. */
+export interface CodocsOwnerDiscovery {
+  policy: CodeFilePolicy;
+  /** ignore 규칙 읽기·폴더 열거 단계에서 확인하지 못한 범위다. */
+  failures: readonly CodeCollectionFailure[];
+  /** .gitignore 계층과 root .codocsignore로 제외되지 않은 가장 바깥 하위 .codocs의 소유 폴더(프로젝트 상대, `/` 구분)이며 탐색 순서다. */
+  owners: readonly string[];
+}
+/**
+ * Git 명령 없이 .gitignore 계층과 root .codocsignore만으로 프로젝트를 순회해 하위 .codocs를 찾는다.
+ * Git 추적 여부는 보지 않으므로 제외된 폴더 안에 추적된 .codocs도 인정하지 않는다.
+ * 파일 원문은 읽지 않으며 .codocs 안으로는 내려가지 않는다. 링크와 `.git`은 따라가지 않는다.
+ */
+export async function discoverCodocsOwners(
+  projectRoot: string,
+  excludedDirectories: readonly string[] = [],
+): Promise<CodocsOwnerDiscovery> {
+  projectRoot = path.resolve(projectRoot);
+  const codocsIgnore = await readCodocsIgnore(projectRoot);
+  const layers: IgnoreLayer[] = [];
+  const unknown = new Set<string>();
+  const failures: CodeCollectionFailure[] = [];
+  const owners: string[] = [];
+  const policy: CodeFilePolicy = {
+    projectRoot,
+    // Git을 실행하지 않으므로 추적 집합은 비어 있고 저장소 종류는 판정에 쓰지 않는다.
+    repositoryKind: codeRepositoryKinds.nonGit,
+    tracked: new Set(),
+    trackedDirectories: new Set(),
+    layers,
+    unknownIgnoreDirectories: unknown,
+    ...codocsIgnorePolicyFields(codocsIgnore),
+    ...(excludedDirectories.length ? { excludedDirectories } : {}),
+  };
+  await walkCodeDirectory(
+    {
+      projectRoot,
+      policy,
+      layers,
+      unknown,
+      failures,
+      candidates: [],
+      codocsOwners: owners,
+    },
+    '',
+  );
+  return {
+    policy: { ...policy, layers: sortedLayers(layers) },
+    failures: [
+      ...(codocsIgnore.failure ? [codocsIgnore.failure] : []),
+      ...failures,
+    ],
+    owners,
   };
 }
 /** 정렬된 기존 관측에 정렬된 추가 관측을 전체 탐색 순서를 유지하며 합친다. */

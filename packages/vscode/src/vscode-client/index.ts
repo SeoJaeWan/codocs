@@ -51,10 +51,12 @@ import {
 } from '../rename/index.js';
 import {
   isOwnedByWorkspaceRoot,
+  nestedWorkspaceRoots,
   type WorkspaceRoot,
 } from '../workspace-routing/index.js';
 
 const refreshMethod = 'codocs/refresh';
+const nestedWorkspaceFoldersMethod = 'codocs/nestedWorkspaceFolders';
 import {
   DiagnosticStatus,
   diagnosticStatusCommand,
@@ -514,7 +516,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
     this.#stopping = false;
     this.#diagnosticStatus = new DiagnosticStatus(this.#folder);
     const directoryWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(this.#folder, '.codocs'),
+      new vscode.RelativePattern(this.#folder, '**/.codocs'),
     );
     const serverOptions: ServerOptions = {
       module: this.#serverPath,
@@ -525,6 +527,10 @@ export class VscodeFolderClient implements FolderClientBoundary {
       workspaceFolder: this.#folder,
       // SDK selector는 넓게 두고 middleware가 중첩 workspace의 가장 가까운 루트만 통과시킨다.
       documentSelector: [{ scheme: 'file' }],
+      /** 이 folder 안에서 별도 workspace folder로 열린 폴더는 그 folder의 서버가 맡으므로 이 서버가 .codocs를 찾지 않게 알린다. */
+      initializationOptions: () => ({
+        nestedWorkspaceFolderUris: this.#nestedFolderUris(),
+      }),
       middleware: this.#documentMiddleware(),
       errorHandler: this.#errorHandler(),
       /** 시작 실패를 제한된 횟수만 자동 재시작한다. */
@@ -568,6 +574,9 @@ export class VscodeFolderClient implements FolderClientBoundary {
       directoryWatcher,
       directoryWatcher.onDidCreate(refresh),
       directoryWatcher.onDidDelete(refresh),
+      vscode.workspace.onDidChangeWorkspaceFolders(() =>
+        this.#syncNestedFolders(),
+      ),
       client.onDidChangeState(reportRunning),
     );
     await client.start();
@@ -739,6 +748,33 @@ export class VscodeFolderClient implements FolderClientBoundary {
         workspaceUri: this.#folder.uri.toString(),
       })
       .catch(reportRefreshFailure);
+  }
+
+  /** 이 folder 안에서 별도 workspace folder로 열린 폴더의 URI 목록이다. */
+  #nestedFolderUris(): string[] {
+    const roots = (vscode.workspace.workspaceFolders ?? []).map((folder) => ({
+      fsPath: folder.uri.fsPath,
+      uri: folder.uri.toString(),
+    }));
+    return nestedWorkspaceRoots(
+      { fsPath: this.#folder.uri.fsPath, uri: this.#folder.uri.toString() },
+      roots,
+    ).map((root) => root.uri);
+  }
+
+  /** workspace folder 구성이 바뀌면 이 서버에 중첩 폴더 목록을 다시 알린다. */
+  #syncNestedFolders(): void {
+    const client = this.#client;
+    if (!client?.isRunning()) return;
+    client
+      .sendNotification(nestedWorkspaceFoldersMethod, {
+        folderUris: this.#nestedFolderUris(),
+      })
+      .catch((error: unknown) =>
+        this.#output.appendLine(
+          `Codocs 중첩 workspace 폴더 알림에 실패했습니다: ${errorMessage(error)}`,
+        ),
+      );
   }
 
   /** 반복 시작 실패 뒤 중단 상태와 수동 복구 방법을 기록한다. */

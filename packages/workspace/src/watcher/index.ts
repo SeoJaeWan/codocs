@@ -58,6 +58,14 @@ export class WorkspaceWatcher {
   #reopenRequested = false;
   #reopening: Promise<void> | undefined;
   #contentIdentity: ContentIdentity | undefined;
+  /** 내용을 감시할 하위 .codocs의 절대 경로다. 연결을 다시 열 때도 이 목록을 따른다. */
+  #nestedTargets: readonly string[] = [];
+  /** 하위 .codocs마다 연결한 내용 감시와 연결 당시의 폴더 식별자다. */
+  readonly #nested = new Map<
+    string,
+    { watcher: FSWatcher; ready: Promise<void>; identity: ContentIdentity }
+  >();
+  #nestedSync: Promise<void> = Promise.resolve();
   readonly #retiring = new Set<Promise<void>>();
   #closing: Promise<void> | undefined;
 
@@ -258,11 +266,13 @@ export class WorkspaceWatcher {
   }
 
   /** 디렉터리 식별자로 같은 경로의 실제 교체를 구분한다. */
-  async #readContentIdentity(): Promise<ContentIdentity | undefined> {
+  async #readContentIdentity(
+    directory = path.join(this.#root, codocsDirectoryName),
+  ): Promise<ContentIdentity | undefined> {
     const selected = await resolveProjectRoot({ cwd: this.#root });
     if (!selected.success) return undefined;
     try {
-      const result = await lstat(path.join(this.#root, codocsDirectoryName));
+      const result = await lstat(directory);
       return result.isDirectory() && !result.isSymbolicLink()
         ? { dev: result.dev, ino: result.ino }
         : undefined;
@@ -270,6 +280,108 @@ export class WorkspaceWatcher {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw error;
     }
+  }
+
+  /** 두 폴더 식별자가 같은 실제 폴더를 가리키는지 비교한다. 부재와 미지원 대상도 같은 값이면 같다. */
+  static #sameIdentity(
+    left: ContentIdentity | undefined,
+    right: ContentIdentity | undefined,
+  ): boolean {
+    return (
+      left === right ||
+      (!!left && !!right && left.dev === right.dev && left.ino === right.ino)
+    );
+  }
+
+  /**
+   * 하위 .codocs의 내용 감시 대상을 바꾼다. 빠진 폴더의 감시는 닫고 새 폴더는 연결해 준비를 기다린다.
+   * 루트 .codocs와 달리 프로젝트 루트 보완 폴링은 하지 않으며 폴더 생성·삭제는 호출자가 알려 준다.
+   * @param directories 인정된 하위 .codocs의 절대 경로다.
+   */
+  setNestedDirectories(directories: readonly string[]): Promise<void> {
+    this.#nestedTargets = directories.map((directory) =>
+      path.resolve(directory),
+    );
+    return this.#syncNested(this.#epoch).catch((error: unknown) =>
+      this.#recover(error),
+    );
+  }
+
+  /**
+   * 하위 .codocs 폴더가 같은 경로에서 교체되었으면 내용 감시를 다시 연결하고 그 범위의 재확인을 요청한다.
+   * 감시 중이 아닌 폴더는 무시한다.
+   * @param directory 하위 .codocs의 절대 경로다.
+   */
+  reopenNestedDirectory(directory: string): Promise<void> {
+    const target = path.resolve(directory);
+    const epoch = this.#epoch;
+    const run = this.#nestedSync.then(
+      /** 폴더 식별자가 바뀐 경우에만 감시를 다시 연결한다. */ async () => {
+        const current = this.#nested.get(target);
+        if (!current || !this.#active(epoch)) return;
+        const identity = await this.#readContentIdentity(target);
+        if (
+          !this.#active(epoch) ||
+          WorkspaceWatcher.#sameIdentity(identity, current.identity)
+        )
+          return;
+        this.#nested.delete(target);
+        await this.#retire(current.watcher);
+        await this.#connectNested(target, epoch);
+        if (this.#active(epoch)) this.#signal(target);
+      },
+    );
+    this.#nestedSync = run.catch(() => undefined);
+    return run.catch((error: unknown) => this.#recover(error));
+  }
+
+  /**
+   * 하위 .codocs 감시의 열고 닫기를 차례로 수행해 겹친 요청이 같은 폴더를 두 번 연결하지 않게 한다.
+   * 연결 오류는 호출자에게 그대로 전달한다.
+   */
+  #syncNested(epoch: number): Promise<void> {
+    const run = this.#nestedSync.then(
+      /** 원하는 목록과 다른 연결만 닫고 연다. */ async () => {
+        if (!this.#active(epoch)) return;
+        const wanted = new Set(this.#nestedTargets);
+        for (const [directory, connection] of this.#nested)
+          if (!wanted.has(directory)) {
+            this.#nested.delete(directory);
+            await this.#retire(connection.watcher);
+          }
+        await Promise.all(
+          [...wanted]
+            .filter((directory) => !this.#nested.has(directory))
+            .map((directory) => this.#connectNested(directory, epoch)),
+        );
+      },
+    );
+    this.#nestedSync = run.catch(() => undefined);
+    return run;
+  }
+
+  /** 하위 .codocs 하나의 내용 감시를 연결하고 준비를 기다린다. 폴더 자체의 생성·삭제는 교체 확인으로 넘긴다. */
+  async #connectNested(directory: string, epoch: number): Promise<void> {
+    const identity = (await this.#readContentIdentity(directory)) ?? null;
+    if (!this.#active(epoch) || this.#nested.has(directory)) return;
+    const connection = this.#connect(
+      directory,
+      { followSymlinks: false },
+      epoch,
+      /** 하위 .codocs 내용의 변화를 전달하고 폴더 자체의 교체는 다시 연결한다. */
+      (event, changed) => {
+        if (
+          path.resolve(changed) === directory &&
+          (event === 'addDir' || event === 'unlinkDir')
+        )
+          void this.reopenNestedDirectory(directory).catch((error: unknown) =>
+            this.#fail(error),
+          );
+        else this.#signal(changed);
+      },
+    );
+    this.#nested.set(directory, { ...connection, identity });
+    await connection.ready;
   }
   /** 루트 교체 감시와 내용 감시를 연결하고 모든 대상의 준비를 기다린다. */
   async #open(epoch: number): Promise<void> {
@@ -358,7 +470,7 @@ export class WorkspaceWatcher {
       },
     );
     try {
-      await Promise.all([root.ready, content?.ready]);
+      await Promise.all([root.ready, content?.ready, this.#syncNested(epoch)]);
     } finally {
       this.#openingContent = false;
     }
@@ -465,6 +577,7 @@ export class WorkspaceWatcher {
         )
       : Promise.resolve();
     this.#directoryRegistrations.clear();
+    this.#nested.clear();
     const connections = [...this.#connections];
     this.#connections.clear();
     await Promise.all([
@@ -504,7 +617,11 @@ export class WorkspaceWatcher {
     this.#recoveryUsed = true;
     await this.#reconnect();
     if (this.#state.ready)
-      this.#signal(path.join(this.#root, codocsDirectoryName));
+      for (const directory of [
+        path.join(this.#root, codocsDirectoryName),
+        ...this.#nestedTargets,
+      ])
+        this.#signal(directory);
   }
   /** 실제 오류의 원인과 수동 복구 안내를 보존한다. */
   #fail(error: unknown): void {

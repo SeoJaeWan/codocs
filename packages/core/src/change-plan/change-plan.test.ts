@@ -11,6 +11,8 @@ import {
   catalogDiagnosticMessages,
   changePlanDiagnosticCodes,
   changePlanDiagnosticMessages,
+  documentPathExample,
+  documentPathMessages,
   diagnosticSeverities,
   schemaDiagnosticCodes,
   schemaDiagnosticMessages,
@@ -1032,15 +1034,16 @@ describe('planDocumentChange', () => {
 
   describe('문서 경로·원문 버전·색인 상태 확인', () => {
     it.each([
-      ['현재 폴더 구간', '.codocs/./new.yaml'],
-      ['상위 폴더 구간', '.codocs/team/../new.yaml'],
-      ['빈 경로 구간', '.codocs//new.yaml'],
-      ['역슬래시', '.codocs\\new.yaml'],
-      ['절대 경로', '/project/.codocs/new.yaml'],
-      ['지원하지 않는 확장자', '.codocs/new.json'],
-    ])(
-      '생성 경로에 %s을 사용하면 잘못된 요청으로 거부한다',
-      (_label, targetPath) => {
+      ['현재 폴더 구간', '.codocs/./new.yaml', 'dotSegment'],
+      ['상위 폴더 구간', '.codocs/team/../new.yaml', 'dotSegment'],
+      ['빈 경로 구간', '.codocs//new.yaml', 'emptySegment'],
+      ['역슬래시', '.codocs\\new.yaml', 'backslash'],
+      ['절대 경로', '/project/.codocs/new.yaml', 'absolute'],
+      ['파일명 없음', '.codocs/', 'missingFileName'],
+      ['지원하지 않는 확장자', '.codocs/new.json', 'extension'],
+    ] as const)(
+      '생성 경로에 %s을 사용하면 원인별 문구와 올바른 예시로 거부한다',
+      (_label, targetPath, problem) => {
         const request = {
           mode: 'create',
           path: targetPath,
@@ -1059,10 +1062,13 @@ describe('planDocumentChange', () => {
             {
               code: changePlanDiagnosticCodes.invalidRequest,
               severity: diagnosticSeverities.error,
-              message: changePlanDiagnosticMessages.invalidRequest,
+              message: documentPathMessages[problem],
             },
           ],
         });
+        expect(
+          documentPathMessages[problem].endsWith(documentPathExample),
+        ).toBe(true);
       },
     );
 

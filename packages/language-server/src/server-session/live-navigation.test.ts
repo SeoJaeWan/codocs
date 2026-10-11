@@ -397,3 +397,177 @@ describe('live YAML과 디스크 대상의 연결', () => {
     },
   );
 });
+
+describe('다른 작업 공간 폴더로 열린 하위 폴더의 .codocs 소유', () => {
+  const zoneText = (id: string): string =>
+    `_codocs:\n  id: ${id}\n  name: Zone\ndefinition: 본문\n`;
+  const sourceText =
+    '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[Zone]]"\n';
+  let nested: string;
+  let nestedFolder: { uri: string; name: string };
+
+  beforeEach(async () => {
+    nested = path.join(root, 'nested');
+    nestedFolder = { uri: pathToFileURL(nested).href, name: 'nested' };
+    await mkdir(path.join(nested, '.codocs'), { recursive: true });
+    await writeFile(path.join(root, '.codocs/zone.yaml'), zoneText('outer'));
+    await writeFile(path.join(nested, '.codocs/zone.yaml'), zoneText('inner'));
+  });
+
+  /** 출처 문서의 [[Zone]]이 가리키는 문서 URI와 진단 코드를 구한다. */
+  async function resolveZone(
+    directory: string,
+  ): Promise<{ target: string | undefined; codes: (string | number)[] }> {
+    const uri = pathToFileURL(path.join(directory, '.codocs/source.yaml')).href;
+    session.openDocument({
+      textDocument: { uri, version: 1, languageId: 'yaml', text: sourceText },
+    });
+    const links = await session.documentLinks(uri);
+    const selected =
+      links.length === 1
+        ? (
+            JSON.parse(
+              decodeURIComponent(links[0]!.target!.split('?')[1]!),
+            ) as unknown[]
+          )[0]
+        : undefined;
+    const confirmed = selected ? await session.confirmSource(selected) : null;
+    const diagnostics = (await session.documentDiagnostics(uri))!.diagnostics;
+    return {
+      target: confirmed?.uri,
+      codes: diagnostics.map((item) => item.code!),
+    };
+  }
+
+  it('하위 폴더가 별도 작업 공간 폴더로 열려 있으면 바깥 작업 공간은 자기 문서로 [[Zone]]을 해석하고 안쪽은 자기 문서로 해석한다', async () => {
+    await session.changeWorkspaceFolders([nestedFolder], []);
+    await session.refreshWorkspaces();
+
+    const outer = await resolveZone(root);
+    const inner = await resolveZone(nested);
+
+    expect(outer).toEqual({
+      target: pathToFileURL(path.join(root, '.codocs/zone.yaml')).href,
+      codes: [],
+    });
+    expect(inner).toEqual({
+      target: pathToFileURL(path.join(nested, '.codocs/zone.yaml')).href,
+      codes: [],
+    });
+  });
+
+  it('하위 폴더의 작업 공간 폴더를 닫으면 바깥 작업 공간이 그 .codocs를 다시 인정해 [[Zone]]이 모호해진다', async () => {
+    await session.changeWorkspaceFolders([nestedFolder], []);
+    await session.refreshWorkspaces();
+    await session.changeWorkspaceFolders([], [nestedFolder]);
+
+    await vi.waitFor(
+      async () => {
+        await session.refreshWorkspaces();
+        const outer = await resolveZone(root);
+        expect(outer.target).toBeUndefined();
+        expect(outer.codes).toContain('reference_ambiguous');
+      },
+      { timeout: 10_000, interval: 100 },
+    );
+  });
+
+  it('하위 폴더를 작업 공간 폴더로 추가하면 바깥 작업 공간은 그 .codocs를 제외해 모호함이 사라진다', async () => {
+    await session.refreshWorkspaces();
+    expect((await resolveZone(root)).codes).toContain('reference_ambiguous');
+
+    await session.changeWorkspaceFolders([nestedFolder], []);
+
+    await vi.waitFor(
+      async () => {
+        await session.refreshWorkspaces();
+        const outer = await resolveZone(root);
+        expect(outer.codes).toEqual([]);
+        expect(outer.target).toBe(
+          pathToFileURL(path.join(root, '.codocs/zone.yaml')).href,
+        );
+      },
+      { timeout: 10_000, interval: 100 },
+    );
+  });
+});
+
+describe('클라이언트가 알려 준 중첩 workspace 폴더의 .codocs 제외', () => {
+  const zoneText = (id: string): string =>
+    `_codocs:\n  id: ${id}\n  name: Zone\ndefinition: 본문\n`;
+  const sourceText =
+    '_codocs:\n  id: source\n  name: 출처\ndefinition: "[[Zone]]"\n';
+
+  /** 루트와 하위 폴더에 같은 이름의 문서를 두고 하위 폴더가 별도 서버로 열렸다고 알린 서버 세션을 만든다. */
+  async function outerSession(
+    nestedWorkspaceFolderUris: unknown,
+  ): Promise<{ outer: LanguageServerSession; sourceUri: string }> {
+    const nested = path.join(root, 'nested');
+    await mkdir(path.join(nested, '.codocs'), { recursive: true });
+    await writeFile(path.join(root, '.codocs/zone.yaml'), zoneText('outer'));
+    await writeFile(path.join(nested, '.codocs/zone.yaml'), zoneText('inner'));
+    const outer = new LanguageServerSession();
+    await outer.initialize({
+      processId: null,
+      rootUri: pathToFileURL(root).href,
+      capabilities: {},
+      initializationOptions: { nestedWorkspaceFolderUris },
+    });
+    await outer.refreshWorkspaces();
+    const uri = pathToFileURL(path.join(root, '.codocs/source.yaml')).href;
+    outer.openDocument({
+      textDocument: { uri, version: 1, languageId: 'yaml', text: sourceText },
+    });
+    return { outer, sourceUri: uri };
+  }
+
+  it('initializationOptions로 하위 폴더가 별도 서버로 열렸다고 알리면 이 서버는 그 .codocs를 색인하지 않아 [[Zone]]이 모호하지 않다', async () => {
+    const { outer, sourceUri: uri } = await outerSession([
+      pathToFileURL(path.join(root, 'nested')).href,
+    ]);
+    try {
+      const diagnostics = (await outer.documentDiagnostics(uri))!.diagnostics;
+      expect(diagnostics).toEqual([]);
+    } finally {
+      await outer.close();
+    }
+  });
+
+  it('알림으로 중첩 폴더 목록이 비면 이 서버가 하위 폴더의 .codocs를 다시 인정해 [[Zone]]이 모호해진다', async () => {
+    const { outer, sourceUri: uri } = await outerSession([
+      pathToFileURL(path.join(root, 'nested')).href,
+    ]);
+    try {
+      outer.setNestedWorkspaceFolders([]);
+      await vi.waitFor(
+        async () => {
+          await outer.refreshWorkspaces();
+          const diagnostics = (await outer.documentDiagnostics(uri))!
+            .diagnostics;
+          expect(diagnostics.map((item) => item.code)).toContain(
+            'reference_ambiguous',
+          );
+        },
+        { timeout: 10_000, interval: 100 },
+      );
+    } finally {
+      await outer.close();
+    }
+  });
+
+  it('중첩 폴더 목록에 잘못된 값이 있으면 무시하고 이 서버가 하위 폴더의 .codocs를 인정한다', async () => {
+    const { outer, sourceUri: uri } = await outerSession([
+      'not a uri',
+      42,
+      'http://example.com/nested',
+    ]);
+    try {
+      const diagnostics = (await outer.documentDiagnostics(uri))!.diagnostics;
+      expect(diagnostics.map((item) => item.code)).toContain(
+        'reference_ambiguous',
+      );
+    } finally {
+      await outer.close();
+    }
+  });
+});

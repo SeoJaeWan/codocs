@@ -13,7 +13,13 @@ import {
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
 } from '../diagnostics/index.js';
-import { inspectWorkspaceParent, resolveWorkspacePath } from '../index.js';
+import {
+  checkDocumentPath,
+  inspectWorkspaceParent,
+  locateOwningCodocs,
+  normalizeDocumentPathInput,
+  resolveWorkspacePath,
+} from '../index.js';
 import type { ProjectRoot } from '../project-root/index.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
@@ -190,6 +196,50 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
     });
   });
 
+  it('하위 폴더의 .codocs 파일은 그 .codocs를 접근 범위로 제공한다', async () => {
+    const codocs = path.join(project, 'packages', 'core', '.codocs');
+    await mkdir(codocs, { recursive: true });
+    const file = path.join(codocs, 'a.yaml');
+    await writeFile(file, '원문');
+    expect(
+      await resolveWorkspacePath(selectedRoot, 'packages/core/.codocs/a.yaml'),
+    ).toMatchObject({
+      success: true,
+      logicalPath: file,
+      path: path.join('packages', 'core', '.codocs', 'a.yaml'),
+      kind: 'file',
+      scope: { kind: 'workspace', logicalPath: codocs },
+    });
+  });
+
+  it('하위 .codocs에서 ..로 그 .codocs 밖에 나가면 거부한다', async () => {
+    await mkdir(path.join(project, 'packages', '.codocs'), { recursive: true });
+    await writeFile(path.join(project, 'packages', 'x.yaml'), '원문');
+    expect(
+      await resolveWorkspacePath(selectedRoot, 'packages/.codocs/../x.yaml'),
+    ).toMatchObject({
+      success: false,
+      status: 'denied',
+      diagnostics: [{ code: workspaceDiagnosticCodes.pathOutsideWorkspace }],
+    });
+  });
+
+  it('하위 .codocs의 바깥 폴더가 정션이면 대상이 프로젝트 안이어도 거부한다', async () => {
+    const target = path.join(project, 'ordinary');
+    await mkdir(path.join(target, '.codocs'), { recursive: true });
+    await writeFile(path.join(target, '.codocs', 'a.yaml'), '원문');
+    await createLink(target, path.join(project, 'linked'), 'junction');
+    expect(
+      await resolveWorkspacePath(selectedRoot, 'linked/.codocs/a.yaml'),
+    ).toMatchObject({
+      success: false,
+      status: 'unavailable',
+      diagnostics: [
+        { code: workspaceDiagnosticCodes.unsupportedWorkspaceLink },
+      ],
+    });
+  });
+
   it.each([null, 1, {}, '', ' ', '.codocs/\0bad'])(
     '잘못된 경로 %s를 거부한다',
     async (input) => {
@@ -223,6 +273,34 @@ describe('inspectWorkspaceParent: 폴더를 만들지 않는 부모 점검', () 
     ).rejects.toThrow();
   });
 
+  it('없는 하위 .codocs와 바깥 폴더도 상위부터 만들 순서로 돌려준다', async () => {
+    const result = await inspectWorkspaceParent(
+      selectedRoot,
+      'packages/new/.codocs/a.yaml',
+    );
+
+    expect(result).toEqual({
+      success: true,
+      logicalPath: path.join(project, 'packages', 'new', '.codocs', 'a.yaml'),
+      missingDirectories: [
+        path.join(project, 'packages'),
+        path.join(project, 'packages', 'new'),
+        path.join(project, 'packages', 'new', '.codocs'),
+      ],
+    });
+  });
+
+  it('없는 루트 .codocs도 만들 폴더로 돌려준다', async () => {
+    await rmWithRetry(path.join(project, '.codocs'), { recursive: true });
+    const result = await inspectWorkspaceParent(selectedRoot, '.codocs/a.yaml');
+
+    expect(result).toEqual({
+      success: true,
+      logicalPath: path.join(project, '.codocs', 'a.yaml'),
+      missingDirectories: [path.join(project, '.codocs')],
+    });
+  });
+
   it('폴더 자리에 일반 파일이 있으면 notDirectory 진단으로 거절한다', async () => {
     await writeFile(path.join(project, '.codocs', 'a'), 'file');
     const result = await inspectWorkspaceParent(
@@ -246,4 +324,86 @@ describe('inspectWorkspaceParent: 폴더를 만들지 않는 부모 점검', () 
         success: false,
       });
   });
+});
+
+describe('normalizeDocumentPathInput: 입력 경로 정규화', () => {
+  it.each([
+    ['역슬래시', '.codocs\\orders\\a.yaml', '.codocs/orders/a.yaml'],
+    ['연속 슬래시', '.codocs//orders///a.yaml', '.codocs/orders/a.yaml'],
+    [
+      '역슬래시와 연속 슬래시',
+      '.codocs\\\\orders/\\a.yaml',
+      '.codocs/orders/a.yaml',
+    ],
+    ['끝 슬래시', '.codocs\\', '.codocs/'],
+    ['이미 정규화된 경로', '.codocs/orders/a.yaml', '.codocs/orders/a.yaml'],
+  ])('%s를 / 하나로 바꾼다', (_label, input, expected) => {
+    expect(normalizeDocumentPathInput(input)).toBe(expected);
+  });
+});
+
+describe('locateOwningCodocs: 소유 .codocs 판정', () => {
+  it.each([
+    ['루트 .codocs', '.codocs/a.yaml', 0, '', 'a.yaml'],
+    [
+      '하위 폴더의 첫 .codocs',
+      'packages/web/.codocs/x/a.yaml',
+      2,
+      'packages/web',
+      'x/a.yaml',
+    ],
+    [
+      '중첩된 .codocs 구간은 첫 구간',
+      'a/.codocs/b/.codocs/c.yaml',
+      1,
+      'a',
+      'b/.codocs/c.yaml',
+    ],
+  ])('%s를 찾는다', (_label, input, index, ownerDirectory, relativePath) => {
+    expect(locateOwningCodocs(input)).toEqual({
+      index,
+      ownerDirectory,
+      relativePath,
+    });
+  });
+
+  it('.codocs 구간이 없으면 undefined다', () => {
+    expect(locateOwningCodocs('orders/order.yaml')).toBeUndefined();
+  });
+});
+
+describe('checkDocumentPath: 원인별 형식 검사', () => {
+  it('.codocs 구간이 없으면 missingCodocs다', () => {
+    expect(checkDocumentPath('orders/order.yaml')).toEqual({
+      success: false,
+      problem: 'missingCodocs',
+    });
+  });
+
+  it.each([
+    ['POSIX 절대 경로', '/abs/.codocs/a.yaml', 'absolute'],
+    ['드라이브 절대 경로', 'D:/p/.codocs/a.yaml', 'absolute'],
+    ['.. 구간', '.codocs/../a.yaml', 'dotSegment'],
+    ['. 구간', '.codocs/./a.yaml', 'dotSegment'],
+    ['파일명 없음', '.codocs/', 'missingFileName'],
+    ['.codocs만 있는 경로', '.codocs', 'missingFileName'],
+    ['하위 .codocs로 끝나는 경로', 'packages/web/.codocs', 'missingFileName'],
+    ['확장자 불일치', '.codocs/a.json', 'extension'],
+  ] as const)('%s는 %s 원인으로 거부한다', (_label, input, problem) => {
+    expect(checkDocumentPath(input)).toEqual({ success: false, problem });
+  });
+
+  it.each([
+    ['루트 .codocs', '.codocs/orders/order.yml'],
+    ['하위 폴더의 .codocs', 'packages/web/.codocs/a.yaml'],
+    ['.codocs 안의 .codocs 구간', '.codocs/a/.codocs/b.yaml'],
+  ])(
+    '구간 하나 이상이 .codocs인 YAML 경로(%s)는 구간을 돌려준다',
+    (_label, input) => {
+      expect(checkDocumentPath(input)).toEqual({
+        success: true,
+        segments: input.split('/'),
+      });
+    },
+  );
 });

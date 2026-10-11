@@ -343,7 +343,7 @@ describe('VscodeFolderClient 갱신 요청 신호', () => {
     );
     await client.start();
     expect(boundary.watchers.map((watcher) => watcher.pattern)).toEqual([
-      '.codocs',
+      '**/.codocs',
     ]);
     const { create, change, delete: remove } = boundary.watchers[0]!.handlers;
     expect(change).toEqual([]);

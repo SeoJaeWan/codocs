@@ -16,6 +16,7 @@ import type {
   WorkspaceCodeRenameFile,
   WorkspaceCodeRenameSources,
 } from '../code-reference/index.js';
+import { locateOwningCodocs } from '../paths/index.js';
 import {
   workspaceRenameFileKinds,
   workspaceRenameUnknownCodePath,
@@ -43,9 +44,9 @@ export interface CodeRenamePlan {
   revisions: Readonly<Record<string, string>>;
 }
 
-/** 코드 수집 경로가 .codocs 안이면 문서 쪽 계산이 다루므로 제외한다. */
+/** 코드 수집 경로가 루트나 하위 .codocs 안이면 문서 쪽 계산이 다루므로 제외한다. */
 function insideCodocs(filePath: string): boolean {
-  return filePath === '.codocs' || filePath.startsWith('.codocs/');
+  return locateOwningCodocs(filePath) !== undefined;
 }
 
 /**

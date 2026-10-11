@@ -13,9 +13,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createSourceCli } from '../../test-support/source-cli.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
-/** 요청의 `/` 구분 경로를 서버가 결과에 담는 OS 구분자 표기로 바꾼다. */
-const native = (requestPath: string): string =>
-  path.join(...requestPath.split('/'));
+/** 서버는 OS와 무관하게 `/` 구분 경로를 결과에 담는다. */
+const native = (requestPath: string): string => requestPath;
 
 let sourceCli: Awaited<ReturnType<typeof createSourceCli>>;
 let project: string;
@@ -123,11 +122,13 @@ async function found(name: string): Promise<boolean> {
 }
 
 /** 파일 구조가 바뀐 직후 감시기가 시작한 색인 재구성이 끝날 때까지 기다린 뒤 전체 검증 결과를 꺼낸다. */
-async function validateSettled(): Promise<Reply> {
+async function validateSettled(
+  args: Record<string, unknown> = {},
+): Promise<Reply> {
   // 느린 CI에서 재구성이 늦어도 기다리고, 끝내 준비되지 않으면 다른 단정과 섞이지 않게 여기서 실패한다.
   const deadline = Date.now() + 10_000;
   for (;;) {
-    const result = await call('codocs_validate', {});
+    const result = await call('codocs_validate', args);
     if (result.error?.code !== 'index_not_ready') return result;
     if (Date.now() >= deadline)
       throw new Error('색인 재구성이 10초 안에 끝나지 않았습니다.');
@@ -164,6 +165,20 @@ describe('도구 목록의 codocs_write 입력', () => {
       expect(text).toContain(word);
     expect(write.description).toContain('changes');
   });
+});
+
+describe('도구 설명의 path 규칙', () => {
+  it.each(['codocs_write', 'codocs_validate'])(
+    '%s 설명에 path 규칙과 예시가 있다',
+    async (name) => {
+      await start(files);
+      const tool = (await client!.listTools()).tools.find(
+        (item) => item.name === name,
+      )!;
+      expect(tool.description).toContain('.codocs/orders/order.yaml');
+      expect(tool.description).toContain('프로젝트 루트');
+    },
+  );
 });
 
 describe('codocs_write changes 저장', () => {
@@ -497,5 +512,68 @@ describe('codocs_write move', () => {
     expect(rejected).toMatchObject({ success: false, saved: false });
     expect(await read('.codocs/b.yaml')).toBe(b);
     expect(await read('.codocs/c.yaml')).toBe(c);
+  });
+});
+
+describe('codocs_write 경로 정규화와 결과 경로', () => {
+  const created = {
+    _codocs: { id: 'order', name: '가상주문' },
+    definition: '주문 본문',
+  };
+
+  it.each([
+    ['역슬래시', '.codocs\\orders\\a.yaml'],
+    ['연속 슬래시', '.codocs//orders/a.yaml'],
+  ])(
+    'create 경로의 %s는 /로 정규화해 저장하고 결과 경로도 /다',
+    async (_label, requested) => {
+      await start({ '.codocs/a.yaml': a });
+      const result = await call('codocs_write', {
+        mode: 'create',
+        path: requested,
+        document: created,
+      });
+      expect(result).toMatchObject({
+        success: true,
+        saved: true,
+        source: { path: '.codocs/orders/a.yaml' },
+      });
+      expect(await exists('.codocs/orders/a.yaml')).toBe(true);
+    },
+  );
+
+  it('create 결과의 source.path를 move와 validate 입력에 그대로 넣으면 성공한다', async () => {
+    await start({ '.codocs/a.yaml': a });
+    const result = await call('codocs_write', {
+      mode: 'create',
+      path: '.codocs/orders/order.yaml',
+      document: created,
+    });
+    const source = (result.source as { path: string }).path;
+    const checked = await validateSettled({ path: source });
+    expect(checked).toMatchObject({ success: true });
+    const moved = await call('codocs_write', {
+      mode: 'move',
+      id: 'order',
+      revision: await revisionOf('가상주문'),
+      path: source.replace('order.yaml', 'moved.yaml'),
+    });
+    expect(moved).toMatchObject({
+      success: true,
+      previousPath: source,
+      source: { path: '.codocs/orders/moved.yaml' },
+    });
+  });
+
+  it('get의 문서 경로와 역슬래시 validate 입력도 OS와 무관하게 동작한다', async () => {
+    await start({ '.codocs/a.yaml': a, '.codocs/sub/b.yaml': b });
+    const got = await call('codocs_get', { addresses: ['가상B'] });
+    expect(got.results).toMatchObject([
+      { source: { path: '.codocs/sub/b.yaml' } },
+    ]);
+    const checked = await validateSettled({
+      path: '.codocs\\sub\\b.yaml',
+    });
+    expect(checked).toMatchObject({ success: true });
   });
 });

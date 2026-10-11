@@ -29,6 +29,19 @@ export function isOwnedByWorkspaceRoot(
   return nearestWorkspaceRoot(documentPath, roots)?.uri === root.uri;
 }
 
+/** 선택한 workspace folder 안에 있으면서 별도 workspace folder로 열린 폴더를 고른다. 자기 자신은 제외한다. */
+export function nestedWorkspaceRoots(
+  root: WorkspaceRoot,
+  roots: readonly WorkspaceRoot[],
+): WorkspaceRoot[] {
+  return roots.filter(
+    (candidate) =>
+      candidate.uri !== root.uri &&
+      path.resolve(candidate.fsPath) !== path.resolve(root.fsPath) &&
+      containsPath(root.fsPath, candidate.fsPath),
+  );
+}
+
 /** 가장 가까운 workspace가 소유한 요청만 해당 client에 전달한다. */
 export async function routeOwnedRequest<Result>(
   documentPath: string,

@@ -16,7 +16,7 @@ Use either integration on its own, or both. Codocs supports projects on local di
 Requires **Node.js 24.x**. Install the package in a directory of your choice:
 
 ```sh
-npm install co-documentation@0.0.1
+npm install co-documentation@1.0.0
 ```
 
 In your MCP client's configuration, set the installed executable and the **absolute path to your project**:
@@ -33,6 +33,8 @@ In your MCP client's configuration, set the installed executable and the **absol
 ```
 
 Replace `/absolute/install` with the directory where you ran `npm install`. `--project` points to the project folder containing `.codocs`.
+
+Documents can also live in `.codocs` folders inside subfolders of the project, such as `packages/core/.codocs/a.yaml`. One server for the project root reads them all as one project, so IDs and names must be unique across every `.codocs`. A subfolder `.codocs` is used only where neither a `.gitignore` nor the root `.codocsignore` excludes it. Git is not consulted, so a `.codocs` inside a `.gitignore`d folder is not used even if Git tracks it.
 
 On Windows, use `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd` as the JSON command value. If your client cannot run `.cmd` files, set `command` to `node` and pass the absolute path to `node_modules/co-documentation/dist/runtime/cli.js` as the first argument, followed by `--project` and your project path. Client configuration formats vary; use a local stdio connection with these arguments.
 
@@ -60,7 +62,7 @@ For example, ask your assistant to “find the definition of an order,” “che
 Requires desktop **VS Code 1.100.0 or later**. Search for `seojaewan.codocs` in Extensions, or run:
 
 ```sh
-code --install-extension seojaewan.codocs@0.0.1
+code --install-extension seojaewan.codocs@1.0.0
 ```
 
 If you have a VSIX file, install it with **Extensions: Install from VSIX...**. The extension includes its language server and uses VS Code's built-in runtime, so no separate Node.js installation is needed.

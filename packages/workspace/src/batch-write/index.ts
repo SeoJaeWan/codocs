@@ -24,8 +24,20 @@ import {
   collectWorkspaceCodeEvidence,
   type WorkspaceCodeEvidence,
 } from '../code-reference/index.js';
+import {
+  createWorkspaceDiagnostic,
+  workspaceDiagnosticCodes,
+} from '../diagnostics/index.js';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
-import { loadWorkspace, type WorkspaceScanResult } from '../loader/index.js';
+import {
+  loadWorkspace,
+  scanForWrite,
+  type WorkspaceScanResult,
+} from '../loader/index.js';
+import {
+  codocsLocationRejection,
+  type CodocsLocations,
+} from '../paths/index.js';
 import type { ProjectRoot } from '../project-root/index.js';
 import { calculateRevision } from '../revision/index.js';
 import {
@@ -301,19 +313,56 @@ function toChange(
 }
 
 /**
+ * create·move의 새 경로가 탐색 규칙에서 빠졌거나 확인하지 못한 하위 .codocs이면 항목마다 거부 진단을 만든다.
+ * @param planned 계획한 항목이다. 바꾸는 create·move만 확인한다.
+ * @param scan 위치 규칙을 담은 같은 스캔이다.
+ */
+function locationRejections(
+  planned: readonly PlannedChangeItem[],
+  scan: WorkspaceScanResult,
+): Diagnostic<string>[] {
+  const diagnostics: Diagnostic<string>[] = [];
+  for (const item of planned) {
+    if (
+      !item.changed ||
+      (item.mode !== changePlanModes.create &&
+        item.mode !== changePlanModes.move)
+    )
+      continue;
+    const rejected = codocsLocationRejection(
+      scan.codocsLocations,
+      item.path.split(path.sep).join('/'),
+    );
+    if (rejected)
+      diagnostics.push(
+        createWorkspaceDiagnostic(
+          workspaceDiagnosticCodes.invalidWorkspacePath,
+          rejected,
+          item.path,
+        ),
+      );
+  }
+  return diagnostics;
+}
+
+/**
  * 반영 직전 전체를 다시 탐색하고 계획을 다시 세워 후보가 같은지 확인한다. batch 전체에 한 번 수행한다.
  * 후보가 달라지면 달라진 항목의 문서를 모두 revision_conflict로 돌려준다.
+ * 다시 탐색할 하위 .codocs는 계획에 쓴 스캔의 위치 규칙을 따른다.
  */
 async function recheck(
   root: ProjectRoot,
   items: unknown,
   planned: readonly PlannedChangeItem[],
   collect: () => Promise<WorkspaceCodeEvidence>,
+  locations: CodocsLocations | undefined,
 ): Promise<readonly Diagnostic<string>[]> {
-  const current = await loadWorkspace({
-    cwd: root.startCwd,
-    project: root.projectRoot,
-  });
+  const current = scanForWrite(
+    await loadWorkspace(
+      { cwd: root.startCwd, project: root.projectRoot },
+      locations ? { codocsLocations: locations } : {},
+    ),
+  );
   const first = planned.find((item) => item.changed) ?? planned[0];
   if (current.status !== scanStatuses.complete)
     return [
@@ -414,7 +463,7 @@ export async function saveWorkspaceChanges(
   );
   const plan: WorkspaceChangesPlanResult = await planProtectedWorkspaceChanges(
     items,
-    scan,
+    scanForWrite(scan),
     collect,
   );
   if (plan.status === changePlanStatuses.failed)
@@ -447,6 +496,8 @@ export async function saveWorkspaceChanges(
     };
   const root = scan.root;
   const planned = plan.items;
+  const rejected = locationRejections(planned, scan);
+  if (rejected.length) return { result: failed(rejected), touchedPaths: [] };
   const operations: WorkspaceFileOperation[] = [];
   const itemOf: PlannedChangeItem[] = [];
   for (const item of planned) {
@@ -459,7 +510,7 @@ export async function saveWorkspaceChanges(
   async function beforeBatchApply(): Promise<readonly Diagnostic<string>[]> {
     const early = await options.beforeBatchApply?.();
     if (early?.length) return early;
-    return recheck(root, items, planned, collect);
+    return recheck(root, items, planned, collect, scan.codocsLocations);
   }
   const applied = await applyWorkspaceFileBatch(root, operations, {
     ...options,

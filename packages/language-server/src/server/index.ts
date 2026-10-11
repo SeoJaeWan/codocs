@@ -7,6 +7,7 @@ import {
 import {
   LanguageServerSession,
   workspaceRefreshRequestMethod,
+  nestedWorkspaceFoldersNotificationMethod,
   type WorkspaceRefreshRequest,
 } from '../server-session/index.js';
 import {
@@ -189,6 +190,11 @@ export function bindLanguageServer(
     workspaceRefreshRequestMethod,
     async (request: WorkspaceRefreshRequest | undefined) =>
       session.refreshWorkspaces(request),
+  );
+  connection.onNotification(
+    nestedWorkspaceFoldersNotificationMethod,
+    (input: { folderUris?: unknown } | undefined) =>
+      session.setNestedWorkspaceFolders(input?.folderUris),
   );
   /** 종료 요청을 받으면 세션을 닫는다. */
   const shutdown = async (): Promise<void> => {
