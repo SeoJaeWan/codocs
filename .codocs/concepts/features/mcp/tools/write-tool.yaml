@@ -9,8 +9,9 @@ _codocs:
   저장 전에 변경 후의 문서 전체를 [[문서 검증]]과 프로젝트의 ID·이름 충돌, 참조 기준으로 검사하며 오류가 남으면 저장하지 않는다. 다른 문서와 코드 파일의 참조를 새로 끊는 변경도 저장하지 않는다.
   create가 실패했다고 update로 바꾸거나 update가 실패했다고 replace로 바꾸거나, 없는 문서의 update를 새 문서로 만들지 않는다.
 create: |
-  .codocs 아래의 상대 path와 전체 document를 받아 새 파일을 만든다. 경로는 `/`로 구분하고 `.yaml` 또는 `.yml`로 끝나야 한다.
-  절대 경로, `.`·`..` 구간, 빈 구간, 역슬래시는 보정하지 않고 거부한다. 이미 있는 파일은 덮어쓰지 않으며(file_exists), 필요한 .codocs와 상위 폴더는 만든다.
+  프로젝트 루트(--project, 생략하면 서버를 시작한 위치) 기준 상대 path와 전체 document를 받아 새 파일을 만든다. path는 `.codocs/orders/order.yaml`처럼 `/`로 구분하고 루트의 `.codocs` 아래에서 `.yaml` 또는 `.yml`로 끝나야 한다.
+  `\`는 모든 OS에서 `/`로, 연속한 `/`는 하나로 바꿔 받는다. 절대 경로, `.`·`..` 구간, 파일명 없이 `/`로 끝나는 경로, `.codocs` 구간이 없는 경로, `.yaml`·`.yml`이 아닌 확장자는 보정하지 않고 거부한다. 거부 메시지는 원인마다 다르며 끝에 올바른 예시(`.codocs/orders/order.yaml`)를 붙인다.
+  이미 있는 파일은 덮어쓰지 않으며(file_exists), 필요한 .codocs와 상위 폴더는 만든다.
   document는 `_codocs`와 섹션으로 구성하며 입력한 키 순서대로 저장한다.
 update: |
   현재 ID, [[codocs_get]]으로 읽은 [[revision]], 최상위 키의 set·unset을 받는다. 파일 위치는 그대로 둔다.
@@ -79,6 +80,7 @@ changes: |
   실제로 동시 저장 때문에 변경이 사라지는 사례가 생기면 잠금이나 조건부 저장을 다시 검토한다.
 결과: |
   success·saved·changed로 요청 처리, 파일 저장, 내용 변경 여부를 구분하고, 저장했으면 id·source.path·새 revision·경고와 색인 반영 결과(indexUpdated)를 돌려준다. 문서 본문은 다시 돌려주지 않는다.
+  결과의 문서 경로(source.path·changes[].path·previousPath)는 OS와 무관하게 `/`로 구분하며, 그대로 move의 path나 [[codocs_validate]]의 path에 넣을 수 있다.
   단일 delete 결과에는 revision이 없고, 단일 move 결과에는 새 경로를 source.path로, 원래 경로를 previousPath로 담는다.
   changes 결과는 입력 순서의 changes 배열에 항목마다 index·mode·id·path·state를 담고, 새 revision은 있으면 revision에, move는 원래 경로를 previousPath에 담는다. path는 반영한 뒤의 경로이며 delete는 지운 경로, move는 새 경로다. 지운 문서의 revision은 없다.
   항목의 state는 changed(반영함), restored(반영했다가 되돌림), restore_failed(되돌리지 못함), unchanged(바뀐 내용이 없거나 반영하지 않음)다. 계획이나 사전 검사에서 실패하면 changes는 빈 배열이고, 반영 중 실패하면 모든 항목의 state를 입력 순서로 담는다.

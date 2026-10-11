@@ -301,7 +301,7 @@ describe('소스 MCP stdio 서버', () => {
       expect(results[0]).toMatchObject({
         found: true,
         document: { definition },
-        source: { path: path.join('.codocs', 'normal.yaml') },
+        source: { path: '.codocs/normal.yaml' },
         references: targets.map(
           (_, index) => `Target ${String(index).padStart(2, '0')}`,
         ),
@@ -309,7 +309,7 @@ describe('소스 MCP stdio 서버', () => {
       expect(results[1]).toMatchObject({
         found: true,
         rawYaml,
-        source: { path: path.join('.codocs', 'invalid.yaml') },
+        source: { path: '.codocs/invalid.yaml' },
       });
       expect(results[1]).not.toHaveProperty('document');
       expect(results[1]?.revision).toBe(
@@ -319,10 +319,7 @@ describe('소스 MCP stdio 서버', () => {
       expect(results[2]).toMatchObject({
         found: true,
         conflict: true,
-        paths: [
-          path.join('.codocs', 'conflict-a.yaml'),
-          path.join('.codocs', 'conflict-b.yaml'),
-        ],
+        paths: ['.codocs/conflict-a.yaml', '.codocs/conflict-b.yaml'],
       });
       expect(results[3]).toMatchObject({
         found: false,

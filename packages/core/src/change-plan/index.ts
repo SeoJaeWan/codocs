@@ -26,9 +26,11 @@ import {
   changePlanDiagnosticCodes,
   changePlanDiagnosticMessages,
   diagnosticSeverities,
+  documentPathMessages,
   queryDiagnosticCodes,
   queryDiagnosticMessages,
   type Diagnostic,
+  type DocumentPathProblem,
 } from '../diagnostics/index.js';
 import {
   getPropertyRange,
@@ -573,16 +575,40 @@ function replaceRequest(input: Record<string, unknown>): boolean {
   return Object.keys(input).every((key) => allowed.has(key));
 }
 
-/** 문서 경로 규칙이다. `.codocs` 아래 상대 경로, `/` 구분, `.yaml`/`.yml`, 빈·`.`·`..` 구간과 절대·역슬래시 금지. */
-function documentPath(path: unknown): path is string {
-  return (
-    typeof path === 'string' &&
-    path !== '' &&
-    !path.startsWith('/') &&
-    !path.includes('\\') &&
-    !path.split('/').some((part) => !part || part === '.' || part === '..') &&
-    /\.ya?ml$/u.test(path)
-  );
+/**
+ * 문서 경로 규칙의 위반 원인을 가린다. `.codocs` 아래 상대 경로, `/` 구분, `.yaml`/`.yml`이며 빈·`.`·`..` 구간과 절대 경로·역슬래시는 금지한다.
+ * 문자열이 아니거나 빈 값이면 원인을 특정하지 않고 일반 요청 오류로 본다.
+ * @returns 규칙을 지키면 undefined, 원인을 특정할 수 없으면 invalidRequest, 아니면 원인 키다.
+ */
+function documentPathProblem(
+  path: unknown,
+): DocumentPathProblem | 'invalidRequest' | undefined {
+  if (typeof path !== 'string' || path === '') return 'invalidRequest';
+  if (path.startsWith('/')) return 'absolute';
+  if (path.includes('\\')) return 'backslash';
+  const parts = path.split('/');
+  if (parts.some((part) => part === '.' || part === '..')) return 'dotSegment';
+  if (parts.at(-1) === '') return 'missingFileName';
+  if (parts.some((part) => part === '')) return 'emptySegment';
+  if (!/\.ya?ml$/u.test(path)) return 'extension';
+  return undefined;
+}
+
+/** 경로 형식 오류를 원인별 문구와 함께 반환한다. 코드는 invalid_change_request다. */
+function pathFailure(
+  problem: DocumentPathProblem | 'invalidRequest',
+): PrepareResult {
+  const base = failure('invalidRequest');
+  return {
+    ok: false,
+    diagnostics:
+      problem === 'invalidRequest'
+        ? base.diagnostics
+        : base.diagnostics.map((item) => ({
+            ...item,
+            message: documentPathMessages[problem],
+          })),
+  };
 }
 
 /** 경로 표기를 바꾸지 않는 기본 변환이다. */
@@ -634,8 +660,9 @@ function prepareItem(
     return prepareFailure('invalidRequest');
   const mode = input.mode as ChangePlanMode;
   if (mode === changePlanModes.create) {
-    if (!documentPath(input.path)) return prepareFailure('invalidRequest');
-    const path = (context.catalogPath ?? keepPath)(input.path);
+    const createProblem = documentPathProblem(input.path);
+    if (createProblem) return pathFailure(createProblem);
+    const path = (context.catalogPath ?? keepPath)(input.path as string);
     if (context.catalog.documents.has(path))
       return prepareFailure('pathExists', path);
     if (!plainData(input.document)) return prepareFailure('invalidRequest');
@@ -695,12 +722,11 @@ function prepareItem(
     if (!exactKeys(input, ['mode', 'id', 'revision']))
       return prepareFailure('invalidRequest');
   } else if (mode === changePlanModes.move) {
-    if (
-      !exactKeys(input, ['mode', 'id', 'revision', 'path']) ||
-      !documentPath(input.path)
-    )
+    if (!exactKeys(input, ['mode', 'id', 'revision', 'path']))
       return prepareFailure('invalidRequest');
-    newPath = (context.catalogPath ?? keepPath)(input.path);
+    const moveProblem = documentPathProblem(input.path);
+    if (moveProblem) return pathFailure(moveProblem);
+    newPath = (context.catalogPath ?? keepPath)(input.path as string);
   } else {
     const requestedSet = input.set,
       requestedUnset = input.unset;

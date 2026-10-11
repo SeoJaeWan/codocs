@@ -40,6 +40,7 @@ import {
   resolveReference,
   type CatalogIdentity,
   type CatalogLiveReferenceResult,
+  documentPathMessages,
   queryDiagnosticCodes,
   queryDiagnosticMessages,
   scanStatuses,
@@ -56,6 +57,7 @@ import {
   type SearchIndex,
   type SearchResult,
   type Diagnostic,
+  type DocumentPathProblem,
   type RequestFailure,
   type RequestResult,
   type ScanStatus,
@@ -74,7 +76,11 @@ import {
   type Stats,
 } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { resolveWorkspacePath } from '../paths/index.js';
+import {
+  checkDocumentPath,
+  normalizeDocumentPathInput,
+  resolveWorkspacePath,
+} from '../paths/index.js';
 import type { CodeCollectionFailure } from '../paths/code-file-access.js';
 import { calculateRevision } from '../revision/index.js';
 import { pathToFileURL } from 'node:url';
@@ -115,11 +121,7 @@ import {
   type WorkspaceRenameApplySuccess,
   type WorkspaceRenamePreview,
 } from '../rename/index.js';
-import {
-  codocsDirectoryName,
-  resolveProjectRoot,
-  type ProjectRoot,
-} from '../project-root/index.js';
+import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
 import { QueryObservations } from './observations.js';
 import {
   workspaceLifecycleStates,
@@ -537,22 +539,23 @@ function invalidInput(
   };
 }
 
-/** 검증 요청은 발견 가능한 프로젝트 상대 YAML 파일 한 개만 지정한다. */
-function validationPath(input: string): string | undefined {
-  if (path.isAbsolute(input) || path.win32.isAbsolute(input)) return;
-  const normalized = discoveryPath(input);
-  const segments = normalized
-    .split(path.sep)
-    .filter((segment) => segment !== '');
-  while (segments[0] === '.') segments.shift();
-  if (
-    segments[0] !== codocsDirectoryName ||
-    segments.length < 2 ||
-    segments.some((segment) => /[*?\[\]{}]/u.test(segment)) ||
-    !/\.ya?ml$/u.test(normalized)
-  )
-    return;
-  return normalized;
+/** 검증 경로 판정 결과다. 거부하면 원인을 알 수 있을 때 원인을 함께 담는다. */
+type ValidationPathResult =
+  { path: string } | { problem?: DocumentPathProblem };
+
+/**
+ * 검증 요청은 발견 가능한 프로젝트 상대 YAML 파일 한 개만 지정한다.
+ * 역슬래시와 연속 슬래시는 `/` 하나로 바꿔 받고, 맨 앞의 `./`는 무시한다.
+ */
+function validationPath(input: string): ValidationPathResult {
+  const normalized = normalizeDocumentPathInput(input);
+  const segments = normalized.split('/');
+  while (segments[0] === '.' && segments.length > 1) segments.shift();
+  const checked = checkDocumentPath(segments.join('/'));
+  if (!checked.success) return { problem: checked.problem };
+  if (checked.segments.some((segment) => /[*?\[\]{}]/u.test(segment)))
+    return {};
+  return { path: discoveryPath(checked.segments.join('/')) };
 }
 
 /** 실제 경로·IO 원인을 잃지 않고 검증 요청 실패의 외부 진단을 만든다. */
@@ -1672,17 +1675,20 @@ export class WorkspaceQuerySession {
     };
     let selectedPath: string | undefined;
     if (inputPath !== undefined) {
-      const candidate = validationPath(inputPath);
-      if (!candidate)
+      const checkedPath = validationPath(inputPath);
+      if (!('path' in checkedPath))
         return {
           success: false,
           scanStatus: scan.status,
           error: validationDiagnostic(
             queryDiagnosticCodes.invalidPath,
-            queryDiagnosticMessages.invalidPath,
+            checkedPath.problem === undefined
+              ? queryDiagnosticMessages.invalidPath
+              : documentPathMessages[checkedPath.problem],
             inputPath,
           ),
         };
+      const candidate = checkedPath.path;
       const resolved = await resolveWorkspacePath(scan.root, candidate);
       const unavailable = changedState();
       if (unavailable) return unavailable;

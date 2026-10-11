@@ -13,7 +13,13 @@ import {
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
 } from '../diagnostics/index.js';
-import { inspectWorkspaceParent, resolveWorkspacePath } from '../index.js';
+import {
+  checkDocumentPath,
+  inspectWorkspaceParent,
+  locateOwningCodocs,
+  normalizeDocumentPathInput,
+  resolveWorkspacePath,
+} from '../index.js';
 import type { ProjectRoot } from '../project-root/index.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
@@ -246,4 +252,85 @@ describe('inspectWorkspaceParent: 폴더를 만들지 않는 부모 점검', () 
         success: false,
       });
   });
+});
+
+describe('normalizeDocumentPathInput: 입력 경로 정규화', () => {
+  it.each([
+    ['역슬래시', '.codocs\\orders\\a.yaml', '.codocs/orders/a.yaml'],
+    ['연속 슬래시', '.codocs//orders///a.yaml', '.codocs/orders/a.yaml'],
+    [
+      '역슬래시와 연속 슬래시',
+      '.codocs\\\\orders/\\a.yaml',
+      '.codocs/orders/a.yaml',
+    ],
+    ['끝 슬래시', '.codocs\\', '.codocs/'],
+    ['이미 정규화된 경로', '.codocs/orders/a.yaml', '.codocs/orders/a.yaml'],
+  ])('%s를 / 하나로 바꾼다', (_label, input, expected) => {
+    expect(normalizeDocumentPathInput(input)).toBe(expected);
+  });
+});
+
+describe('locateOwningCodocs: 소유 .codocs 판정', () => {
+  it.each([
+    ['루트 .codocs', '.codocs/a.yaml', 0, '', 'a.yaml'],
+    [
+      '하위 폴더의 첫 .codocs',
+      'packages/web/.codocs/x/a.yaml',
+      2,
+      'packages/web',
+      'x/a.yaml',
+    ],
+    [
+      '중첩된 .codocs 구간은 첫 구간',
+      'a/.codocs/b/.codocs/c.yaml',
+      1,
+      'a',
+      'b/.codocs/c.yaml',
+    ],
+  ])('%s를 찾는다', (_label, input, index, ownerDirectory, relativePath) => {
+    expect(locateOwningCodocs(input)).toEqual({
+      index,
+      ownerDirectory,
+      relativePath,
+    });
+  });
+
+  it('.codocs 구간이 없으면 undefined다', () => {
+    expect(locateOwningCodocs('orders/order.yaml')).toBeUndefined();
+  });
+});
+
+describe('checkDocumentPath: 원인별 형식 검사', () => {
+  it('.codocs 구간이 없으면 missingCodocs다', () => {
+    expect(checkDocumentPath('orders/order.yaml')).toEqual({
+      success: false,
+      problem: 'missingCodocs',
+    });
+  });
+
+  it.each([
+    ['POSIX 절대 경로', '/abs/.codocs/a.yaml', 'absolute'],
+    ['드라이브 절대 경로', 'D:/p/.codocs/a.yaml', 'absolute'],
+    ['.. 구간', '.codocs/../a.yaml', 'dotSegment'],
+    ['. 구간', '.codocs/./a.yaml', 'dotSegment'],
+    ['파일명 없음', '.codocs/', 'missingFileName'],
+    ['.codocs만 있는 경로', '.codocs', 'missingFileName'],
+    ['확장자 불일치', '.codocs/a.json', 'extension'],
+  ] as const)('%s는 %s 원인으로 거부한다', (_label, input, problem) => {
+    expect(checkDocumentPath(input)).toEqual({ success: false, problem });
+  });
+
+  it('하위 폴더의 .codocs는 이 단계에서 인정하지 않는다', () => {
+    expect(checkDocumentPath('packages/web/.codocs/a.yaml')).toEqual({
+      success: false,
+      problem: 'missingCodocs',
+    });
+  });
+
+  it.each(['.codocs/a.yaml', '.codocs/orders/order.yml'])(
+    '루트 .codocs 아래 YAML %s는 구간을 돌려준다',
+    (input) => {
+      expect(checkDocumentPath(input)).toMatchObject({ success: true });
+    },
+  );
 });

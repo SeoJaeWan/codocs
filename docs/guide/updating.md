@@ -89,6 +89,12 @@ ID를 바꿔도 과거 ID는 남기지 않는다. 이후 조회·수정은 새 I
 - 확인해야 하는 코드 파일을 아직 수집하지 못했거나 읽지 못했으면 `code_evidence_incomplete`로 저장하지 않는다. 깨지지 않았다는 뜻이 아니므로 코드 수집이 끝난 뒤 다시 요청한다. 같은 요청을 revision만 바꿔 반복하지 않는다.
 - 거절한 요청은 파일을 바꾸지 않는다. 지우려는 섹션을 가리키는 참조를 먼저 고친 뒤 다시 요청한다.
 
+## 문서 경로 규칙
+
+create와 move의 `path`는 프로젝트 루트(`--project`, 생략하면 서버를 시작한 위치) 기준 상대 경로다. `.codocs/orders/order.yaml`처럼 `/`로 구분하고 루트의 `.codocs` 아래에서 `.yaml` 또는 `.yml`로 끝나야 한다.
+`\`와 연속한 `/`는 `/` 하나로 바꿔 받는다. 절대 경로, `.`·`..` 구간, 파일명 없이 `/`로 끝나는 경로, `.codocs` 구간이 없는 경로, 다른 확장자는 거절하며 메시지가 원인과 올바른 예시(`.codocs/orders/order.yaml`)를 알려 준다.
+결과의 `source.path`·`changes[].path`·`previousPath`는 OS와 무관하게 `/`로 구분하므로 그대로 move의 `path`나 `codocs_validate`의 `path`에 넣을 수 있다.
+
 ## 문서 삭제와 이동
 
 문서 파일을 지우거나 다른 경로로 옮길 때도 `codocs_get`으로 읽은 `revision`을 보낸다.

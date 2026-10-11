@@ -1,6 +1,6 @@
 import { queryDiagnosticCodes, queryDiagnosticMessages } from '@codocs/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createCodocsQueryHandlers } from './index.js';
+import { createCodocsQueryHandlers, toPortableResultPaths } from './index.js';
 import type { WorkspaceQuerySession } from '@codocs/workspace';
 
 const backend = vi.hoisted(
@@ -769,5 +769,59 @@ describe('createCodocsQueryHandlers: MCP 조회 응답 전달과 입력 검증',
     expect(serialized).toContain(large);
     expect(serialized).not.toContain('response_too_large');
     expect(serialized).not.toContain('truncated');
+  });
+});
+
+describe('toPortableResultPaths: 결과 경계의 문서 경로 변환', () => {
+  it.each([
+    [
+      'source.path',
+      { source: { path: '.codocs\\a.yaml' } },
+      { source: { path: '.codocs/a.yaml' } },
+    ],
+    [
+      'changes[].path와 previousPath',
+      {
+        changes: [
+          { path: '.codocs\\b\\a.yaml', previousPath: '.codocs\\a.yaml' },
+        ],
+      },
+      {
+        changes: [{ path: '.codocs/b/a.yaml', previousPath: '.codocs/a.yaml' }],
+      },
+    ],
+    [
+      '진단 path와 relatedPaths',
+      {
+        diagnostics: [
+          { path: '.codocs\\a.yaml', relatedPaths: ['.codocs\\b.yaml'] },
+        ],
+      },
+      {
+        diagnostics: [
+          { path: '.codocs/a.yaml', relatedPaths: ['.codocs/b.yaml'] },
+        ],
+      },
+    ],
+    [
+      '조회 충돌의 paths',
+      { paths: ['.codocs\\a.yaml', '.codocs\\b.yaml'] },
+      { paths: ['.codocs/a.yaml', '.codocs/b.yaml'] },
+    ],
+  ])('Windows 구분자를 가진 %s를 /로 바꾼다', (_label, input, expected) => {
+    expect(toPortableResultPaths(input, '\\')).toEqual(expected);
+  });
+
+  it('경로가 아닌 값은 바꾸지 않고 바뀐 것이 없으면 원본을 돌려준다', () => {
+    const unchanged = {
+      definition: 'a\\b',
+      source: { path: '.codocs/a.yaml' },
+    };
+    expect(toPortableResultPaths(unchanged, '\\')).toBe(unchanged);
+  });
+
+  it('POSIX 구분자에서는 결과를 그대로 돌려준다', () => {
+    const result = { source: { path: '.codocs/a.yaml' } };
+    expect(toPortableResultPaths(result, '/')).toBe(result);
   });
 });

@@ -1,5 +1,6 @@
 import { lstat, mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
+import { documentPathMessages, type DocumentPathProblem } from '@codocs/core';
 import {
   createWorkspaceDiagnostic,
   getIoErrorCode,
@@ -70,6 +71,70 @@ function pathSegments(input: string): string[] {
   return input
     .split(path.sep === '\\' ? /[\\/]/u : /\//u)
     .filter((segment) => segment !== '');
+}
+
+/**
+ * write·validate가 받은 문서 경로의 역슬래시를 `/`로 바꾸고 연속 `/`를 하나로 합친다.
+ * 구간 의미(`.`·`..`, 절대 경로, 끝 `/`)는 바꾸지 않아 이후 검사가 원인을 판정한다.
+ */
+export function normalizeDocumentPathInput(input: string): string {
+  return input.replaceAll('\\', '/').replace(/\/{2,}/gu, '/');
+}
+
+/** 소유 .codocs 판정 결과다. */
+export interface OwningCodocs {
+  /** 경로 구간에서 소유 .codocs의 위치다. 0이면 프로젝트 루트의 .codocs다. */
+  index: number;
+  /** 프로젝트 루트 기준 .codocs 소유 폴더 경로다. 프로젝트 루트이면 빈 문자열이다. */
+  ownerDirectory: string;
+  /** 소유 .codocs 아래의 상대 경로다. */
+  relativePath: string;
+}
+
+/**
+ * `/`로 구분한 문서 경로에서 첫 `.codocs` 구간을 소유 .codocs로 찾는다.
+ * 파일 시스템을 읽지 않는 순수 판정이며, 입력은 normalizeDocumentPathInput을 거친 경로여야 한다.
+ * @returns 경로에 .codocs 구간이 없으면 undefined다.
+ */
+export function locateOwningCodocs(
+  documentPath: string,
+): OwningCodocs | undefined {
+  const segments = documentPath.split('/');
+  const index = segments.indexOf(codocsDirectoryName);
+  if (index < 0) return undefined;
+  return {
+    index,
+    ownerDirectory: segments.slice(0, index).join('/'),
+    relativePath: segments.slice(index + 1).join('/'),
+  };
+}
+
+/** 문서 경로 검사 결과다. 성공하면 구간 목록을, 실패하면 원인을 담는다. */
+export type DocumentPathCheck =
+  | { success: true; segments: string[] }
+  | { success: false; problem: DocumentPathProblem };
+
+/**
+ * 저장 후보 경로의 형식을 검사하고 원인을 가린다. 이 단계는 루트 .codocs 아래의 YAML 파일만 인정한다.
+ * @param input 프로젝트 루트 기준 상대 경로이며 구분자는 `/`나 OS 구분자다.
+ */
+export function checkDocumentPath(input: string): DocumentPathCheck {
+  const segments = pathSegments(input);
+  if (
+    path.isAbsolute(input) ||
+    path.win32.isAbsolute(input) ||
+    /^[A-Za-z]:/u.test(input)
+  )
+    return { success: false, problem: 'absolute' };
+  if (locateOwningCodocs(segments.join('/'))?.index !== 0)
+    return { success: false, problem: 'missingCodocs' };
+  if (segments.some((segment) => segment === '.' || segment === '..'))
+    return { success: false, problem: 'dotSegment' };
+  if (segments.length < 2 || /[\\/]$/u.test(input))
+    return { success: false, problem: 'missingFileName' };
+  if (!/\.ya?ml$/u.test(segments.at(-1) ?? ''))
+    return { success: false, problem: 'extension' };
+  return { success: true, segments };
 }
 
 /** 거부·누락·대상 확인 실패를 확인된 경로와 함께 반환한다. */
@@ -277,20 +342,15 @@ export async function ensureWorkspaceParent(
   | { success: true; logicalPath: string }
   | { success: false; diagnostics: readonly WorkspaceDiagnostic[] }
 > {
-  const segments = pathSegments(input);
-  if (
-    path.isAbsolute(input) ||
-    segments.length < 2 ||
-    segments[0] !== codocsDirectoryName ||
-    segments.some((segment) => segment === '.' || segment === '..') ||
-    !/\.ya?ml$/u.test(segments.at(-1) ?? '')
-  )
+  const checked = checkDocumentPath(input);
+  if (!checked.success)
     return failure(
       root,
       workspacePathFailureStatuses.denied,
       workspaceDiagnosticCodes.invalidWorkspacePath,
-      workspaceDiagnosticMessages.invalidPath,
+      documentPathMessages[checked.problem],
     );
+  const segments = checked.segments;
   const selected = await resolveProjectRoot({
     cwd: root.startCwd,
     project: root.projectRoot,
@@ -356,20 +416,15 @@ export async function inspectWorkspaceParent(
   root: ProjectRoot,
   input: string,
 ): Promise<WorkspaceParentInspection> {
-  const segments = pathSegments(input);
-  if (
-    path.isAbsolute(input) ||
-    segments.length < 2 ||
-    segments[0] !== codocsDirectoryName ||
-    segments.some((segment) => segment === '.' || segment === '..') ||
-    !/\.ya?ml$/u.test(segments.at(-1) ?? '')
-  )
+  const checked = checkDocumentPath(input);
+  if (!checked.success)
     return failure(
       root,
       workspacePathFailureStatuses.denied,
       workspaceDiagnosticCodes.invalidWorkspacePath,
-      workspaceDiagnosticMessages.invalidPath,
+      documentPathMessages[checked.problem],
     ) as WorkspaceParentInspection;
+  const segments = checked.segments;
   const selected = await resolveProjectRoot({
     cwd: root.startCwd,
     project: root.projectRoot,

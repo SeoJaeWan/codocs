@@ -11,6 +11,12 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  changePlanDiagnosticCodes,
+  documentPathExample,
+  documentPathMessages,
+} from '@codocs/core';
+import { workspaceDiagnosticCodes } from '../diagnostics/index.js';
 import { createLink } from '../test-support/links.js';
 import { loadWorkspace } from '../loader/index.js';
 import {
@@ -432,4 +438,93 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
     ).toEqual(['EPERM', 'EACCES']);
     expect(await readFile(originalFile, 'utf8')).toBe(original);
   });
+});
+
+describe('saveWorkspaceChange: create 경로 정규화와 원인별 거절', () => {
+  it.each([
+    ['역슬래시', '.codocs\\orders\\a.yaml'],
+    ['연속 슬래시', '.codocs//orders/a.yaml'],
+  ])(
+    'create 경로의 %s는 /로 정규화해 .codocs/orders/a.yaml에 저장한다',
+    async (_label, requested) => {
+      const scan = await loadWorkspace({ cwd: root });
+      const result = await saveWorkspaceChange(
+        { mode: 'create', path: requested, document },
+        scan,
+      );
+      expect(result).toMatchObject({
+        success: true,
+        saved: true,
+        source: { path: path.join('.codocs', 'orders', 'a.yaml') },
+      });
+      expect(
+        await readFile(path.join(folder, 'orders', 'a.yaml'), 'utf8'),
+      ).toContain('id: created');
+    },
+  );
+
+  it('.codocs 폴더 없이 시작하는 create 경로는 .codocs 없음 문구와 예시로 거절한다', async () => {
+    const scan = await loadWorkspace({ cwd: root });
+    const result = await saveWorkspaceChange(
+      { mode: 'create', path: 'orders/order.yaml', document },
+      scan,
+    );
+    expect(result).toMatchObject({
+      success: false,
+      diagnostics: [
+        {
+          code: workspaceDiagnosticCodes.invalidWorkspacePath,
+          message: documentPathMessages.missingCodocs,
+        },
+      ],
+    });
+    expect(documentPathMessages.missingCodocs).toContain(documentPathExample);
+  });
+
+  it.each([
+    [
+      'POSIX 절대 경로',
+      '/abs/.codocs/a.yaml',
+      'absolute',
+      changePlanDiagnosticCodes.invalidRequest,
+    ],
+    [
+      '드라이브 절대 경로',
+      'D:/p/.codocs/a.yaml',
+      'absolute',
+      workspaceDiagnosticCodes.invalidWorkspacePath,
+    ],
+    [
+      '.. 구간',
+      '.codocs/../a.yaml',
+      'dotSegment',
+      changePlanDiagnosticCodes.invalidRequest,
+    ],
+    [
+      '파일명 없음',
+      '.codocs/',
+      'missingFileName',
+      changePlanDiagnosticCodes.invalidRequest,
+    ],
+    [
+      '확장자 불일치',
+      '.codocs/a.json',
+      'extension',
+      changePlanDiagnosticCodes.invalidRequest,
+    ],
+  ] as const)(
+    'create 경로의 %s는 원인별 문구와 예시로 감지 계층의 코드로 거절한다',
+    async (_label, requested, problem, code) => {
+      const scan = await loadWorkspace({ cwd: root });
+      const result = await saveWorkspaceChange(
+        { mode: 'create', path: requested, document },
+        scan,
+      );
+      expect(result).toMatchObject({
+        success: false,
+        diagnostics: [{ code, message: documentPathMessages[problem] }],
+      });
+      expect(documentPathMessages[problem]).toContain(documentPathExample);
+    },
+  );
 });
