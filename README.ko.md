@@ -16,7 +16,7 @@ Codocs는 로컬 `.codocs` YAML 파일에 작성한 프로젝트 지식을 코�
 **Node.js 24.x**가 필요하다. 원하는 디렉터리에서 다음 명령으로 설치한다.
 
 ```sh
-npm install co-documentation@0.0.1
+npm install co-documentation@1.0.0
 ```
 
 MCP 클라이언트 설정에 설치된 실행 파일과 **프로젝트의 절대 경로**를 지정한다.
@@ -62,7 +62,7 @@ AI 도우미에게 “주문의 정의를 찾아줘”, “프로젝트 문서�
 데스크톱 **VS Code 1.100.0 이상**이 필요하다. 확장 화면에서 `seojaewan.codocs`를 검색하거나 다음 명령으로 설치한다.
 
 ```sh
-code --install-extension seojaewan.codocs@0.0.1
+code --install-extension seojaewan.codocs@1.0.0
 ```
 
 VSIX 파일이 있다면 **Extensions: Install from VSIX...**로 설치할 수 있다. 확장에 언어 서버가 포함되어 있고 VS Code 내장 런타임을 사용하므로 별도의 Node.js 설치는 필요하지 않다.
