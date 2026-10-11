@@ -8,6 +8,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 import {
   catalogDiagnosticCodes,
   diagnosticSeverities,
+  documentPathExample,
+  documentPathMessages,
   queryDiagnosticCodes,
   scanStatuses,
   yamlDiagnosticCodes,
@@ -234,6 +236,57 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         });
       },
     );
+
+    it.each([
+      ['orders/order.yaml', 'missingCodocs'],
+      ['/abs/.codocs/a.yaml', 'absolute'],
+      ['D:/p/.codocs/a.yaml', 'absolute'],
+      ['.codocs/../a.yaml', 'dotSegment'],
+      ['.codocs/', 'missingFileName'],
+      ['.codocs/a.json', 'extension'],
+    ] as const)(
+      '형식이 잘못된 경로 %s는 원인별 문구와 올바른 예시로 invalid_path를 반환한다',
+      async (requested, problem) => {
+        const session = createWorkspaceQuerySession({ cwd: project });
+        const result = await session.validate(requested);
+        expect(result).toMatchObject({
+          success: false,
+          error: {
+            code: queryDiagnosticCodes.invalidPath,
+            message: documentPathMessages[problem],
+          },
+        });
+        expect(documentPathMessages[problem]).toContain(documentPathExample);
+      },
+    );
+
+    it.each(['.codocs\\a.yaml', '.codocs//a.yaml', './.codocs/a.yaml'])(
+      '경로 %s의 역슬래시와 연속 슬래시는 /로 바꿔 같은 파일을 검증한다',
+      async (requested) => {
+        await file(
+          'a.yaml',
+          '_codocs:\n  id: a\n  name: A\ndefinition: 본문\n',
+        );
+        const session = createWorkspaceQuerySession({ cwd: project });
+        expect(await session.validate(requested)).toMatchObject({
+          success: true,
+          diagnostics: [],
+        });
+      },
+    );
+
+    it('--project를 지정해도 생략해도 같은 상대 경로로 같은 파일을 찾는다', async () => {
+      await file('a.yaml', '_codocs:\n  id: a\n  name: A\ndefinition: 본문\n');
+      const omitted = createWorkspaceQuerySession({ cwd: project });
+      const explicit = createWorkspaceQuerySession({
+        cwd: path.dirname(project),
+        project,
+      });
+      const first = await omitted.validate('.codocs/a.yaml');
+      const second = await explicit.validate('.codocs/a.yaml');
+      expect(first).toMatchObject({ success: true, diagnostics: [] });
+      expect(second).toEqual(first);
+    });
 
     it('없는 파일의 경로와 ENOENT 원인을 보존한다', async () => {
       const session = createWorkspaceQuerySession({ cwd: project });

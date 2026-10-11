@@ -34,7 +34,11 @@ import {
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { planProtectedWorkspaceChange } from '../change-plan/index.js';
-import { getIoErrorCode } from '../diagnostics/index.js';
+import {
+  createWorkspaceDiagnostic,
+  getIoErrorCode,
+  workspaceDiagnosticCodes,
+} from '../diagnostics/index.js';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
 import { loadWorkspace, type WorkspaceScanResult } from '../loader/index.js';
 import {
@@ -49,8 +53,10 @@ import {
   type CodeFilePolicy,
 } from '../paths/code-file-access.js';
 import {
+  codocsLocationRejection,
   ensureWorkspaceParent,
   inspectWorkspaceParent,
+  locateOwningCodocs,
   resolveWorkspacePath,
 } from '../paths/index.js';
 import {
@@ -365,6 +371,20 @@ export async function saveWorkspaceChange(
       diagnostics: planned.diagnostics,
     };
   }
+  if (baseRevision === undefined) {
+    const rejected = codocsLocationRejection(
+      scan.codocsLocations,
+      sourcePath.split(path.sep).join('/'),
+    );
+    if (rejected)
+      return failure(
+        createWorkspaceDiagnostic(
+          workspaceDiagnosticCodes.invalidWorkspacePath,
+          rejected,
+          sourcePath,
+        ),
+      );
+  }
   const parent = await ensureWorkspaceParent(
     root,
     sourcePath,
@@ -469,10 +489,10 @@ export async function saveWorkspaceChange(
         operations,
       );
       if (beforeScan.length) throw new StorageRejection(beforeScan);
-      const current = await loadWorkspace({
-        cwd: root.startCwd,
-        project: root.projectRoot,
-      });
+      const current = await loadWorkspace(
+        { cwd: root.startCwd, project: root.projectRoot },
+        scan.codocsLocations ? { codocsLocations: scan.codocsLocations } : {},
+      );
       if (current.status !== scanStatuses.complete)
         throw new StorageRejection([
           storageDiagnostic(
@@ -2383,7 +2403,10 @@ async function applyMove(
   };
 }
 
-/** 지운 파일이 있던 폴더 가운데 `.codocs` 바로 아래까지의 하위 폴더를 깊은 순서로 모은다. */
+/**
+ * 지운 파일이 있던 폴더 가운데 소유 `.codocs`(경로의 첫 `.codocs` 구간) 바로 아래까지의 하위 폴더를 깊은 순서로 모은다.
+ * 소유 `.codocs` 자체와 그 바깥 폴더는 후보에 넣지 않는다.
+ */
 function emptyFolderCandidates(
   operations: readonly WorkspaceFileOperation[],
 ): string[] {
@@ -2395,7 +2418,9 @@ function emptyFolderCandidates(
     )
       continue;
     const segments = operation.path.split(/[\\/]/u).filter(Boolean);
-    for (let depth = 2; depth < segments.length; depth++)
+    const owner = locateOwningCodocs(segments.join('/'));
+    if (!owner) continue;
+    for (let depth = owner.index + 2; depth < segments.length; depth++)
       folders.add(segments.slice(0, depth).join('/'));
   }
   return [...folders].sort(

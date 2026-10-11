@@ -18,11 +18,12 @@ export class CodeReferenceWatcher {
   #cancel = new Set<() => void>();
   /**
    * 시작 전 구독을 고정하며 실패는 수집 계층에 전달한다.
+   * changed는 경로와 함께 chokidar 이벤트 종류(add·addDir·change·unlink·unlinkDir)를 받으며 메타데이터 보완 관측은 종류가 없다.
    * excluded는 수집 정책과 같은 판단으로 감시하지 않을 경로를 알려 준다.
    */
   constructor(
     readonly projectRoot: string,
-    readonly changed: (paths: readonly string[]) => void,
+    readonly changed: (paths: readonly string[], event?: string) => void,
     readonly failed: (error: unknown) => void,
     readonly excluded: CodeWatchExclusion = /** 기본값은 제외하지 않는다. */ () =>
       false,
@@ -114,8 +115,11 @@ export class CodeReferenceWatcher {
         ) => {
           watcher.on(
             'all',
-            /** 등록한 source 경로 변경을 전달한다. */ (_event, input) => {
-              if (!this.#closed) this.changed([input]);
+            /** 등록한 source 경로 변경을 종류와 함께 전달한다. */ (
+              event,
+              input,
+            ) => {
+              if (!this.#closed) this.changed([input], event);
             },
           );
           watcher.on('error', (error) => {

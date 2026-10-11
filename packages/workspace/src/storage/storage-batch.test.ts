@@ -158,6 +158,24 @@ describe('applyWorkspaceFileBatch: 연산 반영', () => {
     ]);
   });
 
+  it('하위 .codocs create가 없는 .codocs와 바깥 폴더를 모두 만든다', async () => {
+    const result = await applyWorkspaceFileBatch(root, [
+      {
+        kind: workspaceFileOperationKinds.create,
+        path: 'packages/new/.codocs/a.yaml',
+        raw: created,
+      },
+    ]);
+
+    expect(result).toMatchObject({ success: true, saved: true });
+    expect(
+      await readFile(
+        path.join(dir, 'packages', 'new', '.codocs', 'a.yaml'),
+        'utf8',
+      ),
+    ).toBe(created);
+  });
+
   it('연산이 없으면 아무것도 저장하지 않은 성공으로 돌려준다', async () => {
     expect(await applyWorkspaceFileBatch(root, [])).toMatchObject({
       success: true,
@@ -338,6 +356,43 @@ describe('비게 된 폴더 제거', () => {
     ]);
   });
 
+  it('루트 .codocs 안의 .codocs 구간 문서를 지우면 루트 .codocs 바로 아래 폴더까지 제거한다', async () => {
+    const inner = '_codocs:\n  id: inner\n  name: 안쪽\ndefinition: 가\n';
+    await writeProjectTree(dir, { '.codocs/x/.codocs/b.yaml': inner });
+    const result = await applyWorkspaceFileBatch(root, [
+      {
+        kind: workspaceFileOperationKinds.delete,
+        path: '.codocs/x/.codocs/b.yaml',
+        baseRevision: revision(inner),
+      },
+    ]);
+
+    expect(result.folders).toEqual([
+      { path: '.codocs/x/.codocs', state: 'changed' },
+      { path: '.codocs/x', state: 'changed' },
+    ]);
+    expect(await readdir(path.join(dir, '.codocs'))).not.toContain('x');
+  });
+
+  it('하위 .codocs의 마지막 문서를 지우면 비게 된 안쪽 폴더만 제거하고 그 .codocs와 바깥 폴더는 남긴다', async () => {
+    const nested = '_codocs:\n  id: nested\n  name: 하위\ndefinition: 가\n';
+    await writeProjectTree(dir, { 'packages/core/.codocs/x/a.yaml': nested });
+    const result = await applyWorkspaceFileBatch(root, [
+      {
+        kind: workspaceFileOperationKinds.delete,
+        path: 'packages/core/.codocs/x/a.yaml',
+        baseRevision: revision(nested),
+      },
+    ]);
+
+    expect(result.folders).toEqual([
+      { path: 'packages/core/.codocs/x', state: 'changed' },
+    ]);
+    expect(
+      await readdir(path.join(dir, 'packages', 'core', '.codocs')),
+    ).toEqual([]);
+  });
+
   it('.codocs 바로 아래 파일만 지워 .codocs가 비어도 .codocs 자체는 제거하지 않는다', async () => {
     await rmWithRetry(path.join(dir, '.codocs', 'sub'), { recursive: true });
     await rmWithRetry(path.join(dir, '.codocs', 'b.yaml'));
@@ -442,6 +497,28 @@ describe('중간 실패의 역순 복구', () => {
     const result = await applyWorkspaceFileBatch(
       root,
       [create('p/q/n.yaml', created), replace('a.yaml', a, 'a2\n')],
+      { operations: { rename: failingRename(() => true) } },
+    );
+
+    expect(result.operations.map((item) => item.state)).toEqual([
+      'restored',
+      'unchanged',
+    ]);
+    expect(await snapshotProjectTree(dir)).toEqual(before);
+  });
+
+  it('하위 .codocs create를 복구하면 이번에 만든 .codocs와 바깥 폴더를 모두 제거한다', async () => {
+    const before = await snapshotProjectTree(dir);
+    const result = await applyWorkspaceFileBatch(
+      root,
+      [
+        {
+          kind: workspaceFileOperationKinds.create,
+          path: 'packages/new/.codocs/a.yaml',
+          raw: created,
+        },
+        replace('a.yaml', a, 'a2\n'),
+      ],
       { operations: { rename: failingRename(() => true) } },
     );
 

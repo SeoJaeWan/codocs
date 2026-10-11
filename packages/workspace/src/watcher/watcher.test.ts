@@ -190,3 +190,66 @@ describe('createWorkspaceWatcher 파일 변화 신호', () => {
     });
   });
 });
+
+describe('WorkspaceWatcher.setNestedDirectories: 하위 .codocs 내용 감시', () => {
+  it('하위 .codocs를 감시 대상으로 주면 그 안의 파일 생성 경로를 전달한다', async () => {
+    const nested = path.join(project, 'packages', 'core', '.codocs');
+    await mkdir(nested, { recursive: true });
+    watcher = await createWorkspaceWatcher(project);
+    const paths: string[] = [];
+    watcher.subscribe((batch) => paths.push(...batch.paths));
+    await watcher.setNestedDirectories([nested]);
+    const target = path.join(nested, 'a.yaml');
+
+    await writeFile(target, 'id: a\n');
+
+    await vi.waitFor(() => expect(paths).toContain(target), {
+      timeout: 5_000,
+    });
+  });
+
+  it('감시 대상에서 뺀 하위 .codocs의 파일 변경은 전달하지 않는다', async () => {
+    const codocs = path.join(project, '.codocs');
+    const nested = path.join(project, 'packages', 'core', '.codocs');
+    await mkdir(codocs);
+    await mkdir(nested, { recursive: true });
+    watcher = await createWorkspaceWatcher(project);
+    await watcher.setNestedDirectories([nested]);
+    await watcher.setNestedDirectories([]);
+    const paths: string[] = [];
+    watcher.subscribe((batch) => paths.push(...batch.paths));
+    const ignored = path.join(nested, 'a.yaml');
+    const observed = path.join(codocs, 'b.yaml');
+
+    await writeFile(ignored, 'id: a\n');
+    await writeFile(observed, 'id: b\n');
+
+    // 같은 시점에 바꾼 루트 .codocs 파일이 전달된 뒤에도 뺀 .codocs의 파일은 없어야 한다.
+    await vi.waitFor(() => expect(paths).toContain(observed), {
+      timeout: 5_000,
+    });
+    expect(paths).not.toContain(ignored);
+  });
+
+  it('하위 .codocs 폴더가 같은 경로에서 교체되면 다시 감시해 새 폴더의 파일 생성 경로를 전달한다', async () => {
+    const nested = path.join(project, 'packages', 'core', '.codocs');
+    await mkdir(nested, { recursive: true });
+    watcher = await createWorkspaceWatcher(project);
+    await watcher.setNestedDirectories([nested]);
+    await renameWithRetry(
+      nested,
+      path.join(project, 'packages', 'core', 'old'),
+    );
+    await mkdir(nested);
+    await watcher.reopenNestedDirectory(nested);
+    const paths: string[] = [];
+    watcher.subscribe((batch) => paths.push(...batch.paths));
+    const target = path.join(nested, 'a.yaml');
+
+    await writeFile(target, 'id: a\n');
+
+    await vi.waitFor(() => expect(paths).toContain(target), {
+      timeout: 5_000,
+    });
+  });
+});

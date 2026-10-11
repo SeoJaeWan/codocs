@@ -34,6 +34,8 @@ MCP 클라이언트 설정에 설치된 실행 파일과 **프로젝트의 절�
 
 `/absolute/install`은 `npm install`을 실행한 디렉터리로 바꾼다. `--project`에는 `.codocs`를 포함하는 프로젝트 폴더를 지정한다.
 
+문서는 `packages/core/.codocs/a.yaml`처럼 프로젝트 안 하위 폴더의 `.codocs`에도 둘 수 있다. 프로젝트 루트의 서버 하나가 모든 `.codocs`를 한 프로젝트로 읽으므로 ID와 이름은 모든 `.codocs`에서 유일해야 한다. 하위 폴더의 `.codocs`는 코드 참조 수집이 파일을 읽는 위치에서만 쓴다. Git이 추적하거나 `.gitignore`가 제외하지 않았고, 루트의 `.codocsignore`도 제외하지 않은 위치다.
+
 Windows에서는 JSON의 command 값으로 `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd`를 사용한다. `.cmd` 파일을 실행하지 못하는 클라이언트에서는 `command`를 `node`로 지정하고, 첫 번째 인자로 `node_modules/co-documentation/dist/runtime/cli.js`의 절대 경로를 전달한 뒤 `--project`와 프로젝트 경로를 이어서 지정한다. 클라이언트별 설정 형식에 맞춰 로컬 stdio 연결을 사용한다.
 
 ### 사용할 수 있는 도구

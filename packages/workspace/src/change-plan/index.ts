@@ -18,6 +18,7 @@ import {
 import path from 'node:path';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
 import type { WorkspaceScanResult } from '../loader/index.js';
+import { normalizeDocumentPathInput } from '../paths/index.js';
 import { discoveryPath } from '../query/discovery-path.js';
 import { calculateRevision } from '../revision/index.js';
 
@@ -32,6 +33,58 @@ export type WorkspaceChangePlanResult =
 /** 쓰기 직전 보호에 쓸 코드 파일의 저장 원문 증거를 새로 수집하는 경계다. */
 export type WorkspaceCodeEvidenceCollector =
   () => Promise<WorkspaceCodeEvidence>;
+
+/** 항목 객체에서 자체 데이터 속성 값만 읽는다. 접근자는 실행하지 않는다. */
+function ownValue(input: unknown, key: string): unknown {
+  if (typeof input !== 'object' || input === null) return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(input, key);
+    return descriptor && 'value' in descriptor
+      ? (descriptor.value as unknown)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * create·move 항목의 path를 `/` 하나 구분 형식으로 정규화한 사본을 돌려준다. 다른 항목과 다른 속성은 바꾸지 않는다.
+ * 접근자는 실행하지 않으며 정규화할 값이 없거나 이미 정규화되어 있으면 원본을 그대로 돌려준다.
+ */
+function normalizeItemPath(item: unknown): unknown {
+  if (typeof item !== 'object' || item === null || Array.isArray(item))
+    return item;
+  try {
+    const mode = ownValue(item, 'mode');
+    const requested = ownValue(item, 'path');
+    if ((mode !== 'create' && mode !== 'move') || typeof requested !== 'string')
+      return item;
+    const normalized = normalizeDocumentPathInput(requested);
+    if (normalized === requested) return item;
+    return Object.defineProperties(
+      {},
+      {
+        ...Object.getOwnPropertyDescriptors(item),
+        path: {
+          value: normalized,
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        },
+      },
+    );
+  } catch {
+    return item;
+  }
+}
+
+/** 여러 항목의 create·move path를 정규화한다. 배열이 아니면 core가 판정하도록 그대로 돌려준다. */
+function normalizeItemPaths(items: unknown): unknown {
+  if (!Array.isArray(items)) return items;
+  return Array.from({ length: items.length }, (_, index) =>
+    normalizeItemPath(ownValue(items, String(index))),
+  );
+}
 
 /**
  * 같은 스캔의 원문·revision·확인 상태로 순수 core 후보 계산을 연결한다. 디스크를 다시 읽거나 쓰지 않는다.
@@ -69,7 +122,7 @@ export function planWorkspaceChange(
     path === undefined
       ? undefined
       : scan.documents.find((item) => item.source.path === path);
-  const result = planDocumentChange(input, {
+  const result = planDocumentChange(normalizeItemPath(input), {
     catalog,
     ...(document
       ? {
@@ -158,19 +211,6 @@ export async function planProtectedWorkspaceChange(
 /** 다중 항목 계획 결과다. 후보에는 항목별로 새 바이트 revision을 붙이지 않는다. 반영 뒤 디스크 revision을 쓴다. */
 export type WorkspaceChangesPlanResult = ChangesPlanResult;
 
-/** 항목 객체에서 자체 데이터 속성 값만 읽는다. 접근자는 실행하지 않는다. */
-function ownValue(input: unknown, key: string): unknown {
-  if (typeof input !== 'object' || input === null) return undefined;
-  try {
-    const descriptor = Object.getOwnPropertyDescriptor(input, key);
-    return descriptor && 'value' in descriptor
-      ? (descriptor.value as unknown)
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 /** 기존 문서를 대상으로 하는 항목들의 같은 스캔 원문을 모은다. 유일한 경로로 정해지지 않는 ID는 core가 판정한다. */
 function batchSources(
   items: unknown,
@@ -214,8 +254,9 @@ export function planWorkspaceChanges(
   catalog: Catalog = buildWorkspaceCatalog(scan),
   codeReferences?: readonly ChangePlanCodeReference[],
 ): WorkspaceChangesPlanResult {
-  const sources = batchSources(items, scan, catalog);
-  return planDocumentChanges(items, {
+  const normalized = normalizeItemPaths(items);
+  const sources = batchSources(normalized, scan, catalog);
+  return planDocumentChanges(normalized, {
     catalog,
     ...(sources.length ? { sources } : {}),
     ...(codeReferences ? { codeReferences } : {}),
