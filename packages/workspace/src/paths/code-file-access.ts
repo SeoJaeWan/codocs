@@ -719,23 +719,23 @@ export async function computeCodeFilePolicy(
     ...(git.gitDirectory ? { gitDirectory: git.gitDirectory } : {}),
   };
 }
-/** 하위 .codocs 찾기 결과다. 정책은 위치 판정과 감시 제외에 그대로 쓴다. */
+/** 하위 .codocs 찾기 결과다. 정책은 Git 추적 집합 없이 ignore 규칙만 담으며 위치 판정과 감시 제외에 쓴다. */
 export interface CodocsOwnerDiscovery {
   policy: CodeFilePolicy;
-  /** Git·ignore·폴더 열거 단계에서 확인하지 못한 범위다. */
+  /** ignore 규칙 읽기·폴더 열거 단계에서 확인하지 못한 범위다. */
   failures: readonly CodeCollectionFailure[];
-  /** 코드 파일 수집 규칙을 통과한 가장 바깥 하위 .codocs의 소유 폴더(프로젝트 상대, `/` 구분)이며 탐색 순서다. */
+  /** .gitignore 계층과 root .codocsignore로 제외되지 않은 가장 바깥 하위 .codocs의 소유 폴더(프로젝트 상대, `/` 구분)이며 탐색 순서다. */
   owners: readonly string[];
 }
 /**
- * 코드 파일 수집과 같은 Git 추적 집합·.gitignore 계층·root .codocsignore로 프로젝트를 순회해 하위 .codocs를 찾는다.
+ * Git 명령 없이 .gitignore 계층과 root .codocsignore만으로 프로젝트를 순회해 하위 .codocs를 찾는다.
+ * Git 추적 여부는 보지 않으므로 제외된 폴더 안에 추적된 .codocs도 인정하지 않는다.
  * 파일 원문은 읽지 않으며 .codocs 안으로는 내려가지 않는다. 링크와 `.git`은 따라가지 않는다.
  */
 export async function discoverCodocsOwners(
   projectRoot: string,
 ): Promise<CodocsOwnerDiscovery> {
   projectRoot = path.resolve(projectRoot);
-  const git = await readTrackedCodeFiles(projectRoot);
   const codocsIgnore = await readCodocsIgnore(projectRoot);
   const layers: IgnoreLayer[] = [];
   const unknown = new Set<string>();
@@ -743,9 +743,10 @@ export async function discoverCodocsOwners(
   const owners: string[] = [];
   const policy: CodeFilePolicy = {
     projectRoot,
-    repositoryKind: git.repositoryKind,
-    tracked: git.tracked,
-    trackedDirectories: trackedAncestors(git.tracked),
+    // Git을 실행하지 않으므로 추적 집합은 비어 있고 저장소 종류는 판정에 쓰지 않는다.
+    repositoryKind: codeRepositoryKinds.nonGit,
+    tracked: new Set(),
+    trackedDirectories: new Set(),
     layers,
     unknownIgnoreDirectories: unknown,
     ...codocsIgnorePolicyFields(codocsIgnore),
@@ -765,7 +766,6 @@ export async function discoverCodocsOwners(
   return {
     policy: { ...policy, layers: sortedLayers(layers) },
     failures: [
-      ...(git.failure ? [git.failure] : []),
       ...(codocsIgnore.failure ? [codocsIgnore.failure] : []),
       ...failures,
     ],

@@ -1,10 +1,15 @@
 import { execFile } from 'node:child_process';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ioFailures } from '../test-support/file-system.js';
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
+});
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { codeRepositoryKinds } from '../code-reference/domain-values.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 import {
   classifyCodocsLocation,
@@ -27,6 +32,8 @@ beforeEach(async () => {
   project = await mkdtemp(path.join(tmpdir(), 'codocs-locations-'));
 });
 afterEach(async () => {
+  ioFailures.clear();
+  vi.unstubAllEnvs();
   await rmWithRetry(project, { recursive: true, force: true });
 });
 
@@ -56,20 +63,43 @@ describe('discoverCodocsLocations: 하위 .codocs 찾기', () => {
     expect(result.owners).toEqual([]);
   });
 
-  it('.gitignore가 제외한 폴더라도 Git이 추적하는 .codocs는 찾는다', async () => {
+  it('.gitignore가 제외한 폴더의 .codocs는 Git이 강제로 추적해도 찾지 않는다', async () => {
     await execute('git', ['init', project]);
-    await file('.gitignore', 'vendor/\n');
-    await file('vendor/lib/.codocs/a.yaml');
-    await execute('git', [
-      '-C',
-      project,
-      'add',
-      '-f',
-      'vendor/lib/.codocs/a.yaml',
-    ]);
+    await file('.gitignore', 'build/\n');
+    await file('build/.codocs/a.yaml');
+    await file('packages/core/.codocs/a.yaml');
+    await execute('git', ['-C', project, 'add', '-f', 'build/.codocs/a.yaml']);
     const result = await discoverCodocsLocations(project);
 
-    expect(result.owners).toEqual(['vendor/lib']);
+    expect(result.owners).toEqual(['packages/core']);
+    expect(result.failures).toEqual([]);
+  });
+
+  it('git 실행 파일을 찾을 수 없어도 하위 .codocs를 찾고 실패를 알리지 않는다', async () => {
+    await file('.gitignore', 'build/\n');
+    await file('build/.codocs/a.yaml');
+    await file('packages/core/.codocs/a.yaml');
+    vi.stubEnv('PATH', '');
+    const result = await discoverCodocsLocations(project);
+
+    expect(result.owners).toEqual(['packages/core']);
+    expect(result.failures).toEqual([]);
+    expect(classifyCodocsLocation(result, 'packages/core')).toBe(
+      codocsLocationStates.recognized,
+    );
+    expect(classifyCodocsLocation(result, 'build')).toBe(
+      codocsLocationStates.excluded,
+    );
+  });
+
+  it('git 없이도 폴더별 .gitignore 계층으로 제외한다', async () => {
+    await file('packages/.gitignore', 'generated/\n');
+    await file('packages/generated/.codocs/a.yaml');
+    await file('packages/core/.codocs/a.yaml');
+    vi.stubEnv('PATH', '');
+    const result = await discoverCodocsLocations(project);
+
+    expect(result.owners).toEqual(['packages/core']);
   });
 
   it('루트 .codocsignore가 제외한 폴더의 .codocs는 Git 추적과 무관하게 찾지 않는다', async () => {
@@ -88,7 +118,6 @@ describe('discoverCodocsLocations: 하위 .codocs 찾기', () => {
     await file('docs/.codocs/a.yaml');
     const result = await discoverCodocsLocations(project);
 
-    expect(result.policy.repositoryKind).not.toBe(codeRepositoryKinds.unknown);
     expect(result.owners).toEqual(['docs']);
   });
 });
@@ -129,15 +158,20 @@ describe('classifyCodocsLocation: .codocs 위치 판정', () => {
     expect(classifyCodocsLocation(locations, owner)).toBe(expected);
   });
 
-  it('Git 상태를 확인하지 못한 규칙이면 하위 .codocs를 unknown으로 판정한다', async () => {
-    const known = await discoverCodocsLocations(project);
-    const locations: CodocsLocations = {
-      ...known,
-      policy: { ...known.policy, repositoryKind: codeRepositoryKinds.unknown },
-    };
+  it('루트 .codocsignore를 읽지 못하면 하위 .codocs는 unknown이고 루트는 recognized다', async () => {
+    await file('.codocsignore', 'examples/\n');
+    ioFailures.set(path.join(project, '.codocsignore'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const locations = await discoverCodocsLocations(project);
 
+    expect(locations.failures).toHaveLength(1);
     expect(classifyCodocsLocation(locations, 'packages/core')).toBe(
       codocsLocationStates.unknown,
+    );
+    expect(classifyCodocsLocation(locations, '')).toBe(
+      codocsLocationStates.recognized,
     );
   });
 

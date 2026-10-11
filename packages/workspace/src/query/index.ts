@@ -90,7 +90,7 @@ import {
   type CodocsLocations,
 } from '../paths/index.js';
 import type { CodeCollectionFailure } from '../paths/code-file-access.js';
-import { CodeReferenceWatcher } from '../watcher/code-reference-watcher.js';
+import { CodocsLocationWatcher } from './location-watcher.js';
 import { calculateRevision } from '../revision/index.js';
 import { pathToFileURL } from 'node:url';
 import {
@@ -104,6 +104,7 @@ import {
   loadWorkspacePath,
   WorkspaceObservationCache,
   containsWorkspacePath,
+  scanBlocksWrite,
   type WorkspacePathScanResult,
   type WorkspaceScanDiagnostic,
   type WorkspaceScanResult,
@@ -761,8 +762,8 @@ export class WorkspaceQuerySession {
   readonly #selections = new Map<string, CandidateSelection>();
   /** 마지막으로 확인한 하위 .codocs 위치와 판정 규칙이다. 감시 실패도 실패 범위로 담는다. */
   #locations: CodocsLocations | undefined;
-  /** 하위 .codocs 생성·삭제와 규칙 파일 변경을 알리는 프로젝트 감시다. 코드 참조 감시와 같은 규칙 범위만 본다. */
-  #locationWatcher: CodeReferenceWatcher | undefined;
+  /** 하위 .codocs 생성·삭제와 규칙 파일 변경을 알리는 프로젝트 감시다. .gitignore·루트 .codocsignore가 제외하지 않은 범위만 보며 Git은 실행하지 않는다. */
+  #locationWatcher: CodocsLocationWatcher | undefined;
   /** 위치 감시를 등록한 규칙의 지문이다. 규칙이 바뀌면 다시 등록한다. */
   #locationRules: string | undefined;
   #locationRegistering = false;
@@ -900,7 +901,7 @@ export class WorkspaceQuerySession {
   }
 
   /**
-   * 코드 파일 수집 규칙으로 하위 .codocs를 다시 찾고 감시를 맞춘다. 규칙이 바뀌었으면 위치 감시를 다시 등록한다.
+   * .gitignore·루트 .codocsignore로 하위 .codocs를 다시 찾고 감시를 맞춘다. 규칙이 바뀌었으면 위치 감시를 다시 등록한다.
    * @returns 새로 인정한 .codocs와 더 이상 인정하지 않는 .codocs의 발견 경로, 그리고 게시할 변경이 있는지다.
    */
   async #updateLocations(): Promise<{
@@ -958,7 +959,7 @@ export class WorkspaceQuerySession {
     await previous?.close();
     if (!root || this.#closed) return;
     this.#locationFailure = undefined;
-    const watcher: CodeReferenceWatcher = new CodeReferenceWatcher(
+    const watcher: CodocsLocationWatcher = new CodocsLocationWatcher(
       root.projectRoot,
       /** 현재 위치 감시의 신호만 위치 재확인으로 넘긴다. */ (paths, event) => {
         if (watcher === this.#locationWatcher)
@@ -968,7 +969,7 @@ export class WorkspaceQuerySession {
         if (watcher === this.#locationWatcher || this.#locationRegistering)
           this.#locationWatchBroken(error);
       },
-      /** 코드 수집과 같은 규칙으로 제외하고 .codocs 안쪽은 보지 않는다. */ (
+      /** ignore 규칙으로 제외하고 .codocs 안쪽은 보지 않는다. */ (
         input,
         stats,
       ) => {
@@ -1004,7 +1005,7 @@ export class WorkspaceQuerySession {
 
   /**
    * 위치 감시 신호에서 하위 .codocs 위치에 영향을 줄 수 있는 것만 위치 재확인으로 넘긴다.
-   * 규칙 파일·Git 메타데이터·폴더 생성·삭제가 대상이며 일반 파일의 내용 변경은 무시한다.
+   * 규칙 파일·폴더 생성·삭제가 대상이며 일반 파일의 내용 변경은 무시한다.
    * 인정된 하위 .codocs 폴더 자체가 바뀌면 그 내용 감시를 다시 확인하고 범위를 다시 읽는다.
    */
   #locationChanged(paths: readonly string[], event: string | undefined): void {
@@ -1023,7 +1024,6 @@ export class WorkspaceQuerySession {
         !relative ||
         relative === '..' ||
         relative.startsWith('../') ||
-        relative.split('/').includes('.git') ||
         name === '.gitignore' ||
         relative === '.codocsignore' ||
         structural
@@ -1134,7 +1134,7 @@ export class WorkspaceQuerySession {
       this.#stamps.clear();
       this.#droppedScopes.clear();
       for (const codocs of this.#codocsRoots()) this.#cache.invalidate(codocs);
-      // 하위 .codocs는 코드 파일 수집 규칙으로 찾은 뒤 감시를 준비하고 읽는다. 위치 확인이 끝나기 전에는 준비 중이다.
+      // 하위 .codocs는 .gitignore·루트 .codocsignore로 찾은 뒤 감시를 준비하고 읽는다. 위치 확인이 끝나기 전에는 준비 중이다.
       const changes = await this.#withLocationLock(() =>
         this.#updateLocations(),
       );
@@ -1405,7 +1405,7 @@ export class WorkspaceQuerySession {
     if (watchFailure)
       return this.#writeFailure([this.#watchFailureResult(watchFailure).error]);
     if (
-      scan.status !== scanStatuses.complete ||
+      scanBlocksWrite(scan) ||
       this.readiness.state !== workspaceLifecycleStates.ready ||
       !this.#catalog
     )

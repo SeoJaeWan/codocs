@@ -34,7 +34,7 @@ In your MCP client's configuration, set the installed executable and the **absol
 
 Replace `/absolute/install` with the directory where you ran `npm install`. `--project` points to the project folder containing `.codocs`.
 
-Documents can also live in `.codocs` folders inside subfolders of the project, such as `packages/core/.codocs/a.yaml`. One server for the project root reads them all as one project, so IDs and names must be unique across every `.codocs`. A subfolder `.codocs` is used only where code reference collection would read files: Git tracks it or `.gitignore` does not exclude it, and the root `.codocsignore` does not exclude it.
+Documents can also live in `.codocs` folders inside subfolders of the project, such as `packages/core/.codocs/a.yaml`. One server for the project root reads them all as one project, so IDs and names must be unique across every `.codocs`. A subfolder `.codocs` is used only where neither a `.gitignore` nor the root `.codocsignore` excludes it. Git is not consulted, so a `.codocs` inside a `.gitignore`d folder is not used even if Git tracks it.
 
 On Windows, use `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd` as the JSON command value. If your client cannot run `.cmd` files, set `command` to `node` and pass the absolute path to `node_modules/co-documentation/dist/runtime/cli.js` as the first argument, followed by `--project` and your project path. Client configuration formats vary; use a local stdio connection with these arguments.
 

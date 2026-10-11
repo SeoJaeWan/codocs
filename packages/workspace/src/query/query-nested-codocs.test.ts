@@ -9,6 +9,7 @@ import {
   documentPathExample,
   queryDiagnosticCodes,
 } from '@codocs/core';
+import { ioFailures } from '../test-support/file-system.js';
 import { workspaceDiagnosticCodes } from '../diagnostics/index.js';
 import { failingRename } from '../test-support/storage-faults.js';
 import { calculateRevision } from '../revision/index.js';
@@ -18,6 +19,12 @@ import {
   type WorkspaceQuerySessionOptions,
 } from './index.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const { withIoFailures } = await import('../test-support/file-system.js');
+  return withIoFailures(actual);
+});
 
 const execute = promisify(execFile);
 const rootText =
@@ -68,6 +75,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  ioFailures.clear();
   await Promise.all(sessions.splice(0).map((session) => session.close()));
   vi.unstubAllEnvs();
   await rmWithRetry(project, { recursive: true, force: true });
@@ -158,11 +166,29 @@ describe('WorkspaceQuerySession: 하위 .codocs 탐색과 조회', () => {
     );
   });
 
-  it('Git 상태를 확인하지 못하면 하위 .codocs를 미확인으로 보고 탐색을 partial로 알린다', async () => {
-    vi.stubEnv('PATH', '');
-    const result = await newSession().list();
+  it('.gitignore가 제외한 폴더의 .codocs는 Git이 강제로 추적해도 색인하지 않는다', async () => {
+    await file('.gitignore', 'build/\n');
+    await file('build/.codocs/a.yaml', documentText('built', '빌드'));
+    await execute('git', ['-C', project, 'add', '-f', 'build/.codocs/a.yaml']);
+    const result = await newSession().get(['빌드']);
 
-    expect(result).toMatchObject({ success: true, scanStatus: 'partial' });
+    expect(result).toMatchObject({
+      success: true,
+      scanStatus: 'complete',
+      results: [{ found: false }],
+    });
+  });
+
+  it('git 실행 파일을 찾을 수 없어도 하위 .codocs를 인정하고 탐색이 complete다', async () => {
+    await file('packages/core/.codocs/a.yaml', documentText('core-a', '코어'));
+    vi.stubEnv('PATH', '');
+    const result = await newSession().get(['코어']);
+
+    expect(result).toMatchObject({
+      success: true,
+      scanStatus: 'complete',
+      results: [{ found: true }],
+    });
   });
 });
 
@@ -255,6 +281,60 @@ describe('WorkspaceQuerySession.write: 하위 .codocs 저장', () => {
       expect(await exists('.workbench')).toBe(false);
     },
   );
+
+  it('git 실행 파일을 찾을 수 없어도 루트와 .gitignore가 제외하지 않은 하위 .codocs에 create·update가 저장된다', async () => {
+    vi.stubEnv('PATH', '');
+    const session = newSession();
+    const created = await session.write({
+      mode: 'create',
+      path: 'packages/core/.codocs/a.yaml',
+      document: {
+        _codocs: { id: 'core-a', name: '코어' },
+        definition: '본문',
+      },
+    });
+    const updated = await session.write({
+      mode: 'update',
+      id: 'root-doc',
+      revision: calculateRevision(Buffer.from(rootText)),
+      set: { definition: '바뀜' },
+    });
+
+    expect(created).toMatchObject({ success: true, saved: true });
+    expect(updated).toMatchObject({ success: true, saved: true });
+    expect(await exists('packages/core/.codocs/a.yaml')).toBe(true);
+  });
+
+  it('루트 .codocsignore를 읽지 못하면 루트 문서 저장은 성공하고 하위 위치 create는 거부한다', async () => {
+    await file('.codocsignore', 'examples/\n');
+    ioFailures.set(path.join(project, '.codocsignore'), {
+      operations: ['lstat'],
+      code: 'EACCES',
+    });
+    const session = newSession();
+    const rejected = await session.write({
+      mode: 'create',
+      path: 'packages/core/.codocs/a.yaml',
+      document: {
+        _codocs: { id: 'core-a', name: '코어' },
+        definition: '본문',
+      },
+    });
+    const saved = await session.write({
+      mode: 'update',
+      id: 'root-doc',
+      revision: calculateRevision(Buffer.from(rootText)),
+      set: { definition: '바뀜' },
+    });
+
+    expect(rejected).toMatchObject({
+      success: false,
+      saved: false,
+      error: { code: workspaceDiagnosticCodes.invalidWorkspacePath },
+    });
+    expect(await exists('packages')).toBe(false);
+    expect(saved).toMatchObject({ success: true, saved: true });
+  });
 
   it('하위 .codocs의 문서를 루트 .codocs로 move하면 새 경로로 조회되고 원래 .codocs는 남는다', async () => {
     const nested = documentText('core-a', '코어');

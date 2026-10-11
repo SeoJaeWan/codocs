@@ -24,8 +24,9 @@ codocs_write의 create·move는 path가 `.codocs/`로 시작해야 저장된다.
 ### 하위 `.codocs` 인정
 
 - 프로젝트 루트의 `.codocs`뿐 아니라 `packages/core/.codocs/a.yaml`처럼 하위 폴더의 `.codocs`도 인정한다.
-- 인정 위치는 코드 파일 수집 규칙을 따른다. Git이 추적하거나 `.gitignore`가 제외하지 않았고 루트 `.codocsignore`도 제외하지 않은 위치만 인정하며, 다른 위치의 문서는 색인하지 않는다. 제외된 위치로의 create·move는 그 위치를 알리는 메시지와 함께 invalid_workspace_path로 거부한다.
+- 인정 위치는 각 폴더의 `.gitignore`와 루트 `.codocsignore`로 제외되지 않은 위치다. 판단에 git 명령을 쓰지 않으며 Git 추적 여부를 보지 않으므로 무시 폴더 안에 강제 커밋된 `.codocs`도 제외한다. 다른 위치의 문서는 색인하지 않는다. 제외된 위치로의 create·move는 그 위치를 알리는 메시지와 함께 invalid_workspace_path로 거부한다.
 - 문서는 경로에서 가장 바깥의 `.codocs`에 속한다. 예를 들어 `.codocs/a/.codocs/b.yaml`은 루트 `.codocs`의 문서다.
+- git이 없거나 실패해도 하위 `.codocs` 탐색과 모든 저장은 영향을 받지 않는다. `.gitignore`나 `.codocsignore`를 읽지 못하면 루트 `.codocs`는 그대로 저장되고, 판단할 수 없는 하위 위치만 확인 못함으로 알리며 그 위치로의 create·move만 거부한다.
 - ID와 이름은 모든 `.codocs`를 합쳐 프로젝트 전체에서 유일해야 한다.
 - create와 move는 단일 요청과 changes 모두 없는 `.codocs`와 바깥 폴더를 전부 만든다. changes가 실패하면 이번 요청이 만든 폴더를 모두 지운다.
 - 삭제나 이동으로 비게 된 폴더는 문서가 속한 `.codocs` 바로 아래까지만 지운다. `.codocs` 자체와 그 바깥 폴더는 남긴다.
@@ -61,6 +62,9 @@ codocs_write의 create·move는 path가 `.codocs/`로 시작해야 저장된다.
 - `\`나 `//`가 섞인 path도 저장되고, 결과 경로는 `/`로 나온다.
 - `packages/core/.codocs/a.yaml`을 create하면 codocs_get·codocs_list·codocs_validate로 조회된다.
 - 제외된 위치(예: `.gitignore`가 제외한 폴더)의 `.codocs`로 create·move하면 위치를 알리는 메시지로 거부되고 폴더가 만들어지지 않는다.
+- git 실행 파일을 찾을 수 없는 환경에서도 루트 `.codocs`와 `.gitignore`가 제외하지 않은 하위 `.codocs`의 create·update가 저장되고 탐색은 complete다.
+- `.gitignore`가 제외한 폴더의 `.codocs`는 git에 강제 추적되어 있어도 인정되지 않는다.
+- `.codocsignore`를 읽지 못하면 루트 문서 저장은 성공하고 하위 위치 create는 거부된다.
 - 다른 `.codocs`에 같은 ID나 이름이 있으면 저장하지 않는다.
 - 하위 `.codocs` 문서를 지우거나 옮기면 소유 `.codocs` 바로 아래까지만 빈 폴더를 지운다. changes가 실패하면 만든 폴더를 모두 지운다.
 - 언어 서버 세션 테스트에서 하위 `.codocs` 문서의 hover가 프로젝트 기준 전체 경로를 보여준다.

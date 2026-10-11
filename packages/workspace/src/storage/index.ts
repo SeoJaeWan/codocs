@@ -40,7 +40,11 @@ import {
   workspaceDiagnosticCodes,
 } from '../diagnostics/index.js';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
-import { loadWorkspace, type WorkspaceScanResult } from '../loader/index.js';
+import {
+  loadWorkspace,
+  scanForWrite,
+  type WorkspaceScanResult,
+} from '../loader/index.js';
 import {
   codeFileReasons,
   collectWorkspaceCodeEvidence,
@@ -318,7 +322,11 @@ export async function saveWorkspaceChange(
   const collectEvidence =
     options.collectCodeEvidence ?? collectWorkspaceCodeEvidence;
   const collect = codeEvidenceCollector(projectRoot, collectEvidence);
-  const planned = await planProtectedWorkspaceChange(input, scan, collect);
+  const planned = await planProtectedWorkspaceChange(
+    input,
+    scanForWrite(scan),
+    collect,
+  );
   if (planned.status === changePlanStatuses.failed)
     return failure(...planned.diagnostics);
   if (!('root' in scan) || !scan.root)
@@ -489,9 +497,11 @@ export async function saveWorkspaceChange(
         operations,
       );
       if (beforeScan.length) throw new StorageRejection(beforeScan);
-      const current = await loadWorkspace(
-        { cwd: root.startCwd, project: root.projectRoot },
-        scan.codocsLocations ? { codocsLocations: scan.codocsLocations } : {},
+      const current = scanForWrite(
+        await loadWorkspace(
+          { cwd: root.startCwd, project: root.projectRoot },
+          scan.codocsLocations ? { codocsLocations: scan.codocsLocations } : {},
+        ),
       );
       if (current.status !== scanStatuses.complete)
         throw new StorageRejection([

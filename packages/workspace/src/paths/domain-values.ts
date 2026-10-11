@@ -33,13 +33,13 @@ export const workspacePathFailureStatuses = {
 export type WorkspacePathFailureStatus =
   (typeof workspacePathFailureStatuses)[keyof typeof workspacePathFailureStatuses];
 
-/** 하위 .codocs 위치를 코드 파일 수집 규칙으로 판정한 결과다. @domainValues */
+/** 하위 .codocs 위치를 .gitignore·루트 .codocsignore로 판정한 결과다. @domainValues */
 export const codocsLocationStates = {
   /** 루트 .codocs이거나 규칙을 통과한 위치라 문서를 탐색하고 저장할 수 있다. */
   recognized: 'recognized',
   /** .gitignore 또는 .codocsignore가 제외한 위치라 탐색하지 않고 저장을 거부한다. */
   excluded: 'excluded',
-  /** Git·ignore 규칙을 확인하지 못해 인정 여부를 정하지 못했다. 탐색하지 않고 저장을 거부한다. */
+  /** ignore 규칙을 확인하지 못해 인정 여부를 정하지 못했다. 탐색하지 않고 저장을 거부한다. */
   unknown: 'unknown',
 } as const;
 /** 원본 상수에서 도출한 CodocsLocationState 타입이다. */

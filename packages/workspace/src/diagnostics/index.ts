@@ -49,14 +49,14 @@ export const workspaceDiagnosticMessages = {
   notDirectory: '탐색할 작업 경로는 디렉터리이어야 합니다.',
   /** 파일 읽기나 폴더 열거의 실제 IO 실패에 사용한다. */
   readFailed: '작업 경로를 읽을 수 없습니다.',
-  /** create·move·validate 대상의 .codocs가 코드 파일 수집 규칙에서 빠진 위치일 때 그 위치 뒤에 붙인다. */
+  /** create·move·validate 대상의 .codocs가 .gitignore나 .codocsignore로 제외된 위치일 때 그 위치 뒤에 붙인다. */
   codocsLocationExcluded: `.gitignore 또는 .codocsignore가 탐색에서 제외한 위치라 이 .codocs에는 문서를 둘 수 없습니다. 올바른 예: ${documentPathExample}`,
-  /** create·move·validate 대상의 .codocs 위치를 코드 파일 수집 규칙으로 확인하지 못했을 때 그 위치 뒤에 붙인다. */
+  /** create·move·validate 대상의 .codocs 위치를 ignore 규칙으로 확인하지 못했을 때 그 위치 뒤에 붙인다. */
   codocsLocationUnknown:
-    'Git·.gitignore·.codocsignore 규칙을 확인하지 못해 이 .codocs를 인정할 수 없습니다. codocs_refresh 뒤 다시 시도하세요.',
-  /** 하위 .codocs를 찾는 코드 파일 수집 규칙의 일부를 확인하지 못해 탐색이 부분 결과일 때 원인 앞에 붙인다. */
+    '.gitignore·.codocsignore 규칙을 확인하지 못해 이 .codocs를 인정할 수 없습니다. codocs_refresh 뒤 다시 시도하세요.',
+  /** 하위 .codocs를 찾는 ignore 규칙의 일부를 확인하지 못해 탐색이 부분 결과일 때 원인 앞에 붙인다. */
   codocsLocationsIncomplete:
-    '하위 .codocs를 찾는 탐색 규칙(Git·.gitignore·.codocsignore)을 확인하지 못해 일부 .codocs를 확인하지 못했습니다. 원인:',
+    '하위 .codocs를 찾는 탐색 규칙(.gitignore·.codocsignore)을 확인하지 못해 일부 .codocs를 확인하지 못했습니다. 원인:',
 } as const;
 
 /** 코드 정의에서 도출한 workspace 진단 코드다. */

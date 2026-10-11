@@ -225,7 +225,7 @@ function readFailure(
 export interface WorkspaceLoadOptions {
   cache?: WorkspaceObservationCache;
   /**
-   * 전체 탐색이 읽을 하위 .codocs다. 생략하면 코드 파일 수집 규칙으로 프로젝트를 순회해 찾는다.
+   * 전체 탐색이 읽을 하위 .codocs다. 생략하면 .gitignore·루트 .codocsignore로 프로젝트를 순회해 찾는다.
    * 경로별 재확인(loadWorkspacePath)에서는 쓰지 않는다.
    */
   codocsLocations?: CodocsLocations;
@@ -250,6 +250,35 @@ export function codocsLocationScanFailures(
       location: true,
     }),
   );
+}
+
+/**
+ * 탐색 결과가 저장을 막는지 판단한다. complete가 아니면 막되, 하위 .codocs 위치 규칙을 확인하지 못한 실패만 있는 partial은 막지 않는다.
+ * 그 경우에도 확인하지 못한 위치로의 create·move는 위치 판정이 거부한다.
+ * @param scan 탐색 결과의 상태와 실패 목록이다.
+ */
+export function scanBlocksWrite(scan: {
+  status: WorkspaceScanResult['status'];
+  failures: readonly WorkspaceScanFailure[];
+}): boolean {
+  if (scan.status === scanStatuses.complete) return false;
+  return !(
+    scan.status === scanStatuses.partial &&
+    scan.failures.every(
+      /** 위치 실패만 있는지 확인한다. */ (item) => item.location,
+    )
+  );
+}
+
+/**
+ * 저장 계획에 쓸 탐색 결과를 만든다. 위치 규칙 실패만 있는 partial은 확인한 범위 안에서 complete로 다루고, 그 밖의 결과는 그대로 둔다.
+ * 위치 규칙을 확인하지 못한 하위 위치의 판정은 코드 위치 판정(`codocsLocations`)이 계속 맡는다.
+ * @param scan 탐색 결과다.
+ */
+export function scanForWrite(scan: WorkspaceScanResult): WorkspaceScanResult {
+  if (scan.status !== scanStatuses.partial || scanBlocksWrite(scan))
+    return scan;
+  return { ...scan, status: scanStatuses.complete, failures: [] };
 }
 
 /** 경로별 탐색 결과들을 하나로 합친다. 문서와 관측은 발견 경로 순서로 정렬한다. */

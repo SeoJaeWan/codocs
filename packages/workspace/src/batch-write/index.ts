@@ -29,7 +29,11 @@ import {
   workspaceDiagnosticCodes,
 } from '../diagnostics/index.js';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
-import { loadWorkspace, type WorkspaceScanResult } from '../loader/index.js';
+import {
+  loadWorkspace,
+  scanForWrite,
+  type WorkspaceScanResult,
+} from '../loader/index.js';
 import {
   codocsLocationRejection,
   type CodocsLocations,
@@ -353,9 +357,11 @@ async function recheck(
   collect: () => Promise<WorkspaceCodeEvidence>,
   locations: CodocsLocations | undefined,
 ): Promise<readonly Diagnostic<string>[]> {
-  const current = await loadWorkspace(
-    { cwd: root.startCwd, project: root.projectRoot },
-    locations ? { codocsLocations: locations } : {},
+  const current = scanForWrite(
+    await loadWorkspace(
+      { cwd: root.startCwd, project: root.projectRoot },
+      locations ? { codocsLocations: locations } : {},
+    ),
   );
   const first = planned.find((item) => item.changed) ?? planned[0];
   if (current.status !== scanStatuses.complete)
@@ -457,7 +463,7 @@ export async function saveWorkspaceChanges(
   );
   const plan: WorkspaceChangesPlanResult = await planProtectedWorkspaceChanges(
     items,
-    scan,
+    scanForWrite(scan),
     collect,
   );
   if (plan.status === changePlanStatuses.failed)
