@@ -514,7 +514,7 @@ export class VscodeFolderClient implements FolderClientBoundary {
     this.#stopping = false;
     this.#diagnosticStatus = new DiagnosticStatus(this.#folder);
     const directoryWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(this.#folder, '.codocs'),
+      new vscode.RelativePattern(this.#folder, '**/.codocs'),
     );
     const serverOptions: ServerOptions = {
       module: this.#serverPath,

@@ -3,10 +3,12 @@ import {
   workspaceDiagnosticCodes,
   workspaceLifecycleStates,
 } from '@codocs/workspace';
+import type { WorkspacePathDocumentResult } from '@codocs/workspace';
 import { describe, expect, it } from 'vitest';
 import {
   createEmptyHover,
   createStatusHover,
+  detailLabel,
   escapeMarkdown,
 } from './index.js';
 
@@ -59,6 +61,38 @@ describe('Hover Markdown 이스케이프', () => {
   it('사용자 제공 텍스트의 링크·명령·서식 문자를 이스케이프하면 서식으로 해석되지 않는다', () => {
     expect(escapeMarkdown('[x](command:evil) *b*')).toBe(
       '\\[x\\]\\(command:evil\\) \\*b\\*',
+    );
+  });
+});
+
+describe('동명 후보 경로 표시', () => {
+  /** 이름이 같은 후보 결과를 경로만 바꿔 만든다. */
+  function candidate(documentPath: string): WorkspacePathDocumentResult {
+    return {
+      path: documentPath,
+      found: true,
+      source: { path: documentPath, uri: `file:///${documentPath}` },
+    } as unknown as WorkspacePathDocumentResult;
+  }
+
+  it('루트 .codocs 문서는 .codocs/를 뺀 경로를 보여준다', () => {
+    const peers = [
+      candidate('.codocs/payment/reservation.yaml'),
+      candidate('.codocs/shipping/reservation.yaml'),
+    ];
+    expect(detailLabel(peers[0]!, peers)).toBe(
+      'reservation.yaml — payment/reservation.yaml',
+    );
+  });
+
+  it('하위 .codocs 문서는 프로젝트 기준 전체 경로를 `/`로 보여준다', () => {
+    const peers = [
+      candidate('.codocs/a.yaml'),
+      candidate('packages/core/.codocs/a.yaml'),
+    ];
+    expect(detailLabel(peers[0]!, peers)).toBe('a.yaml — a.yaml');
+    expect(detailLabel(peers[1]!, peers)).toBe(
+      'a.yaml — packages/core/.codocs/a.yaml',
     );
   });
 });

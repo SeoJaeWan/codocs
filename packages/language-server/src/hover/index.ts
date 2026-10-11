@@ -1,4 +1,6 @@
 import {
+  locateOwningCodocs,
+  normalizeDocumentPathInput,
   workspaceDiagnosticCodes,
   type WorkspacePathDocumentResult,
   type WorkspaceQueryDiagnostic,
@@ -41,6 +43,13 @@ function pathLabel(documentPath: string): string {
   return documentPath.split(/[\\/]/u).at(-1) ?? documentPath;
 }
 
+/** 루트 .codocs 문서는 .codocs/를 뺀 경로, 하위 .codocs 문서는 프로젝트 기준 전체 경로로 표시한다. */
+function peerPathLabel(documentPath: string): string {
+  const normalized = normalizeDocumentPathInput(documentPath);
+  const owner = locateOwningCodocs(normalized);
+  return owner?.index === 0 ? owner.relativePath : normalized;
+}
+
 /** 상세 결과에서 이름·현재 ID·경로 순서로 링크 이름을 선택한다. */
 export function detailLabel(
   result: WorkspacePathDocumentResult,
@@ -59,7 +68,7 @@ export function detailLabel(
     ).length < 2
   )
     return name;
-  return `${name} — ${result.path.replace(/^\.codocs[/\\]/u, '')}`;
+  return `${name} — ${peerPathLabel(result.path)}`;
 }
 
 /** 준비·실패 상태를 매칭 없음과 구분하는 정보 Hover를 만든다. */
