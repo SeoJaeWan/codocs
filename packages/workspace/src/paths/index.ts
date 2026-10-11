@@ -2,6 +2,10 @@ import { lstat, mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { documentPathMessages, type DocumentPathProblem } from '@codocs/core';
 import {
+  classifyCodocsLocation,
+  type CodocsLocations,
+} from './codocs-locations.js';
+import {
   createWorkspaceDiagnostic,
   getIoErrorCode,
   workspaceDiagnosticCodes,
@@ -15,6 +19,7 @@ import {
   type ProjectRoot,
 } from '../project-root/index.js';
 import {
+  codocsLocationStates,
   workspacePathFailureStatuses,
   workspaceScopeKinds,
   workspaceTargetKinds,
@@ -24,6 +29,7 @@ import {
 } from './domain-values.js';
 export * from './domain-values.js';
 export * from './code-file-access.js';
+export * from './codocs-locations.js';
 
 /** 실제 .codocs 디렉터리가 부여한 현 시점 접근 범위다. */
 export interface WorkspaceAccessScope {
@@ -109,13 +115,36 @@ export function locateOwningCodocs(
   };
 }
 
+/**
+ * 문서 경로의 소유 .codocs가 탐색 규칙에서 빠졌거나 확인하지 못한 위치이면 거부 문구를 돌려준다.
+ * 문구는 그 .codocs 위치로 시작하며 제외된 위치에는 올바른 예시가 붙는다. 루트 .codocs는 거부하지 않는다.
+ * @param locations 마지막으로 확인한 위치 규칙이다.
+ * @param documentPath `/`로 구분한 프로젝트 상대 문서 경로다.
+ * @returns 인정되는 위치이거나 .codocs 구간이 없으면 undefined다.
+ */
+export function codocsLocationRejection(
+  locations: CodocsLocations | undefined,
+  documentPath: string,
+): string | undefined {
+  const owner = locateOwningCodocs(documentPath);
+  if (!owner?.ownerDirectory) return undefined;
+  const state = classifyCodocsLocation(locations, owner.ownerDirectory);
+  const location = `${owner.ownerDirectory}/${codocsDirectoryName}`;
+  if (state === codocsLocationStates.excluded)
+    return `${location}: ${workspaceDiagnosticMessages.codocsLocationExcluded}`;
+  if (state === codocsLocationStates.unknown)
+    return `${location}: ${workspaceDiagnosticMessages.codocsLocationUnknown}`;
+  return undefined;
+}
+
 /** 문서 경로 검사 결과다. 성공하면 구간 목록을, 실패하면 원인을 담는다. */
 export type DocumentPathCheck =
   | { success: true; segments: string[] }
   | { success: false; problem: DocumentPathProblem };
 
 /**
- * 저장 후보 경로의 형식을 검사하고 원인을 가린다. 이 단계는 루트 .codocs 아래의 YAML 파일만 인정한다.
+ * 저장 후보 경로의 형식을 검사하고 원인을 가린다. 구간 하나 이상이 `.codocs`인 YAML 파일 경로만 인정하며
+ * 하위 .codocs의 위치가 탐색 규칙에서 인정되는지는 판단하지 않는다.
  * @param input 프로젝트 루트 기준 상대 경로이며 구분자는 `/`나 OS 구분자다.
  */
 export function checkDocumentPath(input: string): DocumentPathCheck {
@@ -126,11 +155,11 @@ export function checkDocumentPath(input: string): DocumentPathCheck {
     /^[A-Za-z]:/u.test(input)
   )
     return { success: false, problem: 'absolute' };
-  if (locateOwningCodocs(segments.join('/'))?.index !== 0)
-    return { success: false, problem: 'missingCodocs' };
+  const owner = locateOwningCodocs(segments.join('/'));
+  if (!owner) return { success: false, problem: 'missingCodocs' };
   if (segments.some((segment) => segment === '.' || segment === '..'))
     return { success: false, problem: 'dotSegment' };
-  if (segments.length < 2 || /[\\/]$/u.test(input))
+  if (owner.index >= segments.length - 1 || /[\\/]$/u.test(input))
     return { success: false, problem: 'missingFileName' };
   if (!/\.ya?ml$/u.test(segments.at(-1) ?? ''))
     return { success: false, problem: 'extension' };
@@ -214,7 +243,9 @@ async function checkTarget(
 }
 
 /**
- * .codocs의 일반 파일·폴더만 확인한다. 후속 IO는 사용 직전에 다시 확인해야 한다.
+ * 소유 .codocs(경로의 첫 `.codocs` 구간) 아래의 일반 파일·폴더만 확인한다. 후속 IO는 사용 직전에 다시 확인해야 한다.
+ * 소유 .codocs까지의 바깥 폴더도 링크·종류를 확인하며 `..`로 소유 .codocs 밖에 나갈 수 없다.
+ * 하위 .codocs가 탐색 규칙에서 인정되는 위치인지는 판단하지 않는다.
  */
 export async function resolveWorkspacePath(
   root: ProjectRoot,
@@ -257,13 +288,20 @@ export async function resolveWorkspacePath(
     (path.sep === '\\' && relativeInput.endsWith('/'))
   )
     segments.push('.');
-  if (segments.shift() !== codocsDirectoryName)
+  // 첫 .codocs 구간이 소유 .codocs다. 그 앞 구간은 프로젝트 안의 일반 폴더여야 하며 .·..로 경계를 흐리지 않는다.
+  const ownerIndex = segments.indexOf(codocsDirectoryName);
+  const ownerSegments = segments.slice(0, Math.max(ownerIndex, 0));
+  if (
+    ownerIndex < 0 ||
+    ownerSegments.some((segment) => segment === '.' || segment === '..')
+  )
     return failure(
       root,
       workspacePathFailureStatuses.denied,
       workspaceDiagnosticCodes.pathOutsideWorkspace,
       workspaceDiagnosticMessages.pathOutsideWorkspace,
     );
+  segments.splice(0, ownerIndex + 1);
 
   const validatedRoot = await resolveProjectRoot({
     cwd: root.startCwd,
@@ -275,7 +313,21 @@ export async function resolveWorkspacePath(
       status: workspacePathFailureStatuses.unavailable,
       diagnostics: validatedRoot.diagnostics,
     };
-  const codocsPath = validatedRoot.root.codocsPath;
+  let ownerPath = validatedRoot.root.projectRoot;
+  for (const segment of ownerSegments) {
+    ownerPath = path.join(ownerPath, segment);
+    const checkedOwner = await checkTarget(root, ownerPath, true);
+    if ('success' in checkedOwner) return checkedOwner;
+    if (checkedOwner.kind !== workspaceTargetKinds.directory)
+      return failure(
+        root,
+        workspacePathFailureStatuses.unavailable,
+        workspaceDiagnosticCodes.notDirectory,
+        workspaceDiagnosticMessages.notDirectory,
+        ownerPath,
+      );
+  }
+  const codocsPath = path.join(ownerPath, codocsDirectoryName);
   const checkedRoot = await checkTarget(root, codocsPath, true);
   if ('success' in checkedRoot) return checkedRoot;
   if (checkedRoot.kind !== workspaceTargetKinds.directory)
@@ -411,6 +463,7 @@ export type WorkspaceParentInspection =
 /**
  * 저장 후보의 프로젝트 상대 경로를 검증하고 폴더를 만들지 않은 채 부모 폴더 상태를 점검한다.
  * 존재하는 폴더는 연결·종류를 확인하고, 처음 없는 폴더부터 끝까지를 만들 순서대로 돌려준다.
+ * 없는 .codocs와 그 바깥 폴더도 만들 폴더에 넣어 단일 create와 같이 만든다.
  */
 export async function inspectWorkspaceParent(
   root: ProjectRoot,
@@ -447,8 +500,7 @@ export async function inspectWorkspaceParent(
     if ('success' in checked) {
       if (
         !checked.success &&
-        checked.status === workspacePathFailureStatuses.missing &&
-        segment !== codocsDirectoryName
+        checked.status === workspacePathFailureStatuses.missing
       ) {
         missingDirectories.push(current);
         continue;

@@ -24,7 +24,9 @@ import {
   workspaceTargetKinds,
 } from '../paths/domain-values.js';
 import {
+  discoverCodocsLocations,
   resolveWorkspacePath,
+  type CodocsLocations,
   type WorkspaceAccessPolicy,
   type WorkspaceAccessScope,
   type WorkspacePathResult,
@@ -98,6 +100,8 @@ export interface WorkspaceScanFailure {
   logicalPath?: string;
   realPath?: string;
   diagnostics: readonly WorkspaceDiagnostic[];
+  /** 하위 .codocs 위치 규칙을 확인하지 못한 실패다. 경로 범위 재확인이 아니라 위치 재확인으로 바뀐다. */
+  location?: true;
 }
 
 /** 읽은 문서와 확인하지 못한 범위를 분리하여 후속 색인의 삭제 오판을 방지한다. */
@@ -106,6 +110,8 @@ interface WorkspaceScanResults {
   failures: readonly WorkspaceScanFailure[];
   skippedLinks: readonly WorkspaceDiagnostic[];
   diagnostics: readonly WorkspaceScanDiagnostic[];
+  /** 이 탐색이 대상으로 삼은 하위 .codocs와 위치 판정 규칙이다. 루트 .codocs는 항상 대상이다. */
+  codocsLocations?: CodocsLocations;
 }
 
 /** 탐색 완료 여부는 문서 유효성과 별개다. failed에서만 유효한 루트가 없을 수 있다. */
@@ -218,6 +224,54 @@ function readFailure(
 /** 전체 탐색 또는 경로 보정 사이에서 공유할 관측이다. */
 export interface WorkspaceLoadOptions {
   cache?: WorkspaceObservationCache;
+  /**
+   * 전체 탐색이 읽을 하위 .codocs다. 생략하면 코드 파일 수집 규칙으로 프로젝트를 순회해 찾는다.
+   * 경로별 재확인(loadWorkspacePath)에서는 쓰지 않는다.
+   */
+  codocsLocations?: CodocsLocations;
+}
+
+/**
+ * 하위 .codocs 위치 규칙을 확인하지 못한 범위를 탐색 실패로 바꾼다. 실패가 있으면 탐색은 partial이다.
+ * @param locations 이번 탐색이 쓴 위치 규칙이다.
+ */
+export function codocsLocationScanFailures(
+  locations: CodocsLocations | undefined,
+): WorkspaceScanFailure[] {
+  return (locations?.failures ?? []).map(
+    /** 확인하지 못한 규칙 범위 하나를 위치 실패로 옮긴다. */ (item) => ({
+      kind: catalogFailureKinds.unknown,
+      diagnostics: [
+        createWorkspaceDiagnostic(
+          workspaceDiagnosticCodes.readFailed,
+          `${workspaceDiagnosticMessages.codocsLocationsIncomplete} ${item.path === undefined ? '' : `${item.path}: `}${item.message}`,
+        ),
+      ],
+      location: true,
+    }),
+  );
+}
+
+/** 경로별 탐색 결과들을 하나로 합친다. 문서와 관측은 발견 경로 순서로 정렬한다. */
+function mergeScans(
+  scans: readonly WorkspacePathScanResult[],
+): Pick<
+  WorkspacePathScanResult,
+  'documents' | 'failures' | 'skippedLinks' | 'diagnostics' | 'observations'
+> {
+  return {
+    documents: scans
+      .flatMap((scan) => scan.documents)
+      .sort((left, right) => left.source.path.localeCompare(right.source.path)),
+    observations: scans
+      .flatMap((scan) => scan.observations)
+      .sort((left, right) =>
+        left.document.source.path.localeCompare(right.document.source.path),
+      ),
+    failures: scans.flatMap((scan) => scan.failures),
+    skippedLinks: scans.flatMap((scan) => scan.skippedLinks),
+    diagnostics: scans.flatMap((scan) => scan.diagnostics),
+  };
 }
 
 /** 직접 확인한 부재다. 미지원 연결·읽기 오류와 구분하며 전체 삭제 판정은 수행하지 않는다. */
@@ -273,15 +327,39 @@ export async function loadWorkspace(
         ? {}
         : { projectRoot: selected.projectRoot }),
     };
-  const result = await scanPath(selected.root, codocsDirectoryName, options);
+  const locations =
+    options.codocsLocations ??
+    (await discoverCodocsLocations(selected.root.projectRoot));
+  const rootScan = await scanPath(selected.root, codocsDirectoryName, options);
+  const nestedScans: WorkspacePathScanResult[] = [];
+  for (const owner of locations.owners)
+    nestedScans.push(
+      await scanPath(
+        selected.root,
+        path.join(...owner.split('/'), codocsDirectoryName),
+        options,
+      ),
+    );
+  const merged = mergeScans([rootScan, ...nestedScans]);
+  const locationFailures = codocsLocationScanFailures(locations);
+  const failures = [...merged.failures, ...locationFailures];
   return {
     root: selected.root,
-    status: result.outcome,
-    documents: result.documents,
-    failures: result.failures,
-    skippedLinks: result.skippedLinks,
-    diagnostics: result.diagnostics,
-    observations: result.observations,
+    status:
+      rootScan.outcome === scanStatuses.failed
+        ? scanStatuses.failed
+        : failures.length > 0
+          ? scanStatuses.partial
+          : scanStatuses.complete,
+    documents: merged.documents,
+    failures,
+    skippedLinks: merged.skippedLinks,
+    diagnostics: [
+      ...merged.diagnostics,
+      ...locationFailures.flatMap((item) => item.diagnostics),
+    ],
+    observations: merged.observations,
+    codocsLocations: locations,
   };
 }
 

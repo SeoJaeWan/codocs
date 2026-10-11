@@ -258,6 +258,49 @@ describe('소스 MCP stdio 서버', () => {
     }
   });
 
+  it.each(['codocs_write', 'codocs_validate'])(
+    '%s 설명에 하위 .codocs 경로 예시를 담는다',
+    async (name) => {
+      const { client } = await clientFor(projectA);
+      try {
+        const tools = (await client.listTools()).tools;
+        expect(tools.find((tool) => tool.name === name)?.description).toContain(
+          'packages/core/.codocs/a.yaml',
+        );
+      } finally {
+        await client.close();
+      }
+    },
+  );
+
+  it('codocs_validate에 하위 .codocs 문서 경로를 주면 그 문서를 / 구분 경로로 검증한다', async () => {
+    const project = path.join(fixture, 'nested');
+    await mkdir(path.join(project, 'packages', 'core', '.codocs'), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(project, 'packages', 'core', '.codocs', 'a.yaml'),
+      '_codocs:\n  id: core-a\n  name: core-a\ndefinition: 본문\n',
+    );
+    const { client } = await clientFor(project);
+    try {
+      expect(
+        payload(
+          await client.callTool({
+            name: 'codocs_validate',
+            arguments: { path: 'packages/core/.codocs/a.yaml' },
+          }),
+        ),
+      ).toMatchObject({
+        success: true,
+        path: 'packages/core/.codocs/a.yaml',
+        diagnostics: [],
+      });
+    } finally {
+      await client.close();
+    }
+  });
+
   it('큰 정상 문서와 .inf 원문을 혼합 조회해 본문·직접 참조·revision·진단을 전부 보존한다', async () => {
     const selected = path.join(fixture, 'large');
     const folder = path.join(selected, '.codocs');

@@ -78,10 +78,19 @@ import {
 import { stat } from 'node:fs/promises';
 import {
   checkDocumentPath,
+  classifyCodocsLocation,
+  codeWatchRuleKey,
+  codocsLocationRejection,
+  discoverCodocsLocations,
+  isCodeWatchIgnored,
+  locateOwningCodocs,
   normalizeDocumentPathInput,
   resolveWorkspacePath,
+  type CodeFilePolicy,
+  type CodocsLocations,
 } from '../paths/index.js';
 import type { CodeCollectionFailure } from '../paths/code-file-access.js';
+import { CodeReferenceWatcher } from '../watcher/code-reference-watcher.js';
 import { calculateRevision } from '../revision/index.js';
 import { pathToFileURL } from 'node:url';
 import {
@@ -100,6 +109,7 @@ import {
   type WorkspaceScanResult,
 } from '../loader/index.js';
 import {
+  codocsLocationStates,
   workspacePathFailureStatuses,
   workspaceTargetKinds,
 } from '../paths/domain-values.js';
@@ -121,7 +131,11 @@ import {
   type WorkspaceRenameApplySuccess,
   type WorkspaceRenamePreview,
 } from '../rename/index.js';
-import { resolveProjectRoot, type ProjectRoot } from '../project-root/index.js';
+import {
+  codocsDirectoryName,
+  resolveProjectRoot,
+  type ProjectRoot,
+} from '../project-root/index.js';
 import { QueryObservations } from './observations.js';
 import {
   workspaceLifecycleStates,
@@ -445,7 +459,7 @@ function supportedCandidateFile(
   );
   const segments = relative.split(path.sep);
   if (
-    segments[0] !== '.codocs' ||
+    !segments.includes(codocsDirectoryName) ||
     segments.some((segment) => segment === '..' || segment === '')
   )
     return undefined;
@@ -478,6 +492,19 @@ export interface WorkspaceSectionDestination {
   kind: 'occurrence';
   range: SourceRange;
   markerText: string;
+}
+
+/** 위치 감시 신호 중 하위 .codocs 위치를 다시 확인해야 하는 폴더 생성·삭제 이벤트다. */
+const locationStructureEvents: ReadonlySet<string> = new Set([
+  'addDir',
+  'unlinkDir',
+]);
+
+/** 프로젝트 상대 경로가 어떤 .codocs의 안쪽 항목인지 확인한다. .codocs 폴더 자체는 아니다. */
+function insideCodocs(relative: string): boolean {
+  const parts = relative.split('/');
+  const index = parts.indexOf(codocsDirectoryName);
+  return index >= 0 && index < parts.length - 1;
 }
 
 /** 명시 refresh가 문서 게시와 코드 관측을 같은 세대로 맞추려고 다시 얻는 횟수의 상한이며 계약 수치가 아니다. */
@@ -732,6 +759,24 @@ export class WorkspaceQuerySession {
   >();
   readonly #liveDocuments = new Map<string, WorkspaceLiveReferenceInput>();
   readonly #selections = new Map<string, CandidateSelection>();
+  /** 마지막으로 확인한 하위 .codocs 위치와 판정 규칙이다. 감시 실패도 실패 범위로 담는다. */
+  #locations: CodocsLocations | undefined;
+  /** 하위 .codocs 생성·삭제와 규칙 파일 변경을 알리는 프로젝트 감시다. 코드 참조 감시와 같은 규칙 범위만 본다. */
+  #locationWatcher: CodeReferenceWatcher | undefined;
+  /** 위치 감시를 등록한 규칙의 지문이다. 규칙이 바뀌면 다시 등록한다. */
+  #locationRules: string | undefined;
+  #locationRegistering = false;
+  /** 위치 감시 등록·실행 실패다. 다시 등록에 성공하면 지운다. */
+  #locationFailure: CodeCollectionFailure | undefined;
+  /** 위치를 다시 확인해야 하는 신호가 있다. */
+  #locationSignals = false;
+  #locationQueued = false;
+  /** 위치 확인을 차례로 수행하는 잠금이다. */
+  #locationLock: Promise<void> = Promise.resolve();
+  /** 게시하지 않은 위치 규칙 변경이 있다. */
+  #locationsDirty = false;
+  /** 더 이상 인정하지 않아 문서를 지울 .codocs 범위다. */
+  readonly #droppedScopes = new Set<string>();
 
   /** 프로젝트 선택의 own data 값만 고정하고 IO는 각 요청 시 수행한다. */
   constructor(
@@ -769,10 +814,9 @@ export class WorkspaceQuerySession {
         this.#stamps.delete(changed);
       }
       const scopes: string[] = [];
-      if (containsWorkspacePath(this.#root.codocsPath, changed))
-        scopes.push(changed);
-      else if (containsWorkspacePath(changed, this.#root.codocsPath))
-        scopes.push(this.#root.codocsPath);
+      for (const codocs of this.#codocsRoots())
+        if (containsWorkspacePath(codocs, changed)) scopes.push(changed);
+        else if (containsWorkspacePath(changed, codocs)) scopes.push(codocs);
       for (const scope of new Set(scopes)) {
         this.#cache.invalidate(scope);
         if (
@@ -788,6 +832,210 @@ export class WorkspaceQuerySession {
     }
     if (start && this.#pending.size && !this.#refreshPromise)
       void this.#synchronize(false).catch(() => undefined);
+  }
+
+  /** 탐색 대상인 루트 .codocs와 인정된 하위 .codocs의 발견 경로(OS 절대 경로)다. 루트가 먼저다. */
+  #codocsRoots(): string[] {
+    const root = this.#root;
+    if (!root) return [];
+    return [
+      root.codocsPath,
+      ...(this.#locations?.owners ?? []).map((owner) =>
+        path.join(root.projectRoot, ...owner.split('/'), codocsDirectoryName),
+      ),
+    ];
+  }
+
+  /** 위치 확인을 잠금 순서대로 수행한다. 앞선 확인의 실패는 다음 확인을 막지 않는다. */
+  #withLocationLock<T>(action: () => Promise<T>): Promise<T> {
+    const run = this.#locationLock.then(action);
+    this.#locationLock = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  /** 위치 신호를 기록하고 진행 중이 아니면 위치 재확인을 예약한다. */
+  #requestLocations(): void {
+    this.#locationSignals = true;
+    if (this.#locationQueued || this.#closed) return;
+    this.#locationQueued = true;
+    this.#withLocationLock(
+      /** 신호가 남아 있는 동안 위치를 다시 확인하고 바뀐 범위를 탐색에 넘긴다. */ async () => {
+        this.#locationQueued = false;
+        while (this.#locationSignals && !this.#closed) {
+          this.#locationSignals = false;
+          const changes = await this.#updateLocations();
+          for (const scope of changes.removed) this.#droppedScopes.add(scope);
+          if (changes.added.length) this.#collect(changes.added, false, false);
+          if (
+            changes.changed &&
+            !this.#refreshPromise &&
+            !this.#closed &&
+            this.#scan
+          )
+            void this.#synchronize(false).catch(() => undefined);
+        }
+      },
+    ).catch(
+      /** 위치 확인 예외는 실패 범위로 게시해 하위 .codocs를 확인했다고 보지 않는다. */ (
+        error: unknown,
+      ) => {
+        this.#locationQueued = false;
+        this.#locationFailure = {
+          reason: codeFileReasons.read,
+          message: String(error),
+        };
+        if (this.#locations)
+          this.#locations = {
+            ...this.#locations,
+            failures: [...this.#locations.failures, this.#locationFailure],
+          };
+        this.#locationsDirty = true;
+        if (!this.#refreshPromise && !this.#closed && this.#scan)
+          void this.#synchronize(false).catch(() => undefined);
+      },
+    );
+  }
+
+  /**
+   * 코드 파일 수집 규칙으로 하위 .codocs를 다시 찾고 감시를 맞춘다. 규칙이 바뀌었으면 위치 감시를 다시 등록한다.
+   * @returns 새로 인정한 .codocs와 더 이상 인정하지 않는 .codocs의 발견 경로, 그리고 게시할 변경이 있는지다.
+   */
+  async #updateLocations(): Promise<{
+    added: string[];
+    removed: string[];
+    changed: boolean;
+  }> {
+    const root = this.#root;
+    if (!root || this.#closed)
+      return { added: [], removed: [], changed: false };
+    const discovered = await discoverCodocsLocations(root.projectRoot);
+    if (this.#closed) return { added: [], removed: [], changed: false };
+    const rules = codeWatchRuleKey(discovered.policy);
+    let registered = false;
+    if (!this.#locationWatcher || rules !== this.#locationRules) {
+      await this.#registerLocationWatcher(discovered.policy);
+      this.#locationRules = rules;
+      registered = true;
+    }
+    if (this.#closed) return { added: [], removed: [], changed: false };
+    const previous = this.#codocsRoots();
+    const before = JSON.stringify([
+      this.#locations?.owners ?? [],
+      this.#locations?.failures ?? [],
+    ]);
+    this.#locations = this.#locationFailure
+      ? {
+          ...discovered,
+          failures: [...discovered.failures, this.#locationFailure],
+        }
+      : discovered;
+    const current = this.#codocsRoots();
+    await this.#watcher?.setNestedDirectories?.(current.slice(1));
+    // 감시를 새로 등록하기 전의 변경을 놓치지 않도록 등록 뒤 한 번 더 확인한다.
+    if (registered) this.#requestLocations();
+    const changed =
+      before !==
+      JSON.stringify([this.#locations.owners, this.#locations.failures]);
+    if (changed) this.#locationsDirty = true;
+    return {
+      added: current.filter((item) => !previous.includes(item)),
+      removed: previous.filter((item) => !current.includes(item)),
+      changed,
+    };
+  }
+
+  /**
+   * 하위 .codocs 위치 감시를 규칙에 맞게 다시 등록한다. .codocs 안쪽 내용은 문서 감시가 맡으므로 제외한다.
+   * 등록 중 오류는 실패 범위로 남기고 자동으로 다시 등록하지 않는다.
+   */
+  async #registerLocationWatcher(policy: CodeFilePolicy): Promise<void> {
+    const root = this.#root;
+    const previous = this.#locationWatcher;
+    this.#locationWatcher = undefined;
+    await previous?.close();
+    if (!root || this.#closed) return;
+    this.#locationFailure = undefined;
+    const watcher: CodeReferenceWatcher = new CodeReferenceWatcher(
+      root.projectRoot,
+      /** 현재 위치 감시의 신호만 위치 재확인으로 넘긴다. */ (paths, event) => {
+        if (watcher === this.#locationWatcher)
+          this.#locationChanged(paths, event);
+      },
+      /** 현재 위치 감시의 오류만 실패로 기록한다. */ (error) => {
+        if (watcher === this.#locationWatcher || this.#locationRegistering)
+          this.#locationWatchBroken(error);
+      },
+      /** 코드 수집과 같은 규칙으로 제외하고 .codocs 안쪽은 보지 않는다. */ (
+        input,
+        stats,
+      ) => {
+        const relative = path
+          .relative(root.projectRoot, path.resolve(input))
+          .split(path.sep)
+          .join('/');
+        return (
+          insideCodocs(relative) || isCodeWatchIgnored(policy, input, stats)
+        );
+      },
+    );
+    this.#locationWatcher = watcher;
+    this.#locationRegistering = true;
+    try {
+      await watcher.start();
+    } finally {
+      this.#locationRegistering = false;
+    }
+  }
+
+  /** 위치 감시 오류를 실패 범위로 남긴다. 등록이 끝난 뒤의 오류는 다시 등록해 복구를 시도한다. */
+  #locationWatchBroken(error: unknown): void {
+    if (this.#closed) return;
+    this.#locationFailure = {
+      reason: codeFileReasons.watch,
+      message: String(error),
+    };
+    if (this.#locationRegistering) return;
+    this.#locationRules = undefined;
+    this.#requestLocations();
+  }
+
+  /**
+   * 위치 감시 신호에서 하위 .codocs 위치에 영향을 줄 수 있는 것만 위치 재확인으로 넘긴다.
+   * 규칙 파일·Git 메타데이터·폴더 생성·삭제가 대상이며 일반 파일의 내용 변경은 무시한다.
+   * 인정된 하위 .codocs 폴더 자체가 바뀌면 그 내용 감시를 다시 확인하고 범위를 다시 읽는다.
+   */
+  #locationChanged(paths: readonly string[], event: string | undefined): void {
+    const root = this.#root;
+    if (this.#closed || !root) return;
+    for (const input of paths) {
+      const absolute = path.resolve(input);
+      const relative = path
+        .relative(root.projectRoot, absolute)
+        .split(path.sep)
+        .join('/');
+      const name = relative.slice(relative.lastIndexOf('/') + 1);
+      const structural =
+        event === undefined || locationStructureEvents.has(event);
+      if (
+        !relative ||
+        relative === '..' ||
+        relative.startsWith('../') ||
+        relative.split('/').includes('.git') ||
+        name === '.gitignore' ||
+        relative === '.codocsignore' ||
+        structural
+      )
+        this.#requestLocations();
+      if (structural && this.#codocsRoots().slice(1).includes(absolute)) {
+        // 다시 연결이 실패하면 문서 감시가 자체 복구·실패 상태로 알린다.
+        const reopening = this.#watcher?.reopenNestedDirectory?.(absolute);
+        if (reopening) void reopening.catch(() => undefined);
+        this.#collect([absolute]);
+      }
+    }
   }
 
   /**
@@ -884,8 +1132,19 @@ export class WorkspaceQuerySession {
       this.#watcher?.drain();
       this.#pending.clear();
       this.#stamps.clear();
-      if (this.#root) this.#cache.invalidate(this.#root.codocsPath);
-      const loaded = await loadWorkspace(this.#input, options);
+      this.#droppedScopes.clear();
+      for (const codocs of this.#codocsRoots()) this.#cache.invalidate(codocs);
+      // 하위 .codocs는 코드 파일 수집 규칙으로 찾은 뒤 감시를 준비하고 읽는다. 위치 확인이 끝나기 전에는 준비 중이다.
+      const changes = await this.#withLocationLock(() =>
+        this.#updateLocations(),
+      );
+      if (this.#closed) return this.#closedScan();
+      for (const codocs of changes.added) this.#cache.invalidate(codocs);
+      this.#locationsDirty = false;
+      const loaded = await loadWorkspace(this.#input, {
+        ...options,
+        ...(this.#locations ? { codocsLocations: this.#locations } : {}),
+      });
       if (this.#closed) return this.#closedScan();
       this.#watcher?.drain();
       if (!loaded.root) {
@@ -916,9 +1175,16 @@ export class WorkspaceQuerySession {
         return failed;
       }
       this.#watcher?.drain();
+      // 더 이상 인정하지 않는 .codocs의 문서는 읽지 않고 지운다. 다시 인정되면 범위 재확인으로 읽는다.
+      const dropped = [...this.#droppedScopes];
+      this.#droppedScopes.clear();
+      for (const scope of dropped) {
+        this.#cache.invalidate(scope);
+        working.drop(scope);
+      }
       const scopes = [...this.#pending];
       this.#pending.clear();
-      if (!scopes.length) break;
+      if (!scopes.length && !dropped.length) break;
       for (const scope of scopes) {
         if (this.#closed) return this.#closedScan();
         // 읽기 전 stamp를 기록해 읽는 중 도착한 같은 상태의 중복 신호는 버리고 실제 변경은 다른 stamp로 다시 감지한다.
@@ -938,6 +1204,8 @@ export class WorkspaceQuerySession {
       }
     }
     if (this.#closed) return this.#closedScan();
+    this.#locationsDirty = false;
+    working.setLocations(this.#locations);
     const scan = working.snapshot();
     this.#publish(scan);
     return scan;
@@ -1008,7 +1276,12 @@ export class WorkspaceQuerySession {
         }
       }
       this.#watcher?.drain();
-      if (this.#pending.size && !this.#closed)
+      if (
+        (this.#pending.size ||
+          this.#droppedScopes.size ||
+          this.#locationsDirty) &&
+        !this.#closed
+      )
         void this.#synchronize(false).catch(() => undefined);
     };
     void operation.then(clear, clear);
@@ -1040,6 +1313,8 @@ export class WorkspaceQuerySession {
     if (this.#closed || !this.#root) return false;
     pathName = discoveryPath(pathName);
     const logicalPath = path.resolve(this.#root.projectRoot, pathName);
+    if (revision !== undefined) await this.#acceptSavedLocation(pathName);
+    if (this.#closed) return false;
     this.#collect([logicalPath], false, false);
     while (!this.#closed) {
       const operation =
@@ -1059,6 +1334,44 @@ export class WorkspaceQuerySession {
         return true;
     }
     return false;
+  }
+
+  /**
+   * 저장한 문서의 하위 .codocs가 아직 탐색 대상이 아니면 규칙으로 인정되는지 확인해 감시 신호를 기다리지 않고 대상에 넣는다.
+   * 인정되지 않는 위치는 넣지 않으며, 이후 위치 재확인이 실제 디스크 상태로 다시 맞춘다.
+   * @param pathName 저장한 문서의 발견 경로다.
+   */
+  async #acceptSavedLocation(pathName: string): Promise<void> {
+    const owner = locateOwningCodocs(pathName.split(path.sep).join('/'));
+    const ownerDirectory = owner?.ownerDirectory;
+    if (
+      !ownerDirectory ||
+      !this.#locations ||
+      this.#locations.owners.includes(ownerDirectory) ||
+      classifyCodocsLocation(this.#locations, ownerDirectory) !==
+        codocsLocationStates.recognized
+    )
+      return;
+    await this.#withLocationLock(
+      /** 잠금 안에서 다시 확인한 뒤 위치를 더하고 감시를 맞춘다. */ async () => {
+        const locations = this.#locations;
+        if (
+          this.#closed ||
+          !locations ||
+          locations.owners.includes(ownerDirectory)
+        )
+          return;
+        this.#locations = {
+          ...locations,
+          owners: [...locations.owners, ownerDirectory],
+        };
+        this.#locationsDirty = true;
+        await this.#watcher?.setNestedDirectories?.(
+          this.#codocsRoots().slice(1),
+        );
+      },
+    );
+    this.#requestLocations();
   }
 
   /**
@@ -1689,6 +2002,20 @@ export class WorkspaceQuerySession {
           ),
         };
       const candidate = checkedPath.path;
+      const rejected = codocsLocationRejection(
+        scan.codocsLocations,
+        candidate.split(path.sep).join('/'),
+      );
+      if (rejected)
+        return {
+          success: false,
+          scanStatus: scan.status,
+          error: validationDiagnostic(
+            queryDiagnosticCodes.invalidPath,
+            rejected,
+            inputPath,
+          ),
+        };
       const resolved = await resolveWorkspacePath(scan.root, candidate);
       const unavailable = changedState();
       if (unavailable) return unavailable;
@@ -2336,6 +2663,8 @@ export class WorkspaceQuerySession {
       if (this.#refreshPromise) await this.#refreshPromise;
       if (this.#closed) return scanFailure(this.#closedScan());
       if (this.#watcher) await this.#watcher.refresh();
+      // 위치 감시가 실패했으면 전체 탐색에서 다시 등록한다.
+      if (this.#locationFailure) this.#locationRules = undefined;
       while (this.#refreshPromise) await this.#refreshPromise;
       let scan = await this.#synchronize();
       // 첫 refresh에서도 코드 색인을 만들어 문서 색인과 같은 시점에 처음부터 다시 수집한다.
@@ -2415,7 +2744,12 @@ export class WorkspaceQuerySession {
     this.#liveDocuments.clear();
     this.#codeListeners.clear();
     for (const token of this.#selections.keys()) this.releaseCandidate(token);
+    this.#droppedScopes.clear();
     await this.#watcher?.close();
+    await this.#locationWatcher?.close();
+    // 진행 중인 위치 확인이 끝난 뒤 그 사이 등록된 감시도 닫는다.
+    await this.#locationLock;
+    await this.#locationWatcher?.close();
     await this.#codeIndex?.close();
   }
 

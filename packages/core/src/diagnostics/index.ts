@@ -173,14 +173,14 @@ export const documentPathMessages = {
   dotSegment: `경로에는 '.'와 '..' 구간을 쓸 수 없습니다. 올바른 예: ${documentPathExample}`,
   /** 경로에 역슬래시가 남아 있다. 작업 공간 계층은 core에 넘기기 전에 `/`로 바꾼다. */
   backslash: `경로는 '/'로 구분해야 합니다. 올바른 예: ${documentPathExample}`,
-  /** 경로가 `/`로 끝나거나 .codocs 아래에 파일명이 없다. */
+  /** 경로가 `/`로 끝나거나 소유 .codocs 아래에 파일명이 없다. */
   missingFileName: `경로의 끝에 파일명이 있어야 합니다. 올바른 예: ${documentPathExample}`,
   /** 경로 중간에 빈 구간이 있다. */
   emptySegment: `경로에 빈 구간이 있습니다. 올바른 예: ${documentPathExample}`,
   /** 파일명이 .yaml 또는 .yml로 끝나지 않는다. */
   extension: `파일명은 .yaml 또는 .yml로 끝나야 합니다. 올바른 예: ${documentPathExample}`,
   /** 경로에 .codocs 폴더 구간이 없다. */
-  missingCodocs: `경로는 .codocs 폴더로 시작해야 합니다. 올바른 예: ${documentPathExample}`,
+  missingCodocs: `경로에 .codocs 폴더 구간이 있어야 합니다. 올바른 예: ${documentPathExample}`,
 } as const;
 /** 문서 경로 형식 오류의 원인이다. */
 export type DocumentPathProblem = keyof typeof documentPathMessages;

@@ -7,9 +7,10 @@ _codocs:
   프로젝트 전체나 YAML 파일 하나의 문서 문제와 코드 파일의 `@codocs` 참조 문제를 확인하는 [[MCP 도구]]다.
   문서 하나의 형식 검사인 [[문서 검증]]과 프로젝트의 ID·이름 충돌, 참조 검사를 함께 적용한다.
 입력: |
-  path를 생략하면 .codocs 전체를 검사한다.
-  path에는 프로젝트 루트(--project, 생략하면 서버를 시작한 위치) 기준 루트 .codocs 아래의 상대 경로로 YAML 파일 하나를 지정한다. `.codocs/orders/order.yaml`처럼 `/`로 구분하며 [[codocs_get]]의 source.path를 그대로 쓸 수 있다. `\`는 모든 OS에서 `/`로, 연속한 `/`는 하나로 바꿔 받는다.
+  path를 생략하면 루트와 하위 폴더의 모든 .codocs를 검사한다.
+  path에는 프로젝트 루트(--project, 생략하면 서버를 시작한 위치) 기준 상대 경로로 .codocs 안의 YAML 파일 하나를 지정한다. `.codocs/orders/order.yaml`이나 `packages/core/.codocs/a.yaml`처럼 `/`로 구분하며 [[codocs_get]]의 source.path를 그대로 쓸 수 있다. `\`는 모든 OS에서 `/`로, 연속한 `/`는 하나로 바꿔 받는다.
   .codocs 밖, 코드 파일을 포함한 YAML이 아닌 경로, 절대 경로, `.`·`..` 구간, 파일명 없는 폴더 경로, 와일드카드, 여러 경로는 허용하지 않으며 invalid_path로 거부한다. 거부 메시지는 원인마다 다르며 끝에 올바른 예시(`.codocs/orders/order.yaml`)를 붙인다. 링크·정션 경로는 따라가지 않고 거부한다.
+  [[탐색]]이 인정하지 않는 하위 폴더의 .codocs(예: `.gitignore`가 제외한 위치) 안의 경로도 invalid_path로 거부하며 메시지는 그 .codocs 위치로 시작한다.
 결과: |
   파일 하나를 지정해도 전체 색인으로 ID 중복과 참조 대상을 확인하되, 그 파일의 진단과 관련 충돌 파일 경로만 돌려준다.
   ID가 없거나 YAML을 해석하지 못한 파일도 경로로 검사할 수 있다.

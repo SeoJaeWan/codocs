@@ -91,7 +91,8 @@ ID를 바꿔도 과거 ID는 남기지 않는다. 이후 조회·수정은 새 I
 
 ## 문서 경로 규칙
 
-create와 move의 `path`는 프로젝트 루트(`--project`, 생략하면 서버를 시작한 위치) 기준 상대 경로다. `.codocs/orders/order.yaml`처럼 `/`로 구분하고 루트의 `.codocs` 아래에서 `.yaml` 또는 `.yml`로 끝나야 한다.
+create와 move의 `path`는 프로젝트 루트(`--project`, 생략하면 서버를 시작한 위치) 기준 상대 경로다. `/`로 구분하고 구간 하나 이상이 `.codocs`이며 `.yaml` 또는 `.yml`로 끝나야 한다. 루트 .codocs는 `.codocs/orders/order.yaml`, 하위 폴더 .codocs는 `packages/core/.codocs/a.yaml`처럼 쓴다.
+문서는 경로에서 가장 바깥의 `.codocs`에 속하며, 필요한 `.codocs`와 그 바깥 폴더는 만든다. 하위 폴더 .codocs는 `.gitignore`·`.codocsignore`가 제외하지 않은 위치만 쓸 수 있으며, 제외된 위치(예: `.gitignore`의 `.workbench/x/.codocs`)는 `invalid_workspace_path`로 거절하고 메시지가 그 위치와 올바른 예시를 알려 준다.
 `\`와 연속한 `/`는 `/` 하나로 바꿔 받는다. 절대 경로, `.`·`..` 구간, 파일명 없이 `/`로 끝나는 경로, `.codocs` 구간이 없는 경로, 다른 확장자는 거절하며 메시지가 원인과 올바른 예시(`.codocs/orders/order.yaml`)를 알려 준다.
 결과의 `source.path`·`changes[].path`·`previousPath`는 OS와 무관하게 `/`로 구분하므로 그대로 move의 `path`나 `codocs_validate`의 `path`에 넣을 수 있다.
 
@@ -105,7 +106,7 @@ create와 move의 `path`는 프로젝트 루트(`--project`, 생략하면 서버
 - 이동은 내용·`id`·`name`을 바꾸지 않으므로 같은 이름으로 조회되고 참조가 유지된다. 새 경로에 이미 파일이 있으면 `file_exists`로 거절한다.
 - 삭제한 문서를 다른 문서나 코드 파일의 `@codocs` 표기가 참조하면 `reference_broken`으로 거절한다. 참조를 먼저 고치거나 아래 changes로 함께 보낸다.
 - 삭제나 이동 때문에 건드리지 않은 문서의 `_codocs.parent`가 새로 끊기면 `reference_broken`으로 거절하며 진단에 자식 문서의 경로와 `parent` 항목 위치가 담긴다.
-- 삭제나 이동으로 비게 된 폴더는 `.codocs` 바로 아래 폴더까지 제거한다. `.codocs` 자체와 요청 전부터 비어 있던 폴더, 다른 파일이 남은 폴더는 그대로 둔다.
+- 삭제나 이동으로 비게 된 폴더는 문서가 속한 `.codocs` 바로 아래 폴더까지 제거한다. `.codocs` 자체와 그 바깥 폴더, 요청 전부터 비어 있던 폴더, 다른 파일이 남은 폴더는 그대로 둔다. 하위 폴더 .codocs의 마지막 문서를 지워도 그 `.codocs`는 남는다.
 - 같은 ID의 파일이 여럿이면 그 ID로 삭제하거나 옮기지 않는다.
 
 ## 여러 문서를 한 번에 변경
