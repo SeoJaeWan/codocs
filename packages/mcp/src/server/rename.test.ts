@@ -389,8 +389,8 @@ describe('codocs_rename section', () => {
     });
     expect(result.changes).toHaveLength(3);
     expect(Object.keys(result.revisions).sort()).toEqual([
-      path.join('.codocs', 'payment.yaml'),
-      path.join('.codocs', 'refund.yaml'),
+      '.codocs/payment.yaml',
+      '.codocs/refund.yaml',
     ]);
     expect(await read('refund.yaml')).toBe(refund);
     expect(await read('payment.yaml')).toBe(payment);

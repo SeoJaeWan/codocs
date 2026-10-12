@@ -1,4 +1,3 @@
-import path from 'node:path';
 import {
   diagnosticSeverities,
   queryDiagnosticCodes,
@@ -87,81 +86,6 @@ export interface CodocsQueryHandlers {
   refresh(input?: unknown): Promise<WorkspaceRefreshResult>;
 }
 
-/** 문서 경로를 담는 결과 속성 이름이다. 값은 문자열이거나 문자열 배열이다. */
-const documentPathKeys = new Set([
-  'path',
-  'previousPath',
-  'relatedPaths',
-  'paths',
-  'conflictPaths',
-]);
-
-/** 경로 문자열의 OS 구분자를 `/`로 바꾼다. */
-function portablePath(value: string, separator: string): string {
-  return separator === '/' ? value : value.replaceAll(separator, '/');
-}
-
-/**
- * MCP 결과의 문서 경로(path·previousPath·relatedPaths·paths·conflictPaths)를 OS와 무관하게 `/` 구분으로 바꾼 사본을 돌려준다.
- * 내부 표현(Windows의 `\\`)은 바꾸지 않고 결과 경계에서만 변환하며, 문서 경로가 아닌 값은 그대로 둔다.
- * @param value 도구 결과다.
- * @param separator 내부 경로의 OS 구분자다. 기본은 현재 OS의 구분자다.
- */
-export function toPortableResultPaths<T>(
-  value: T,
-  separator: string = path.sep,
-): T {
-  if (separator === '/') return value;
-  return convertPaths(value, separator) as T;
-}
-
-/** 배열의 각 항목에 변환을 적용하고, 바뀐 항목이 없으면 원본 배열을 그대로 돌려준다. */
-function mapShared(
-  items: readonly unknown[],
-  convert: (item: unknown) => unknown,
-): readonly unknown[] {
-  const converted = items.map(convert);
-  return converted.every((item, index) => item === items[index])
-    ? items
-    : converted;
-}
-
-/** 객체 속성 하나를 변환한다. 문서 경로 속성의 문자열과 문자열 배열은 구분자를 바꾸고 나머지는 재귀로 훑는다. */
-function convertEntry(
-  key: string,
-  item: unknown,
-  separator: string,
-): [string, unknown] {
-  if (typeof item === 'string' && documentPathKeys.has(key))
-    return [key, portablePath(item, separator)];
-  if (Array.isArray(item) && documentPathKeys.has(key))
-    return [
-      key,
-      mapShared(item as unknown[], (entry) =>
-        typeof entry === 'string'
-          ? portablePath(entry, separator)
-          : convertPaths(entry, separator),
-      ),
-    ];
-  return [key, convertPaths(item, separator)];
-}
-
-/** 값을 재귀로 훑어 문서 경로 속성만 변환한다. 바뀐 부분만 복사하고 바뀐 것이 없으면 원본을 돌려준다. */
-function convertPaths(value: unknown, separator: string): unknown {
-  if (Array.isArray(value))
-    return mapShared(value as unknown[], (item) =>
-      convertPaths(item, separator),
-    );
-  if (typeof value !== 'object' || value === null) return value;
-  const entries = Object.entries(value);
-  const converted = entries.map(([key, item]) =>
-    convertEntry(key, item, separator),
-  );
-  return converted.every(([, item], index) => item === entries[index]![1])
-    ? value
-    : Object.fromEntries(converted);
-}
-
 /** scan을 시작하지 못한 입력 오류를 고정 공통 진단으로 반환한다. */
 function invalidInput(): WorkspaceQueryFailure {
   return {
@@ -246,27 +170,27 @@ export function createCodocsQueryHandlers(
     async codocsList(input?: unknown): Promise<CodocsListResponse> {
       const parsed = parseListInput(arguments.length === 0 ? {} : input);
       if (!parsed) return invalidInput();
-      return toPortableResultPaths(await session.list(parsed));
+      return session.list(parsed);
     },
     /** 유효한 상세 입력 전체만 workspace scan과 조회로 전달한다.
      * */
     async codocsGet(input: unknown): Promise<CodocsGetResponse> {
       const parsed = parseGetInput(input);
       if (!parsed) return invalidInput();
-      return toPortableResultPaths(await session.get(parsed.addresses));
+      return session.get(parsed.addresses);
     },
     /** 유효한 검색어 입력만 workspace 검색으로 전달한다. */
     async codocsSearch(input: unknown): Promise<CodocsSearchResponse> {
       const parsed = parseSearchInput(input);
       if (!parsed) return invalidInput();
-      return toPortableResultPaths(await session.search(parsed.queries));
+      return session.search(parsed.queries);
     },
     /** 같은 세션의 완료 색인과 경로 검사로 검증 범위를 결정한다.
      * */
     async codocsValidate(input?: unknown): Promise<CodocsValidationResponse> {
       const parsed = parseValidateInput(arguments.length === 0 ? {} : input);
       if (!parsed) return invalidInput();
-      return toPortableResultPaths(await session.validate(parsed.path));
+      return session.validate(parsed.path);
     },
     /** 같은 세션의 명시 refresh로 색인을 다시 구성한다. */
     codocsRefresh: refresh,
@@ -284,7 +208,7 @@ export function createCodocsQueryHandlers(
           diagnostics: [error],
         };
       }
-      return toPortableResultPaths(await session.write(parsed));
+      return session.write(parsed);
     },
     /** 현재 ID를 파일 경로로 바꾼 뒤 preview 또는 apply를 workspace에 전달한다. 결과는 가공하지 않는다.
      * */

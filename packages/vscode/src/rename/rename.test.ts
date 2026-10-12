@@ -13,12 +13,12 @@ import {
   type RenameHost,
 } from './index.js';
 
-const orderPath = '.codocs\\order.yaml';
-const refPath = '.codocs\\ref.yaml';
+const orderPath = '.codocs/order.yaml';
+const refPath = '.codocs/ref.yaml';
 const orderUri = 'file:///fixture/.codocs/order.yaml';
 const refUri = 'file:///fixture/.codocs/ref.yaml';
-const twinA = { name: '쌍둥이', path: '.codocs\\twin-a.yaml' };
-const twinB = { name: '쌍둥이', path: '.codocs\\twin-b.yaml' };
+const twinA = { name: '쌍둥이', path: '.codocs/twin-a.yaml' };
+const twinB = { name: '쌍둥이', path: '.codocs/twin-b.yaml' };
 
 /** 서버가 돌려주는 미리보기 응답을 만든다. 달라지는 조건만 인자로 받는다. */
 function planResponse(

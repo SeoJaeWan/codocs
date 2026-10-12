@@ -104,7 +104,7 @@ describe('prepareRename 시작 위치 확인', () => {
         start: { line, character: 8 },
         end: { line, character: 10 },
       },
-      targetPath: path.join('.codocs', 'order.yaml'),
+      targetPath: '.codocs/order.yaml',
     });
   });
 
@@ -120,7 +120,7 @@ describe('prepareRename 시작 위치 확인', () => {
 
     expect(result?.kind).toBe('document');
     expect(result?.placeholder).toBe('주문');
-    expect(result?.targetPath).toBe(path.join('.codocs', 'order.yaml'));
+    expect(result?.targetPath).toBe('.codocs/order.yaml');
     expect(result?.range).toEqual({
       start: { line, character },
       end: { line, character: character + '주문'.length },
@@ -226,7 +226,7 @@ describe('prepareRename 섹션 위치', () => {
       kind: 'section',
       section: '환불정책',
       placeholder: '환불정책',
-      targetPath: path.join('.codocs', 'refund.yaml'),
+      targetPath: '.codocs/refund.yaml',
       range: {
         start: { line: plain.line, character: 0 },
         end: { line: plain.line, character: 4 },
@@ -256,7 +256,7 @@ describe('prepareRename 섹션 위치', () => {
       kind: 'section',
       section: '환불정책',
       placeholder: '환불정책',
-      targetPath: path.join('.codocs', 'refund.yaml'),
+      targetPath: '.codocs/refund.yaml',
       range: {
         start: { line: section.line, character: section.character - 1 },
         end: {
@@ -269,7 +269,7 @@ describe('prepareRename 섹션 위치', () => {
     expect(name.result).toEqual({
       kind: 'document',
       placeholder: '환불',
-      targetPath: path.join('.codocs', 'refund.yaml'),
+      targetPath: '.codocs/refund.yaml',
       range: {
         start: { line: name.line, character: name.character - 1 },
         end: { line: name.line, character: name.character - 1 + '환불'.length },
@@ -281,9 +281,7 @@ describe('prepareRename 섹션 위치', () => {
     const section = await prepareAt('.codocs/refund.yaml', '환불:예외', 4);
     expect(section.result?.kind).toBe('section');
     expect(section.result?.section).toBe('예외');
-    expect(section.result?.targetPath).toBe(
-      path.join('.codocs', 'refund.yaml'),
-    );
+    expect(section.result?.targetPath).toBe('.codocs/refund.yaml');
     const name = await prepareAt('.codocs/refund.yaml', '환불:예외', 1);
     expect(name.result?.kind).toBe('document');
     expect(name.result?.placeholder).toBe('환불');
@@ -302,7 +300,7 @@ describe('prepareRename 섹션 위치', () => {
     await open('.codocs/pay.yaml');
     const result = await session.planRename({
       textDocument: { uri: uriOf('.codocs/pay.yaml') },
-      targetPath: path.join('.codocs', 'refund.yaml'),
+      targetPath: '.codocs/refund.yaml',
       section: '환불정책',
       newName: '환불 규정',
     });
@@ -321,8 +319,8 @@ describe('planRename 미리보기 요청', () => {
   it('영향받는 파일의 revision과 file URI를 돌려주며 디스크는 바꾸지 않는다', async () => {
     await open('.codocs/order.yaml');
     const before = await readFile(path.join(root, '.codocs/ref.yaml'), 'utf8');
-    const orderPath = path.join('.codocs', 'order.yaml');
-    const refPath = path.join('.codocs', 'ref.yaml');
+    const orderPath = '.codocs/order.yaml';
+    const refPath = '.codocs/ref.yaml';
 
     const result = await session.planRename({
       textDocument: { uri: uriOf('.codocs/order.yaml') },
@@ -344,8 +342,8 @@ describe('planRename 미리보기 요청', () => {
 
   it('모호한 참조의 선택을 전달하면 선택한 후보를 기준으로 계산한다', async () => {
     await open('.codocs/twin-a.yaml');
-    const twinA = path.join('.codocs', 'twin-a.yaml');
-    const twinRef = path.join('.codocs', 'twin-ref.yaml');
+    const twinA = '.codocs/twin-a.yaml';
+    const twinRef = '.codocs/twin-ref.yaml';
 
     const result = await session.planRename({
       textDocument: { uri: uriOf('.codocs/twin-a.yaml') },
@@ -413,7 +411,7 @@ describe('코드 파일 표기를 포함한 이름 변경 요청', () => {
     await open('.codocs/order.yaml');
     const request = {
       textDocument: { uri: uriOf('.codocs/order.yaml') },
-      targetPath: path.join('.codocs', 'order.yaml'),
+      targetPath: '.codocs/order.yaml',
       newName: '새주문',
     };
     const preview = await session.planRename(request);
@@ -452,8 +450,8 @@ describe('코드 파일 표기를 포함한 이름 변경 요청', () => {
 describe('applyRename 반영 요청', () => {
   it('미리보기의 revision으로 요청하면 영향 파일에 새 이름과 참조를 쓴다', async () => {
     await open('.codocs/order.yaml');
-    const orderPath = path.join('.codocs', 'order.yaml');
-    const refPath = path.join('.codocs', 'ref.yaml');
+    const orderPath = '.codocs/order.yaml';
+    const refPath = '.codocs/ref.yaml';
     const request = {
       textDocument: { uri: uriOf('.codocs/order.yaml') },
       targetPath: orderPath,
@@ -483,7 +481,7 @@ describe('applyRename 반영 요청', () => {
 
   it('파일이 미리보기 뒤에 바뀌면 거절하고 파일을 바꾸지 않는다', async () => {
     await open('.codocs/order.yaml');
-    const orderPath = path.join('.codocs', 'order.yaml');
+    const orderPath = '.codocs/order.yaml';
     const request = {
       textDocument: { uri: uriOf('.codocs/order.yaml') },
       targetPath: orderPath,

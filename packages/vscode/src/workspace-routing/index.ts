@@ -1,4 +1,4 @@
-import path from 'node:path';
+import path, { type PlatformPath } from 'node:path';
 
 /** 문서 소유권을 계산할 workspace root다. */
 export interface WorkspaceRoot {
@@ -11,12 +11,14 @@ export interface WorkspaceRoot {
 export function nearestWorkspaceRoot(
   documentPath: string,
   roots: readonly WorkspaceRoot[],
+  pathModule: PlatformPath = path,
 ): WorkspaceRoot | undefined {
   return roots
-    .filter((root) => containsPath(root.fsPath, documentPath))
+    .filter((root) => containsPath(root.fsPath, documentPath, pathModule))
     .sort(
       (left, right) =>
-        path.resolve(right.fsPath).length - path.resolve(left.fsPath).length,
+        pathModule.resolve(right.fsPath).length -
+        pathModule.resolve(left.fsPath).length,
     )[0];
 }
 
@@ -25,20 +27,25 @@ export function isOwnedByWorkspaceRoot(
   documentPath: string,
   root: WorkspaceRoot,
   roots: readonly WorkspaceRoot[],
+  pathModule: PlatformPath = path,
 ): boolean {
-  return nearestWorkspaceRoot(documentPath, roots)?.uri === root.uri;
+  return (
+    nearestWorkspaceRoot(documentPath, roots, pathModule)?.uri === root.uri
+  );
 }
 
 /** 선택한 workspace folder 안에 있으면서 별도 workspace folder로 열린 폴더를 고른다. 자기 자신은 제외한다. */
 export function nestedWorkspaceRoots(
   root: WorkspaceRoot,
   roots: readonly WorkspaceRoot[],
+  pathModule: PlatformPath = path,
 ): WorkspaceRoot[] {
   return roots.filter(
-    (candidate) =>
+    /** 자기 자신을 뺀 하위 folder만 남긴다. */ (candidate) =>
       candidate.uri !== root.uri &&
-      path.resolve(candidate.fsPath) !== path.resolve(root.fsPath) &&
-      containsPath(root.fsPath, candidate.fsPath),
+      pathModule.resolve(candidate.fsPath) !==
+        pathModule.resolve(root.fsPath) &&
+      containsPath(root.fsPath, candidate.fsPath, pathModule),
   );
 }
 
@@ -53,16 +60,20 @@ export async function routeOwnedRequest<Result>(
   return request();
 }
 
-/** 플랫폼 경로 구분자 기준으로 실제 하위 경로만 포함한다. */
-function containsPath(rootPath: string, candidatePath: string): boolean {
-  const relative = path.relative(
-    path.resolve(rootPath),
-    path.resolve(candidatePath),
+/** 주어진 경로 규칙(기본은 실행 중인 OS)의 구분자 기준으로 실제 하위 경로만 포함한다. */
+function containsPath(
+  rootPath: string,
+  candidatePath: string,
+  pathModule: PlatformPath,
+): boolean {
+  const relative = pathModule.relative(
+    pathModule.resolve(rootPath),
+    pathModule.resolve(candidatePath),
   );
   return (
     relative === '' ||
-    (!relative.startsWith(`..${path.sep}`) &&
+    (!relative.startsWith(`..${pathModule.sep}`) &&
       relative !== '..' &&
-      !path.isAbsolute(relative))
+      !pathModule.isAbsolute(relative))
   );
 }

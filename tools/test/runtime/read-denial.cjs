@@ -7,7 +7,15 @@ async function denyRead(
   target,
   marker,
   platform = process.platform,
-  io = { chmod, readFile, stat, writeFile, rm },
+  io = {
+    chmod,
+    readFile,
+    stat,
+    writeFile,
+    rm,
+    spawn,
+    systemRoot: process.env.SystemRoot,
+  },
 ) {
   let child;
   let mode;
@@ -16,9 +24,9 @@ async function denyRead(
   let stderr = '';
   let spawnError;
   if (platform === 'win32') {
-    child = spawn(
+    child = io.spawn(
       path.join(
-        process.env.SystemRoot,
+        io.systemRoot,
         'System32/WindowsPowerShell/v1.0/powershell.exe',
       ),
       [

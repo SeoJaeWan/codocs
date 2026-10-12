@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { on } from 'node:events';
+import { EventEmitter, on } from 'node:events';
 import { watch } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -130,23 +130,45 @@ test('macOS 준비 표시 쓰기가 실패해도 파일 권한을 즉시 복원�
   assert.equal(state.mode, 0o644);
 });
 
-test(
-  'Windows 대상 파일이 없으면 잠금 준비 실패를 반환한다',
-  { skip: process.platform !== 'win32' },
-  /** 생성되지 않은 대상의 잠금 준비 실패를 관측한다. */ async () => {
-    const root = await mkdtemp(
-      path.join(os.tmpdir(), 'codocs-denial-missing-'),
-    );
-    try {
-      await assert.rejects(
-        denial.denyRead(
-          path.join(root, 'missing.yaml'),
-          path.join(root, 'lock'),
-        ),
-        /준비 실패/u,
-      );
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
-  },
-);
+test('Windows 대상 파일이 없어 잠금 프로세스가 먼저 끝나면 잠금 준비 실패를 반환한다', /** 주입한 프로세스 종료로 준비 실패를 관측한다. */ async () => {
+  const spawned = [];
+  const files = new Set();
+  const io = {
+    systemRoot: 'C:\\Windows',
+    /** 대상 파일이 없다는 오류를 내고 종료한 PowerShell 프로세스를 대신한다. */
+    spawn: (command, args) => {
+      const child = new EventEmitter();
+      child.stderr = new EventEmitter();
+      child.pid = 1;
+      child.exitCode = 1;
+      child.signalCode = null;
+      /** 이미 종료한 프로세스라 종료할 것이 없다. */
+      child.kill = () => {};
+      spawned.push({ command, args });
+      return child;
+    },
+    /** 준비 표시가 만들어지지 않은 상태를 만든다. */
+    readFile: async () => {
+      throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+    },
+    /** 해제 표시 기록을 관측한다. */
+    writeFile: async (file) => {
+      files.add(file);
+    },
+    /** 정리 호출을 받아들인다. */
+    rm: async () => {},
+  };
+  await assert.rejects(
+    denial.denyRead(
+      'C:\\fixture\\missing.yaml',
+      'C:\\fixture\\lock',
+      'win32',
+      io,
+    ),
+    /준비 실패/u,
+  );
+  assert.equal(spawned.length, 1);
+  assert.match(spawned[0].command, /powershell\.exe$/u);
+  assert.ok(spawned[0].args.includes('C:\\fixture\\missing.yaml'));
+  assert.ok(files.has('C:\\fixture\\lock-release'));
+});

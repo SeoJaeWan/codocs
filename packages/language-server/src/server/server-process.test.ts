@@ -674,7 +674,7 @@ describe('language server stdio 프로세스', () => {
         },
       });
       await client.request(2, workspaceRefreshRequestMethod, {});
-      const targetPath = path.join('.codocs', 'order.yaml');
+      const targetPath = '.codocs/order.yaml';
 
       const prepared = await client.request(3, 'codocs/prepareRename', {
         textDocument: { uri: orderUri },
