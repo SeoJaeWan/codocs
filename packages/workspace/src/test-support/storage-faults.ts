@@ -12,6 +12,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { toProjectPath } from '../paths/project-path.js';
 
 /** 실패 연산에 실제 시스템 코드 형태를 부여한다. */
 export function ioError(code: string): Error {
@@ -133,7 +134,7 @@ export async function snapshotProjectTree(
   const walk = async (directory: string): Promise<void> => {
     for (const name of (await readdir(directory)).sort()) {
       const target = path.join(directory, name);
-      const relative = path.relative(root, target).split(path.sep).join('/');
+      const relative = toProjectPath(root, target);
       const stats = await lstat(target);
       if (stats.isDirectory()) {
         entries[relative] = 'dir';

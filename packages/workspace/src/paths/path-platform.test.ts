@@ -50,7 +50,7 @@ describe('현재 OS의 실제 경로·링크와 오류 처리', () => {
     expect(result).toMatchObject({
       success: false,
       status: 'denied',
-      path: path.join('.codocs', '연결'),
+      path: '.codocs/연결',
       diagnostics: [{ code: 'unsupported_workspace_link' }],
     });
   });

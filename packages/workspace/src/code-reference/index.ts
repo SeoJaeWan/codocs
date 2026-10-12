@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { calculateRevision } from '../revision/index.js';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { toOsPath } from '../paths/project-path.js';
 import {
   codeReferenceStatuses,
   scanStatuses,
@@ -435,8 +436,7 @@ export class WorkspaceCodeReferenceIndex {
           ...resolution,
           occurrenceId: `${sourcePath}:${marker.offsetRange.start}:${marker.offsetRange.end}`,
           sourcePath,
-          sourceUri: pathToFileURL(path.join(this.projectRoot, sourcePath))
-            .href,
+          sourceUri: pathToFileURL(toOsPath(this.projectRoot, sourcePath)).href,
           sourceIdentity: buffer?.identity ?? file.identity,
           sourceRevision: buffer?.revision ?? file.revision,
           ...(buffer ? { documentVersion: buffer.documentVersion } : {}),

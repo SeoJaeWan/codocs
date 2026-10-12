@@ -54,7 +54,7 @@ async function updateRequest(
 ) {
   const scan = await loadWorkspace({ cwd: root });
   const source = scan.documents.find(
-    (item) => item.source.path === path.join('.codocs', 'first.yaml'),
+    (item) => item.source.path === '.codocs/first.yaml',
   );
   return {
     scan,
@@ -87,7 +87,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
           sawTemp = entries.some((name) => name.startsWith('.codocs-write-'));
           const fresh = await loadWorkspace({ cwd: root });
           expect(fresh.documents.map((item) => item.source.path)).not.toContain(
-            path.join('.codocs', 'new', 'nested', 'created.yaml'),
+            '.codocs/new/nested/created.yaml',
           );
         },
       },
@@ -146,7 +146,7 @@ describe('saveWorkspaceChange: 실제 파일에 단일 문서 반영', () => {
   it('검증된 무변경이면 파일과 임시 파일을 쓰지 않는다', async () => {
     const { scan } = await updateRequest();
     const source = scan.documents.find(
-      (item) => item.source.path === path.join('.codocs', 'first.yaml'),
+      (item) => item.source.path === '.codocs/first.yaml',
     );
     const result = await saveWorkspaceChange(
       {
@@ -455,7 +455,7 @@ describe('saveWorkspaceChange: create 경로 정규화와 원인별 거절', () 
       expect(result).toMatchObject({
         success: true,
         saved: true,
-        source: { path: path.join('.codocs', 'orders', 'a.yaml') },
+        source: { path: '.codocs/orders/a.yaml' },
       });
       expect(
         await readFile(path.join(folder, 'orders', 'a.yaml'), 'utf8'),

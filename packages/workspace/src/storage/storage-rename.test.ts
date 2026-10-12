@@ -17,8 +17,8 @@ import { applyWorkspaceRename } from './index.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
-const orderPath = path.join('.codocs', 'order.yaml');
-const sourcePath = path.join('.codocs', 'source.yaml');
+const orderPath = '.codocs/order.yaml';
+const sourcePath = '.codocs/source.yaml';
 const order = "_codocs:\n  id: order\n  name: '주문'\ndefinition: 주문 설명\n";
 const source =
   '_codocs:\n  id: source\n  name: 출처\ndefinition: "참조 [[주문]]"\n';
@@ -195,7 +195,7 @@ describe('applyWorkspaceRename: 이름 변경 반영', () => {
         diagnostics: [
           {
             code: 'rename_affected_files_changed',
-            path: path.join('.codocs', 'late.yaml'),
+            path: '.codocs/late.yaml',
           },
         ],
       });

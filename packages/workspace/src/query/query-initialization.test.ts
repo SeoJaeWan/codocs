@@ -113,7 +113,7 @@ describe('최초 조회와 실제 파일 감시 연결', () => {
         targets: [
           {
             found: true,
-            path: path.join('.codocs', 'alpha.yaml'),
+            path: '.codocs/alpha.yaml',
             document: { definition: '최신' },
             revision: createHash('sha256')
               .update(

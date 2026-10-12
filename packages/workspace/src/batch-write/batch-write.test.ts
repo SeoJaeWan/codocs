@@ -20,11 +20,6 @@ import {
 } from '../test-support/storage-faults.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
-/** 요청의 `/` 구분 경로를 결과가 담는 OS 구분자 표기로 바꾼다. */
-function native(requestPath: string): string {
-  return path.join(...requestPath.split('/'));
-}
-
 let root: string;
 let sessions: WorkspaceQuerySession[];
 
@@ -177,8 +172,8 @@ describe('세션 write의 changes 저장', () => {
     expect(result).toMatchObject({ success: false, saved: false });
     if (result.success) return;
     const paths = result.diagnostics.map((item) => item.path);
-    expect(paths).toContain(native('.codocs/b.yaml'));
-    expect(paths).toContain(native('.codocs/c.yaml'));
+    expect(paths).toContain('.codocs/b.yaml');
+    expect(paths).toContain('.codocs/c.yaml');
     expect(await snapshotProjectTree(root)).toEqual(before);
   });
 
@@ -382,9 +377,9 @@ describe('세션 write의 delete·move', () => {
       saved: true,
       changed: true,
       id: 'a',
-      source: { path: native('.codocs/moved/a.yaml') },
+      source: { path: '.codocs/moved/a.yaml' },
       revision,
-      previousPath: native('.codocs/a.yaml'),
+      previousPath: '.codocs/a.yaml',
       warnings: [],
       diagnostics: [],
       indexUpdated: true,
@@ -392,9 +387,7 @@ describe('세션 write의 delete·move', () => {
     expect(await exists('.codocs/a.yaml')).toBe(false);
     expect(await current.get(['문서A'])).toMatchObject({
       success: true,
-      results: [
-        { found: true, source: { path: native('.codocs/moved/a.yaml') } },
-      ],
+      results: [{ found: true, source: { path: '.codocs/moved/a.yaml' } }],
     });
     expect(JSON.stringify(await current.validate())).not.toContain(
       'reference_',
@@ -429,7 +422,7 @@ describe('세션 write의 delete·move', () => {
       saved: true,
       changed: true,
       id: 'a',
-      source: { path: native('.codocs/a.yaml') },
+      source: { path: '.codocs/a.yaml' },
       indexUpdated: true,
     });
     expect(result).not.toHaveProperty('revision');
@@ -472,7 +465,7 @@ describe('세션 write의 delete·move', () => {
     if (rejected.success) return;
     expect(rejected.diagnostics[0]).toMatchObject({
       code: 'reference_broken',
-      path: native('.codocs/k.yaml'),
+      path: '.codocs/k.yaml',
     });
     const saved = await current.write({
       changes: [
@@ -644,8 +637,8 @@ describe('세션 write의 반영 실패·경쟁', () => {
         item.code === 'change_revision_mismatch',
     );
     expect(conflicts.map((item) => item.path).sort()).toEqual([
-      native('.codocs/b.yaml'),
-      native('.codocs/c.yaml'),
+      '.codocs/b.yaml',
+      '.codocs/c.yaml',
     ]);
     expect(await readFile(path.join(root, '.codocs/b.yaml'), 'utf8')).toBe(
       changedB,
@@ -706,7 +699,7 @@ describe('세션 write의 단일 저장 회귀', () => {
       success: true,
       saved: true,
       id: 'n',
-      source: { path: native('.codocs/sub/n.yaml') },
+      source: { path: '.codocs/sub/n.yaml' },
       indexUpdated: true,
     });
     expect(result).not.toHaveProperty('changes');

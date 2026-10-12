@@ -152,7 +152,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
       session.catalogVersion,
     );
     expect(await session.confirmCandidate(token!)).toMatchObject({
-      result: { path: path.join('.codocs', 'target.yaml') },
+      result: { path: '.codocs/target.yaml' },
     });
   });
 
@@ -184,7 +184,7 @@ describe('선택 후보 확인의 거부·보존 계약', () => {
     )!;
     origin.reference.name = '없는 이름';
     expect(await session.confirmCandidate(token)).toMatchObject({
-      result: { path: path.join('.codocs', 'target.yaml') },
+      result: { path: '.codocs/target.yaml' },
     });
   });
 
@@ -327,7 +327,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
     await refresh;
     expect(await pending).toMatchObject({
       catalogVersion: session.catalogVersion,
-      result: { path: path.join('.codocs', 'target.yaml') },
+      result: { path: '.codocs/target.yaml' },
     });
   });
 
@@ -386,7 +386,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
         failures: [
           {
             kind: workspaceTargetKinds.file,
-            path: path.join('.codocs', 'target.yaml'),
+            path: '.codocs/target.yaml',
             diagnostics: [],
           },
         ],
@@ -441,7 +441,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
       else
         expect(result).toMatchObject({
           catalogVersion: session.catalogVersion,
-          result: { path: path.join('.codocs', 'target.yaml') },
+          result: { path: '.codocs/target.yaml' },
         });
     },
   );
@@ -457,7 +457,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
         failures: [
           {
             kind: workspaceTargetKinds.file,
-            path: path.join('.codocs', 'unread.yaml'),
+            path: '.codocs/unread.yaml',
             diagnostics: [],
           },
         ],
@@ -475,7 +475,7 @@ describe('완료 관측 교체와 명시 후보의 확인', () => {
       session.catalogVersion,
     );
     expect(await session.confirmCandidate(token!)).toMatchObject({
-      result: { path: path.join('.codocs', 'target.yaml') },
+      result: { path: '.codocs/target.yaml' },
     });
     expect(
       session.captureCandidate(

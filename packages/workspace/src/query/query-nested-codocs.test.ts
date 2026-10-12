@@ -92,7 +92,7 @@ describe('WorkspaceQuerySession: 하위 .codocs 탐색과 조회', () => {
       results: [
         {
           found: true,
-          source: { path: path.join('packages', 'core', '.codocs', 'a.yaml') },
+          source: { path: 'packages/core/.codocs/a.yaml' },
         },
       ],
     });
@@ -116,7 +116,7 @@ describe('WorkspaceQuerySession: 하위 .codocs 탐색과 조회', () => {
 
     expect(result).toMatchObject({
       success: true,
-      path: path.join('packages', 'core', '.codocs', 'a.yaml'),
+      path: 'packages/core/.codocs/a.yaml',
       diagnostics: [],
     });
   });
@@ -158,12 +158,7 @@ describe('WorkspaceQuerySession: 하위 .codocs 탐색과 조회', () => {
         .filter((item) => item.code === catalogDiagnosticCodes.duplicateName)
         .map((item) => item.path)
         .sort(),
-    ).toEqual(
-      [
-        path.join('.codocs', 'root.yaml'),
-        path.join('packages', 'core', '.codocs', 'a.yaml'),
-      ].sort(),
-    );
+    ).toEqual(['.codocs/root.yaml', 'packages/core/.codocs/a.yaml'].sort());
   });
 
   it('.gitignore가 제외한 폴더의 .codocs는 Git이 강제로 추적해도 색인하지 않는다', async () => {
@@ -349,7 +344,7 @@ describe('WorkspaceQuerySession.write: 하위 .codocs 저장', () => {
 
     expect(moved).toMatchObject({
       success: true,
-      source: { path: path.join('.codocs', 'core-a.yaml') },
+      source: { path: '.codocs/core-a.yaml' },
       indexUpdated: true,
     });
     expect(await exists('packages/core/.codocs')).toBe(true);

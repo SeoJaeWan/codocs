@@ -76,11 +76,6 @@ export interface ChangePlanContext {
    * 섹션을 삭제하는 후보(`removedSections`)에서만 의미가 있으며 생략하면 코드 영향은 판단하지 않는다.
    */
   codeReferences?: readonly ChangePlanCodeReference[];
-  /**
-   * 요청의 `/` 구분 문서 경로를 색인이 쓰는 경로 표기로 바꾼다. 생략하면 요청 표기 그대로 쓴다.
-   * 색인·원문의 경로가 OS 구분자인 환경에서 create·move 대상의 존재·중복 확인과 결과 경로를 색인 표기와 맞춘다.
-   */
-  catalogPath?: (requestPath: string) => string;
 }
 
 /** 요청이나 후보 검증이 실패한 결과다. 실패한 항목의 경로와 위치를 진단에 담는다. */
@@ -102,11 +97,6 @@ export interface ChangePlansContext {
    * 결과의 `requiresCodeEvidence`가 true일 때만 의미가 있으며 생략하면 코드 영향은 판단하지 않는다.
    */
   codeReferences?: readonly ChangePlanCodeReference[];
-  /**
-   * 요청의 `/` 구분 문서 경로를 색인이 쓰는 경로 표기로 바꾼다. 생략하면 요청 표기 그대로 쓴다.
-   * 색인·원문의 경로가 OS 구분자인 환경에서 create·move 대상의 존재·중복 확인과 결과 경로를 색인 표기와 맞춘다.
-   */
-  catalogPath?: (requestPath: string) => string;
 }
 
 /** 다중 항목 계획의 항목 하나가 입력 순서대로 돌려주는 후보다. */
@@ -611,11 +601,6 @@ function pathFailure(
   };
 }
 
-/** 경로 표기를 바꾸지 않는 기본 변환이다. */
-function keepPath(requestPath: string): string {
-  return requestPath;
-}
-
 /** 파싱이 끝난 문서 하나의 후보 계산 중간 값이다. 최종 색인이 만들어진 뒤에 판정을 마친다. */
 interface PreparedItem {
   index: number;
@@ -662,7 +647,7 @@ function prepareItem(
   if (mode === changePlanModes.create) {
     const createProblem = documentPathProblem(input.path);
     if (createProblem) return pathFailure(createProblem);
-    const path = (context.catalogPath ?? keepPath)(input.path as string);
+    const path = input.path as string;
     if (context.catalog.documents.has(path))
       return prepareFailure('pathExists', path);
     if (!plainData(input.document)) return prepareFailure('invalidRequest');
@@ -726,7 +711,7 @@ function prepareItem(
       return prepareFailure('invalidRequest');
     const moveProblem = documentPathProblem(input.path);
     if (moveProblem) return pathFailure(moveProblem);
-    newPath = (context.catalogPath ?? keepPath)(input.path as string);
+    newPath = input.path as string;
   } else {
     const requestedSet = input.set,
       requestedUnset = input.unset;
@@ -863,7 +848,6 @@ function exactKeys(
 function duplicateInput(
   items: readonly unknown[],
   catalog: Catalog,
-  catalogPath: (requestPath: string) => string,
 ): Diagnostic<string> | undefined {
   const ids = new Set<string>(),
     paths = new Set<string>();
@@ -899,8 +883,7 @@ function duplicateInput(
     const known =
       typeof item.id === 'string' ? catalog.idPaths.get(item.id) : undefined;
     const original = !created && known?.size === 1 ? [...known][0] : undefined;
-    const added =
-      typeof item.path === 'string' ? catalogPath(item.path) : undefined;
+    const added = typeof item.path === 'string' ? item.path : undefined;
     const duplicateId = take(ids, [typeof id === 'string' ? id : undefined]);
     if (duplicateId !== undefined)
       return invalid(`같은 문서 ID(${duplicateId})는 한 번만 지정하세요.`);
@@ -1223,11 +1206,7 @@ function planDocumentChangesInternal(
         : undefined;
     },
   );
-  const duplicate = duplicateInput(
-    items,
-    context.catalog,
-    context.catalogPath ?? keepPath,
-  );
+  const duplicate = duplicateInput(items, context.catalog);
   if (duplicate)
     return { status: changePlanStatuses.failed, diagnostics: [duplicate] };
   const prepared: PreparedItem[] = [];
@@ -1305,7 +1284,6 @@ export function planDocumentChange(
       ...(context.codeReferences
         ? { codeReferences: context.codeReferences }
         : {}),
-      ...(context.catalogPath ? { catalogPath: context.catalogPath } : {}),
     });
     if (result.status === changePlanStatuses.failed) return result;
     const item = result.items[0];

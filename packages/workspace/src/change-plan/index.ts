@@ -15,11 +15,9 @@ import {
   workspaceCodeEvidenceDiagnosticMessages,
   type WorkspaceCodeEvidence,
 } from '../code-reference/index.js';
-import path from 'node:path';
 import { buildWorkspaceCatalog } from '../indexing/index.js';
 import type { WorkspaceScanResult } from '../loader/index.js';
 import { normalizeDocumentPathInput } from '../paths/index.js';
-import { discoveryPath } from '../query/discovery-path.js';
 import { calculateRevision } from '../revision/index.js';
 
 /** 미저장 후보의 새 바이트 revision을 포함한다. */
@@ -135,7 +133,6 @@ export function planWorkspaceChange(
         }
       : {}),
     ...(codeReferences ? { codeReferences } : {}),
-    catalogPath: discoveryPath,
   });
   if (result.status !== changePlanStatuses.candidate) return result;
   return {
@@ -184,7 +181,7 @@ export async function planProtectedWorkspaceChange(
   )
     return first;
   const evidence = await collect();
-  const targetPath = first.path.split(path.sep).join('/');
+  const targetPath = first.path;
   if (!evidence.complete)
     return {
       status: changePlanStatuses.failed,
@@ -260,7 +257,6 @@ export function planWorkspaceChanges(
     catalog,
     ...(sources.length ? { sources } : {}),
     ...(codeReferences ? { codeReferences } : {}),
-    catalogPath: discoveryPath,
   });
 }
 
@@ -302,8 +298,7 @@ export async function planProtectedWorkspaceChanges(
         item.previousPath === undefined
           ? [item.path]
           : [item.path, item.previousPath],
-      )
-      .map((item) => item.split(path.sep).join('/')),
+      ),
   );
   return planWorkspaceChanges(
     items,

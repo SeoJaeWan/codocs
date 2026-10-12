@@ -41,9 +41,9 @@ afterEach(
     await rmWithRetry(project, { recursive: true, force: true });
   },
 );
-/** 발견 경로 표기를 임의로 보정하지 않는다. */
+/** 발견 경로는 OS와 무관하게 `/`로 구분한다. */
 function discovered(name: string): string {
-  return path.join('.codocs', name);
+  return `.codocs/${name}`;
 }
 /** 실제 YAML 원문을 쓰고 절대 파일 경로를 반환한다. */
 async function file(name: string, raw: string): Promise<string> {

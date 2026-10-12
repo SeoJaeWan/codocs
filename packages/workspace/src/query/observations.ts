@@ -1,5 +1,4 @@
 import { scanStatuses } from '@codocs/core';
-import path from 'node:path';
 import {
   codocsLocationScanFailures,
   containsWorkspacePath,
@@ -10,6 +9,7 @@ import {
   type WorkspaceScanFailure,
   type WorkspaceScanResult,
 } from '../loader/index.js';
+import { toOsPath } from '../paths/project-path.js';
 import type { CodocsLocations } from '../paths/index.js';
 import type { ProjectRoot } from '../project-root/index.js';
 
@@ -64,7 +64,7 @@ export class QueryObservations {
         !item.path ||
         !containsWorkspacePath(
           scope,
-          path.join(this.#root.projectRoot, item.path),
+          toOsPath(this.#root.projectRoot, item.path),
         ),
     );
   }

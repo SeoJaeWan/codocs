@@ -27,9 +27,16 @@ import {
   type WorkspaceScopeKind,
   type WorkspaceTargetKind,
 } from './domain-values.js';
+import {
+  splitPathInput,
+  splitWorkspaceInput,
+  toProjectPath,
+  type PathModule,
+} from './project-path.js';
 export * from './domain-values.js';
 export * from './code-file-access.js';
 export * from './codocs-locations.js';
+export * from './project-path.js';
 
 /** 실제 .codocs 디렉터리가 부여한 현 시점 접근 범위다. */
 export interface WorkspaceAccessScope {
@@ -73,10 +80,8 @@ interface CheckedTarget {
 /**
  * 입력 경로의 구분자를 나누되 대소문자·유니코드 및 ..를 보존한다.
  */
-function pathSegments(input: string): string[] {
-  return input
-    .split(path.sep === '\\' ? /[\\/]/u : /\//u)
-    .filter((segment) => segment !== '');
+function pathSegments(input: string, pathModule: PathModule): string[] {
+  return splitPathInput(input, pathModule).filter((segment) => segment !== '');
 }
 
 /**
@@ -146,11 +151,15 @@ export type DocumentPathCheck =
  * 저장 후보 경로의 형식을 검사하고 원인을 가린다. 구간 하나 이상이 `.codocs`인 YAML 파일 경로만 인정하며
  * 하위 .codocs의 위치가 탐색 규칙에서 인정되는지는 판단하지 않는다.
  * @param input 프로젝트 루트 기준 상대 경로이며 구분자는 `/`나 OS 구분자다.
+ * @param pathModule 경로 규칙이다. 기본값은 실행 중인 OS이며 `\`는 win32에서만 구분자로 인정한다.
  */
-export function checkDocumentPath(input: string): DocumentPathCheck {
-  const segments = pathSegments(input);
+export function checkDocumentPath(
+  input: string,
+  pathModule: PathModule = path,
+): DocumentPathCheck {
+  const segments = pathSegments(input, pathModule);
   if (
-    path.isAbsolute(input) ||
+    pathModule.isAbsolute(input) ||
     path.win32.isAbsolute(input) ||
     /^[A-Za-z]:/u.test(input)
   )
@@ -178,7 +187,7 @@ function failure(
   const sourcePath =
     logicalPath === undefined
       ? undefined
-      : path.relative(root.projectRoot, logicalPath);
+      : toProjectPath(root.projectRoot, logicalPath);
   return {
     success: false,
     status,
@@ -258,36 +267,15 @@ export async function resolveWorkspacePath(
       workspaceDiagnosticCodes.invalidWorkspacePath,
       workspaceDiagnosticMessages.invalidPath,
     );
-  // 입력 전체를 정규화하면 중간 연결과 ..를 지울 수 있으므로 원문 성분을 유지한다.
-  const pathInput = path.sep === '\\' ? input.replaceAll('/', path.sep) : input;
-  const projectPrefix = root.projectRoot.endsWith(path.sep)
-    ? root.projectRoot
-    : root.projectRoot + path.sep;
-  let relativeInput = pathInput;
-  if (path.isAbsolute(pathInput)) {
-    if (!pathInput.startsWith(projectPrefix))
-      return failure(
-        root,
-        workspacePathFailureStatuses.denied,
-        workspaceDiagnosticCodes.pathOutsideWorkspace,
-        workspaceDiagnosticMessages.pathOutsideWorkspace,
-      );
-    relativeInput = pathInput.slice(projectPrefix.length);
-  } else if (path.parse(pathInput).root !== '') {
+  const split = splitWorkspaceInput(root.projectRoot, input);
+  if (!split.success)
     return failure(
       root,
       workspacePathFailureStatuses.denied,
       workspaceDiagnosticCodes.pathOutsideWorkspace,
       workspaceDiagnosticMessages.pathOutsideWorkspace,
     );
-  }
-  const segments = pathSegments(relativeInput);
-  while (segments[0] === '.') segments.shift();
-  if (
-    relativeInput.endsWith(path.sep) ||
-    (path.sep === '\\' && relativeInput.endsWith('/'))
-  )
-    segments.push('.');
+  const segments = split.segments;
   // 첫 .codocs 구간이 소유 .codocs다. 그 앞 구간은 프로젝트 안의 일반 폴더여야 하며 .·..로 경계를 흐리지 않는다.
   const ownerIndex = segments.indexOf(codocsDirectoryName);
   const ownerSegments = segments.slice(0, Math.max(ownerIndex, 0));
@@ -373,7 +361,7 @@ export async function resolveWorkspacePath(
   return {
     success: true,
     logicalPath: current.logicalPath,
-    path: path.relative(root.projectRoot, current.logicalPath),
+    path: toProjectPath(root.projectRoot, current.logicalPath),
     realPath: current.realPath,
     kind: current.kind,
     scope,

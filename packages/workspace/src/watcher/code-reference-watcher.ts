@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import type { Stats } from 'node:fs';
 import { promisify } from 'node:util';
 import path from 'node:path';
+import { toProjectPath } from '../paths/project-path.js';
 const execute = promisify(execFile);
 /** 감시하지 않을 경로인지 판단하며 종류를 알 수 없는 첫 호출은 stats가 없다. */
 export type CodeWatchExclusion = (
@@ -55,7 +56,7 @@ export class CodeReferenceWatcher {
       ignoreInitial: true,
       /** Git 내부는 별도 index·HEAD 감시만 허용한다. */
       ignored: (input: string, stats?: Stats): boolean => {
-        const parts = path.relative(this.projectRoot, input).split(path.sep);
+        const parts = toProjectPath(this.projectRoot, input).split('/');
         if (parts.indexOf('.git') >= 0) return parts.at(-1) !== '.git';
         return this.excluded(input, stats);
       },

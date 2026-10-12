@@ -55,7 +55,7 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
         success: true,
         logicalPath: file,
         realPath: await realpath(file),
-        path: path.join('.codocs', '한글.yaml'),
+        path: '.codocs/한글.yaml',
         kind: 'file',
         scope: { kind: 'workspace' },
         access: { read: true, write: true },
@@ -70,7 +70,7 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
       await resolveWorkspacePath(selectedRoot, '.codocs/nested/../target.yaml'),
     ).toMatchObject({
       success: true,
-      path: path.join('.codocs', 'target.yaml'),
+      path: '.codocs/target.yaml',
     });
     expect(
       await resolveWorkspacePath(selectedRoot, '.codocs/../outside.yaml'),
@@ -154,7 +154,7 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
     for (const input of ['linked.yaml', 'broken.yaml']) {
       const result = await resolveWorkspacePath(
         selectedRoot,
-        path.join('.codocs', input),
+        `.codocs/${input}`,
       );
       expect(result).toMatchObject({
         success: false,
@@ -162,7 +162,7 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
         diagnostics: [
           {
             code: workspaceDiagnosticCodes.unsupportedWorkspaceLink,
-            path: path.join('.codocs', input),
+            path: `.codocs/${input}`,
           },
         ],
       });
@@ -206,7 +206,7 @@ describe('resolveWorkspacePath: 일반 .codocs 경계', () => {
     ).toMatchObject({
       success: true,
       logicalPath: file,
-      path: path.join('packages', 'core', '.codocs', 'a.yaml'),
+      path: 'packages/core/.codocs/a.yaml',
       kind: 'file',
       scope: { kind: 'workspace', logicalPath: codocs },
     });

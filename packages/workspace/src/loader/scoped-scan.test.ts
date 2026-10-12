@@ -70,7 +70,7 @@ afterEach(async () => {
 
 describe('loadWorkspacePath: 지정 경로의 관측과 재사용', () => {
   it('파일 하나를 확인하면 전체 상태 없이 해당 파일의 관측만 반환한다', async () => {
-    const file = path.join('.codocs', 'a.yaml');
+    const file = '.codocs/a.yaml';
     await writeFile(path.join(fixture, file), rawA);
     await writeFile(path.join(codocs, 'b.yaml'), rawB);
     const result = await loadWorkspacePath(root, file);
@@ -272,7 +272,7 @@ describe('loadWorkspacePath: 부재와 접근 실패', () => {
       const result = await loadWorkspacePath(root, target);
       expect(result.outcome).toBe('complete');
       expect(result.absent).toEqual([
-        { path: path.join('.codocs', name), logicalPath: target },
+        { path: `.codocs/${name}`, logicalPath: target },
       ]);
       expect(result.failures).toEqual([]);
       expect(result.documents).toEqual([]);
@@ -287,9 +287,7 @@ describe('loadWorkspacePath: 부재와 접근 실패', () => {
     await rmWithRetry(a);
     const result = await loadWorkspacePath(root, a, { cache });
     expect(result.documents).toEqual([]);
-    expect(result.absent).toEqual([
-      { path: path.join('.codocs', 'a.yaml'), logicalPath: a },
-    ]);
+    expect(result.absent).toEqual([{ path: '.codocs/a.yaml', logicalPath: a }]);
   });
 
   it('캐시에 있는 파일의 읽기 접근 확인이 EACCES로 거부되면 이전 문서 대신 실패를 반환한다', async () => {
@@ -386,7 +384,7 @@ describe('loadWorkspacePath: 미지원 연결', () => {
       {
         code: 'unsupported_workspace_link',
         severity: 'warning',
-        path: path.join('.codocs', 'linked'),
+        path: '.codocs/linked',
       },
     ]);
   });
@@ -427,7 +425,7 @@ describe('열거 뒤 항목 부재의 직접 확인', () => {
     expect(result.documents).toEqual([]);
     expect(result.failures).toEqual([]);
     expect(result.absent).toEqual([
-      { path: path.join('.codocs', 'a.yaml'), logicalPath: target },
+      { path: '.codocs/a.yaml', logicalPath: target },
     ]);
   });
 });
