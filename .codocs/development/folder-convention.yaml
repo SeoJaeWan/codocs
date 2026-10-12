@@ -20,7 +20,6 @@ _codocs:
   작은 기능은 index.ts에 직접 작성하고 커지면 같은 폴더의 보조 파일로 나눈다. 기능의 도메인 상수는 같은 폴더의 domain-values.ts에 둔다.
   실제 IO·프로세스를 쓰는 테스트도 그 책임을 가진 코드 옆에 둔다.
   여러 테스트가 함께 쓰는 준비 코드와 mock은 그 패키지의 test-support 폴더에 둔다.
-  실제 VS Code UI 테스트는 vscode 패키지의 별도 테스트 영역(test-runner)에 둔다.
   빌드·배포·개발 도구는 tools/ 아래에 두고 그 테스트도 구현 옆에 둔다.
 빌드 대상: |
   배포용 빌드에서는 test 파일과 test-support를 제외한다.
