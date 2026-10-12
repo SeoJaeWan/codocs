@@ -246,7 +246,7 @@ describe('코드 파일 표기를 포함한 섹션 이름 변경', () => {
       storage: {
         operations: {
           rename: async (source, target) => {
-            if (target.endsWith('src/refund.ts'))
+            if (target.endsWith(path.join('src', 'refund.ts')))
               throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' });
             await renameFile(source, target);
           },
