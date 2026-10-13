@@ -1,55 +1,106 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { EventEmitter, on } from 'node:events';
-import { watch } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
+import { EventEmitter } from 'node:events';
 import denial from './read-denial.cjs';
 
-/** 부모·형제 이벤트를 건너뛰고 실제 대상 파일의 감시 이벤트를 기다린다. */
-async function observeFile(watcher, filename) {
-  for await (const [, changed] of on(watcher, 'change', {
-    signal: AbortSignal.timeout(5000),
-  })) {
-    if (changed?.toString() === filename) return;
-  }
-}
+test('지원하지 않는 OS에서 읽기 거부를 준비하면 미지원 OS 오류로 거부한다', /** 주입한 platform이 지원 목록에 없을 때의 실패를 확인한다. */ async () => {
+  await assert.rejects(
+    denial.denyRead('/fixture/document.yaml', '/fixture/lock', 'linux', {}),
+    /읽기 거부 fixture 미지원 OS: linux/u,
+  );
+});
 
-test('현재 OS에서 읽기만 거부하고 파일 감시와 해제 뒤 원문을 보존한다', /** Windows 데이터 잠금 또는 Mac 권한 제한이 감시 등록을 방해하지 않는지 확인한다. */ async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'codocs-denial-'));
-  const documents = path.join(root, 'documents');
-  await mkdir(documents);
-  const target = path.join(documents, 'document.yaml');
-  await writeFile(target, 'original');
-  let release;
-  let watcher;
-  try {
-    release = await denial.denyRead(target, path.join(root, 'lock'));
-    await assert.rejects(
-      readFile(target),
-      /** 실제 OS의 읽기 거부를 확인한다. */ (error) =>
-        ['EACCES', 'EPERM', 'EBUSY'].includes(error.code),
-    );
-    // 제품처럼 부모 디렉터리를 감시한다. macOS는 읽기 거부 파일 직접 감시도 거부한다.
-    watcher = watch(documents);
-    // 새 디렉터리의 초기 이벤트와 감시 준비를 실제 파일 생성으로 확인한다.
-    await Promise.all([
-      observeFile(watcher, 'watch-ready'),
-      writeFile(path.join(documents, 'watch-ready'), 'ready'),
-    ]);
-    await release();
-    assert.equal(await readFile(target, 'utf8'), 'original');
-    await Promise.all([
-      observeFile(watcher, path.basename(target)),
-      writeFile(target, 'updated'),
-    ]);
-    assert.equal(await readFile(target, 'utf8'), 'updated');
-  } finally {
-    watcher?.close();
-    await release?.();
-    await rm(root, { recursive: true, force: true });
-  }
+test('macOS에서 읽기 거부를 해제하면 원문을 보존하고 준비 표시를 정리한다', /** 권한 제한 동안 준비 표시가 기록되고 해제 뒤 원문이 그대로인지 확인한다. */ async () => {
+  const target = '/fixture/document.yaml';
+  const marker = '/fixture/lock';
+  const state = { mode: 0o640, content: 'original', files: new Set() };
+  const io = {
+    /** 기존 권한을 반환한다. */
+    stat: async () => ({ mode: state.mode }),
+    /** 권한 변경을 기록한다. */
+    chmod: async (_, mode) => {
+      state.mode = mode;
+    },
+    /** 준비 표시 파일을 기록한다. */
+    writeFile: async (file) => {
+      state.files.add(file);
+    },
+    /** 권한이 없는 대상은 EACCES로, 표시 파일은 존재 여부로 응답한다. */
+    readFile: async (file) => {
+      if (file === target) {
+        if (state.mode === 0)
+          throw Object.assign(new Error('denied'), { code: 'EACCES' });
+        return state.content;
+      }
+      if (!state.files.has(file))
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      return '';
+    },
+    /** 표시 파일을 제거한다. */
+    rm: async (file) => {
+      state.files.delete(file);
+    },
+  };
+  const release = await denial.denyRead(target, marker, 'darwin', io);
+  assert.ok(state.files.has(marker + '-ready'));
+  await release();
+  assert.equal(await io.readFile(target), 'original');
+  assert.equal(state.files.size, 0);
+});
+
+test('Windows에서 잠금 프로세스가 준비 표시를 남기면 읽기를 거부하고 해제 시 프로세스를 종료하며 원문을 보존한다', /** 주입한 PowerShell 프로세스와 파일 호출로 Windows 잠금 성공 경로를 확인한다. */ async () => {
+  const target = 'C:\\fixture\\document.yaml';
+  const marker = 'C:\\fixture\\lock';
+  const state = { locked: false, content: 'original', files: new Set() };
+  const child = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.pid = 1;
+  child.exitCode = null;
+  child.signalCode = null;
+  child.killed = false;
+  /** 강제 종료 요청을 기록한다. */
+  child.kill = () => {
+    child.killed = true;
+  };
+  const io = {
+    systemRoot: 'C:\\Windows',
+    /** 잠금을 잡고 준비 표시를 남긴 PowerShell 프로세스를 대신한다. */
+    spawn: () => {
+      state.locked = true;
+      state.files.add(marker + '-ready');
+      return child;
+    },
+    /** 잠긴 동안 대상은 EBUSY로, 표시 파일은 존재 여부로 응답한다. */
+    readFile: async (file) => {
+      if (file === target) {
+        if (state.locked)
+          throw Object.assign(new Error('busy'), { code: 'EBUSY' });
+        return state.content;
+      }
+      if (!state.files.has(file))
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      return '';
+    },
+    /** 해제 표시를 받으면 프로세스가 잠금을 풀고 종료한 것으로 처리한다. */
+    writeFile: async (file) => {
+      state.files.add(file);
+      if (file === marker + '-release') {
+        state.locked = false;
+        child.exitCode = 0;
+        setImmediate(() => child.emit('close'));
+      }
+    },
+    /** 표시 파일을 제거한다. */
+    rm: async (file) => {
+      state.files.delete(file);
+    },
+  };
+  const release = await denial.denyRead(target, marker, 'win32', io);
+  assert.equal(state.locked, true);
+  await release();
+  assert.equal(state.locked, false);
+  assert.equal(child.killed, false);
+  assert.equal(await io.readFile(target), 'original');
 });
 
 test('macOS 권한 준비는 읽기 거부를 확인하고 원래 권한으로 복원한다', /** OS 권한 호출을 대체해 Mac 경계의 상태 전이를 확인한다. */ async () => {
