@@ -1,5 +1,23 @@
 # @codocs/workspace
 
+## 0.1.0
+
+### Minor Changes
+
+- 41ddb9d: Documents can now live in `.codocs` folders inside subfolders of the project, such as `packages/core/.codocs/a.yaml`, in addition to the root `.codocs`. A subfolder `.codocs` is recognized only where no `.gitignore` and not the root `.codocsignore` excludes it, decided without running Git (so Git tracking does not matter and a missing or failing Git does not affect it); documents in other locations are not indexed. If a `.gitignore` or `.codocsignore` cannot be read, only the locations it would decide are treated as unknown: create and move into them are rejected while root `.codocs` documents can still be saved. A document belongs to the outermost `.codocs` in its path. Scanning, watching, `codocs_get`, `codocs_list`, `codocs_validate` (including `path`) and rename now cover every recognized `.codocs`, and a subfolder `.codocs` created or deleted while the server runs is picked up without a restart; editing `.codocsignore` recalculates which locations are recognized. IDs and names must be unique across all `.codocs`. `codocs_write` create and move create the missing `.codocs` and outer folders in both single and `changes` requests, a failed `changes` request removes every folder it created, and emptied folders are removed only up to the owning `.codocs`. Creating or moving into an excluded location is rejected with `invalid_workspace_path` and a message that names the location. The tool descriptions now include a subfolder example (`packages/core/.codocs/a.yaml`).
+
+  프로젝트 루트의 `.codocs`뿐 아니라 `packages/core/.codocs/a.yaml`처럼 하위 폴더의 `.codocs`에도 문서를 둘 수 있다. 하위 폴더의 `.codocs`는 `.gitignore`와 루트 `.codocsignore`가 제외하지 않은 위치에서만 인정하며 다른 위치의 문서는 색인하지 않는다. 이 판단에는 Git을 쓰지 않으므로 Git 추적 여부나 Git 실행 실패와 무관하다. `.gitignore`나 `.codocsignore`를 읽지 못하면 그 규칙으로 판단할 수 없는 위치만 확인하지 못한 것으로 보고 그 위치로의 create·move만 거부하며 루트 `.codocs` 문서는 계속 저장할 수 있다. 문서는 경로에서 가장 바깥 `.codocs`에 속한다. 탐색·감시·`codocs_get`·`codocs_list`·`codocs_validate`(`path` 포함)·이름 변경이 인정된 모든 `.codocs`를 대상으로 하고, 서버 실행 중 하위 `.codocs`를 만들거나 지우면 재시작 없이 반영하며 `.codocsignore`를 고치면 인정 범위를 다시 계산한다. ID와 이름은 모든 `.codocs`에서 유일해야 한다. `codocs_write`의 create·move는 단일 요청과 `changes` 모두 없는 `.codocs`와 바깥 폴더를 만들고, `changes`가 실패하면 이번 요청이 만든 폴더를 모두 지우며, 비게 된 폴더는 소유 `.codocs` 바로 아래까지만 지운다. 제외된 위치로의 create·move는 그 위치를 알리는 메시지와 함께 `invalid_workspace_path`로 거부한다. 도구 설명에 하위 폴더 예시(`packages/core/.codocs/a.yaml`)를 더했다.
+
+### Patch Changes
+
+- ec1ca64: `codocs_write` (create and move) and `codocs_validate` now take `path` as a project-root-relative path such as `.codocs/orders/order.yaml`. Backslashes and repeated slashes are converted to a single `/` on every OS, and document paths in tool results (`source.path`, `changes[].path`, `previousPath`, diagnostic `path`/`relatedPaths`) always use `/`, so a result path can be passed straight back to `move` or `codocs_validate`. Invalid paths are rejected with a message for each cause (no `.codocs` folder, absolute path, `.`/`..` segment, missing file name, wrong extension) that ends with a correct example. The tool descriptions now state the path rule.
+
+  `codocs_write`(create·move)와 `codocs_validate`의 `path`를 `.codocs/orders/order.yaml`처럼 프로젝트 루트 기준 상대 경로로 확정한다. 역슬래시와 연속 슬래시는 모든 OS에서 `/` 하나로 바꿔 받고, 도구 결과의 문서 경로(`source.path`, `changes[].path`, `previousPath`, 진단의 `path`/`relatedPaths`)는 항상 `/`로 내보내므로 결과 경로를 그대로 `move`나 `codocs_validate`에 넣을 수 있다. 잘못된 경로는 원인(`.codocs` 폴더 없음, 절대 경로, `.`·`..` 구간, 파일명 없음, 확장자 불일치)마다 다른 메시지로 거부하며 끝에 올바른 예시를 붙인다. 도구 설명에도 경로 규칙을 적었다.
+
+- Updated dependencies [41ddb9d]
+- Updated dependencies [ec1ca64]
+  - @codocs/core@0.0.3
+
 ## 0.0.3
 
 ### Patch Changes
