@@ -44,17 +44,18 @@ _codocs:
 
   pnpm release:verify는 다시 빌드하지 않고 pnpm release:pack의 출력 또는 지정한 tgz·VSIX를 검사한다.
   MCP는 저장소 밖 새 소비자에 tarball을 offline 설치해 codocs bin의 시작·SDK 연결·도구 등록(listTools)을 확인한다. 도구별 결과나 쓰기·감시의 세부 계약은 기능 테스트가 맡으며 여기서 반복하지 않는다.
-  VSIX는 manifest·진입점·자산을 확인한다. 가이드와 예시는 배포 파일의 전체 목록과 바이트를 원본(LF로 맞춘 예상 바이트)과 비교하며 일부 파일만 확인해 대신하지 않는다.
+  VSIX는 manifest·진입점·자산을 확인하고, 압축을 푼 폴더를 공식 도구(@vscode/test-cli·@vscode/test-electron)로 실제 VS Code에서 실행해 확장 활성화·명령 등록과 번들된 언어 서버의 Hover 값을 VS Code API로 확인한다. 화면은 조작하지 않으며 도구별 결과와 Hover의 조건별 내용은 기능 테스트가 맡는다.
+  가이드와 예시는 배포 파일의 전체 목록과 바이트를 원본(LF로 맞춘 예상 바이트)과 비교하며 일부 파일만 확인해 대신하지 않는다.
   내부 패키지 overrides나 저장소 의존성으로 빠진 파일을 보충하지 않고, 검사 뒤 시험 프로세스를 정리한다.
 
-  CI는 Ubuntu job에서 tgz·VSIX를 한 번 조립해 artifact로 넘기고, 같은 job에서 pnpm release:verify로 그 파일을 확인한다. 검사 도중 다시 빌드하지 않으며 파일 전달의 무결성은 artifact 기능에 맡긴다.
+  CI는 Ubuntu job에서 tgz·VSIX를 한 번 조립해 artifact로 넘기고, 같은 job에서 pnpm release:verify로 그 파일을 확인한다. VSIX의 VS Code 실행은 화면이 없는 Ubuntu에서 xvfb-run으로 한다. 검사 도중 다시 빌드하지 않으며 파일 전달의 무결성은 artifact 기능에 맡긴다.
 지원 환경: |
   현재 지원·검증 대상은 Windows와 macOS의 로컬 디스크이며 검증한 OS·CPU·런타임부터 명시한다.
   Linux는 지원 범위에 넣지 않는다. CI의 검사와 배포 workflow가 Ubuntu에서 돈다는 사실은 Linux 지원 검증이 아니다. WSL·컨테이너·SSH는 별도 시험이 필요하며 네트워크 공유 폴더는 보장하지 않는다.
   배포는 같은 소스가 Ubuntu CI에서 두 OS의 platform을 주입한 비교 테스트와 배포 파일 검증을 통과한 뒤 진행한다. 이 검증은 실제 Windows·macOS에서 실행한 것이 아니므로, CI 실행 성공만으로 실제 Mac과 Windows에서의 동작까지 검증했다고 보지 않는다. 사용자가 보고한 OS별 문제의 조사와 재검증도 배포 준비에 포함한다.
   실행한 환경·버전·검사 범위를 기록하고 다른 플랫폼이나 이전 버전으로 넓혀 말하지 않는다. 테스트 도구 실패와 제품 실패를 구분하며 준비 실패·미실행·취소는 통과 근거가 아니다.
 
-  VS Code manifest의 지원 하한(engines.vscode 1.100.0)은 API·번들 의존성·내장 런타임 요구가 달라질 때 근거를 확인해 조정한다. VSIX는 구성과 manifest만 확인하며 설치나 활성화는 검증하지 않으므로, 하한 버전에서의 동작을 검증했다고 말하지 않는다.
+  VS Code manifest의 지원 하한(engines.vscode 1.100.0)은 API·번들 의존성·내장 런타임 요구가 달라질 때 근거를 확인해 조정한다. VSIX 실행 검증은 검증에 쓴 VS Code 버전 하나에서만 하므로, 하한 버전에서의 동작을 검증했다고 말하지 않는다.
 배포용 저장소 설정: |
   자동 배포에 필요한 저장소 설정은 소스와 별도로 적용하고 실제 동작으로 확인한다.
 
