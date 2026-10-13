@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  access,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -11,6 +20,14 @@ import {
   releaseFiles,
   safeZipPath,
 } from './verify-release.mjs';
+import {
+  createFixture,
+  isCi,
+  runVscodeSmoke,
+  vscodeVersion,
+} from './vscode-smoke/vscode-smoke.mjs';
+
+const suite = createRequire(import.meta.url)('./vscode-smoke/suite.cjs');
 
 /** 임시 폴더에 빈 파일을 만들어 선택 규칙만 검사한다. */
 async function withFiles(names, run) {
@@ -213,5 +230,266 @@ test('Linux에서는 설치된 bin이 확장자 없는 링크를 가리킨다', 
   assert.equal(
     installedBinPath('consumer', 'linux'),
     path.join('consumer', 'node_modules/.bin/codocs'),
+  );
+});
+
+test('CI 환경 변수가 문자열 true이면 CI로 판단한다', /** CI 판단의 입력과 결과를 확인한다. */ () => {
+  assert.equal(isCi({ CI: 'true' }), true);
+});
+
+test('CI 환경 변수가 없거나 true가 아니면 CI가 아니다', /** CI 판단의 입력과 결과를 확인한다. */ () => {
+  assert.equal(isCi({}), false);
+  assert.equal(isCi({ CI: 'false' }), false);
+  assert.equal(isCi({ CI: '1' }), false);
+});
+
+/** 임시 저장소 루트와 임시 폴더를 만들어 VS Code 단계 시험에 넘긴다. */
+async function withSmokeRoots(run) {
+  const base = await mkdtemp(path.join(os.tmpdir(), 'codocs-smoke-'));
+  try {
+    await run({
+      root: path.join(base, 'root'),
+      temporary: path.join(base, 'tmp'),
+    });
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+}
+
+test('CI가 아니면 VS Code를 실행하지 않고 건너뜀으로 기록한다', /** 실행기 미호출과 결과를 확인한다. */ async () => {
+  await withSmokeRoots(
+    /** 임시 루트에서 VS Code 단계를 실행한다. */ async (roots) => {
+      let called = false;
+      const result = await runVscodeSmoke({
+        ...roots,
+        extension: roots.root,
+        env: {},
+        runTests: /** 실행기 호출을 기록한다. */ async () => {
+          called = true;
+          return 0;
+        },
+      });
+      assert.equal(called, false);
+      assert.equal(result.status, 'skipped');
+      assert.equal(result.version, vscodeVersion);
+      assert.match(result.reason, /CI가 아니어서/u);
+    },
+  );
+});
+
+test('CI이면 고정 버전과 .workbench 아래 프로필로 VS Code를 실행하고 정리한다', /** 실행기에 넘긴 옵션과 정리를 확인한다. */ async () => {
+  await withSmokeRoots(
+    /** 임시 루트에서 VS Code 단계를 실행한다. */ async (roots) => {
+      let options;
+      const result = await runVscodeSmoke({
+        ...roots,
+        extension: '/extracted/extension',
+        env: { CI: 'true' },
+        runTests: /** 실행기에 넘어온 옵션을 기록한다. */ async (given) => {
+          options = given;
+          await access(given.extensionTestsPath);
+          await access(given.extensionTestsEnv.CODOCS_SMOKE_SOURCE);
+          return 0;
+        },
+      });
+      assert.deepEqual(result, { status: 'passed', version: vscodeVersion });
+      const base = path.join(roots.root, '.workbench/vscode-test');
+      assert.equal(options.version, vscodeVersion);
+      assert.equal(options.cachePath, path.join(base, 'cache'));
+      assert.equal(options.extensionDevelopmentPath, '/extracted/extension');
+      assert.equal(
+        options.extensionTestsEnv.CODOCS_SMOKE_TARGET,
+        'Smoke Target',
+      );
+      for (const name of ['--user-data-dir=', '--extensions-dir='])
+        assert.ok(
+          options.launchArgs.some((arg) =>
+            arg.startsWith(name + base + path.sep),
+          ),
+          name,
+        );
+      assert.deepEqual(await readdir(base), []);
+    },
+  );
+});
+
+test('VS Code 실행이 실패하면 오류를 전달하고 프로필 폴더를 정리한다', /** 거부와 정리를 확인한다. */ async () => {
+  await withSmokeRoots(
+    /** 임시 루트에서 VS Code 단계를 실행한다. */ async (roots) => {
+      await assert.rejects(
+        runVscodeSmoke({
+          ...roots,
+          extension: roots.root,
+          env: { CI: 'true' },
+          runTests: /** 실행기 호출을 기록한다. */ async () => {
+            throw new Error('Test run failed with code 1');
+          },
+        }),
+        /Test run failed/u,
+      );
+      assert.deepEqual(
+        await readdir(path.join(roots.root, '.workbench/vscode-test')),
+        [],
+      );
+    },
+  );
+});
+
+test('검증 문서는 대상 문서를 [[이름]]으로 참조한다', /** 만든 문서의 참조를 확인한다. */ async () => {
+  await withSmokeRoots(
+    /** 임시 루트에서 VS Code 단계를 실행한다. */ async (roots) => {
+      const fixture = await createFixture(roots.temporary);
+      const text = await readFile(fixture.source, 'utf8');
+      assert.ok(text.includes('[[' + fixture.targetName + ']]'));
+      assert.match(
+        await readFile(
+          path.join(fixture.project, '.codocs/target.yaml'),
+          'utf8',
+        ),
+        /name: Smoke Target/u,
+      );
+    },
+  );
+});
+
+/** 확장 활성화·명령·Hover 응답을 지정한 값으로 돌려주는 VS Code API 대역을 만든다. */
+function fakeVscode({ active = true, commands, hover }) {
+  return {
+    extensions: {
+      getExtension: /** 시험 대역이 값을 돌려준다. */ () => ({
+        isActive: active,
+        activate: /** 시험 대역이 값을 돌려준다. */ async () => {},
+      }),
+    },
+    commands: {
+      getCommands: /** 시험 대역이 값을 돌려준다. */ async () => commands,
+      executeCommand: /** 시험 대역이 값을 돌려준다. */ async () => hover,
+    },
+    workspace: {
+      openTextDocument: /** 시험 대역이 값을 돌려준다. */ async (uri) => ({
+        uri,
+        positionAt: /** 시험 대역이 값을 돌려준다. */ (offset) => ({ offset }),
+      }),
+    },
+    Uri: { file: /** 시험 대역이 값을 돌려준다. */ (file) => ({ file }) },
+  };
+}
+
+/** 대상 참조를 담은 원본 문서를 만들고 그 경로와 환경을 넘긴다. */
+async function withSourceEnv(run) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'codocs-suite-'));
+  try {
+    const fixture = await createFixture(directory);
+    await run({
+      CODOCS_SMOKE_SOURCE: fixture.source,
+      CODOCS_SMOKE_TARGET: fixture.targetName,
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+/** 기다리지 않고 한 번만 확인하게 하는 시간 대역이다. */
+const noWait = {
+  deadlineMs: 0,
+  intervalMs: 0,
+  wait: /** 시험 대역이 값을 돌려준다. */ async () => {},
+};
+
+test('활성화·명령·Hover가 모두 맞으면 검증이 통과한다', /** 통과를 확인한다. */ async () => {
+  await withSourceEnv(
+    /** 검증 문서 환경에서 검사를 실행한다. */ async (env) => {
+      await suite.runChecks(
+        fakeVscode({
+          commands: ['codocs.restartLanguageServers'],
+          hover: [{ contents: [{ value: 'Smoke Target 문서' }] }],
+        }),
+        env,
+        noWait,
+      );
+    },
+  );
+});
+
+test('명령이 등록되지 않았으면 검증이 실패한다', /** 실패를 확인한다. */ async () => {
+  await withSourceEnv(
+    /** 검증 문서 환경에서 검사를 실행한다. */ async (env) => {
+      await assert.rejects(
+        suite.runChecks(
+          fakeVscode({
+            commands: [],
+            hover: [{ contents: ['Smoke Target'] }],
+          }),
+          env,
+          noWait,
+        ),
+        /codocs\.restartLanguageServers/u,
+      );
+    },
+  );
+});
+
+test('확장이 활성화되지 않았으면 검증이 실패한다', /** 실패를 확인한다. */ async () => {
+  await withSourceEnv(
+    /** 검증 문서 환경에서 검사를 실행한다. */ async (env) => {
+      await assert.rejects(
+        suite.runChecks(
+          fakeVscode({
+            active: false,
+            commands: ['codocs.restartLanguageServers'],
+            hover: [{ contents: ['Smoke Target'] }],
+          }),
+          env,
+          noWait,
+        ),
+        /활성화되지 않았습니다/u,
+      );
+    },
+  );
+});
+
+test('Hover에 대상 이름이 없으면 마감 뒤 검증이 실패한다', /** 실패를 확인한다. */ async () => {
+  await withSourceEnv(
+    /** 검증 문서 환경에서 검사를 실행한다. */ async (env) => {
+      await assert.rejects(
+        suite.runChecks(
+          fakeVscode({
+            commands: ['codocs.restartLanguageServers'],
+            hover: [{ contents: ['다른 내용'] }],
+          }),
+          env,
+          noWait,
+        ),
+        /Hover에 대상 이름이/u,
+      );
+    },
+  );
+});
+
+test('Hover가 처음엔 비어 있다가 나타나면 마감 안에서 다시 확인해 통과한다', /** 재확인 횟수와 결과를 확인한다. */ async () => {
+  let calls = 0;
+  let clock = 0;
+  const result = await suite.pollUntil(
+    async () => (++calls >= 3 ? 'ready' : ''),
+    {
+      deadlineMs: 100,
+      intervalMs: 10,
+      now: /** 시험 대역이 값을 돌려준다. */ () => clock,
+      wait: /** 시험 대역이 값을 돌려준다. */ async (ms) => {
+        clock += ms;
+      },
+    },
+  );
+  assert.deepEqual(result, { ok: true, last: 'ready' });
+  assert.equal(calls, 3);
+});
+
+test('Hover 내용은 문자열과 Markdown 값을 모두 이어 붙인다', /** 합친 문자열을 확인한다. */ () => {
+  assert.equal(
+    suite.hoverText([
+      { contents: ['가'] },
+      { contents: [{ value: '나' }, '다'] },
+    ]),
+    '가\n나\n다',
   );
 });

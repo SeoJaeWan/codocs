@@ -48,7 +48,7 @@ _codocs:
   가이드와 예시는 배포 파일의 전체 목록과 바이트를 원본(LF로 맞춘 예상 바이트)과 비교하며 일부 파일만 확인해 대신하지 않는다.
   내부 패키지 overrides나 저장소 의존성으로 빠진 파일을 보충하지 않고, 검사 뒤 시험 프로세스를 정리한다.
 
-  CI는 Ubuntu job에서 tgz·VSIX를 한 번 조립해 artifact로 넘기고, 같은 job에서 pnpm release:verify로 그 파일을 확인한다. VSIX의 VS Code 실행은 화면이 없는 Ubuntu에서 xvfb-run으로 한다. 검사 도중 다시 빌드하지 않으며 파일 전달의 무결성은 artifact 기능에 맡긴다.
+  CI는 Ubuntu job에서 tgz·VSIX를 한 번 조립해 artifact로 넘기고, 같은 job에서 pnpm release:verify로 그 파일을 확인한다. VSIX의 VS Code 실행은 화면이 없는 Ubuntu에서 xvfb-run으로 한다. 이 실행 단계는 CI(환경 변수 CI가 true)에서만 돌며, 로컬 pnpm release:verify는 단계를 건너뛰었다고 출력하고 result.json에 skipped로 남기므로 로컬 통과는 VSIX의 활성화·명령·Hover를 검증한 것이 아니다. 검사 도중 다시 빌드하지 않으며 파일 전달의 무결성은 artifact 기능에 맡긴다.
 지원 환경: |
   현재 지원·검증 대상은 Windows와 macOS의 로컬 디스크이며 검증한 OS·CPU·런타임부터 명시한다.
   Linux는 지원 범위에 넣지 않는다. CI의 검사와 배포 workflow가 Ubuntu에서 돈다는 사실은 Linux 지원 검증이 아니다. WSL·컨테이너·SSH는 별도 시험이 필요하며 네트워크 공유 폴더는 보장하지 않는다.

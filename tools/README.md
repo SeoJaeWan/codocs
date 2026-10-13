@@ -21,6 +21,6 @@ MCP의 도구 입력·결과 계산은 `packages/mcp/src/tool-input`과 `query`�
 
 Node glob은 도구의 `.mjs`·`.cjs`와 중첩 `test-support` 테스트를 포함한다.
 
-CI는 Ubuntu에서 `static`(타입·린트·서식), `pack`, `test` job을 병렬로 실행한다. `pack` job은 `release:pack`으로 `.workbench/release/`에 최종 tgz/VSIX를 만들고 `release:verify`로 확인한 뒤 artifact로 올린다. `test` job은 `build` 다음 `pnpm test`를 실행한다. OS별 동작은 platform을 주입한 테스트로 한 OS에서 비교하며, Ubuntu는 실행 환경이지 Linux 지원 검증이 아니다. VSIX는 구성과 manifest만 확인하고 설치·활성화는 검증하지 않는다.
+CI는 Ubuntu에서 `static`(타입·린트·서식), `pack`, `test` job을 병렬로 실행한다. `pack` job은 `release:pack`으로 `.workbench/release/`에 최종 tgz/VSIX를 만들고 `release:verify`로 확인한 뒤 artifact로 올린다. `test` job은 `build` 다음 `pnpm test`를 실행한다. OS별 동작은 platform을 주입한 테스트로 한 OS에서 비교하며, Ubuntu는 실행 환경이지 Linux 지원 검증이 아니다. VSIX는 구성과 manifest를 확인하고, `CI=true`일 때만 `release:verify`가 푼 확장 폴더를 `@vscode/test-electron`으로 고정 버전(1.141.0)의 실제 VS Code에서 실행해 활성화·명령 등록·Hover 값을 확인한다. 이 단계는 CI의 `pack` job과 배포 workflow에서 `xvfb-run -a pnpm release:verify`로 돌며, 로컬 실행은 건너뛴 사실을 출력하고 `result.json`에 `skipped`로 남긴다.
 
 최종 배포물은 MCP tarball 하나와 VSIX 하나다. `release:pack`은 `.workbench/release/`를 비우고 두 파일만 남기며, `release:verify`는 인자 없이 실행하면 그 위치의 파일을, 두 경로를 주면 그 파일을 검사한다. `verify-release.mjs`가 manifest·진입점·가이드·예제·메타데이터·notice·서버 번들을 검사한다. 저장소 밖 MCP 설치는 SDK 연결과 `listTools`의 여덟 도구 등록까지만 확인하며 설치 fixture는 종료 뒤 제거한다. 로컬 VS Code 창을 실행하지 않는다.
