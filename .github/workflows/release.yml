@@ -154,7 +154,7 @@ jobs:
         run: pnpm release:pack
       - name: Verify the tgz and VSIX
         if: ${{ steps.plan.outputs.any == 'true' }}
-        run: pnpm release:verify
+        run: xvfb-run -a pnpm release:verify
       - id: collect
         name: Collect the tgz and VSIX paths and checksums
         if: ${{ steps.plan.outputs.any == 'true' }}

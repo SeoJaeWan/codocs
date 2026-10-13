@@ -38,7 +38,7 @@ jobs:
       - name: Pack the tgz and VSIX
         run: pnpm release:pack
       - name: Verify the tgz and VSIX on the publish runner
-        run: pnpm release:verify
+        run: xvfb-run -a pnpm release:verify
       - id: artifact
         name: Name the release artifact
         run: echo "name=release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"

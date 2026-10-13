@@ -20,7 +20,7 @@ PR 검사: |
   검사는 다음처럼 나눠 실행한다.
 
   - static: typecheck·lint·Prettier 검사를 단계별로 한 번 실행한다.
-  - pack: 배포 파일(tgz·VSIX)을 한 번 조립해 pnpm release:verify로 확인하고 artifact로 올린다.
+  - pack: 배포 파일(tgz·VSIX)을 한 번 조립해 pnpm release:verify로 확인하고 artifact로 올린다. VSIX를 실제 VS Code에서 실행하는 검증도 이 job에서 xvfb-run으로 한다.
   - test: build 뒤 pnpm test를 실행한다.
 
   세 job은 모두 Ubuntu에서 병렬로 실행해 실패한 검사를 job 단위로 구분한다. OS마다 결과가 다른 계약은 platform을 주입한 비교 테스트로 확인하므로([[테스트 컨벤션]]) Windows·macOS 러너를 따로 쓰지 않는다.
