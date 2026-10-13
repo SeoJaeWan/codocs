@@ -6,6 +6,7 @@ import test from 'node:test';
 import { crc32 } from 'node:zlib';
 import {
   extractZip,
+  installedBinPath,
   listZip,
   releaseFiles,
   safeZipPath,
@@ -192,4 +193,25 @@ test('safeZipPath는 이름의 대소문자를 보존하고 탈출 경로를 모
     '.',
   ])
     assert.throws(() => safeZipPath(base, name), /Unsafe zip entry path/u);
+});
+
+test('Windows에서는 설치된 bin이 .cmd 래퍼를 가리킨다', /** win32 규칙의 bin 경로를 확인한다. */ () => {
+  assert.equal(
+    installedBinPath('consumer', 'win32'),
+    path.join('consumer', 'node_modules/.bin/codocs.cmd'),
+  );
+});
+
+test('macOS에서는 설치된 bin이 확장자 없는 링크를 가리킨다', /** darwin 규칙의 bin 경로를 확인한다. */ () => {
+  assert.equal(
+    installedBinPath('consumer', 'darwin'),
+    path.join('consumer', 'node_modules/.bin/codocs'),
+  );
+});
+
+test('Linux에서는 설치된 bin이 확장자 없는 링크를 가리킨다', /** linux 규칙의 bin 경로를 확인한다. */ () => {
+  assert.equal(
+    installedBinPath('consumer', 'linux'),
+    path.join('consumer', 'node_modules/.bin/codocs'),
+  );
 });

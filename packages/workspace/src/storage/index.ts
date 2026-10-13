@@ -62,6 +62,7 @@ import {
   inspectWorkspaceParent,
   locateOwningCodocs,
   resolveWorkspacePath,
+  toOsPath,
 } from '../paths/index.js';
 import {
   workspacePathFailureStatuses,
@@ -136,6 +137,11 @@ export interface WorkspaceStorageOptions {
    * IDE 편집 buffer나 색인의 보유 관측은 저장 보호의 근거가 될 수 없다.
    */
   collectCodeEvidence?: (projectRoot: string) => Promise<WorkspaceCodeEvidence>;
+  /**
+   * 일시적 공유 위반 재시도를 적용할 OS다. 기본값은 실행 중인 OS이며 `win32`일 때만 재시도한다.
+   * 테스트는 이 값으로 다른 OS의 재시도 규칙을 한 OS에서 재현한다.
+   */
+  platform?: NodeJS.Platform;
 }
 
 /** 저장 결과는 디스크 반영 여부와 변경 여부를 따로 전달한다. */
@@ -175,6 +181,27 @@ const fileOperations: WorkspaceStorageOperations = {
 
 // Windows의 일시적인 교체 공유 위반만 짧고 유한하게 기다린다.
 const windowsRenameRetryDelays = [20, 50, 100] as const;
+
+/**
+ * 실패한 연산을 이번 시도 뒤에 다시 시도할 때 기다릴 시간을 정한다.
+ * Windows에서 허용한 오류 코드이고 남은 시도가 있을 때만 값을 돌려준다.
+ * @param error 실패한 연산이 던진 값이다.
+ * @param attempt 지금까지 실패한 횟수(0부터)다.
+ * @param codes 재시도를 허용하는 오류 코드다.
+ * @param platform 기본값은 실행 중인 OS다.
+ * @returns 재시도하지 않으면 undefined다.
+ */
+function windowsRetryWait(
+  error: unknown,
+  attempt: number,
+  codes: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): number | undefined {
+  const code = getIoErrorCode(error);
+  if (platform !== 'win32' || code === undefined || !codes.includes(code))
+    return undefined;
+  return windowsRenameRetryDelays[attempt];
+}
 
 /** 반영 전의 확인 실패를 실제 IO 예외와 구분한다. */
 class StorageRejection extends Error {
@@ -380,10 +407,7 @@ export async function saveWorkspaceChange(
     };
   }
   if (baseRevision === undefined) {
-    const rejected = codocsLocationRejection(
-      scan.codocsLocations,
-      sourcePath.split(path.sep).join('/'),
-    );
+    const rejected = codocsLocationRejection(scan.codocsLocations, sourcePath);
     if (rejected)
       return failure(
         createWorkspaceDiagnostic(
@@ -523,7 +547,7 @@ export async function saveWorkspaceChange(
       const catalog = buildWorkspaceCatalog(current);
       if (
         [...(catalog.idPaths.get(planned.id) ?? [])].some(
-          (item) => path.normalize(item) !== path.normalize(sourcePath),
+          (item) => item !== sourcePath,
         )
       )
         throw new StorageRejection([
@@ -599,13 +623,13 @@ export async function saveWorkspaceChange(
         try {
           await operations.rename(tempPath, logicalPath);
         } catch (error: unknown) {
-          const wait = windowsRenameRetryDelays[attempt];
-          if (
-            process.platform !== 'win32' ||
-            getIoErrorCode(error) !== 'EPERM' ||
-            wait === undefined
-          )
-            throw error;
+          const wait = windowsRetryWait(
+            error,
+            attempt,
+            ['EPERM'],
+            options.platform,
+          );
+          if (wait === undefined) throw error;
           await delay(wait);
           continue;
         }
@@ -817,13 +841,13 @@ async function replaceWorkspaceFile(
       try {
         await operations.rename(tempPath, logicalPath);
       } catch (error: unknown) {
-        const wait = windowsRenameRetryDelays[attempt];
-        if (
-          process.platform !== 'win32' ||
-          getIoErrorCode(error) !== 'EPERM' ||
-          wait === undefined
-        )
-          throw error;
+        const wait = windowsRetryWait(
+          error,
+          attempt,
+          ['EPERM'],
+          options.platform,
+        );
+        if (wait === undefined) throw error;
         await delay(wait);
         continue;
       }
@@ -926,7 +950,7 @@ async function checkCodeRenameTarget(
   | { success: true; target: RenameTarget }
   | { success: false; diagnostics: readonly Diagnostic<string>[] }
 > {
-  const logicalPath = path.join(root.projectRoot, ...edit.path.split('/'));
+  const logicalPath = toOsPath(root.projectRoot, edit.path);
   const eligible = await inspectCodeTarget(policy, edit.path, edit.revision);
   if (eligible.length) return { success: false, diagnostics: eligible };
   let mode: number;
@@ -1431,20 +1455,22 @@ interface BatchContext {
   options: WorkspaceStorageOptions;
 }
 
-/** 일시적인 Windows 공유 위반만 짧고 유한하게 재시도한다. */
-async function withWindowsRetry<T>(action: () => Promise<T>): Promise<T> {
+/** 일시적인 Windows 공유 위반(EPERM·EBUSY)만 짧고 유한하게 재시도한다. */
+async function withWindowsRetry<T>(
+  ctx: BatchContext,
+  action: () => Promise<T>,
+): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
       return await action();
     } catch (error: unknown) {
-      const wait = windowsRenameRetryDelays[attempt];
-      const code = getIoErrorCode(error);
-      if (
-        process.platform !== 'win32' ||
-        (code !== 'EPERM' && code !== 'EBUSY') ||
-        wait === undefined
-      )
-        throw error;
+      const wait = windowsRetryWait(
+        error,
+        attempt,
+        ['EPERM', 'EBUSY'],
+        ctx.options.platform,
+      );
+      if (wait === undefined) throw error;
       await delay(wait);
     }
   }
@@ -1602,7 +1628,7 @@ async function removeCreatedDirectories(
   const causes: Diagnostic<string>[] = [];
   for (const directory of [...directories].reverse()) {
     try {
-      await withWindowsRetry(() => ctx.operations.rmdir(directory));
+      await withWindowsRetry(ctx, () => ctx.operations.rmdir(directory));
     } catch (error: unknown) {
       causes.push(
         restoreCause(
@@ -1826,8 +1852,7 @@ async function prepareFileBatch(
   const seen = new Set<string>();
   /** 같은 경로를 두 연산이 다루면 순서에 따라 결과가 달라지므로 거부한다. */
   const claim = (sourcePath: string): void => {
-    const key = path.normalize(sourcePath);
-    if (seen.has(key))
+    if (seen.has(sourcePath))
       diagnostics.push(
         storageDiagnostic(
           storageDiagnosticCodes.fileAccessFailed,
@@ -1836,7 +1861,7 @@ async function prepareFileBatch(
           '같은 경로를 두 번 이상 다룰 수 없습니다.',
         ),
       );
-    seen.add(key);
+    seen.add(sourcePath);
   };
   for (const [index, operation] of operations.entries()) {
     claim(operation.path);
@@ -2110,7 +2135,7 @@ async function applyCreate(
             ),
           ];
         try {
-          await withWindowsRetry(() =>
+          await withWindowsRetry(ctx, () =>
             ctx.operations.unlink(parent.logicalPath),
           );
         } catch (error: unknown) {
@@ -2208,7 +2233,9 @@ async function applyDelete(
   if (stale.length) return stepFailure(stale);
   try {
     if (ctx.options.beforeApply) await ctx.options.beforeApply();
-    await withWindowsRetry(() => ctx.operations.unlink(prepared.logicalPath));
+    await withWindowsRetry(ctx, () =>
+      ctx.operations.unlink(prepared.logicalPath),
+    );
   } catch (error: unknown) {
     return stepFailure([
       storageDiagnostic(
@@ -2330,7 +2357,9 @@ async function applyMove(
     );
   }
   try {
-    await withWindowsRetry(() => ctx.operations.unlink(prepared.logicalPath));
+    await withWindowsRetry(ctx, () =>
+      ctx.operations.unlink(prepared.logicalPath),
+    );
   } catch (error: unknown) {
     const cause = storageDiagnostic(
       storageDiagnosticCodes.fileWriteFailed,
@@ -2342,7 +2371,7 @@ async function applyMove(
     const identity = prepared.identity!;
     const linkRemoved =
       (await sameFile(ctx.operations, parent.logicalPath, identity)) &&
-      (await withWindowsRetry(() =>
+      (await withWindowsRetry(ctx, () =>
         ctx.operations.unlink(parent.logicalPath),
       ).then(
         /** 새 경로의 링크를 지웠다. */ () => true,
@@ -2395,7 +2424,7 @@ async function applyMove(
           ];
         }
         try {
-          await withWindowsRetry(() =>
+          await withWindowsRetry(ctx, () =>
             ctx.operations.unlink(parent.logicalPath),
           );
         } catch (error: unknown) {
@@ -2459,7 +2488,9 @@ async function removeEmptiedFolders(
     if (checked.kind !== workspaceTargetKinds.directory) continue;
     try {
       if ((await ctx.operations.readdir(checked.logicalPath)).length) continue;
-      await withWindowsRetry(() => ctx.operations.rmdir(checked.logicalPath));
+      await withWindowsRetry(ctx, () =>
+        ctx.operations.rmdir(checked.logicalPath),
+      );
       removed.push({ path: folder, logicalPath: checked.logicalPath });
     } catch (error: unknown) {
       const code = getIoErrorCode(error);

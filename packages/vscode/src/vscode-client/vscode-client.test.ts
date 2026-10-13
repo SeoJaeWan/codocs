@@ -259,7 +259,11 @@ vi.mock('vscode-languageclient/node.js', () => ({
     }
   },
 }));
-import { VscodeExtensionRuntime, VscodeFolderClient } from './index.js';
+import {
+  VscodeExtensionRuntime,
+  VscodeFolderClient,
+  sameFilePath,
+} from './index.js';
 import { openSourceFailureReasons } from '../open-source/index.js';
 import type * as vscode from 'vscode';
 
@@ -681,6 +685,77 @@ describe('source-owning Inlay Hint provider', () => {
     };
     expect(await boundary.hints!(boundary.document, {}, token)).toEqual([]);
     await client.stop();
+  });
+});
+
+describe('Hover provider의 원문 열기 명령 신뢰', () => {
+  it('서버가 만든 원문 열기 링크가 담긴 Hover 응답에는 openSource 명령만 신뢰 목록에 올려 반환한다', async () => {
+    const client = new VscodeFolderClient(
+      boundary.folder as vscode.WorkspaceFolder,
+      '/unused',
+      { appendLine: vi.fn() } as unknown as vscode.OutputChannel,
+    );
+    await client.start();
+    const response = {
+      contents: [
+        {
+          value:
+            '[원문 열기: 환불 (.codocs/refund.yaml)](command:codocs.openSource?%5B%5D)',
+        },
+        { value: '[외부](command:evil)' },
+      ],
+    };
+    boundary.send.mockResolvedValue(response);
+    const token = { isCancellationRequested: false };
+
+    const hover = await boundary.hover!(boundary.document, {}, token);
+
+    expect(hover).toBe(response);
+    expect(response.contents[0]).toMatchObject({
+      isTrusted: { enabledCommands: ['codocs.openSource'] },
+    });
+    expect(response.contents[1]).not.toHaveProperty('isTrusted');
+    await client.stop();
+  });
+});
+
+describe('sameFilePath: OS별 대소문자 규칙', () => {
+  it('win32에서는 드라이브·폴더·파일 이름의 대소문자가 달라도 같은 파일이다', () => {
+    expect(
+      sameFilePath(
+        'C:\\Project\\Order.yaml',
+        'c:\\project\\order.YAML',
+        'win32',
+      ),
+    ).toBe(true);
+  });
+
+  it('darwin에서는 대소문자가 달라도 같은 파일이다', () => {
+    expect(
+      sameFilePath('/Project/Order.yaml', '/project/order.yaml', 'darwin'),
+    ).toBe(true);
+  });
+
+  it('linux에서는 대소문자가 다르면 다른 파일이다', () => {
+    expect(
+      sameFilePath('/Project/Order.yaml', '/project/order.yaml', 'linux'),
+    ).toBe(false);
+  });
+
+  it('linux에서도 같은 경로를 정규화한 결과는 같은 파일이다', () => {
+    expect(
+      sameFilePath(
+        '/project/./docs/../order.yaml',
+        '/project/order.yaml',
+        'linux',
+      ),
+    ).toBe(true);
+  });
+
+  it('win32에서는 \\ 와 / 구분자가 섞여도 같은 파일이다', () => {
+    expect(
+      sameFilePath('C:\\project\\order.yaml', 'C:/project/order.yaml', 'win32'),
+    ).toBe(true);
   });
 });
 

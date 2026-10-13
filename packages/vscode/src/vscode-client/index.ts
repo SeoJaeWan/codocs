@@ -799,13 +799,23 @@ export class VscodeFolderClient implements FolderClientBoundary {
   }
 }
 
-/** 두 file 경로가 같은 파일을 가리키는지 OS의 대소문자 규칙으로 비교한다. */
-function sameFilePath(left: string, right: string): boolean {
+/**
+ * 두 file 경로가 같은 파일을 가리키는지 OS의 대소문자 규칙으로 비교한다.
+ * win32·darwin은 대소문자를 무시하고 그 밖의 OS는 구분한다.
+ * @param platform 비교 규칙을 정하는 OS다. 기본값은 실행 중인 OS다.
+ */
+export function sameFilePath(
+  left: string,
+  right: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  const pathModule = platform === 'win32' ? path.win32 : path.posix;
+  const caseInsensitive = platform === 'win32' || platform === 'darwin';
   /** 플랫폼의 대소문자 규칙으로 경로를 정규화한다. */
   const normalize = (value: string): string =>
-    process.platform === 'win32' || process.platform === 'darwin'
-      ? path.normalize(value).toLowerCase()
-      : path.normalize(value);
+    caseInsensitive
+      ? pathModule.normalize(value).toLowerCase()
+      : pathModule.normalize(value);
   return normalize(left) === normalize(right);
 }
 

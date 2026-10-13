@@ -15,8 +15,8 @@ import { applyWorkspaceRename } from './index.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
-const refundPath = path.join('.codocs', 'refund.yaml');
-const paymentPath = path.join('.codocs', 'payment.yaml');
+const refundPath = '.codocs/refund.yaml';
+const paymentPath = '.codocs/payment.yaml';
 const refund = '_codocs:\n  id: refund\n  name: 환불\n"환불정책": 본문\n';
 const payment =
   '_codocs:\n  id: payment\n  name: 결제\n취소: "[[환불:환불정책]]"\n';

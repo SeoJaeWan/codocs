@@ -3,6 +3,7 @@ export const codocsDirectoryName = '.codocs';
 import { constants } from 'node:fs';
 import { access, lstat, realpath } from 'node:fs/promises';
 import path from 'node:path';
+import { toProjectPath } from '../paths/project-path.js';
 import {
   createWorkspaceDiagnostic,
   workspaceDiagnosticCodes,
@@ -46,6 +47,26 @@ export function isPathString(input: unknown): input is string {
   );
 }
 
+/** macOS에서 프로젝트보다 위의 시스템 경로로 취급하는 별칭이다. */
+const darwinSystemAliases: readonly string[] = ['/var', '/tmp', '/etc'];
+
+/**
+ * 선택 경로를 따라가다 만난 연결이 프로젝트보다 위의 시스템 경로 별칭이라 허용할 수 있는지 판단한다.
+ * macOS의 /var·/tmp·/etc는 시스템 별칭이며, 선택 경로 자신이거나 다른 OS의 같은 이름은 허용하지 않는다.
+ * @param platform 기본값은 실행 중인 OS다.
+ */
+export function isSystemPathAlias(
+  link: string,
+  selected: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return (
+    platform === 'darwin' &&
+    link !== selected &&
+    darwinSystemAliases.includes(link)
+  );
+}
+
 /** 선택 경로의 이름 성분에 연결이 있으면 후속 파일 작업 전에 그 위치를 반환한다. */
 async function selectedLink(
   startCwd: string,
@@ -54,17 +75,11 @@ async function selectedLink(
   for (const selected of [startCwd, projectRoot]) {
     const volumeRoot = path.parse(selected).root;
     let current = volumeRoot;
-    for (const segment of path.relative(volumeRoot, selected).split(path.sep)) {
+    for (const segment of toProjectPath(volumeRoot, selected).split('/')) {
       if (!segment) continue;
       current = path.join(current, segment);
       if (!(await lstat(current)).isSymbolicLink()) continue;
-      // macOS의 /var·/tmp·/etc는 프로젝트보다 위의 시스템 경로 별칭이다.
-      if (
-        process.platform === 'darwin' &&
-        current !== selected &&
-        ['/var', '/tmp', '/etc'].includes(current)
-      )
-        continue;
+      if (isSystemPathAlias(current, selected)) continue;
       return current;
     }
   }

@@ -14,6 +14,7 @@ import {
   workspaceDiagnosticMessages,
 } from '../diagnostics/index.js';
 import { resolveProjectRoot } from '../index.js';
+import { isSystemPathAlias } from './index.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let fixture: string;
@@ -206,7 +207,7 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
       await mkdir(path.join(target, 'child'), { recursive: true });
       await symlink(target, alias, 'junction');
       for (const input of [
-        { cwd: fixture, project: path.join('별칭', 'child') },
+        { cwd: fixture, project: '별칭/child' },
         { cwd: alias, project: 'child' },
         { cwd: path.join(alias, 'child'), project: '../..' },
         { cwd: path.join(alias, 'child') },
@@ -284,5 +285,33 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
         ],
       });
     });
+  });
+});
+
+describe('isSystemPathAlias: 프로젝트보다 위의 시스템 경로 별칭 판단', () => {
+  it.each(['/var', '/tmp', '/etc'])(
+    'darwin에서 선택 경로 위의 %s 연결은 시스템 별칭으로 허용한다',
+    (link) => {
+      expect(isSystemPathAlias(link, '/var/work/project', 'darwin')).toBe(true);
+    },
+  );
+
+  it.each(['linux', 'win32'] as const)(
+    '%s에서는 같은 이름의 연결도 시스템 별칭으로 허용하지 않는다',
+    (platform) => {
+      expect(isSystemPathAlias('/var', '/var/work/project', platform)).toBe(
+        false,
+      );
+    },
+  );
+
+  it('darwin에서도 연결이 선택 경로 자신이면 허용하지 않는다', () => {
+    expect(isSystemPathAlias('/tmp', '/tmp', 'darwin')).toBe(false);
+  });
+
+  it('darwin에서도 세 별칭이 아닌 연결은 허용하지 않는다', () => {
+    expect(
+      isSystemPathAlias('/Users/me/link', '/Users/me/link/p', 'darwin'),
+    ).toBe(false);
   });
 });

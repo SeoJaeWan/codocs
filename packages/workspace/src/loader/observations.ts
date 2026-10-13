@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { toProjectPath, type PathModule } from '../paths/project-path.js';
 import type { WorkspaceDocumentResult } from './index.js';
 
 /** 읽기 시작 세대와 그 읽기에서 얻은 원문·파싱·진단을 함께 보존한다. */
@@ -7,14 +8,22 @@ export interface WorkspaceDocumentObservation {
   document: WorkspaceDocumentResult;
 }
 
-/** 같은 경로 또는 그 하위인지 OS 경로 연산으로 확인한다. */
-export function containsWorkspacePath(parent: string, child: string): boolean {
-  const relative = path.relative(parent, child);
+/**
+ * 같은 경로 또는 그 하위인지 OS 경로 연산으로 확인한다.
+ * 상대 경로는 `/`로 구분하므로 상위 이탈은 `../` 접두로 판단한다.
+ * @param pathModule 경로 규칙이다. 기본값은 실행 중인 OS다.
+ */
+export function containsWorkspacePath(
+  parent: string,
+  child: string,
+  pathModule: PathModule = path,
+): boolean {
+  const relative = toProjectPath(parent, child, pathModule);
   return (
     relative === '' ||
-    (!path.isAbsolute(relative) &&
+    (!pathModule.isAbsolute(relative) &&
       relative !== '..' &&
-      !relative.startsWith('..' + path.sep))
+      !relative.startsWith('../'))
   );
 }
 

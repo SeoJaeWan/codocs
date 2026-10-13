@@ -169,7 +169,7 @@ describe('saveWorkspaceChange: 임시 파일 기록과 반영 사이 늦게 생�
       diagnostics: [
         {
           code: changePlanDiagnosticCodes.brokenReference,
-          path: path.join('.codocs', 'referrer.yaml'),
+          path: '.codocs/referrer.yaml',
         },
       ],
     });
@@ -205,52 +205,37 @@ describe('saveWorkspaceChange: 임시 파일 기록과 반영 사이 늦게 생�
 
   it('교체 재시도 사이에 새 코드 참조가 생기면 다음 시도의 재검사로 거절하고 원문을 보존한다', async () => {
     const scan = await loadWorkspace({ cwd: root });
-    const platform = Object.getOwnPropertyDescriptor(process, 'platform');
     let attempts = 0;
-    let spoofed = false;
-    /** 재시도 판단이 끝난 뒤 실제 플랫폼 값으로 되돌린다. */
-    const restorePlatform = (): void => {
-      if (spoofed && platform)
-        Object.defineProperty(process, 'platform', platform);
-      spoofed = false;
-    };
-    try {
-      const result = await saveWorkspaceChange(replaceRequest(), scan, {
-        operations: {
-          rename: async (source, destination) => {
-            attempts++;
-            if (attempts === 1) {
-              // 첫 교체 실패와 재시도 사이의 동기화 지점에서 코드 참조를 만든다.
-              await writeFile(
-                path.join(root, 'late.ts'),
-                '// @codocs [[구역:내용]]',
-              );
-              // Windows의 일시적 교체 거부만 재시도하므로 재시도 판단 동안만 플랫폼을 맞춘다.
-              Object.defineProperty(process, 'platform', { value: 'win32' });
-              spoofed = true;
-              // 거부가 전파되는 마이크로태스크가 끝나면 즉시 실제 플랫폼으로 되돌린다.
-              setImmediate(restorePlatform);
-              throw Object.assign(new Error('EPERM'), { code: 'EPERM' });
-            }
-            await renameWithRetry(source, destination);
-          },
+    const result = await saveWorkspaceChange(replaceRequest(), scan, {
+      // Windows의 일시적 교체 거부만 재시도하므로 재시도 규칙을 win32로 주입한다.
+      platform: 'win32',
+      operations: {
+        rename: async (source, destination) => {
+          attempts++;
+          if (attempts === 1) {
+            // 첫 교체 실패와 재시도 사이의 동기화 지점에서 코드 참조를 만든다.
+            await writeFile(
+              path.join(root, 'late.ts'),
+              '// @codocs [[구역:내용]]',
+            );
+            throw Object.assign(new Error('EPERM'), { code: 'EPERM' });
+          }
+          await renameWithRetry(source, destination);
         },
-      });
-      expect(attempts).toBe(1);
-      expect(result).toMatchObject({
-        success: false,
-        saved: false,
-        diagnostics: [
-          {
-            code: changePlanDiagnosticCodes.brokenReference,
-            path: 'late.ts',
-          },
-        ],
-      });
-      expect(await readFile(zoneFile, 'utf8')).toBe(zoneText);
-    } finally {
-      restorePlatform();
-    }
+      },
+    });
+    expect(attempts).toBe(1);
+    expect(result).toMatchObject({
+      success: false,
+      saved: false,
+      diagnostics: [
+        {
+          code: changePlanDiagnosticCodes.brokenReference,
+          path: 'late.ts',
+        },
+      ],
+    });
+    expect(await readFile(zoneFile, 'utf8')).toBe(zoneText);
   });
 
   it('섹션을 삭제하지 않는 수정은 늦게 생긴 코드 참조와 관계없이 저장한다', async () => {

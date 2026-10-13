@@ -688,6 +688,81 @@ describe('중간 실패의 역순 복구', () => {
   });
 });
 
+describe('applyWorkspaceFileBatch: 일시적 공유 위반 재시도', () => {
+  it.each(['EPERM', 'EBUSY'])(
+    'win32에서 삭제가 %s로 한 번 실패하면 다시 시도해 삭제한다',
+    async (code) => {
+      const result = await applyWorkspaceFileBatch(
+        root,
+        [remove('a.yaml', a)],
+        {
+          platform: 'win32',
+          operations: {
+            unlink: (() => {
+              let failures = 0;
+              return failingUnlink(
+                (target) =>
+                  path.basename(target) === 'a.yaml' && ++failures === 1,
+                code,
+              );
+            })(),
+          },
+        },
+      );
+
+      expect(result).toMatchObject({
+        success: true,
+        saved: true,
+        operations: [{ state: 'changed' }],
+      });
+      expect(await snapshotProjectTree(dir)).not.toHaveProperty(
+        '.codocs/a.yaml',
+      );
+    },
+  );
+
+  it.each(['linux', 'darwin'] as const)(
+    '%s에서 삭제가 EPERM으로 실패하면 재시도하지 않고 원본을 보존한다',
+    async (platform) => {
+      let calls = 0;
+      const result = await applyWorkspaceFileBatch(
+        root,
+        [remove('a.yaml', a)],
+        {
+          platform,
+          operations: {
+            unlink: failingUnlink((target) => {
+              if (path.basename(target) === 'a.yaml') calls++;
+              return path.basename(target) === 'a.yaml';
+            }, 'EPERM'),
+          },
+        },
+      );
+
+      expect(calls).toBe(1);
+      expect(result).toMatchObject({ success: false, saved: false });
+      expect(await read('a.yaml')).toBe(a);
+    },
+  );
+
+  it('win32에서도 EPERM·EBUSY가 아닌 오류로 삭제가 실패하면 재시도하지 않는다', async () => {
+    let calls = 0;
+    const result = await applyWorkspaceFileBatch(root, [remove('a.yaml', a)], {
+      platform: 'win32',
+      operations: {
+        unlink: failingUnlink((target) => {
+          if (path.basename(target) === 'a.yaml') calls++;
+          return path.basename(target) === 'a.yaml';
+        }, 'EACCES'),
+      },
+    });
+
+    expect(calls).toBe(1);
+    expect(result).toMatchObject({ success: false, saved: false });
+    expect(await read('a.yaml')).toBe(a);
+  });
+});
+
 describe('공유 상태 상수', () => {
   it('이름 변경과 파일 반영이 같은 상태 값을 공유한다', async () => {
     const { workspaceRenameFileStates } = await import('../rename/index.js');

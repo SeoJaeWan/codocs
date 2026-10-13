@@ -112,7 +112,7 @@ describe('WorkspaceQuerySession.validate: 코드 참조 진단', () => {
     );
     const result = await newSession().validate('.codocs/target.yaml');
     if (!result.success) throw new Error('검증이 성공해야 합니다.');
-    expect(result.path).toBe(path.join('.codocs', 'target.yaml'));
+    expect(result.path).toBe('.codocs/target.yaml');
     expect(result.diagnostics.map((item) => item.path)).toEqual(['related.ts']);
   });
 
@@ -332,7 +332,7 @@ describe('WorkspaceQuerySession.previewRename: 이미 만든 코드 색인의 �
     await session.refresh();
     await writeFile(path.join(root, 'source.ts'), '// @codocs [[대상]]');
     const preview = await session.previewRename({
-      targetPath: path.join('.codocs', 'target.yaml'),
+      targetPath: '.codocs/target.yaml',
       newName: '새 대상',
     });
     expect(preview).toMatchObject({ success: true });

@@ -34,8 +34,8 @@ let project: string;
 let session: WorkspaceQuerySession;
 /** 코드 수집을 붙잡은 테스트가 실패해도 afterEach가 수집을 풀어 세션을 닫을 수 있게 한다. */
 let releaseGate: () => void = () => undefined;
-const refundPath = path.join('.codocs', 'refund.yaml');
-const paymentPath = path.join('.codocs', 'payment.yaml');
+const refundPath = '.codocs/refund.yaml';
+const paymentPath = '.codocs/payment.yaml';
 const refund =
   '_codocs:\n  id: refund\n  name: 환불\n환불정책: |\n  내용\n배송: |\n  내용\n';
 const payment =

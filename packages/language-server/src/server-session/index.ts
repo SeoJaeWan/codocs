@@ -4,7 +4,9 @@ import {
   type CatalogOccurrence,
 } from '@codocs/core';
 import {
+  containsWorkspacePath,
   createWorkspaceQuerySession,
+  toProjectPath,
   locateOwningCodocs,
   type WorkspaceQuerySession,
   type WorkspaceLiveReferenceSuccess,
@@ -256,10 +258,7 @@ export class LanguageServerSession {
 
   /** workspace 상대 발견 경로를 공개 참조 API에 전달한다. */
   #sourcePath(uri: string, workspace: WorkspaceBinding): string {
-    return path
-      .relative(workspace.rootPath, fileURLToPath(uri))
-      .split(path.sep)
-      .join('/');
+    return toProjectPath(workspace.rootPath, fileURLToPath(uri));
   }
 
   /** 같은 문서·완료 관측의 참조 요청을 공유하며 늦은 결과를 폐기한다. */
@@ -395,8 +394,8 @@ export class LanguageServerSession {
                 // Host가 만드는 native 링크의 표시 이름에서도 메타데이터를 서식으로 해석하지 않는다.
                 tooltip: escapeMarkdown(
                   section === undefined
-                    ? `원문 열기: ${detailLabel(detail)} (${detail.path.replaceAll('\\', '/')})`
-                    : `${'name' in item.occurrence ? item.occurrence.name : detailLabel(detail)}:${section} · ${detail.path.replaceAll('\\', '/')}`,
+                    ? `원문 열기: ${detailLabel(detail)} (${detail.path})`
+                    : `${'name' in item.occurrence ? item.occurrence.name : detailLabel(detail)}:${section} · ${detail.path}`,
                 ),
               },
             ]
@@ -719,7 +718,7 @@ export class LanguageServerSession {
       return null;
     const offset = document.offsetAt(request.position);
     const text = document.getText();
-    const ownPath = path.relative(workspace.rootPath, fileURLToPath(uri));
+    const ownPath = toProjectPath(workspace.rootPath, fileURLToPath(uri));
     const name = nameValueRange(text);
     if (name && name.range.start <= offset && offset <= name.range.end)
       return {
@@ -1056,10 +1055,10 @@ export class LanguageServerSession {
       const nested: string[] = [];
       for (const inner of inners) {
         if (!containsPath(outer.rootPath, inner)) continue;
-        const relative = path
-          .relative(path.resolve(outer.rootPath), path.resolve(inner))
-          .split(path.sep)
-          .join('/');
+        const relative = toProjectPath(
+          path.resolve(outer.rootPath),
+          path.resolve(inner),
+        );
         if (relative) nested.push(relative);
       }
       outer.session.setExcludedDirectories?.(nested);
@@ -1201,13 +1200,7 @@ function normalizeWorkspaceUri(uri: string): string {
 
 /** 경로가 루트 자체 또는 그 하위인지 플랫폼 경계로 판별한다. */
 function containsPath(rootPath: string, candidatePath: string): boolean {
-  const relative = path.relative(path.resolve(rootPath), candidatePath);
-  return (
-    relative === '' ||
-    (!relative.startsWith(`..${path.sep}`) &&
-      relative !== '..' &&
-      !path.isAbsolute(relative))
-  );
+  return containsWorkspacePath(path.resolve(rootPath), candidatePath);
 }
 
 /** 이름 변경 요청을 시작하지 못한 고정 실패를 만든다. */

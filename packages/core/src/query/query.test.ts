@@ -188,6 +188,23 @@ describe('projectCatalogList: Catalog parent 기준 목록 투영', () => {
       ]);
     });
 
+    it('이름이 같은 문서의 경로는 `/` 구분자 표기의 UTF-16 코드 단위 순서로 정렬한다', () => {
+      // `/`(0x2F)는 `0`(0x30) 앞이고 `\\`(0x5C)는 뒤라서 구분자 표기가 순서를 바꾼다.
+      const catalog = catalogFromSources({
+        '.codocs/a0b.yaml': documentSource('n1', '같은 이름'),
+        '.codocs/a/b.yaml': documentSource('n2', '같은 이름'),
+        '.codocs/a-b.yaml': documentSource('n3', '같은 이름'),
+      });
+
+      const result = projectCatalogList(catalog);
+
+      expect(result.items.map((item) => item.source.path)).toEqual([
+        '.codocs/a-b.yaml',
+        '.codocs/a/b.yaml',
+        '.codocs/a0b.yaml',
+      ]);
+    });
+
     it('이름은 UTF-16 코드 단위 순서로 정렬한다', () => {
       const catalog = catalogFromSources({
         '1.yaml': documentSource('n1', '나'),

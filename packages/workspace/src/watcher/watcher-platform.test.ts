@@ -100,10 +100,10 @@ describe('현재 OS 경로와 watcher 이벤트·종료 처리', () => {
     watcher.subscribe((batch) => received.push([...batch.paths]));
     try {
       const content = boundary.connections[1]!;
+      // 감시 이벤트가 `/` 표기로 오는 경우를 재현한다.
       const target = path
         .join(contract.codocs, '한글.yaml')
-        .split(path.sep)
-        .join('/');
+        .replaceAll('\\', '/');
       content.emitter.emit('all', 'add', target);
       content.emitter.emit('all', 'change', target);
       watcher.drain();

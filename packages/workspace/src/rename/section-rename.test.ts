@@ -11,7 +11,7 @@ import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 let session: WorkspaceQuerySession;
-const refundPath = path.join('.codocs', 'refund.yaml');
+const refundPath = '.codocs/refund.yaml';
 const refund =
   '_codocs:\n  id: refund\n  name: 환불\n환불정책: 환불 규정 본문\n예외: "자기 참조 [[환불:환불정책]]"\n';
 const payment =
@@ -88,23 +88,13 @@ describe('WorkspaceQuerySession.previewRename: 섹션 이름 변경 미리보기
         change.newText,
       ]),
     ).toEqual([
-      [
-        path.join('.codocs', 'payment.yaml'),
-        undefined,
-        '환불정책',
-        '환불 규정',
-      ],
-      [
-        path.join('.codocs', 'payment.yaml'),
-        undefined,
-        '환불정책',
-        '환불 규정',
-      ],
+      ['.codocs/payment.yaml', undefined, '환불정책', '환불 규정'],
+      ['.codocs/payment.yaml', undefined, '환불정책', '환불 규정'],
       [refundPath, 'key', '환불정책', '환불 규정'],
       [refundPath, undefined, '환불정책', '환불 규정'],
     ]);
     expect(Object.keys(result.revisions).sort()).toEqual([
-      path.join('.codocs', 'payment.yaml'),
+      '.codocs/payment.yaml',
       refundPath,
     ]);
   });
@@ -214,7 +204,7 @@ describe('WorkspaceQuerySession.previewRename: 섹션 이름 변경 미리보기
       'ref.yaml':
         '_codocs:\n  id: ref\n  name: 참조\n본문: "[[환불:환불정책]]"\n',
     });
-    const refPath = path.join('.codocs', 'ref.yaml');
+    const refPath = '.codocs/ref.yaml';
     const unselected = await session.previewRename(request);
 
     expect(unselected).toMatchObject({
@@ -229,7 +219,7 @@ describe('WorkspaceQuerySession.previewRename: 섹션 이름 변경 미리보기
             status: 'ambiguous',
             candidates: [
               { path: refundPath },
-              { path: path.join('.codocs', 'refund2.yaml') },
+              { path: '.codocs/refund2.yaml' },
             ],
           },
         },

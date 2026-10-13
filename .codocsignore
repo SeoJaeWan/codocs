@@ -3,7 +3,6 @@
 
 # Tests
 *.test.*
-packages/vscode/src/integration/test-support/
 
 # Work plans and release records
 .github/workplans/

@@ -1,6 +1,6 @@
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { Stats } from 'node:fs';
-import path from 'node:path';
+import { toProjectPath } from '../paths/project-path.js';
 import type { CodeWatchExclusion } from '../watcher/code-reference-watcher.js';
 
 /**
@@ -35,7 +35,7 @@ export class CodocsLocationWatcher {
       ignoreInitial: true,
       /** `.git` 안쪽은 위치 판정과 무관하므로 보지 않는다. */
       ignored: (input: string, stats?: Stats): boolean =>
-        path.relative(this.projectRoot, input).split(path.sep).includes('.git')
+        toProjectPath(this.projectRoot, input).split('/').includes('.git')
           ? true
           : this.excluded(input, stats),
     });

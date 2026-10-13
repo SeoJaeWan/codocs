@@ -11,9 +11,9 @@ import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
 let root: string;
 let session: WorkspaceQuerySession;
-const orderPath = path.join('.codocs', 'order.yaml');
-const purchasePath = path.join('.codocs', 'purchase-order.yaml');
-const sourcePath = path.join('.codocs', 'source.yaml');
+const orderPath = '.codocs/order.yaml';
+const purchasePath = '.codocs/purchase-order.yaml';
+const sourcePath = '.codocs/source.yaml';
 const order = '_codocs:\n  id: order\n  name: 주문\ndefinition: 주문 설명\n';
 const purchaseOrder =
   '_codocs:\n  id: purchase-order\n  name: 주문\ndefinition: 구매 주문 설명\n';
@@ -233,7 +233,7 @@ describe('WorkspaceQuerySession.previewRename: 이름 변경 미리보기', () =
             candidates: [
               {
                 name: '새주문',
-                path: path.join('.codocs', 'other.yaml'),
+                path: '.codocs/other.yaml',
               },
             ],
           },
@@ -495,7 +495,7 @@ describe('WorkspaceQuerySession.applyRename: 섹션을 적은 참조', () => {
 
   it('문서 이름을 바꾸면 섹션 존재와 관계없이 이름 부분만 고치고 섹션과 따옴표 형식을 유지한다', async () => {
     await writeDocuments({ 'refund.yaml': refund, 'payment.yaml': payment });
-    const target = path.join('.codocs', 'refund.yaml');
+    const target = '.codocs/refund.yaml';
     const preview = await session.previewRename({
       targetPath: target,
       newName: '새:환불',

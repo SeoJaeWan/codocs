@@ -86,6 +86,8 @@ import {
   locateOwningCodocs,
   normalizeDocumentPathInput,
   resolveWorkspacePath,
+  toOsPath,
+  toProjectPath,
   type CodeFilePolicy,
   type CodocsLocations,
 } from '../paths/index.js';
@@ -454,11 +456,11 @@ function supportedCandidateFile(
   projectRoot: string,
   selectedPath: string,
 ): Stats | undefined {
-  const relative = path.relative(
+  const relative = toProjectPath(
     projectRoot,
-    path.resolve(projectRoot, selectedPath),
+    toOsPath(projectRoot, selectedPath),
   );
-  const segments = relative.split(path.sep);
+  const segments = relative.split('/');
   if (
     !segments.includes(codocsDirectoryName) ||
     segments.some((segment) => segment === '..' || segment === '')
@@ -471,10 +473,7 @@ function supportedCandidateFile(
     current = path.join(current, segment);
     entry = lstatSync(current);
     if (entry.isSymbolicLink()) return undefined;
-    if (
-      current !== path.resolve(projectRoot, selectedPath) &&
-      !entry.isDirectory()
-    )
+    if (current !== toOsPath(projectRoot, selectedPath) && !entry.isDirectory())
       return undefined;
   }
   return entry.isFile() ? entry : undefined;
@@ -684,7 +683,7 @@ function withPathConfirmationDiagnostic(
 
 /** 프로젝트 발견 경로를 열 수 있는 file URI로 변환한다. */
 function workspacePathUri(projectRoot: string, documentPath: string): string {
-  return pathToFileURL(path.resolve(projectRoot, documentPath)).href;
+  return pathToFileURL(toOsPath(projectRoot, documentPath)).href;
 }
 
 /** Core 경로 결과에 확인한 프로젝트 기준의 이동 URI를 추가한다. */
@@ -997,10 +996,7 @@ export class WorkspaceQuerySession {
         input,
         stats,
       ) => {
-        const relative = path
-          .relative(root.projectRoot, path.resolve(input))
-          .split(path.sep)
-          .join('/');
+        const relative = toProjectPath(root.projectRoot, path.resolve(input));
         return (
           insideCodocs(relative) || isCodeWatchIgnored(policy, input, stats)
         );
@@ -1037,10 +1033,7 @@ export class WorkspaceQuerySession {
     if (this.#closed || !root) return;
     for (const input of paths) {
       const absolute = path.resolve(input);
-      const relative = path
-        .relative(root.projectRoot, absolute)
-        .split(path.sep)
-        .join('/');
+      const relative = toProjectPath(root.projectRoot, absolute);
       const name = relative.slice(relative.lastIndexOf('/') + 1);
       const structural =
         event === undefined || locationStructureEvents.has(event);
@@ -1336,7 +1329,7 @@ export class WorkspaceQuerySession {
     await this.#options.beforeIndexUpdate?.(attempt);
     if (this.#closed || !this.#root) return false;
     pathName = discoveryPath(pathName);
-    const logicalPath = path.resolve(this.#root.projectRoot, pathName);
+    const logicalPath = toOsPath(this.#root.projectRoot, pathName);
     if (revision !== undefined) await this.#acceptSavedLocation(pathName);
     if (this.#closed) return false;
     this.#collect([logicalPath], false, false);
@@ -1366,7 +1359,7 @@ export class WorkspaceQuerySession {
    * @param pathName 저장한 문서의 발견 경로다.
    */
   async #acceptSavedLocation(pathName: string): Promise<void> {
-    const owner = locateOwningCodocs(pathName.split(path.sep).join('/'));
+    const owner = locateOwningCodocs(pathName);
     const ownerDirectory = owner?.ownerDirectory;
     if (
       !ownerDirectory ||
@@ -2026,10 +2019,7 @@ export class WorkspaceQuerySession {
           ),
         };
       const candidate = checkedPath.path;
-      const rejected = codocsLocationRejection(
-        scan.codocsLocations,
-        candidate.split(path.sep).join('/'),
-      );
+      const rejected = codocsLocationRejection(scan.codocsLocations, candidate);
       if (rejected)
         return {
           success: false,
@@ -2215,7 +2205,7 @@ export class WorkspaceQuerySession {
               document,
             ) => ({
               path: document.path,
-              uri: pathToFileURL(path.resolve(root, document.path)).href,
+              uri: pathToFileURL(toOsPath(root, document.path)).href,
               text: document.observation.parsed.source,
               confirmed:
                 !unavailable &&
@@ -2387,7 +2377,7 @@ export class WorkspaceQuerySession {
       );
       if (!before) return undefined;
       descriptor = openSync(
-        path.resolve(this.#scan.root.projectRoot, selectedPath),
+        toOsPath(this.#scan.root.projectRoot, selectedPath),
         'r',
       );
       file = fstatSync(descriptor);

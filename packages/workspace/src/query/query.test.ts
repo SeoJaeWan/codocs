@@ -94,7 +94,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       expect(result).toMatchObject({
         success: false,
         scanStatus: scanStatuses.partial,
-        error: { path: path.join('.codocs', 'alpha.yaml'), ioCode: 'EACCES' },
+        error: { path: '.codocs/alpha.yaml', ioCode: 'EACCES' },
       });
     });
 
@@ -164,30 +164,25 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
       expect(selected).toMatchObject({
         success: true,
         scanStatus: scanStatuses.complete,
-        path: path.join('.codocs', 'a.yaml'),
+        path: '.codocs/a.yaml',
       });
       if (!all.success || !selected.success) throw new Error('검증 실패');
       expect(
         all.diagnostics.some(
           (item) =>
-            item.path === path.join('.codocs', 'c.yaml') &&
+            item.path === '.codocs/c.yaml' &&
             item.code === yamlDiagnosticCodes.invalidYaml,
         ),
       ).toBe(true);
       expect(selected.diagnostics).toContainEqual(
         expect.objectContaining({
           code: catalogDiagnosticCodes.duplicateId,
-          path: path.join('.codocs', 'a.yaml'),
-          relatedPaths: [
-            path.join('.codocs', 'a.yaml'),
-            path.join('.codocs', 'b.yaml'),
-          ],
+          path: '.codocs/a.yaml',
+          relatedPaths: ['.codocs/a.yaml', '.codocs/b.yaml'],
         }),
       );
       expect(
-        selected.diagnostics.every(
-          (item) => item.path !== path.join('.codocs', 'c.yaml'),
-        ),
+        selected.diagnostics.every((item) => item.path !== '.codocs/c.yaml'),
       ).toBe(true);
     });
 
@@ -204,7 +199,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         diagnostics: [
           expect.objectContaining({
             code: 'missing_required_field',
-            path: path.join('.codocs', 'no-id.yaml'),
+            path: '.codocs/no-id.yaml',
           }),
         ],
       });
@@ -213,7 +208,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         diagnostics: [
           expect.objectContaining({
             code: 'invalid_yaml',
-            path: path.join('.codocs', 'broken.yaml'),
+            path: '.codocs/broken.yaml',
           }),
         ],
       });
@@ -295,7 +290,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         success: false,
         error: {
           code: queryDiagnosticCodes.notFound,
-          path: path.join('.codocs', 'missing.yaml'),
+          path: '.codocs/missing.yaml',
           ioCode: 'ENOENT',
         },
       });
@@ -314,7 +309,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         success: false,
         error: {
           code: queryDiagnosticCodes.fileAccessFailed,
-          path: path.join('.codocs', 'locked.yaml'),
+          path: '.codocs/locked.yaml',
           ioCode: 'EACCES',
         },
       });
@@ -353,7 +348,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
         success: false,
         error: {
           code: 'unsupported_workspace_link',
-          path: path.join('.codocs', 'linked'),
+          path: '.codocs/linked',
         },
       });
     });
@@ -657,7 +652,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
 
       expect(found).toMatchObject({
         success: true,
-        path: path.join('.codocs', 'alpha.yaml'),
+        path: '.codocs/alpha.yaml',
       });
       expect(missing).toEqual({ success: true, scanStatus: 'complete' });
       expect(duplicate).toEqual({ success: true, scanStatus: 'complete' });
@@ -1132,7 +1127,7 @@ describe('workspace 조회 세션', /** scan과 조회 응답의 연결을 검�
 
 describe('경로와 catalog 버전 기반 문서 조회', () => {
   it('현재 ID가 누락된 문서를 경로로 조회하면 내용과 진단을 유지한다', async () => {
-    const documentPath = await file(
+    await file(
       'missing-id.yaml',
       '_codocs:\n  name: 이전 이름\ndefinition: 본문\n',
     );
@@ -1140,7 +1135,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
     await session.refresh();
 
     const result = await session.getByPaths(
-      [path.relative(project, documentPath)],
+      ['.codocs/missing-id.yaml'],
       session.catalogVersion,
     );
 
@@ -1149,13 +1144,13 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       catalogVersion: session.catalogVersion,
       results: [
         {
-          path: path.relative(project, documentPath),
+          path: '.codocs/missing-id.yaml',
           found: true,
           document: { _codocs: { name: '이전 이름' }, definition: '본문' },
           diagnostics: [
             {
               code: 'missing_required_field',
-              path: path.relative(project, documentPath),
+              path: '.codocs/missing-id.yaml',
               fieldPath: ['_codocs', 'id'],
             },
           ],
@@ -1187,14 +1182,10 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       success: true,
       results: [
         {
-          references: [
-            { path: path.join('.codocs', 'target.yaml'), id: 'target' },
-          ],
+          references: [{ path: '.codocs/target.yaml', id: 'target' }],
         },
         {
-          referencedBy: [
-            { path: path.join('.codocs', 'source.yaml'), id: 'source' },
-          ],
+          referencedBy: [{ path: '.codocs/source.yaml', id: 'source' }],
         },
       ],
     });
@@ -1259,7 +1250,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       scanStatus: scanStatuses.partial,
       results: [
         {
-          path: path.join('.codocs', 'outside.yaml'),
+          path: '.codocs/outside.yaml',
           found: false,
           confirmation: 'unconfirmed',
         },
@@ -1280,7 +1271,7 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
     await session.refresh();
 
     const result = await session.getByPaths(
-      [path.join('.codocs', '하위 폴더', '오류 문서.yaml')],
+      ['.codocs/하위 폴더/오류 문서.yaml'],
       session.catalogVersion,
     );
 
@@ -1288,10 +1279,10 @@ describe('경로와 catalog 버전 기반 문서 조회', () => {
       success: true,
       results: [
         {
-          path: path.join('.codocs', '하위 폴더', '오류 문서.yaml'),
+          path: '.codocs/하위 폴더/오류 문서.yaml',
           revision: createHash('sha256').update(raw, 'utf8').digest('hex'),
           source: {
-            path: path.join('.codocs', '하위 폴더', '오류 문서.yaml'),
+            path: '.codocs/하위 폴더/오류 문서.yaml',
             uri: pathToFileURL(
               path.join(project, '.codocs', '하위 폴더', '오류 문서.yaml'),
             ).href,
@@ -1339,7 +1330,7 @@ describe('live 참조와 선택 최신 확인', () => {
       documentVersion: 1,
       targets: [
         {
-          path: path.join('.codocs', 'target.yaml'),
+          path: '.codocs/target.yaml',
           document: { definition: 'disk' },
         },
       ],
@@ -1510,9 +1501,7 @@ describe('live 참조와 선택 최신 확인', () => {
       expect(confirmed).toMatchObject({
         catalogVersion: session.catalogVersion,
         result: {
-          path: moved
-            ? path.join('.codocs', '새 경로.yaml')
-            : path.join('.codocs', 'target.yaml'),
+          path: moved ? '.codocs/새 경로.yaml' : '.codocs/target.yaml',
           document: { definition: '최신' },
         },
       });
@@ -1534,7 +1523,7 @@ describe('live 참조와 선택 최신 확인', () => {
     await renameWithRetry(original, path.join(project, '.codocs/moved.yaml'));
     await session.refresh();
     expect(await session.confirmCandidate(token)).toMatchObject({
-      result: { path: path.join('.codocs', 'moved.yaml') },
+      result: { path: '.codocs/moved.yaml' },
     });
   });
 
@@ -1662,7 +1651,7 @@ describe('문서 이름과 섹션 참조의 조회와 검증', () => {
       expect.objectContaining({
         code: queryDiagnosticCodes.sectionReferenceNotFound,
         severity: diagnosticSeverities.error,
-        path: path.join('.codocs', 'payment.yaml'),
+        path: '.codocs/payment.yaml',
       }),
     ]);
   });

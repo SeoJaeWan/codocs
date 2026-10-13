@@ -163,7 +163,7 @@ describe('planProtectedWorkspaceChange: 섹션 삭제에만 코드 참조 보호
       diagnostics: [
         {
           code: workspaceCodeEvidenceDiagnosticCodes.incomplete,
-          path: path.join('.codocs', 'zone.yaml'),
+          path: '.codocs/zone.yaml',
         },
       ],
     });

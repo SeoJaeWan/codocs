@@ -14,7 +14,6 @@ import {
   type PlannedChangeItem,
 } from '@codocs/core';
 import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import {
   planProtectedWorkspaceChanges,
   type WorkspaceChangesPlanResult,
@@ -36,6 +35,7 @@ import {
 } from '../loader/index.js';
 import {
   codocsLocationRejection,
+  toOsPath,
   type CodocsLocations,
 } from '../paths/index.js';
 import type { ProjectRoot } from '../project-root/index.js';
@@ -329,10 +329,7 @@ function locationRejections(
         item.mode !== changePlanModes.move)
     )
       continue;
-    const rejected = codocsLocationRejection(
-      scan.codocsLocations,
-      item.path.split(path.sep).join('/'),
-    );
+    const rejected = codocsLocationRejection(scan.codocsLocations, item.path);
     if (rejected)
       diagnostics.push(
         createWorkspaceDiagnostic(
@@ -378,9 +375,7 @@ async function recheck(
   for (const item of planned) {
     const expected = sourcePathOf(item);
     const others = [...(catalog.idPaths.get(item.id) ?? [])].filter(
-      (candidate) =>
-        expected === undefined ||
-        path.normalize(candidate) !== path.normalize(expected),
+      (candidate) => expected === undefined || candidate !== expected,
     );
     if (others.length)
       duplicates.push({
@@ -576,7 +571,7 @@ export async function readWorkspacePublishTargets(
   const targets: WorkspacePublishTarget[] = [];
   for (const target of paths) {
     try {
-      const bytes = await readFile(path.resolve(root.projectRoot, target));
+      const bytes = await readFile(toOsPath(root.projectRoot, target));
       targets.push({ path: target, revision: calculateRevision(bytes) });
     } catch (error: unknown) {
       const code =

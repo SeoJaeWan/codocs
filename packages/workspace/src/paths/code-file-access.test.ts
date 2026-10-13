@@ -16,7 +16,9 @@ import {
 } from '../code-reference/domain-values.js';
 import {
   applyCodeSignals,
+  classifyCodeSignal,
   codeFileFailures,
+  codeFileRelativePath,
   codeFileStatus,
   codeWatchRuleKey,
   computeCodeFilePolicy,
@@ -756,5 +758,109 @@ describe('.codocsignore: 프로젝트 root 제외 규칙', () => {
     ]);
     expect(codeFileStatus(healed)).toBe(codeCollectionStatuses.complete);
     expect([...healed.files.keys()]).toContain('a.ts');
+  });
+});
+
+describe('codeFileRelativePath: 코드 파일 경로의 / 구분 상대 경로 변환', () => {
+  it.each([
+    {
+      name: 'win32 규칙에서 `\\` 구분 상대 경로를 `/`로 바꾸고 대소문자·Unicode를 보존한다',
+      pathModule: path.win32,
+      root: 'C:\\work\\Project',
+      input: 'src\\한글\\Main.ts',
+      expected: 'src/한글/Main.ts',
+    },
+    {
+      name: 'win32 규칙에서 프로젝트 안의 절대 경로를 `/` 상대 경로로 바꾼다',
+      pathModule: path.win32,
+      root: 'C:\\work\\Project',
+      input: 'C:\\work\\Project\\src\\Main.ts',
+      expected: 'src/Main.ts',
+    },
+    {
+      name: 'posix 규칙에서 `\\`는 구분자가 아니므로 파일 이름의 문자로 보존한다',
+      pathModule: path.posix,
+      root: '/work/Project',
+      input: 'src/a\\b.ts',
+      expected: 'src/a\\b.ts',
+    },
+    {
+      name: 'win32 규칙에서 `\\`로 구분한 `..` 구간이 있으면 거부한다',
+      pathModule: path.win32,
+      root: 'C:\\work\\Project',
+      input: 'src\\..\\Main.ts',
+      expected: undefined,
+    },
+    {
+      name: 'posix 규칙에서 `\\`로 이은 `..`은 구간이 아니므로 거부하지 않는다',
+      pathModule: path.posix,
+      root: '/work/Project',
+      input: 'src\\..\\Main.ts',
+      expected: 'src\\..\\Main.ts',
+    },
+    {
+      name: 'win32 규칙에서 `.git` 구간이 있으면 거부한다',
+      pathModule: path.win32,
+      root: 'C:\\work\\Project',
+      input: '.git\\config',
+      expected: undefined,
+    },
+  ])('$name', ({ pathModule, root, input, expected }) => {
+    expect(codeFileRelativePath(root, input, pathModule)).toBe(expected);
+  });
+});
+
+describe('classifyCodeSignal: 감시 신호 경로의 분류', () => {
+  it.each([
+    {
+      name: 'win32 규칙의 절대 경로는 `/` 구분 상대 경로로 분류한다',
+      pathModule: path.win32,
+      root: 'C:\\work\\Project',
+      input: 'C:\\work\\Project\\src\\한글\\Main.ts',
+      expected: { kind: 'path', relative: 'src/한글/Main.ts' },
+    },
+    {
+      name: 'posix 규칙의 절대 경로는 `/` 구분 상대 경로로 분류한다',
+      pathModule: path.posix,
+      root: '/work/Project',
+      input: '/work/Project/src/한글/Main.ts',
+      expected: { kind: 'path', relative: 'src/한글/Main.ts' },
+    },
+    {
+      name: 'win32 규칙에서 프로젝트 루트 자신이면 root로 분류한다',
+      pathModule: path.win32,
+      root: 'C:\\work\\Project',
+      input: 'C:\\work\\Project',
+      expected: { kind: 'root' },
+    },
+    {
+      name: 'win32 규칙에서 `.git` 구간이 있으면 git으로 분류한다',
+      pathModule: path.win32,
+      root: 'C:\\work\\Project',
+      input: 'C:\\work\\Project\\.git\\index',
+      expected: { kind: 'git' },
+    },
+    {
+      name: 'win32 규칙에서 프로젝트 밖 경로이면 ignore로 분류한다',
+      pathModule: path.win32,
+      root: 'C:\\work\\Project',
+      input: 'C:\\work\\Other\\a.ts',
+      expected: { kind: 'ignore' },
+    },
+  ])('$name', ({ pathModule, root, input, expected }) => {
+    expect(classifyCodeSignal(root, undefined, input, pathModule)).toEqual(
+      expected,
+    );
+  });
+
+  it('win32 규칙에서 Git 디렉터리 안쪽 경로이면 git으로 분류한다', () => {
+    expect(
+      classifyCodeSignal(
+        'C:\\work\\Project',
+        'C:\\work\\Project.git',
+        'C:\\work\\Project.git\\HEAD',
+        path.win32,
+      ),
+    ).toEqual({ kind: 'git' });
   });
 });

@@ -50,7 +50,7 @@ import {
 /** 파일이 많은 폴더에서도 파일 시스템 요청을 직렬화하지 않되 과도한 동시 요청은 피한다. */
 const directoryEntryBatchSize = 64;
 
-/** 읽은 문서의 발견 경로와 확인한 실제 파일이다. 경로 표기는 임의 변환하지 않는다. */
+/** 읽은 문서의 발견 경로와 확인한 실제 파일이다. 발견 경로(`path`)는 OS와 무관하게 `/`로 구분하고 대소문자·Unicode는 바꾸지 않는다. */
 export interface WorkspaceDocumentSource {
   path: string;
   logicalPath: string;
@@ -363,11 +363,7 @@ export async function loadWorkspace(
   const nestedScans: WorkspacePathScanResult[] = [];
   for (const owner of locations.owners)
     nestedScans.push(
-      await scanPath(
-        selected.root,
-        path.join(...owner.split('/'), codocsDirectoryName),
-        options,
-      ),
+      await scanPath(selected.root, `${owner}/${codocsDirectoryName}`, options),
     );
   const merged = mergeScans([rootScan, ...nestedScans]);
   const locationFailures = codocsLocationScanFailures(locations);

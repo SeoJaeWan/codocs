@@ -6,6 +6,7 @@ import path from 'node:path';
 import ignore, { type Ignore } from 'ignore';
 import { calculateRevision } from '../revision/index.js';
 import { codocsDirectoryName } from '../project-root/index.js';
+import { splitPathInput, type PathModule } from './project-path.js';
 import {
   codeCollectionStatuses,
   codeFileReasons,
@@ -85,22 +86,25 @@ function codeFileIdentity(stat: Stats): string {
 function stamp(stat: Stats): string {
   return `${codeFileIdentity(stat)}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
 }
-/** 원문 성분을 보존한 프로젝트 상대 경로만 허용한다. */
+/**
+ * 원문 성분을 보존한 프로젝트 상대 경로만 허용한다. 결과의 구분자는 `/`다.
+ * @param pathModule 경로 규칙이다. `\`는 win32에서만 구분자로 인정하고 posix에서는 파일 이름의 문자다.
+ */
 export function codeFileRelativePath(
   projectRoot: string,
   input: string,
+  pathModule: PathModule = path,
 ): string | undefined {
-  if (input.split(path.sep === '\\' ? /[\\/]/u : /\//u).includes('..'))
-    return undefined;
-  const relative = path.isAbsolute(input)
-    ? path.relative(projectRoot, input)
+  if (splitPathInput(input, pathModule).includes('..')) return undefined;
+  const relative = pathModule.isAbsolute(input)
+    ? pathModule.relative(projectRoot, input)
     : input;
-  const parts = relative.split(path.sep === '\\' ? /[\\/]/u : /\//u);
+  const parts = splitPathInput(relative, pathModule);
   while (parts[0] === '.') parts.shift();
   if (
     !relative ||
     parts.some((part) => part === '..' || part === '.git' || part === '') ||
-    path.isAbsolute(relative)
+    pathModule.isAbsolute(relative)
   )
     return undefined;
   return parts.join('/');
@@ -485,8 +489,7 @@ export async function readTrackedCodeFiles(
       ['-C', projectRoot, 'ls-files', '-z', '--cached', '--', '.'],
       { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
     );
-    for (const file of files.stdout.split('\0'))
-      if (file) tracked.add(file.replaceAll(path.sep, '/'));
+    for (const file of files.stdout.split('\0')) if (file) tracked.add(file);
     repositoryKind = codeRepositoryKinds.git;
   } catch (error: unknown) {
     if (
@@ -1086,30 +1089,37 @@ async function refreshCodeTrackedFiles(
   return current;
 }
 /** 감시 신호 하나를 처리 시점에 분류한 결과다. */
-type CodeSignal =
+export type CodeSignal =
   | { kind: 'git' }
   | { kind: 'root' }
   | { kind: 'path'; relative: string }
   | { kind: 'ignore' };
-/** Git 메타데이터 경로, 프로젝트 root, 일반 상대 경로를 구분한다. */
-function classifyCodeSignal(
+/**
+ * Git 메타데이터 경로, 프로젝트 root, 일반 상대 경로를 구분한다. 일반 상대 경로는 `/`로 구분한다.
+ * @param pathModule 경로 규칙이다. 기본값은 실행 중인 OS다.
+ */
+export function classifyCodeSignal(
   projectRoot: string,
   gitDirectory: string | undefined,
   input: string,
+  pathModule: PathModule = path,
 ): CodeSignal {
-  const absolute = path.isAbsolute(input)
-    ? path.normalize(input)
-    : path.join(projectRoot, input);
-  const relative = path.relative(projectRoot, absolute);
+  const absolute = pathModule.isAbsolute(input)
+    ? pathModule.normalize(input)
+    : pathModule.join(projectRoot, input);
+  const relative = pathModule.relative(projectRoot, absolute);
   if (!relative) return { kind: 'root' };
-  const parts = relative.split(path.sep);
+  const parts = relative.split(pathModule.sep);
   if (parts.includes('.git')) return { kind: 'git' };
   if (gitDirectory) {
-    const inside = path.relative(gitDirectory, absolute);
-    if (inside === '' || (!inside.startsWith('..') && !path.isAbsolute(inside)))
+    const inside = pathModule.relative(gitDirectory, absolute);
+    if (
+      inside === '' ||
+      (!inside.startsWith('..') && !pathModule.isAbsolute(inside))
+    )
       return { kind: 'git' };
   }
-  if (parts.includes('..') || path.isAbsolute(relative))
+  if (parts.includes('..') || pathModule.isAbsolute(relative))
     return { kind: 'ignore' };
   return { kind: 'path', relative: parts.join('/') };
 }

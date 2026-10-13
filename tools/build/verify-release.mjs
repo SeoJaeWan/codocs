@@ -180,11 +180,20 @@ export async function installMcp(archive, consumer, expectedVersion) {
   return {
     directory,
     entry: path.join(directory, manifest.bin.codocs),
-    bin: path.join(
-      consumer,
-      'node_modules/.bin/codocs' + (process.platform === 'win32' ? '.cmd' : ''),
-    ),
+    bin: installedBinPath(consumer),
   };
+}
+
+/**
+ * 소비자 프로젝트에 설치된 codocs bin 경로다. Windows는 npm이 만드는 `.cmd` 래퍼를 가리킨다.
+ * @param consumer 패키지를 설치한 소비자 프로젝트 폴더다.
+ * @param platform 경로 규칙을 정하는 OS다. 기본값은 실행 중인 OS다.
+ */
+export function installedBinPath(consumer, platform = process.platform) {
+  return path.join(
+    consumer,
+    'node_modules/.bin/codocs' + (platform === 'win32' ? '.cmd' : ''),
+  );
 }
 
 /** 저장소 밖에 설치한 bin의 시작·SDK 연결·도구 등록만 확인한다. */

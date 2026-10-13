@@ -443,12 +443,12 @@ function impactKey(impact: RenameImpact): string {
   return `${impact.reason}\0${impact.path}\0${impact.occurrenceIndex}`;
 }
 
-/** 후보 문서를 목록 항목으로 바꾼다. 경로는 구분자를 통일해 보여준다. */
+/** 후보 문서를 목록 항목으로 바꾼다. 경로는 이미 `/` 구분이므로 그대로 보여준다. */
 function candidateChoice(candidate: RenameCandidate): RenameChoice {
   return {
     id: candidate.path,
     label: candidate.name ?? candidate.path,
-    detail: candidate.path.replaceAll('\\', '/'),
+    detail: candidate.path,
   };
 }
 
@@ -481,7 +481,7 @@ function ensureClean(
     throw new RenameAborted(
       renameAbortReasons.dirtyFiles,
       renameMessages.dirtyFiles(
-        dirty.map((uri) => (byUri.get(uri) ?? uri).replaceAll('\\', '/')),
+        dirty.map((uri) => byUri.get(uri) ?? uri),
         kind,
       ),
     );
@@ -516,11 +516,7 @@ async function choose(
   kind: RenameKind,
 ): Promise<RenameSelection | undefined> {
   const picked = await host.choose({
-    title: renameMessages.chooseTitle(
-      impact.path.replaceAll('\\', '/'),
-      impact.text,
-      kind,
-    ),
+    title: renameMessages.chooseTitle(impact.path, impact.text, kind),
     placeHolder: renameMessages.choosePlaceHolder,
     choices: impact.before.candidates.map(candidateChoice),
   });

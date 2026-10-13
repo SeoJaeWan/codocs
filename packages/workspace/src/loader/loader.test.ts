@@ -63,8 +63,18 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
       {
         status: workspaceDocumentStatuses.valid,
         raw: source,
-        source: { path: path.join('.codocs', 'term.yaml') },
+        source: { path: '.codocs/term.yaml' },
       },
+    ]);
+  });
+
+  it('하위 폴더의 문서를 발견하면 발견 경로를 `/`로 구분한 프로젝트 루트 기준 상대 경로로 담는다', async () => {
+    await document('sub/deep/term.yaml', raw);
+
+    const result = await loadWorkspace({ cwd: project });
+
+    expect(result.documents.map((item) => item.source.path)).toEqual([
+      '.codocs/sub/deep/term.yaml',
     ]);
   });
 
@@ -75,14 +85,15 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     const result = await loadWorkspace({ cwd: project });
     expect(result.status).toBe('complete');
     expect(result.documents).toHaveLength(2);
+    expect(result.documents.map((item) => item.source.path)).toEqual([
+      '.codocs/other/내용.yml',
+      '.codocs/한글 폴더/Mixed.yaml',
+    ]);
     for (const item of result.documents) {
       expect(item.status).toBe('valid');
       expect(item.raw).toBe(raw);
       expect(item.source.realPath).toBe(
         await realpath(item.source.logicalPath),
-      );
-      expect(item.source.path).toBe(
-        path.relative(project, item.source.logicalPath),
       );
       expect(item.access).toEqual({ read: true, write: true });
     }
@@ -94,7 +105,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     const result = await loadWorkspace({ cwd: project });
     expect(result.status).toBe('complete');
     expect(result.documents.map((item) => item.source.path)).toEqual(
-      names.map((name) => path.join('.codocs', name)),
+      names.map((name) => `.codocs/${name}`),
     );
   });
   it('BOM과 주석이 있는 원문 및 빈 YAML을 읽으면 원문을 유지하고 내용 오류만 분리한다', /** 읽은 원문을 파서에 그대로 전달한다. */ async () => {
@@ -176,15 +187,13 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
     const result = await loadWorkspace({ cwd: project });
     expect(result.status).toBe('complete');
     expect(result.documents).toHaveLength(1);
-    expect(result.documents[0]?.source.path).toBe(
-      path.join('.codocs', 'ordinary.yaml'),
-    );
+    expect(result.documents[0]?.source.path).toBe('.codocs/ordinary.yaml');
     expect(result.failures).toEqual([]);
     expect(result.skippedLinks).toMatchObject([
       {
         code: workspaceDiagnosticCodes.unsupportedWorkspaceLink,
         severity: 'warning',
-        path: path.join('.codocs', 'linked'),
+        path: '.codocs/linked',
       },
     ]);
   });
@@ -252,7 +261,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
         diagnostics: [
           expect.objectContaining({
             code: yamlDiagnosticCodes.invalidYaml,
-            path: path.join('.codocs', 'parse.yml'),
+            path: '.codocs/parse.yml',
             severity: 'error',
           }),
         ],
@@ -275,7 +284,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
           expect.objectContaining({
             code: schemaDiagnosticCodes.missingRequiredField,
             fieldPath: ['_codocs', 'id'],
-            path: path.join('.codocs', 'missing.yaml'),
+            path: '.codocs/missing.yaml',
             severity: 'error',
           }),
         ],
@@ -326,7 +335,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
         failures: [
           {
             kind: 'file',
-            path: path.join('.codocs', 'restricted.yaml'),
+            path: '.codocs/restricted.yaml',
             realPath: await realpath(target),
             diagnostics: [
               { code: workspaceDiagnosticCodes.readFailed, ioCode: 'EACCES' },
@@ -352,7 +361,7 @@ describe('loadWorkspace: 발견 경로별 문서 읽기', () => {
         failures: [
           {
             kind: 'directory',
-            path: path.join('.codocs', 'restricted'),
+            path: '.codocs/restricted',
             diagnostics: [
               { code: workspaceDiagnosticCodes.readFailed, ioCode: 'EACCES' },
             ],

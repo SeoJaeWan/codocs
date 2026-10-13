@@ -11,8 +11,8 @@ const original =
   '# 그대로 보존\r\n_codocs:\r\n  id: zone\r\n  name: 구역\r\ndefinition: 설명\r\n';
 let root: string;
 let file: string;
-const zonePath = path.join('.codocs', 'zone.yaml');
-const unrelatedPath = path.join('.codocs', 'unrelated.yaml');
+const zonePath = '.codocs/zone.yaml';
+const unrelatedPath = '.codocs/unrelated.yaml';
 
 beforeEach(async () => {
   root = await mkdtemp(path.join(tmpdir(), 'codocs-change-plan-'));
