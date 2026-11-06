@@ -273,6 +273,43 @@ describe('codocs_write 응답', () => {
     });
   });
 
+  it('update의 edit과 position을 저장하고 바뀐 본문과 섹션 순서를 조회에 반영한다', async () => {
+    const raw =
+      '_codocs:\n  id: gamma\n  name: gamma\n개요: 오래된 설명\n결과: 결과다\n';
+    opened = await openInProcessProject('mcp-res-', {
+      '.codocs/gamma.yaml': raw,
+    });
+    const revision = createHash('sha256')
+      .update(Buffer.from(raw, 'utf8'))
+      .digest('hex');
+
+    const { response, body } = await callWrapped(
+      opened.client,
+      'codocs_write',
+      {
+        mode: 'update',
+        id: 'gamma',
+        revision,
+        edit: [{ section: '개요', old: '오래된', new: '새' }],
+        position: { 결과: { before: '개요' } },
+      },
+    );
+
+    expect(response.isError).toBe(false);
+    expect(body).toMatchObject({ success: true, saved: true, changed: true });
+    const { body: read } = await callWrapped(opened.client, 'codocs_get', {
+      addresses: ['gamma'],
+    });
+    expect(read).toMatchObject({
+      results: [{ document: { 개요: '새 설명', 결과: '결과다' } }],
+    });
+    expect(
+      Object.keys(
+        (read as { results: { document: object }[] }).results[0]!.document,
+      ),
+    ).toEqual(['_codocs', '결과', '개요']);
+  });
+
   it('오래된 revision이면 workspace의 change_revision_mismatch를 저장 없이 전달한다', async () => {
     opened = await openInProcessProject('mcp-res-', {
       '.codocs/alpha.yaml': alpha,
@@ -577,4 +614,47 @@ describe('입력 형식 위반', () => {
       });
     },
   );
+});
+
+describe('--project 없이 시작한 서버의 응답', () => {
+  it('시작 위치에 .git도 .codocs도 없으면 순회하지 않고 --project 지정 안내로 실패한다', async () => {
+    opened = await openInProcessProject(
+      'mcp-res-',
+      { 'repo/.codocs/alpha.yaml': alpha },
+      sourceGuideRoot,
+      { omitProject: true },
+    );
+
+    const { response, body } = await callWrapped(
+      opened.client,
+      'codocs_list',
+      {},
+    );
+
+    expect(response.isError).toBe(true);
+    expect(body).toMatchObject({
+      success: false,
+      scanStatus: 'failed',
+      error: { code: 'project_root_unconfirmed' },
+    });
+    expect(JSON.stringify(body)).toContain('--project');
+  });
+
+  it('시작 위치에 .codocs가 있으면 --project 없이도 그 위치를 프로젝트로 조회한다', async () => {
+    opened = await openInProcessProject(
+      'mcp-res-',
+      { '.codocs/alpha.yaml': alpha },
+      sourceGuideRoot,
+      { omitProject: true },
+    );
+
+    const { response, body } = await callWrapped(
+      opened.client,
+      'codocs_list',
+      {},
+    );
+
+    expect(response.isError).toBe(false);
+    expect(body).toMatchObject({ success: true, items: [{ id: 'alpha' }] });
+  });
 });

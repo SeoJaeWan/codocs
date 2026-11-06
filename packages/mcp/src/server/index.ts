@@ -110,7 +110,7 @@ export function createCodocsServer(
       'codocs_write',
       {
         description:
-          '문서를 생성(create), 부분 수정(update: set·unset), 전체 교체(replace: id·revision·document), 삭제(delete: id·revision), 경로 이동(move: id·revision·path)하고 저장 결과와 색인 게시 상태를 반환합니다. create·move의 path는 프로젝트 루트(--project, 생략하면 서버 시작 위치) 기준 상대 경로이며 /로 구분하고 구간 하나 이상이 .codocs인 .yaml 또는 .yml 파일이어야 합니다(예: .codocs/orders/order.yaml, 하위 폴더의 .codocs는 packages/core/.codocs/a.yaml). 문서는 경로의 가장 바깥 .codocs에 속하며 필요한 .codocs와 바깥 폴더는 만듭니다. 하위 폴더의 .codocs는 .gitignore·.codocsignore가 제외하지 않은 위치만 인정하며 제외된 위치는 원인 메시지와 함께 invalid_workspace_path로 거절합니다. 역슬래시와 연속 슬래시는 /로 바꿔 받고, 절대 경로·. 또는 .. 구간·파일명 없는 경로·다른 확장자·.codocs 구간 없는 경로는 원인별 메시지와 예시로 거절합니다. 결과의 문서 경로(source.path·changes[].path·previousPath)는 OS와 무관하게 /로 구분하며 move·codocs_validate의 path에 그대로 쓸 수 있습니다. 요청 하나는 단일 변경이거나 changes 배열(1개 이상, 항목은 단일 변경과 같은 형태)이며 다른 최상위 속성은 invalid_input입니다. changes는 모든 항목을 반영한 최종 상태를 한 번 검증해 전부 저장하거나 아무것도 저장하지 않고, 같은 문서 ID나 경로가 두 번 나오면 invalid_input이며 결과는 입력 순서의 changes[](state: changed·restored·restore_failed·unchanged)입니다. 저장 도중 실패하면 반영한 항목을 되돌리며 되돌리지 못하면 write_restore_failed입니다. replace의 document는 _codocs를 포함한 문서 전체이며 생략한 최상위 섹션은 삭제되고 set·unset과 함께 보낼 수 없으며 name은 바꿀 수 없습니다(name_change_not_allowed, codocs_rename 사용). 변경이 다른 문서나 코드 파일의 참조 또는 건드리지 않은 문서의 parent를 새로 끊으면 reference_broken으로 거절하고, 확인이 필요한 코드 근거를 읽지 못했으면 code_evidence_incomplete로 거절하며 이때 파일은 바뀌지 않습니다. delete·move로 비게 된 폴더는 소유 .codocs 바로 아래까지 제거하며 .codocs 자체와 바깥 폴더는 남깁니다.',
+          '문서를 생성(create), 부분 수정(update: set·unset·edit·position), 전체 교체(replace: id·revision·document), 삭제(delete: id·revision), 경로 이동(move: id·revision·path)하고 저장 결과와 색인 게시 상태를 반환합니다. create·move의 path는 프로젝트 루트(--project, 생략하면 서버 시작 위치) 기준 상대 경로이며 /로 구분하고 구간 하나 이상이 .codocs인 .yaml 또는 .yml 파일이어야 합니다(예: .codocs/orders/order.yaml, 하위 폴더의 .codocs는 packages/core/.codocs/a.yaml). 문서는 경로의 가장 바깥 .codocs에 속하며 필요한 .codocs와 바깥 폴더는 만듭니다. 하위 폴더의 .codocs는 .gitignore·.codocsignore가 제외하지 않은 위치만 인정하며 제외된 위치는 원인 메시지와 함께 invalid_workspace_path로 거절합니다. 역슬래시와 연속 슬래시는 /로 바꿔 받고, 절대 경로·. 또는 .. 구간·파일명 없는 경로·다른 확장자·.codocs 구간 없는 경로는 원인별 메시지와 예시로 거절합니다. 결과의 문서 경로(source.path·changes[].path·previousPath)는 OS와 무관하게 /로 구분하며 move·codocs_validate의 path에 그대로 쓸 수 있습니다. 요청 하나는 단일 변경이거나 changes 배열(1개 이상, 항목은 단일 변경과 같은 형태)이며 다른 최상위 속성은 invalid_input입니다. changes는 모든 항목을 반영한 최종 상태를 한 번 검증해 전부 저장하거나 아무것도 저장하지 않고, 같은 문서 ID나 경로가 두 번 나오면 invalid_input이며 결과는 입력 순서의 changes[](state: changed·restored·restore_failed·unchanged)입니다. 저장 도중 실패하면 반영한 항목을 되돌리며 되돌리지 못하면 write_restore_failed입니다. update의 edit은 [{section, old, new}]로 섹션 값(codocs_get이 돌려준 글자) 안의 old 하나를 new로 바꾸며 old가 정확히 한 번 나와야 합니다(없으면 edit_text_not_found, 여러 번이면 edit_text_ambiguous). position은 {섹션: {after: 기준}} 또는 {before: 기준}으로 새 섹션이나 기존 섹션을 기준 섹션의 뒤·앞으로 옮기고 적은 순서대로 적용하며, 위치를 정하지 않은 새 섹션은 마지막에 들어갑니다. 섹션 순서는 position으로만 바꿉니다. replace의 document는 _codocs를 포함한 문서 전체이며 생략한 최상위 섹션은 삭제되고 set·unset과 함께 보낼 수 없으며 name은 바꿀 수 없습니다(name_change_not_allowed, codocs_rename 사용). 변경이 다른 문서나 코드 파일의 참조 또는 건드리지 않은 문서의 parent를 새로 끊으면 reference_broken으로 거절하고, 확인이 필요한 코드 근거를 읽지 못했으면 code_evidence_incomplete로 거절하며 이때 파일은 바뀌지 않습니다. delete·move로 비게 된 폴더는 소유 .codocs 바로 아래까지 제거하며 .codocs 자체와 바깥 폴더는 남깁니다.',
         execute: handlers.codocsWrite.bind(handlers),
       },
     ],
@@ -169,12 +169,27 @@ export function createCodocsServer(
   return server;
 }
 
+/**
+ * 서버 시작 옵션으로 조회 세션을 만든다. --project 없이 시작했으면 시작 위치에 .git이나 .codocs가 있을 때만 프로젝트로 보고,
+ * 없으면 그 폴더를 순회하지 않고 도구마다 --project를 지정하라는 오류를 돌려준다. 상위 폴더 전체를 순회하지 않기 위해서다.
+ */
+export function createStartupSession(options: {
+  cwd: string;
+  project?: string;
+}): WorkspaceQuerySession {
+  return createWorkspaceQuerySession(
+    options.project === undefined
+      ? { ...options, requireProjectMarker: true }
+      : options,
+  );
+}
+
 /** 시작 cwd와 프로젝트를 고정하고 연결·세션을 한 멱등 종료 경로로 소유한다. */
 export async function startCodocsStdio(
   options: { cwd: string; project?: string },
   transport: StdioServerTransport = new StdioServerTransport(),
 ): Promise<{ close(): Promise<void> }> {
-  const session = createWorkspaceQuerySession(options);
+  const session = createStartupSession(options);
   let server: Server | undefined;
   let closing: Promise<void> | undefined;
   /** 연결과 세션을 한 번만 닫고 모든 호출자에게 같은 완료를 전달한다. */

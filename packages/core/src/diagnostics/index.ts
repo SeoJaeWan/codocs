@@ -145,6 +145,12 @@ export const changePlanDiagnosticCodes = {
   nameChangeNotAllowed: 'name_change_not_allowed',
   /** 이번 후보가 다른 문서나 코드의 확정된 참조를 새로 끊는다. */
   brokenReference: 'reference_broken',
+  /** edit·position이 가리킨 섹션이나 position의 기준 섹션이 문서에 없다. */
+  sectionNotFound: 'change_section_not_found',
+  /** edit의 old가 섹션 값에 없다. */
+  editTextNotFound: 'edit_text_not_found',
+  /** edit의 old가 섹션 값에 두 번 이상 나온다. */
+  editTextAmbiguous: 'edit_text_ambiguous',
 } as const;
 /** 후보 계산의 고정 진단 문구다. */
 export const changePlanDiagnosticMessages = {
@@ -159,6 +165,12 @@ export const changePlanDiagnosticMessages = {
     '문서 이름은 수정 요청으로 바꿀 수 없습니다. 이름 변경은 codocs_rename으로 참조와 함께 바꾸세요.',
   brokenReference:
     '이 변경은 다른 문서나 코드에서 확정된 참조를 끊습니다. 참조를 먼저 고치거나 해당 섹션을 유지하세요.',
+  sectionNotFound:
+    '고치거나 옮길 섹션 또는 기준 섹션이 문서에 없습니다. codocs_get으로 섹션 이름을 확인하세요.',
+  editTextNotFound:
+    '바꿀 글자(old)를 섹션에서 찾지 못했습니다. codocs_get으로 현재 본문을 다시 읽고 그대로 일치하는 글자를 보내세요.',
+  editTextAmbiguous:
+    '바꿀 글자(old)가 섹션에 여러 번 나옵니다. 앞뒤 글자를 더 넣어 한 곳만 가리키게 하세요.',
 } as const;
 /** 변경 후보 계산의 오류 코드다. */
 export type ChangePlanDiagnosticCode =

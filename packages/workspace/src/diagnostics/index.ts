@@ -9,6 +9,8 @@ export const workspaceDiagnosticCodes = {
   invalidProjectRoot: 'invalid_project_root',
   /** 선택 루트의 대상 확인 또는 읽기·탐색 권한 확인에 실패하면 반환한다. */
   projectRootUnavailable: 'project_root_unavailable',
+  /** --project 없이 시작한 위치에 .git도 .codocs도 없어 프로젝트로 보지 않으면 반환한다. */
+  projectRootUnconfirmed: 'project_root_unconfirmed',
   /** 경로 입력이 비문자열·빈 문자열·NUL 포함 문자열이면 반환한다. */
   invalidWorkspacePath: 'invalid_workspace_path',
   /** .codocs 밖의 입력 또는 그 경계를 벗어나는 이동이면 반환한다. */
@@ -37,6 +39,9 @@ export const workspaceDiagnosticMessages = {
   rootNotDirectory: '선택한 프로젝트 루트는 디렉터리가 아닙니다.',
   /** 선택 루트의 확인 또는 읽기·탐색 권한 확인에 실패했을 때 사용한다. */
   rootUnavailable: '선택한 프로젝트 루트에 접근할 수 없습니다.',
+  /** --project 없이 시작한 위치가 프로젝트로 보이지 않을 때 사용한다. 그 폴더 전체를 탐색하지 않는다. */
+  projectRootUnconfirmed:
+    '--project 없이 시작한 위치에 .git도 .codocs도 없어 프로젝트로 보지 않았습니다. MCP 서버 설정에 --project로 프로젝트 폴더를 지정하세요.',
   /** 경로 입력을 검증하지 못했을 때 사용한다. */
   invalidPath: '작업 경로는 비어 있지 않은 경로 문자열이어야 합니다.',
   /** 작업 범위 밖의 입력에 사용한다. */

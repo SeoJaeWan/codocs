@@ -25,7 +25,14 @@ export interface WorkspaceChangeBatch {
 type ContentIdentity = { dev: number; ino: number } | null;
 /** 변화 감지 실패 후 사용자가 직접 호출할 복구 방법이다. */
 export const watcherRecoveryGuidance =
-  '파일 감시가 중단되었습니다. 원인을 확인한 뒤 codocs_refresh를 실행하세요.';
+  '파일 감시가 중단되어 자동으로 다시 연결하는 중입니다. 바로 복구하려면 원인을 확인한 뒤 codocs_refresh를 실행하세요.';
+/** 자동 재연결에 실패한 뒤 다음 시도까지의 대기 시간(ms)이다. 실패가 이어지면 마지막 값을 반복한다. */
+export const watcherRetryDelays = [1_000, 5_000, 30_000, 60_000] as const;
+
+/** 오류 값에서 로그와 상태에 남길 메시지를 꺼낸다. */
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 /**
  * YAML이나 snapshot 없이 경로 신호·대상별 준비·배치 수명만 관리한다.
@@ -49,7 +56,15 @@ export class WorkspaceWatcher {
     state: workspaceLifecycleStates.starting,
     ready: false,
   };
-  #recoveryUsed = false;
+  /** 마지막 수동 복구 이후 시작한 자동 재연결 횟수다. */
+  #recoveryAttempts = 0;
+  /** 연속 실패 횟수로 다음 재연결 간격을 고른다. 연결에 성공하면 처음으로 되돌린다. */
+  #retryIndex = 0;
+  #retryTimer: ReturnType<typeof setTimeout> | undefined;
+  /** 마지막으로 로그에 남긴 실패 원인이다. 같은 원인의 반복은 다시 남기지 않는다. */
+  #reportedFailure: string | undefined;
+  /** 중단을 로그에 남긴 뒤 아직 복구를 알리지 않았는지다. */
+  #interrupted = false;
   #closed = false;
   #epoch = 0;
   #starting: Promise<void> | undefined;
@@ -82,8 +97,8 @@ export class WorkspaceWatcher {
     return { ...this.#state };
   }
   /** 마지막 수동 복구 이후 자동 재연결 시도 횟수다. */
-  get automaticRecoveryAttempts(): 0 | 1 {
-    return this.#recoveryUsed ? 1 : 0;
+  get automaticRecoveryAttempts(): number {
+    return this.#recoveryAttempts;
   }
   /** 이미 감지했으나 아직 배치로 전달하지 않은 변경의 유무다. */
   get hasPendingChanges(): boolean {
@@ -607,14 +622,18 @@ export class WorkspaceWatcher {
       .catch((error: unknown) => this.#recover(error));
     return this.#starting;
   }
-  /** 오류 한 번에 자동 재연결을 한 번만 허용한다. */
+  /** 감시 오류마다 바로 다시 연결한다. 다시 연결하지 못하면 #fail이 간격을 두고 계속 시도한다. */
   async #recover(error: unknown): Promise<void> {
-    if (this.#closed || this.#reconnecting) return;
-    if (this.#recoveryUsed) {
-      this.#fail(error);
-      return;
-    }
-    this.#recoveryUsed = true;
+    if (this.#closed || this.#reconnecting || this.#retryTimer) return;
+    console.error(
+      `Codocs file watching stopped: ${errorMessage(error)}. Reconnecting.`,
+    );
+    this.#interrupted = true;
+    await this.#reconnectAutomatically();
+  }
+  /** 자동 재연결 뒤 놓쳤을 수 있는 변경을 다시 확인하도록 모든 .codocs를 알린다. */
+  async #reconnectAutomatically(): Promise<void> {
+    this.#recoveryAttempts += 1;
     await this.#reconnect();
     if (this.#state.ready)
       for (const directory of [
@@ -623,15 +642,43 @@ export class WorkspaceWatcher {
       ])
         this.#signal(directory);
   }
-  /** 실제 오류의 원인과 수동 복구 안내를 보존한다. */
+  /** 실제 오류의 원인과 수동 복구 안내를 보존하고 다음 자동 재연결을 예약한다. */
   #fail(error: unknown): void {
-    if (!this.#closed)
-      this.#state = {
-        state: workspaceLifecycleStates.failed,
-        ready: false,
-        cause: error instanceof Error ? error.message : String(error),
-        guidance: watcherRecoveryGuidance,
-      };
+    if (this.#closed) return;
+    const cause = errorMessage(error);
+    this.#state = {
+      state: workspaceLifecycleStates.failed,
+      ready: false,
+      cause,
+      guidance: watcherRecoveryGuidance,
+    };
+    if (this.#retryTimer) return;
+    const delay =
+      watcherRetryDelays[
+        Math.min(this.#retryIndex, watcherRetryDelays.length - 1)
+      ]!;
+    this.#retryIndex += 1;
+    // 같은 원인의 반복 실패는 처음 한 번만 남긴다.
+    if (cause !== this.#reportedFailure)
+      console.error(
+        `Codocs file watching failed: ${cause}. Retrying in ${delay / 1000}s.`,
+      );
+    this.#reportedFailure = cause;
+    this.#interrupted = true;
+    this.#retryTimer = setTimeout(
+      /** 예약한 시간이 되면 다시 연결하고 실패하면 다음 시도를 예약한다. */ () => {
+        this.#retryTimer = undefined;
+        void this.#reconnectAutomatically().catch((failure: unknown) =>
+          this.#fail(failure),
+        );
+      },
+      delay,
+    );
+  }
+  /** 예약한 자동 재연결을 취소한다. */
+  #cancelRetry(): void {
+    if (this.#retryTimer) clearTimeout(this.#retryTimer);
+    this.#retryTimer = undefined;
   }
   /** 재연결 중 close 또는 이전 연결 완료가 자원을 부활시키지 못하게 한다. */
   #reconnect(): Promise<void> {
@@ -649,11 +696,18 @@ export class WorkspaceWatcher {
               state: workspaceLifecycleStates.ready,
               ready: true,
             };
-          if (this.#state.ready)
+          if (this.#state.ready) {
+            this.#cancelRetry();
+            this.#retryIndex = 0;
+            this.#reportedFailure = undefined;
+            if (this.#interrupted)
+              console.error('Codocs file watching recovered.');
+            this.#interrupted = false;
             this.#observe?.('watcher-ready', {
               folder: this.#root,
               recovery: true,
             });
+          }
         } catch (error: unknown) {
           this.#fail(error);
         }
@@ -667,10 +721,12 @@ export class WorkspaceWatcher {
       .catch((error: unknown) => this.#fail(error));
     return operation;
   }
-  /** 수동 복구는 자동 복구 기회를 되돌리고 모든 감시 연결을 준비한다. */
+  /** 수동 복구는 예약한 재연결을 기다리지 않고 바로 다시 연결하며 재연결 간격을 처음으로 되돌린다. */
   async refresh(): Promise<WorkspaceReadiness> {
     if (!this.#closed) {
-      this.#recoveryUsed = false;
+      this.#cancelRetry();
+      this.#retryIndex = 0;
+      this.#recoveryAttempts = 0;
       await this.#reconnect();
     }
     return this.readiness;
@@ -682,6 +738,7 @@ export class WorkspaceWatcher {
     this.#epoch++;
     this.#state = { state: workspaceLifecycleStates.closed, ready: false };
     if (this.#timer) clearTimeout(this.#timer);
+    this.#cancelRetry();
     this.#pending.clear();
     this.#listeners.clear();
     this.#closing = this.#disconnect().then(async () => {

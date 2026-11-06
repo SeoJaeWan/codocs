@@ -87,6 +87,35 @@ describe('MCP 여덟 입력 계약', () => {
     ).toBeUndefined();
   });
 
+  it('write update는 edit(section·old·new)과 position(after 또는 before 하나)을 받고 다른 형태를 거부한다', () => {
+    const update = {
+      mode: 'update',
+      id: 'a',
+      revision: 'r1',
+      edit: [{ section: '개요', old: '이전', new: '이후' }],
+      position: { 개요: { after: '_codocs' }, 결과: { before: '개요' } },
+    };
+    expect(parseWriteInput(update)).toEqual(update);
+    expect(
+      parseWriteInput({ ...update, edit: [{ section: '개요', old: '이전' }] }),
+    ).toBeUndefined();
+    expect(
+      parseWriteInput({
+        ...update,
+        edit: [{ section: '개요', old: '이전', new: '이후', all: true }],
+      }),
+    ).toBeUndefined();
+    expect(
+      parseWriteInput({
+        ...update,
+        position: { 개요: { after: '_codocs', before: '결과' } },
+      }),
+    ).toBeUndefined();
+    expect(
+      parseWriteInput({ ...update, position: { 개요: { beside: '결과' } } }),
+    ).toBeUndefined();
+  });
+
   it('write changes는 1개 이상의 항목만 받고 항목은 단일 입력과 같은 형태이며 다른 최상위 속성은 거부한다', () => {
     const changes = [
       { mode: 'create', path: '.codocs/a.yaml', document: {} },

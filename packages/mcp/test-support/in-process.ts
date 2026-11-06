@@ -3,13 +3,13 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import {
-  createWorkspaceQuerySession,
-  type WorkspaceQuerySession,
-} from '@codocs/workspace';
+import type { WorkspaceQuerySession } from '@codocs/workspace';
 import { expect } from 'vitest';
 import { createCodocsGuideHandler } from '../src/guide/index.js';
-import { createCodocsServer } from '../src/server/index.js';
+import {
+  createCodocsServer,
+  createStartupSession,
+} from '../src/server/index.js';
 import { rmWithRetry } from '../../../tools/test/support/retrying-fs.js';
 
 /** 저장소의 가이드 원문 위치다. 배포 산출물 없이 소스 서버가 읽는다. */
@@ -39,11 +39,13 @@ export interface InProcessProject {
  * @param prefix 임시 폴더 이름 접두어다.
  * @param files 프로젝트 루트 기준 상대 경로와 원문이다.
  * @param guideRoot 가이드 원문 위치다.
+ * @param startup omitProject면 --project 없이 임시 프로젝트에서 시작한 것으로 세션을 만든다.
  */
 export async function openInProcessProject(
   prefix: string,
   files: Record<string, string> = {},
   guideRoot: URL = sourceGuideRoot,
+  startup: { omitProject?: boolean } = {},
 ): Promise<InProcessProject> {
   await mkdir('.workbench', { recursive: true });
   const project = await mkdtemp(path.resolve(`.workbench/${prefix}`));
@@ -51,7 +53,10 @@ export async function openInProcessProject(
     await mkdir(path.dirname(path.join(project, name)), { recursive: true });
     await writeFile(path.join(project, name), text);
   }
-  const session = createWorkspaceQuerySession({ cwd: project });
+  // 서버 시작과 같은 경로로 세션을 만든다. 기본은 --project로 임시 프로젝트를 지정한 시작이다.
+  const session = createStartupSession(
+    startup.omitProject ? { cwd: project } : { cwd: project, project: '.' },
+  );
   const server = createCodocsServer(
     session,
     createCodocsGuideHandler(guideRoot),
