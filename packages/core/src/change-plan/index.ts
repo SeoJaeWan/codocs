@@ -249,6 +249,142 @@ function failure(
   };
 }
 
+/** update의 섹션 안 부분 바꾸기 한 건이다. old는 섹션 값에서 정확히 한 번 나와야 한다. */
+interface SectionEdit {
+  section: string;
+  old: string;
+  new: string;
+}
+
+/** update의 섹션 위치 지정 한 건이다. 적은 순서대로 기준 섹션의 앞이나 뒤로 옮긴다. */
+interface SectionPosition {
+  section: string;
+  placement: 'after' | 'before';
+  anchor: string;
+}
+
+/** edit 입력이 `{ section, old, new }` 문자열 항목의 비어 있지 않은 배열인지 확인하고 복사한다. */
+function sectionEdits(value: unknown): SectionEdit[] | undefined {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  const edits: SectionEdit[] = [];
+  for (const item of value) {
+    if (
+      !record(item) ||
+      !exactKeys(item, ['section', 'old', 'new']) ||
+      typeof item.section !== 'string' ||
+      !item.section ||
+      typeof item.old !== 'string' ||
+      !item.old ||
+      typeof item.new !== 'string'
+    )
+      return undefined;
+    edits.push({ section: item.section, old: item.old, new: item.new });
+  }
+  return edits;
+}
+
+/** position 입력이 섹션 이름마다 `{ after }` 또는 `{ before }` 하나를 가진 객체인지 확인하고 적은 순서대로 복사한다. */
+function sectionPositions(value: unknown): SectionPosition[] | undefined {
+  if (!record(value) || !Object.keys(value).length) return undefined;
+  const positions: SectionPosition[] = [];
+  for (const [section, target] of Object.entries(value)) {
+    if (!section || !record(target)) return undefined;
+    const keys = Object.keys(target);
+    const placement = keys[0];
+    const anchor = placement === undefined ? undefined : target[placement];
+    if (
+      keys.length !== 1 ||
+      (placement !== 'after' && placement !== 'before') ||
+      typeof anchor !== 'string' ||
+      !anchor
+    )
+      return undefined;
+    positions.push({ section, placement, anchor });
+  }
+  return positions;
+}
+
+/**
+ * 최상위 키 하나의 원문 블록 범위다. 키가 있는 줄의 처음부터 값과 줄바꿈까지이며,
+ * 키 바로 위에 빈 줄 없이 붙은 주석 줄도 그 섹션의 것으로 함께 담는다.
+ */
+function sectionBlock(
+  parsed: Extract<YamlParseResult, { success: true }>,
+  key: string,
+): { start: number; end: number } | undefined {
+  const range = getPropertyRange(parsed, [key]);
+  if (!range) return undefined;
+  const source = parsed.source;
+  let start = source.lastIndexOf('\n', range.start - 1) + 1;
+  while (start > 0) {
+    const previous = source.lastIndexOf('\n', start - 2) + 1;
+    if (!/^[ \t]*#/u.test(source.slice(previous, start - 1))) break;
+    start = previous;
+  }
+  let end = range.end;
+  while (end < source.length && /[ \t\r]/u.test(source[end]!)) end++;
+  if (source[end] === '\n') end++;
+  else end = range.end;
+  return { start, end };
+}
+
+/**
+ * 섹션을 적은 순서대로 하나씩 기준 섹션의 앞이나 뒤로 옮긴다. 각 단계는 직전 결과를 기준으로 한다.
+ * 옮기는 섹션의 원문 블록(바로 위 주석 포함)만 잘라 붙이며 다른 섹션의 원문은 그대로 둔다.
+ * @returns 옮긴 원문과 기대하는 최상위 키 순서이며, 섹션이나 기준이 없으면 그 원인이다.
+ */
+function moveSections(
+  raw: string,
+  positions: readonly SectionPosition[],
+  path: string,
+):
+  | { ok: true; raw: string; order: string[] }
+  | { ok: false; code: keyof typeof changePlanDiagnosticCodes } {
+  const eol = raw.includes('\r\n') ? '\r\n' : '\n';
+  let current = raw;
+  let order: string[] | undefined;
+  for (const { section, placement, anchor } of positions) {
+    const parsed = parseYaml(current, path);
+    if (!parsed.success) return { ok: false, code: 'candidateMismatch' };
+    // flow 매핑 문서의 항목 이동은 지원하지 않는다.
+    if (current[parsed.rootRange?.start ?? 0] === '{')
+      return { ok: false, code: 'invalidRequest' };
+    order ??= Object.keys(parsed.data);
+    if (
+      !Object.hasOwn(parsed.data, section) ||
+      !Object.hasOwn(parsed.data, anchor)
+    )
+      return { ok: false, code: 'sectionNotFound' };
+    const block = sectionBlock(parsed, section);
+    if (!block) return { ok: false, code: 'candidateMismatch' };
+    let text = current.slice(block.start, block.end);
+    if (!text.endsWith('\n')) text += eol;
+    const without = current.slice(0, block.start) + current.slice(block.end);
+    const remaining = parseYaml(without, path);
+    if (!remaining.success) return { ok: false, code: 'candidateMismatch' };
+    const target = sectionBlock(remaining, anchor);
+    if (!target) return { ok: false, code: 'candidateMismatch' };
+    const at = placement === 'after' ? target.end : target.start;
+    const separator = at > 0 && without[at - 1] !== '\n' ? eol : '';
+    current = without.slice(0, at) + separator + text + without.slice(at);
+    order = order.filter((key) => key !== section);
+    order.splice(
+      order.indexOf(anchor) + (placement === 'after' ? 1 : 0),
+      0,
+      section,
+    );
+  }
+  return { ok: true, raw: current, order: order ?? [] };
+}
+
+/** 두 키 목록의 순서가 같은지 확인한다. */
+function sameOrder(left: readonly string[], right: readonly string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((key, index) => key === right[index])
+  );
+}
+
 /** 순서 차이와 관계없이 JSON 데이터의 의미를 비교한다. */
 function same(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -692,6 +828,8 @@ function prepareItem(
   let replacement: Record<string, unknown> | undefined;
   let set: Record<string, unknown> | undefined;
   let removals: string[] = [];
+  let edits: SectionEdit[] = [];
+  let positions: SectionPosition[] = [];
   let newPath: string | undefined;
   if (mode === changePlanModes.replace) {
     const document = input.document;
@@ -714,18 +852,49 @@ function prepareItem(
     newPath = input.path as string;
   } else {
     const requestedSet = input.set,
-      requestedUnset = input.unset;
+      requestedUnset = input.unset,
+      requestedEdits = input.edit === undefined ? [] : sectionEdits(input.edit),
+      requestedPositions =
+        input.position === undefined ? [] : sectionPositions(input.position);
     if (
       (requestedSet !== undefined && !record(requestedSet)) ||
       (requestedUnset !== undefined && !stringList(requestedUnset)) ||
-      (!requestedSet && !requestedUnset)
+      !requestedEdits ||
+      !requestedPositions ||
+      (!requestedSet &&
+        !requestedUnset &&
+        !requestedEdits.length &&
+        !requestedPositions.length)
     )
       return prepareFailure('invalidRequest');
     set = requestedSet;
     removals = requestedUnset ?? [];
+    edits = requestedEdits;
+    positions = requestedPositions;
     const changes = set ? Object.keys(set) : [];
     if (
-      (!changes.length && !removals.length) ||
+      (!changes.length &&
+        !removals.length &&
+        !edits.length &&
+        !positions.length) ||
+      // 같은 섹션을 set과 edit으로 함께 바꾸거나 `_codocs`를 edit할 수 없다.
+      edits.some(
+        /** edit 대상이 `_codocs`이거나 set·unset과 겹치는지 확인한다. */
+        ({ section }) =>
+          section === codocsKey ||
+          changes.includes(section) ||
+          removals.includes(section),
+      ) ||
+      // `_codocs`는 옮기거나 그 앞에 둘 수 없고, 자기 자신이나 지우는 섹션을 기준으로 삼을 수 없다.
+      positions.some(
+        /** 위치 지정 하나가 허용되지 않는 조합인지 확인한다. */
+        ({ section, placement, anchor }) =>
+          section === codocsKey ||
+          section === anchor ||
+          removals.includes(section) ||
+          removals.includes(anchor) ||
+          (placement === 'before' && anchor === codocsKey),
+      ) ||
       new Set(removals).size !== removals.length ||
       changes.some((key) => removals.includes(key)) ||
       removals.some(
@@ -807,13 +976,36 @@ function prepareItem(
     ? { ...replacement }
     : { ...parsed.data, ...(set ?? {}) };
   for (const key of removals) delete expected[key];
-  const raw = editYaml(parsed, expected);
+  for (const edit of edits) {
+    const value = expected[edit.section];
+    if (!Object.hasOwn(expected, edit.section))
+      return prepareFailure('sectionNotFound', source.path);
+    if (typeof value !== 'string')
+      return prepareFailure('invalidRequest', source.path);
+    const at = value.indexOf(edit.old);
+    if (at < 0) return prepareFailure('editTextNotFound', source.path);
+    if (value.indexOf(edit.old, at + 1) >= 0)
+      return prepareFailure('editTextAmbiguous', source.path);
+    expected[edit.section] =
+      value.slice(0, at) + edit.new + value.slice(at + edit.old.length);
+  }
+  let raw = editYaml(parsed, expected);
   if (raw === undefined)
     return prepareFailure('candidateMismatch', source.path);
+  let order: string[] | undefined;
+  if (positions.length) {
+    const moved = moveSections(raw, positions, source.path);
+    if (!moved.ok) return prepareFailure(moved.code, source.path);
+    raw = moved.raw;
+    order = moved.order;
+  }
   const candidate = parseYaml(raw, source.path);
   if (!candidate.success)
     return { ok: false, diagnostics: candidate.diagnostics };
-  if (!same(candidate.data, expected))
+  if (
+    !same(candidate.data, expected) ||
+    (order !== undefined && !sameOrder(Object.keys(candidate.data), order))
+  )
     return prepareFailure('candidateMismatch', source.path);
   return {
     ok: true,
@@ -825,7 +1017,10 @@ function prepareItem(
       source,
       raw,
       parsed: candidate,
-      noop: raw === source.raw || same(expected, parsed.data),
+      noop:
+        raw === source.raw ||
+        (same(expected, parsed.data) &&
+          sameOrder(Object.keys(candidate.data), Object.keys(parsed.data))),
       removedSections: getSectionNames(parsed).filter(
         (section) => !Object.hasOwn(candidate.data, section),
       ),

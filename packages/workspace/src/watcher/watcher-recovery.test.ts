@@ -10,6 +10,8 @@ const fake = vi.hoisted(() => ({
     close: ReturnType<typeof vi.fn<() => Promise<void>>>;
   })[],
   failNext: false,
+  /** 켜져 있는 동안 모든 연결이 오류로 끝난다. */
+  failAll: false,
   manualReady: false,
   contentIdentity: undefined as { dev: number; ino: number } | undefined,
   statCalls: 0,
@@ -42,7 +44,7 @@ vi.mock('chokidar', async () => {
           add: () => undefined,
         });
         fake.watchers.push(watcher);
-        const fail = fake.failNext;
+        const fail = fake.failNext || fake.failAll;
         fake.failNext = false;
         if (!fake.manualReady)
           queueMicrotask(() =>
@@ -57,9 +59,17 @@ vi.mock('chokidar', async () => {
 import {
   createWorkspaceWatcher,
   watcherRecoveryGuidance,
+  watcherRetryDelays,
   WorkspaceWatcher,
 } from './index.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
+
+/** 타이머 없이 IO와 microtask를 진행시키며 조건을 기다린다. 가짜 타이머 중에도 쓸 수 있다. */
+async function settleUntil(condition: () => boolean): Promise<void> {
+  for (let turn = 0; turn < 1_000 && !condition(); turn++)
+    await new Promise((resolve) => setImmediate(resolve));
+  expect(condition()).toBe(true);
+}
 
 let project: string;
 let watcher: WorkspaceWatcher | undefined;
@@ -67,6 +77,7 @@ let watcher: WorkspaceWatcher | undefined;
 beforeEach(async () => {
   fake.watchers.length = 0;
   fake.failNext = false;
+  fake.failAll = false;
   fake.manualReady = false;
   fake.contentIdentity = undefined;
   fake.statCalls = 0;
@@ -240,7 +251,7 @@ describe('WorkspaceWatcher 감시 오류 복구', () => {
       expect(watcher.automaticRecoveryAttempts).toBe(1);
     });
 
-    it('자동 복구 성공 후 다시 오류가 나면 추가 재연결 없이 실패를 알린다', async () => {
+    it('자동 복구 성공 후 다시 오류가 나도 다시 재연결해 준비 상태로 돌아온다', async () => {
       watcher = await createWorkspaceWatcher(project);
       fake.watchers[0]!.emit('error', new Error('first failure'));
       await vi.waitFor(
@@ -248,18 +259,58 @@ describe('WorkspaceWatcher 감시 오류 복구', () => {
           expect(watcher!.readiness.state).toBe(workspaceLifecycleStates.ready),
         { timeout: 5_000 },
       );
-      const connectionsBeforeError = [...fake.watchers];
 
       fake.watchers.at(-1)!.emit('error', new Error('second failure'));
 
-      expect(watcher.readiness).toEqual({
-        state: workspaceLifecycleStates.failed,
-        ready: false,
-        cause: 'second failure',
-        guidance: watcherRecoveryGuidance,
-      });
-      expect(watcher.automaticRecoveryAttempts).toBe(1);
-      expect(fake.watchers).toEqual(connectionsBeforeError);
+      expect(watcher.readiness.state).toBe(workspaceLifecycleStates.recovering);
+      await vi.waitFor(
+        () =>
+          expect(watcher!.readiness.state).toBe(workspaceLifecycleStates.ready),
+        { timeout: 5_000 },
+      );
+      expect(watcher.automaticRecoveryAttempts).toBe(2);
+    });
+
+    it('자동 재연결이 계속 실패하면 간격을 늘려 다시 시도하고 연결되면 준비 상태로 돌아온다', async () => {
+      watcher = await createWorkspaceWatcher(project);
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+      let messages: string[] = [];
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        fake.failAll = true;
+        fake.watchers[0]!.emit('error', new Error('connection lost'));
+        await settleUntil(
+          () => watcher!.readiness.state === workspaceLifecycleStates.failed,
+        );
+
+        // 실패할 때마다 다음 간격을 기다린 뒤에야 다시 연결한다.
+        for (const delay of watcherRetryDelays.slice(0, 2)) {
+          const attempts = watcher.automaticRecoveryAttempts;
+          await vi.advanceTimersByTimeAsync(delay - 1);
+          expect(watcher.automaticRecoveryAttempts).toBe(attempts);
+          await vi.advanceTimersByTimeAsync(1);
+          expect(watcher.automaticRecoveryAttempts).toBe(attempts + 1);
+          await settleUntil(
+            () => watcher!.readiness.state === workspaceLifecycleStates.failed,
+          );
+        }
+
+        fake.failAll = false;
+        await vi.advanceTimersByTimeAsync(watcherRetryDelays[2]);
+        await settleUntil(() => watcher!.readiness.ready);
+        messages = log.mock.calls.map((call) => String(call[0]));
+      } finally {
+        vi.useRealTimers();
+        log.mockRestore();
+      }
+
+      expect(watcher.automaticRecoveryAttempts).toBe(4);
+      // 같은 원인의 반복 실패는 한 번만 남기고 중단·복구를 함께 남긴다.
+      expect(messages).toEqual([
+        'Codocs file watching stopped: connection lost. Reconnecting.',
+        'Codocs file watching failed: watch failed. Retrying in 1s.',
+        'Codocs file watching recovered.',
+      ]);
     });
   });
 

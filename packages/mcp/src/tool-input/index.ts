@@ -74,6 +74,26 @@ const writeItemSchema = z.discriminatedUnion('mode', [
     revision: z.string(),
     set: userFields.optional(),
     unset: z.array(z.string()).optional(),
+    /** 섹션 값 안의 글자 하나를 바꾼다. old는 섹션에서 정확히 한 번 나와야 하며 적은 순서대로 적용한다. */
+    edit: z
+      .array(
+        z.strictObject({
+          section: z.string(),
+          old: z.string(),
+          new: z.string(),
+        }),
+      )
+      .optional(),
+    /** 섹션마다 기준 섹션의 뒤(after)나 앞(before)으로 옮긴다. 적은 순서대로 적용한다. */
+    position: z
+      .record(
+        z.string(),
+        z.union([
+          z.strictObject({ after: z.string() }),
+          z.strictObject({ before: z.string() }),
+        ]),
+      )
+      .optional(),
   }),
   /** 문서 전체를 교체한다. set·unset과 섞을 수 없고 알 수 없는 속성은 거부한다. */
   z.strictObject({

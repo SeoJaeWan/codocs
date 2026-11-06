@@ -523,19 +523,30 @@ function superseded(): WorkspaceQueryFailure {
   };
 }
 
-/** 공개 unknown 입력에서 own data path 선택값만 복사한다. */
+/** 공개 unknown 입력에서 own data의 루트 선택값(cwd·project·requireProjectMarker)만 복사한다. */
 function sessionInput(input: unknown): unknown {
   if (typeof input !== 'object' || input === null || Array.isArray(input))
     return input;
   try {
     const cwd = Object.getOwnPropertyDescriptor(input, 'cwd');
     const project = Object.getOwnPropertyDescriptor(input, 'project');
-    if ((cwd && !('value' in cwd)) || (project && !('value' in project)))
+    const marker = Object.getOwnPropertyDescriptor(
+      input,
+      'requireProjectMarker',
+    );
+    if (
+      (cwd && !('value' in cwd)) ||
+      (project && !('value' in project)) ||
+      (marker && !('value' in marker))
+    )
       return null;
     return {
       ...(cwd && 'value' in cwd ? { cwd: cwd.value as unknown } : {}),
       ...(project && 'value' in project
         ? { project: project.value as unknown }
+        : {}),
+      ...(marker && 'value' in marker
+        ? { requireProjectMarker: marker.value as unknown }
         : {}),
     };
   } catch {
@@ -1293,11 +1304,13 @@ export class WorkspaceQuerySession {
         }
       }
       this.#watcher?.drain();
+      // 감시가 실패한 동안의 스캔은 변경을 반영하지 않으므로 다시 돌리지 않는다. 남은 변경은 재연결이나 refresh가 다시 확인한다.
       if (
         (this.#pending.size ||
           this.#droppedScopes.size ||
           this.#locationsDirty) &&
-        !this.#closed
+        !this.#closed &&
+        !this.#watchFailure()
       )
         void this.#synchronize(false).catch(() => undefined);
     };

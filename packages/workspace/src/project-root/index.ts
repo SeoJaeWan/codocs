@@ -6,6 +6,7 @@ import path from 'node:path';
 import { toProjectPath } from '../paths/project-path.js';
 import {
   createWorkspaceDiagnostic,
+  getIoErrorCode,
   workspaceDiagnosticCodes,
   workspaceDiagnosticMessages,
   type WorkspaceDiagnostic,
@@ -23,6 +24,8 @@ export interface ProjectRoot {
 export interface ProjectRootOptions {
   cwd?: string;
   project?: string;
+  /** true면 선택 루트에 .git이나 .codocs가 없을 때 프로젝트로 보지 않는다. MCP 서버가 --project 없이 시작했을 때 쓴다. */
+  requireProjectMarker?: boolean;
 }
 
 /** 유효한 루트와 선택 실패를 구분한다. 실패에는 확인하지 못한 실제 경로가 없다. */
@@ -86,6 +89,18 @@ async function selectedLink(
   return undefined;
 }
 
+/** 프로젝트 표시인 .git(worktree·submodule의 파일 포함)이나 .codocs가 루트에 있는지 확인한다. 상위 폴더는 보지 않는다. */
+async function hasProjectMarker(projectRoot: string): Promise<boolean> {
+  for (const marker of ['.git', codocsDirectoryName])
+    try {
+      await lstat(path.join(projectRoot, marker));
+      return true;
+    } catch (error: unknown) {
+      if (getIoErrorCode(error) !== 'ENOENT') throw error;
+    }
+  return false;
+}
+
 /**
  * 시작 cwd 또는 그 기준의 project 디렉터리를 선택하고 실제 루트와 읽기·탐색 권한을 확인한다.
  * 상위 .codocs·Git을 탐색하지 않으며 .codocs 부재 여부를 루트 선택에 사용하지 않는다.
@@ -96,6 +111,7 @@ export async function resolveProjectRoot(
 ): Promise<ProjectRootResult> {
   let cwd: unknown;
   let project: unknown;
+  let requireProjectMarker = false;
   try {
     if (typeof input !== 'object' || input === null || Array.isArray(input)) {
       return {
@@ -111,6 +127,8 @@ export async function resolveProjectRoot(
     // 접근자·Proxy 예외는 입력 오류로 처리하고 정상 속성 값은 한 번만 읽어 고정한다.
     cwd = 'cwd' in input ? input.cwd : undefined;
     project = 'project' in input ? input.project : undefined;
+    requireProjectMarker =
+      'requireProjectMarker' in input && input.requireProjectMarker === true;
   } catch {
     return {
       success: false,
@@ -192,6 +210,18 @@ export async function resolveProjectRoot(
     }
     await access(projectRoot, constants.R_OK | constants.X_OK);
     const realPath = await realpath(projectRoot);
+    if (requireProjectMarker && !(await hasProjectMarker(projectRoot)))
+      return {
+        success: false,
+        projectRoot,
+        diagnostics: [
+          createWorkspaceDiagnostic(
+            workspaceDiagnosticCodes.projectRootUnconfirmed,
+            workspaceDiagnosticMessages.projectRootUnconfirmed,
+            projectRoot,
+          ),
+        ],
+      };
     return {
       success: true,
       root: {

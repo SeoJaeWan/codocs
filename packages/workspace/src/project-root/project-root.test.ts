@@ -72,6 +72,53 @@ describe('resolveProjectRoot: 프로젝트 루트 선택', () => {
     });
   });
 
+  describe('프로젝트 표시 요구', () => {
+    it('표시를 요구할 때 루트에 .git도 .codocs도 없으면 프로젝트로 보지 않는다', async () => {
+      // 저장소 여러 개를 담은 폴더: 하위 폴더의 .codocs는 표시로 보지 않는다.
+      const container = path.join(fixture, 'dev');
+      await mkdir(path.join(container, 'repo', '.codocs'), { recursive: true });
+      // 저장소 안의 하위 폴더: 상위 폴더의 .git은 표시로 보지 않는다.
+      const repository = path.join(fixture, 'repository');
+      await mkdir(path.join(repository, '.git'), { recursive: true });
+      const child = path.join(repository, 'child');
+      await mkdir(child);
+
+      for (const cwd of [container, child])
+        expect(
+          await resolveProjectRoot({ cwd, requireProjectMarker: true }),
+        ).toEqual({
+          success: false,
+          projectRoot: cwd,
+          diagnostics: [
+            expect.objectContaining({
+              code: workspaceDiagnosticCodes.projectRootUnconfirmed,
+              message: workspaceDiagnosticMessages.projectRootUnconfirmed,
+              path: cwd,
+            }),
+          ],
+        });
+      expect(await resolveProjectRoot({ cwd: container })).toMatchObject({
+        success: true,
+      });
+    });
+    it('표시를 요구할 때 루트에 .git 폴더·.git 파일·.codocs 중 하나가 있으면 루트로 선택한다', async () => {
+      const markers = [
+        ['git-directory', '.git', 'directory'],
+        ['git-file', '.git', 'file'],
+        ['codocs', '.codocs', 'directory'],
+      ] as const;
+      for (const [name, marker, kind] of markers) {
+        const root = path.join(fixture, name);
+        await mkdir(root);
+        if (kind === 'directory') await mkdir(path.join(root, marker));
+        else await writeFile(path.join(root, marker), 'gitdir: ../.git\n');
+        expect(
+          await resolveProjectRoot({ cwd: root, requireProjectMarker: true }),
+        ).toMatchObject({ success: true, root: { projectRoot: root } });
+      }
+    });
+  });
+
   describe('없는 루트와 잘못된 project 진단', () => {
     it('없는 디렉터리를 선택하면 정상 빈 프로젝트로 반환하지 않는다', /** 없는 디렉터리를 선택하면 정상 빈 프로젝트로 반환하지 않는다. */ async () => {
       const input = { cwd: fixture, project: 'missing' };

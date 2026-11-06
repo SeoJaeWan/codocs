@@ -60,6 +60,23 @@ ID를 바꿔도 과거 ID는 남기지 않는다. 이후 조회·수정은 새 I
 `set._codocs`는 `_codocs` 객체 전체를 교체한다. 일부 키만 병합하지 않으므로 `id`와 `name`을 포함해 전달하며, `id`·`parent`는 이 값으로 바뀌고 `name`이 현재 이름과 다르면 `name_change_not_allowed`다.
 `unset`에 `_codocs`를 지정하면 MCP는 `invalid_input`으로 거절한다. `_codocs`는 지울 수 없고 `set._codocs`로 교체만 할 수 있다. 같은 키를 set과 unset에 함께 지정하지 않는다.
 `set.id`는 `_codocs.id`를 바꾸지 않고 `id`라는 이름의 섹션을 만든다. ID를 바꾸려면 `set._codocs`를 쓴다.
+
+섹션의 문장 몇 개만 고칠 때는 섹션 전체를 `set`으로 다시 보내지 않고 `edit`을 쓴다. 섹션 위치는 `position`으로 정한다.
+
+```json
+{
+  "mode": "update",
+  "id": "sample-order",
+  "revision": "읽은 revision",
+  "edit": [{ "section": "개요", "old": "검토 전 설명", "new": "검토한 설명" }],
+  "set": { "검토 메모": "가상 주문의 검토 결과다." },
+  "position": { "검토 메모": { "after": "개요" } }
+}
+```
+
+`edit`의 `old`는 `codocs_get`이 돌려준 섹션 값의 글자를 그대로 쓰며 그 섹션에 정확히 한 번 나와야 한다. 없으면 `edit_text_not_found`, 여러 번 나오면 `edit_text_ambiguous`이고 아무것도 저장하지 않는다. 여러 번 나오면 앞뒤 글자를 더 넣어 한 곳만 가리키게 한다. 같은 섹션의 edit 여러 개는 적은 순서대로 적용하며, 같은 섹션을 `set`과 `edit`에 함께 넣지 않는다.
+`position`은 섹션마다 `after` 또는 `before` 하나로 기준 섹션을 정한다. 새로 더하는 섹션과 이미 있는 섹션 모두 옮길 수 있고, 적은 순서대로 옮긴다. 섹션 바로 위에 붙은 주석은 함께 옮겨진다. `position`이 없는 새 섹션은 문서 끝에 들어가며, `replace`로 순서만 바꾼 문서는 변경으로 보지 않으므로 순서는 `position`으로 바꾼다.
+YAML 파일을 직접 고치면 저장 전 검사와 참조 보호를 거치지 않으므로, 여러 문서를 고칠 때도 `codocs_write`의 `changes`로 묶어 보낸다.
 저장 뒤 `codocs_validate({"path":".codocs/order.yaml"})` 또는 `codocs_validate({})`로 진단을 읽는다.
 경고는 저장을 막지 않을 수 있으므로 성공 여부와 별도로 확인한다.
 
