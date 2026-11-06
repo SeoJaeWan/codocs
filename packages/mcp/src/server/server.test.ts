@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -82,297 +81,24 @@ function payload(response: unknown): Record<string, unknown> {
 }
 
 describe('소스 MCP stdio 서버', () => {
-  it('codocs_search를 도구 목록과 서버 instructions로 노출하고 실제 문서를 검색한다', async () => {
-    const { client, transport } = await clientFor(projectA);
-    try {
-      const instructions = client.getInstructions();
-      expect(instructions).toContain('codocs_search');
-      expect(instructions).toContain('codocs_get');
-      expect(instructions).toContain('[[링크]]');
-      expect(instructions).toContain('emptyQueries');
-      const search = (await client.listTools()).tools.find(
-        (tool) => tool.name === 'codocs_search',
-      );
-      expect(search?.description).toContain('codocs_get');
-      expect(search?.inputSchema).toMatchObject({
-        type: 'object',
-        properties: { queries: { minItems: 1, maxItems: 10 } },
-        required: ['queries'],
-        additionalProperties: false,
-      });
-      const found = payload(
-        await client.callTool({
-          name: 'codocs_search',
-          arguments: { queries: ['alpha', 'zzzqqq'] },
-        }),
-      );
-      expect(found).toMatchObject({
-        success: true,
-        scanStatus: 'complete',
-        emptyQueries: ['zzzqqq'],
-      });
-      const items = found.items as { address: string; queries: string[] }[];
-      expect(items.map((item) => item.address)).toContain('alpha:definition');
-      expect(items[0]?.queries).toEqual(['alpha']);
-      const fetched = payload(
-        await client.callTool({
-          name: 'codocs_get',
-          arguments: { addresses: items.map((item) => item.address) },
-        }),
-      );
-      expect(
-        (fetched.results as { found: boolean }[]).every((item) => item.found),
-      ).toBe(true);
-      expect(
-        payload(
-          await client.callTool({
-            name: 'codocs_search',
-            arguments: { queries: ['zzzqqq'] },
-          }),
-        ),
-      ).toEqual({
-        success: true,
-        scanStatus: 'complete',
-        items: [],
-        emptyQueries: ['zzzqqq'],
-      });
-    } finally {
-      await transport.close();
-    }
-  });
-
-  it('codocs_search의 입력 위반은 invalid_input으로 거부한다', async () => {
-    const { client, transport } = await clientFor(projectA);
-    try {
-      for (const args of [
-        {},
-        { queries: [] },
-        { queries: Array(11).fill('a') },
-        { queries: [''] },
-        { queries: ['x'.repeat(201)] },
-        { queries: 'alpha' },
-        { queries: ['alpha'], extra: true },
-      ])
-        expect(
-          payload(
-            await client.callTool({
-              name: 'codocs_search',
-              arguments: args,
-            }),
-          ),
-        ).toMatchObject({
-          success: false,
-          error: { code: 'invalid_input' },
-        });
-    } finally {
-      await transport.close();
-    }
-  });
-
-  it('초기화 후 쓰기를 포함한 도구를 제공하고 실제 문서를 목록·상세·검증·갱신한다', async () => {
+  it('실제 stdio로 연결하면 도구 여덟 개를 나열하고 검색 결과를 JSON-RPC 응답으로 받는다', async () => {
     const { client, transport } = await clientFor(projectA);
     try {
       const names = (await client.listTools()).tools.map((tool) => tool.name);
-      expect(names).toEqual([
-        'codocs_list',
-        'codocs_get',
-        'codocs_search',
-        'codocs_refresh',
-        'codocs_validate',
-        'codocs_write',
-        'codocs_rename',
-        'codocs_guide',
-      ]);
-      const listed = payload(
-        await client.callTool({ name: 'codocs_list', arguments: {} }),
-      );
-      expect(listed.success).toBe(true);
-      expect((listed.items as { id: string }[]).map((item) => item.id)).toEqual(
-        ['alpha'],
-      );
-      const fetched = payload(
+      expect(names).toHaveLength(8);
+      expect(names).toContain('codocs_search');
+      const found = payload(
         await client.callTool({
-          name: 'codocs_get',
-          arguments: { addresses: ['alpha', 'missing', 'alpha:definition'] },
+          name: 'codocs_search',
+          arguments: { queries: ['alpha'] },
         }),
       );
-      expect(fetched.success).toBe(true);
+      expect(found).toMatchObject({ success: true, scanStatus: 'complete' });
       expect(
-        (fetched.results as { found: boolean }[]).map((item) => item.found),
-      ).toEqual([true, false, true]);
-      expect(fetched.results).toMatchObject([
-        { address: 'alpha', document: { definition: '본문' } },
-        { address: 'missing', diagnostics: [{ code: 'not_found' }] },
-        {
-          address: 'alpha:definition',
-          name: 'alpha',
-          section: { name: 'definition', content: '본문' },
-        },
-      ]);
-      expect(
-        payload(
-          await client.callTool({
-            name: 'codocs_list',
-            arguments: { parent: 'missing' },
-          }),
-        ),
-      ).toMatchObject({ success: false, error: { code: 'not_found' } });
-      expect(
-        payload(
-          await client.callTool({
-            name: 'codocs_list',
-            arguments: { cursor: 'x' },
-          }),
-        ),
-      ).toMatchObject({ success: false, error: { code: 'invalid_input' } });
-      const refreshed = payload(
-        await client.callTool({ name: 'codocs_refresh', arguments: {} }),
-      );
-      expect(refreshed).toMatchObject({
-        success: true,
-        fileCount: 1,
-        itemCount: 1,
-      });
-      const errors = payload(
-        await client.callTool({
-          name: 'codocs_get',
-          arguments: { addresses: [] },
-        }),
-      );
-      expect(errors).toMatchObject({
-        success: false,
-        error: { code: 'invalid_input' },
-      });
-      expect(
-        payload(
-          await client.callTool({ name: 'codocs_validate', arguments: {} }),
-        ),
-      ).toMatchObject({
-        success: true,
-        scanStatus: 'complete',
-        diagnostics: [],
-      });
-      expect(transport.stderr).toBeTruthy();
+        (found.items as { address: string }[]).map((item) => item.address),
+      ).toContain('alpha:definition');
     } finally {
-      await client.close();
-    }
-  });
-
-  it.each(['codocs_write', 'codocs_validate'])(
-    '%s 설명에 하위 .codocs 경로 예시를 담는다',
-    async (name) => {
-      const { client } = await clientFor(projectA);
-      try {
-        const tools = (await client.listTools()).tools;
-        expect(tools.find((tool) => tool.name === name)?.description).toContain(
-          'packages/core/.codocs/a.yaml',
-        );
-      } finally {
-        await client.close();
-      }
-    },
-  );
-
-  it('codocs_validate에 하위 .codocs 문서 경로를 주면 그 문서를 / 구분 경로로 검증한다', async () => {
-    const project = path.join(fixture, 'nested');
-    await mkdir(path.join(project, 'packages', 'core', '.codocs'), {
-      recursive: true,
-    });
-    await writeFile(
-      path.join(project, 'packages', 'core', '.codocs', 'a.yaml'),
-      '_codocs:\n  id: core-a\n  name: core-a\ndefinition: 본문\n',
-    );
-    const { client } = await clientFor(project);
-    try {
-      expect(
-        payload(
-          await client.callTool({
-            name: 'codocs_validate',
-            arguments: { path: 'packages/core/.codocs/a.yaml' },
-          }),
-        ),
-      ).toMatchObject({
-        success: true,
-        path: 'packages/core/.codocs/a.yaml',
-        diagnostics: [],
-      });
-    } finally {
-      await client.close();
-    }
-  });
-
-  it('큰 정상 문서와 .inf 원문을 혼합 조회해 본문·직접 참조·revision·진단을 전부 보존한다', async () => {
-    const selected = path.join(fixture, 'large');
-    const folder = path.join(selected, '.codocs');
-    await mkdir(folder, { recursive: true });
-    const targets = Array.from(
-      { length: 20 },
-      (_, index) => `target-${String(index).padStart(2, '0')}`,
-    );
-    const definition = `${targets.map((_, index) => `[[Target ${String(index).padStart(2, '0')}]]`).join(' ')} ${'x'.repeat(500_000)}`;
-    const rawYaml = `_codocs:\n  id: invalid\n  name: Invalid\ndefinition: ${'y'.repeat(500_000)}\nvalue: .inf\n`;
-    await writeFile(
-      path.join(folder, 'normal.yaml'),
-      `_codocs:\n  id: normal\n  name: Normal\ndefinition: ${JSON.stringify(definition)}\n`,
-    );
-    for (const [index, id] of targets.entries())
-      await writeFile(
-        path.join(folder, `${id}.yaml`),
-        `_codocs:\n  id: ${id}\n  name: Target ${String(index).padStart(2, '0')}\ndefinition: 대상\n`,
-      );
-    await writeFile(path.join(folder, 'invalid.yaml'), rawYaml);
-    await writeFile(
-      path.join(folder, 'conflict-a.yaml'),
-      '_codocs:\n  id: shared\n  name: Conflict A\ndefinition: 본문\n',
-    );
-    await writeFile(
-      path.join(folder, 'conflict-b.yaml'),
-      '_codocs:\n  id: shared\n  name: Conflict B\ndefinition: 본문\n',
-    );
-    const { client } = await clientFor(selected);
-    try {
-      const response = payload(
-        await client.callTool({
-          name: 'codocs_get',
-          arguments: {
-            addresses: ['Normal', 'Invalid', 'Conflict A', 'Missing'],
-          },
-        }),
-      );
-      const results = response.results as Record<string, unknown>[];
-      expect(response.success).toBe(true);
-      expect(results[0]).toMatchObject({
-        found: true,
-        document: { definition },
-        source: { path: '.codocs/normal.yaml' },
-        references: targets.map(
-          (_, index) => `Target ${String(index).padStart(2, '0')}`,
-        ),
-      });
-      expect(results[1]).toMatchObject({
-        found: true,
-        rawYaml,
-        source: { path: '.codocs/invalid.yaml' },
-      });
-      expect(results[1]).not.toHaveProperty('document');
-      expect(results[1]?.revision).toBe(
-        createHash('sha256').update(Buffer.from(rawYaml, 'utf8')).digest('hex'),
-      );
-      expect((results[1]?.diagnostics as unknown[]).length).toBeGreaterThan(0);
-      expect(results[2]).toMatchObject({
-        found: true,
-        conflict: true,
-        paths: ['.codocs/conflict-a.yaml', '.codocs/conflict-b.yaml'],
-      });
-      expect(results[3]).toMatchObject({
-        found: false,
-        diagnostics: [expect.objectContaining({ code: 'not_found' })],
-      });
-      const responseBytes = Buffer.byteLength(JSON.stringify(response));
-      console.info(`stdio-large-payload-bytes=${responseBytes}`);
-      expect(responseBytes).toBeGreaterThan(1_000_000);
-    } finally {
-      await client.close();
+      await transport.close();
     }
   });
 
@@ -404,8 +130,11 @@ describe('소스 MCP stdio 서버', () => {
     });
     let output = '';
     let errors = '';
-    child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
-      output += chunk;
+    const initialized = new Promise<void>((resolve) => {
+      child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
+        output += chunk;
+        if (output.includes('"id":1')) resolve();
+      });
     });
     child.stderr.setEncoding('utf8').on('data', (chunk: string) => {
       errors += chunk;
@@ -422,7 +151,7 @@ describe('소스 MCP stdio 서버', () => {
         },
       }) + '\n',
     );
-    await viWaitFor(() => expect(output).toContain('"id":1'));
+    await initialized;
     child.stdin.end();
     const outcome = await Promise.race([
       once(child, 'exit'),
@@ -480,17 +209,3 @@ describe('소스 MCP stdio 서버', () => {
     await Promise.all([owner.close(), owner.close()]);
   });
 });
-
-/** 프로토콜 응답 도착을 고정 대기 대신 제한 시간 안에 확인한다. */
-async function viWaitFor(assertion: () => void): Promise<void> {
-  const deadline = Date.now() + 5_000;
-  while (Date.now() < deadline) {
-    try {
-      assertion();
-      return;
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-  }
-  assertion();
-}

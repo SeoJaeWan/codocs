@@ -29,6 +29,7 @@
     "@codocs/core": "workspace:*",
     "@modelcontextprotocol/inspector": "2.9.0",
     "@types/node": "22.19.3",
+    "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "3.6.2",
     "esbuild": "0.28.2",
     "eslint": "10.10.0",

@@ -20,6 +20,7 @@ import yauzl from 'yauzl';
 import { releaseMetadata } from './release-metadata.mjs';
 import { readProductVersions } from './release-contract.mjs';
 import { assertReleaseAssets } from './release-assets.mjs';
+import { runVscodeSmoke } from './vscode-smoke/vscode-smoke.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const require = createRequire(path.join(root, 'packages/mcp/package.json'));
@@ -263,8 +264,14 @@ export async function releaseFiles(directory) {
   };
 }
 
-/** 명시한 기존 산출물을 재빌드 없이 검사하고 외부 소비자 증거를 남긴다. */
-export async function verifyRelease(tgz, vsix, versions) {
+/**
+ * 명시한 기존 산출물을 재빌드 없이 검사하고 외부 소비자 증거를 남긴다.
+ * @param tgz MCP tarball 경로
+ * @param vsix VSIX 경로
+ * @param versions 기대 제품 버전. 없으면 저장소에서 읽는다.
+ * @param options env(CI 판단용 환경), runVscode(VS Code 단계 실행기). 시험에서 주입한다.
+ */
+export async function verifyRelease(tgz, vsix, versions, options = {}) {
   assert.equal(process.versions.node.split('.')[0], '24');
   versions ??= await readProductVersions(root);
   const temporary = await mkdtemp(path.join(os.tmpdir(), 'codocs-release-'));
@@ -372,6 +379,19 @@ export async function verifyRelease(tgz, vsix, versions) {
       assert.deepEqual(
         await readFile(path.join(evidence.mcp.directory, file)),
         await releaseMetadata(root, file),
+      );
+    evidence.vscode = { status: 'failed' };
+    evidence.vscode = await (options.runVscode ?? runVscodeSmoke)({
+      extension,
+      temporary,
+      root,
+      env: options.env ?? process.env,
+    });
+    if (evidence.vscode.status === 'skipped')
+      console.log(
+        'VS Code 실행 단계를 실행하지 않았습니다 (' +
+          evidence.vscode.reason +
+          '). 이 로컬 실행은 VSIX의 활성화·명령·Hover를 검증하지 않았습니다.',
       );
     evidence.passed = true;
   } catch (error) {
