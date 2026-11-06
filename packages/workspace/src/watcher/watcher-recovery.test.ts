@@ -64,9 +64,10 @@ import {
 } from './index.js';
 import { rmWithRetry } from '../../../../tools/test/support/retrying-fs.js';
 
-/** 타이머 없이 IO와 microtask를 진행시키며 조건을 기다린다. 가짜 타이머 중에도 쓸 수 있다. */
+/** 타이머 없이 IO와 microtask를 진행시키며 조건을 실제 시간으로 5초까지 기다린다. 가짜 타이머 중에도 쓸 수 있다. */
 async function settleUntil(condition: () => boolean): Promise<void> {
-  for (let turn = 0; turn < 1_000 && !condition(); turn++)
+  const deadline = performance.now() + 5_000;
+  while (!condition() && performance.now() < deadline)
     await new Promise((resolve) => setImmediate(resolve));
   expect(condition()).toBe(true);
 }
