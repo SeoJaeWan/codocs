@@ -82,6 +82,11 @@ import {
 } from '../rename/index.js';
 import { calculateRevision } from '../revision/index.js';
 import {
+  reviewFields,
+  type WorkspaceWriteReview,
+  type WorkspaceWriteReviewFields,
+} from '../write-review/index.js';
+import {
   workspaceFileOperationKinds,
   workspaceFileStates,
   type WorkspaceFileOperationKind,
@@ -142,11 +147,16 @@ export interface WorkspaceStorageOptions {
    * 테스트는 이 값으로 다른 OS의 재시도 규칙을 한 OS에서 재현한다.
    */
   platform?: NodeJS.Platform;
+  /**
+   * 검증을 통과한 저장 계획을 파일을 쓰기 전에 검토한다. 막으면 파일과 폴더를 바꾸지 않는다.
+   * 생략하면 탐지 없이 저장한다.
+   */
+  review?: WorkspaceWriteReview;
 }
 
 /** 저장 결과는 디스크 반영 여부와 변경 여부를 따로 전달한다. */
 export type WorkspaceStorageResult =
-  | {
+  | ({
       success: true;
       saved: boolean;
       changed: boolean;
@@ -155,13 +165,13 @@ export type WorkspaceStorageResult =
       revision: string;
       warnings: readonly Diagnostic<string>[];
       diagnostics: readonly Diagnostic<string>[];
-    }
-  | {
+    } & WorkspaceWriteReviewFields)
+  | ({
       success: false;
       saved: false;
       changed: false;
       diagnostics: readonly Diagnostic<string>[];
-    };
+    } & WorkspaceWriteReviewFields);
 
 const fileOperations: WorkspaceStorageOperations = {
   open,
@@ -417,6 +427,27 @@ export async function saveWorkspaceChange(
         ),
       );
   }
+  const reviewed = options.review
+    ? await options.review({
+        projectRoot: root.projectRoot,
+        catalog: buildWorkspaceCatalog(scanForWrite(scan)),
+        items: [
+          {
+            index: 0,
+            mode: planned.mode,
+            path: sourcePath,
+            data: planned.data,
+            raw: planned.raw,
+          },
+        ],
+        batch: false,
+      })
+    : undefined;
+  if (reviewed?.blocked)
+    return {
+      ...failure(reviewed.blocked),
+      ...reviewFields(reviewed),
+    };
   const parent = await ensureWorkspaceParent(
     root,
     sourcePath,
@@ -686,6 +717,7 @@ export async function saveWorkspaceChange(
     }
   }
   if (!applied) return failure(...failureDiagnostics);
+  const reviewWarnings = reviewed?.warnings ?? [];
   return {
     success: true,
     saved: true,
@@ -693,8 +725,13 @@ export async function saveWorkspaceChange(
     id: planned.id,
     source: { path: sourcePath },
     revision: appliedRevision,
-    warnings: planned.diagnostics,
-    diagnostics: [...planned.diagnostics, ...failureDiagnostics],
+    warnings: [...planned.diagnostics, ...reviewWarnings],
+    diagnostics: [
+      ...planned.diagnostics,
+      ...reviewWarnings,
+      ...failureDiagnostics,
+    ],
+    ...reviewFields(reviewed),
   };
 }
 

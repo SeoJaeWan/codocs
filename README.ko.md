@@ -38,18 +38,45 @@ MCP 클라이언트 설정에 설치된 실행 파일과 **프로젝트의 절�
 
 Windows에서는 JSON의 command 값으로 `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd`를 사용한다. `.cmd` 파일을 실행하지 못하는 클라이언트에서는 `command`를 `node`로 지정하고, 첫 번째 인자로 `node_modules/co-documentation/dist/runtime/cli.js`의 절대 경로를 전달한 뒤 `--project`와 프로젝트 경로를 이어서 지정한다. 클라이언트별 설정 형식에 맞춰 로컬 stdio 연결을 사용한다.
 
+### 중복 탐지(선택)
+
+`codocs_write`는 저장하기 전에, 요청으로 새로 쓴 문장이 다른 문서에 이미 있는 내용을 다시 적은 것인지 확인할 수 있다. 겹치면 저장하지 않고 겹치는 문장 쌍을 돌려주므로 AI 도우미가 옮겨 적은 글을 `[[링크]]`로 바꿀 수 있다. 서버의 환경 변수에 모델 제공자의 API 키를 넣으면 켜진다.
+
+```json
+{
+  "mcpServers": {
+    "codocs": {
+      "command": "/absolute/install/node_modules/.bin/codocs",
+      "args": ["--project", "/absolute/path/my-project"],
+      "env": { "CODOCS_REVIEW_API_KEY": "your-api-key" }
+    }
+  }
+}
+```
+
+**키를 넣으면 새로 쓴 문장과 다른 문서에서 가까운 섹션 최대 10개의 본문이 사용자가 고른 제공자에게 전송된다.** 바뀐 섹션마다 한 번 호출하며 비용은 그 키로 청구된다. 키가 없으면 아무것도 보내지 않고 `codocs_write`는 지금과 똑같이 동작한다.
+
+| 설정      | 환경 변수                            | 프로젝트 루트의 `codocs.config.yaml` | 기본값             |
+| --------- | ------------------------------------ | ------------------------------------ | ------------------ |
+| API 키    | `CODOCS_REVIEW_API_KEY`              | 받지 않음                            | 없음(꺼짐)         |
+| 제공자    | `CODOCS_REVIEW_PROVIDER`             | `review.provider`                    | `anthropic`(유일)  |
+| 모델      | `CODOCS_REVIEW_MODEL`                | `review.model`                       | `claude-haiku-5-5` |
+| 제외 경로 | `CODOCS_REVIEW_EXCLUDE`(쉼표로 구분) | `review.exclude`(목록)               | 없음               |
+
+환경 변수가 파일보다, 파일이 기본값보다 우선하며 환경 변수의 제외 경로 목록은 파일의 목록을 대신한다. 제외 경로는 프로젝트 루트 기준의 `.gitignore` 문법이다(예: `.codocs/discussions/`). 제외한 문서는 겹침 후보가 되지 않고, 그 문서에 쓰는 글도 확인하지 않는다. 설정 파일이 잘못됐거나 제공자 호출이 실패해도 문서는 저장하고 `review_failed` 경고로 알린다. `duplicate_content`로 막히면 먼저 `overlaps`의 두 문장을 읽고, 새 글이 원본이거나 실제로 겹치지 않을 때만 받은 `reviewToken`을 같은 요청에 붙여 다시 보낸다. 자세한 내용은 [수정 가이드](docs/guide/updating.md)에 있다.
+
 ### 사용할 수 있는 도구
 
-| 도구              | 역할                                                                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------ |
-| `codocs_search`   | 검색어로 관련 섹션을 찾아 `codocs_get`으로 읽을 주소를 확인                                      |
-| `codocs_list`     | 최상위 문서와 직속 자식을 섹션 이름과 함께 탐색                                                  |
-| `codocs_get`      | `이름` 또는 `이름:섹션`으로 문서·섹션 본문·참조·revision 조회                                    |
-| `codocs_write`    | 문서 생성, 읽은 revision을 사용한 수정·전체 교체·삭제·이동, `changes`로 여러 문서를 한 번에 변경 |
-| `codocs_rename`   | 문서나 섹션의 이름과 그것을 가리키는 참조를 함께 미리보고 변경                                   |
-| `codocs_validate` | 문서와 코드 파일의 `@codocs` 참조 오류·경고 확인                                                 |
-| `codocs_refresh`  | 프로젝트 문서·코드 참조 색인 재구성                                                              |
-| `codocs_guide`    | 문서 작성·수정·복구 가이드 조회                                                                  |
+| 도구              | 역할                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `codocs_search`   | 검색어로 관련 섹션을 찾아 `codocs_get`으로 읽을 주소를 확인                                                                    |
+| `codocs_list`     | 최상위 문서와 직속 자식을 섹션 이름과 함께 탐색                                                                                |
+| `codocs_get`      | `이름` 또는 `이름:섹션`으로 문서·섹션 본문·참조·revision 조회                                                                  |
+| `codocs_write`    | 문서 생성, 읽은 revision을 사용한 수정·전체 교체·삭제·이동, `changes`로 여러 문서를 한 번에 변경, 선택적으로 새로 쓴 중복 차단 |
+| `codocs_rename`   | 문서나 섹션의 이름과 그것을 가리키는 참조를 함께 미리보고 변경                                                                 |
+| `codocs_validate` | 문서와 코드 파일의 `@codocs` 참조 오류·경고 확인                                                                               |
+| `codocs_refresh`  | 프로젝트 문서·코드 참조 색인 재구성                                                                                            |
+| `codocs_guide`    | 문서 작성·수정·복구 가이드 조회                                                                                                |
 
 문서를 찾을 때 AI 도우미는 작업에서 뽑은 짧은 검색어 몇 개로 `codocs_search`를 호출한다. 가장 관련 있는 섹션의 주소만 본문 없이 돌려주며, 그 주소를 `codocs_get`으로 읽거나 `codocs_list`로 parent 구조를 따라간다. 걸린 것이 없는 검색어는 따로 알리며, 관련 문서가 없다는 뜻은 아니다.
 

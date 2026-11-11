@@ -29,6 +29,7 @@ import {
   parseValidateInput,
   parseWriteInput,
 } from '../tool-input/index.js';
+import type { CodocsWriteReviewer } from '../review/index.js';
 
 /** MCP 호출자가 조회와 변경 요청의 허용 상태를 판단하는 값이다. */
 export interface CodocsAccessState extends WorkspaceReadiness {
@@ -139,10 +140,13 @@ function accessState(session: WorkspaceQuerySession): CodocsAccessState {
 
 /** 한 workspace 세션을 codocs_list/codocs_get 직접 handler로 감싼다.
  * @param session 서버 또는 호출자가 소유하며 종료하는 프로젝트 세션이다.
+ * @param options.reviewer 있으면 codocs_write가 저장 전에 중복을 탐지하고 reviewToken 입력을 받는다.
  */
 export function createCodocsQueryHandlers(
   session: WorkspaceQuerySession,
+  options: { reviewer?: CodocsWriteReviewer } = {},
 ): CodocsQueryHandlers {
+  const reviewer = options.reviewer;
   let activeRefresh: Promise<WorkspaceRefreshResult> | undefined;
   /** 동시 전송 호출을 같은 workspace refresh 결과에 연결한다. */
   function refresh(input?: unknown): Promise<WorkspaceRefreshResult> {
@@ -197,7 +201,7 @@ export function createCodocsQueryHandlers(
     /** 형식 오류만 여기서 거부하고 문서 진단은 workspace 변경 계획에서 보존한다.
      * */
     async codocsWrite(input: unknown): Promise<CodocsWriteResponse> {
-      const parsed = parseWriteInput(input);
+      const parsed = parseWriteInput(input, reviewer !== undefined);
       if (!parsed) {
         const error = invalidInput().error;
         return {
@@ -208,7 +212,12 @@ export function createCodocsQueryHandlers(
           diagnostics: [error],
         };
       }
-      return session.write(parsed);
+      if (!reviewer) return session.write(parsed.request);
+      const token = parsed.reviewToken;
+      return session.write(parsed.request, {
+        /** 저장 계획을 요청의 확인 값과 함께 탐지에 넘긴다. */
+        review: (request) => reviewer.review(request, token),
+      });
     },
     /** 현재 ID를 파일 경로로 바꾼 뒤 preview 또는 apply를 workspace에 전달한다. 결과는 가공하지 않는다.
      * */

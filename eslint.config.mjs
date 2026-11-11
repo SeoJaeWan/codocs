@@ -265,4 +265,14 @@ export default defineConfig(
       '@typescript-eslint/unbound-method': 'off',
     },
   },
+  {
+    // Anthropic Messages API의 요청 필드(max_tokens·output_config)는 외부 API가 정한 snake_case 이름이라 바꿀 수 없다.
+    files: [
+      'packages/mcp/src/review/anthropic.ts',
+      'packages/mcp/src/review/review.test.ts',
+    ],
+    rules: {
+      '@typescript-eslint/naming-convention': 'off',
+    },
+  },
 );

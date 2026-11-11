@@ -705,3 +705,93 @@ describe('세션 write의 단일 저장 회귀', () => {
     expect(result).not.toHaveProperty('changes');
   });
 });
+
+describe('세션 write의 저장 전 검토', () => {
+  it('changes 검토가 막으면 어떤 항목도 저장하지 않고 막은 진단과 겹침·확인 값을 돌려준다', async () => {
+    await writeProjectTree(root, { '.codocs/b.yaml': doc('b', '문서B') });
+    const before = await snapshotProjectTree(root);
+    const blocked = {
+      code: 'duplicate_content',
+      severity: 'error' as const,
+      message: '겹칩니다.',
+    };
+    const overlaps = [
+      {
+        index: 1,
+        section: '문서D:definition',
+        sentence: '본문',
+        address: '문서B:definition',
+        matchedSentence: '본문',
+      },
+    ];
+    const current = session();
+    const result = await current.write(
+      {
+        changes: [
+          {
+            mode: 'create',
+            path: '.codocs/c.yaml',
+            document: { _codocs: { id: 'c', name: '문서C' }, definition: 'C' },
+          },
+          {
+            mode: 'create',
+            path: '.codocs/new/d.yaml',
+            document: {
+              _codocs: { id: 'd', name: '문서D' },
+              definition: '본문',
+            },
+          },
+        ],
+      },
+      {
+        review: () => Promise.resolve({ blocked, overlaps, reviewToken: 't' }),
+      },
+    );
+    expect(result).toEqual({
+      success: false,
+      saved: false,
+      changed: false,
+      changes: [],
+      warnings: [],
+      diagnostics: [blocked],
+      error: blocked,
+      overlaps,
+      reviewToken: 't',
+    });
+    expect(await snapshotProjectTree(root)).toEqual(before);
+  });
+
+  it('changes 검토에는 바뀌는 항목만 입력 순번과 함께 넘기고 batch로 표시한다', async () => {
+    await writeProjectTree(root, { '.codocs/b.yaml': doc('b', '문서B') });
+    const requests: { batch: boolean; items: readonly { index: number }[] }[] =
+      [];
+    const current = session();
+    const result = await current.write(
+      {
+        changes: [
+          {
+            mode: 'update',
+            id: 'b',
+            revision: await revisionOf('.codocs/b.yaml'),
+            set: { definition: '본문' },
+          },
+          {
+            mode: 'create',
+            path: '.codocs/c.yaml',
+            document: { _codocs: { id: 'c', name: '문서C' }, definition: 'C' },
+          },
+        ],
+      },
+      {
+        review: (request) => {
+          requests.push(request);
+          return Promise.resolve({});
+        },
+      },
+    );
+    expect(result).toMatchObject({ success: true, saved: true });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.batch).toBe(true);
+    expect(requests[0]?.items.map((item) => item.index)).toEqual([1]);
+  });
+});

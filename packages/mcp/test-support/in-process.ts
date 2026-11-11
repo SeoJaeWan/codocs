@@ -6,6 +6,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { WorkspaceQuerySession } from '@codocs/workspace';
 import { expect } from 'vitest';
 import { createCodocsGuideHandler } from '../src/guide/index.js';
+import type { CodocsWriteReviewer } from '../src/review/index.js';
 import {
   createCodocsServer,
   createStartupSession,
@@ -39,13 +40,13 @@ export interface InProcessProject {
  * @param prefix 임시 폴더 이름 접두어다.
  * @param files 프로젝트 루트 기준 상대 경로와 원문이다.
  * @param guideRoot 가이드 원문 위치다.
- * @param startup omitProject면 --project 없이 임시 프로젝트에서 시작한 것으로 세션을 만든다.
+ * @param startup omitProject면 --project 없이 임시 프로젝트에서 시작한 것으로 세션을 만든다. reviewer가 있으면 중복 탐지를 켠 서버를 만든다.
  */
 export async function openInProcessProject(
   prefix: string,
   files: Record<string, string> = {},
   guideRoot: URL = sourceGuideRoot,
-  startup: { omitProject?: boolean } = {},
+  startup: { omitProject?: boolean; reviewer?: CodocsWriteReviewer } = {},
 ): Promise<InProcessProject> {
   await mkdir('.workbench', { recursive: true });
   const project = await mkdtemp(path.resolve(`.workbench/${prefix}`));
@@ -60,6 +61,7 @@ export async function openInProcessProject(
   const server = createCodocsServer(
     session,
     createCodocsGuideHandler(guideRoot),
+    startup.reviewer ? { reviewer: startup.reviewer } : {},
   );
   const client = new Client({ name: 'in-process-test', version: '1' });
   const [clientTransport, serverTransport] =

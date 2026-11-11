@@ -38,18 +38,45 @@ Documents can also live in `.codocs` folders inside subfolders of the project, s
 
 On Windows, use `C:\\absolute\\install\\node_modules\\.bin\\codocs.cmd` as the JSON command value. If your client cannot run `.cmd` files, set `command` to `node` and pass the absolute path to `node_modules/co-documentation/dist/runtime/cli.js` as the first argument, followed by `--project` and your project path. Client configuration formats vary; use a local stdio connection with these arguments.
 
+### Duplicate review (optional)
+
+`codocs_write` can check, before saving, whether the sentences a request newly writes restate content that already lives in another document. When they overlap, nothing is saved and the overlapping sentence pairs are returned so the assistant can replace the copy with a `[[link]]`. Add an API key for your model provider to the server's environment:
+
+```json
+{
+  "mcpServers": {
+    "codocs": {
+      "command": "/absolute/install/node_modules/.bin/codocs",
+      "args": ["--project", "/absolute/path/my-project"],
+      "env": { "CODOCS_REVIEW_API_KEY": "your-api-key" }
+    }
+  }
+}
+```
+
+**When the key is set, the newly written sentences and the bodies of up to 10 nearby sections from other documents are sent to the provider you choose**, once per changed section, and billed to your key. Without the key nothing is sent and `codocs_write` behaves exactly as before.
+
+| Setting        | Environment variable                      | `codocs.config.yaml` at the project root | Default            |
+| -------------- | ----------------------------------------- | ---------------------------------------- | ------------------ |
+| API key        | `CODOCS_REVIEW_API_KEY`                   | not accepted                             | none (off)         |
+| Provider       | `CODOCS_REVIEW_PROVIDER`                  | `review.provider`                        | `anthropic` (only) |
+| Model          | `CODOCS_REVIEW_MODEL`                     | `review.model`                           | `claude-haiku-5-5` |
+| Excluded paths | `CODOCS_REVIEW_EXCLUDE` (comma-separated) | `review.exclude` (list)                  | none               |
+
+Environment variables win over the file, and the file over the defaults; an excluded-path list from the environment replaces the file's list. Excluded paths use `.gitignore` syntax relative to the project root (for example `.codocs/discussions/`): those documents are never candidates, and text written into them is not reviewed. If the file is invalid or the provider call fails, the document is still saved with a `review_failed` warning. When a write is blocked with `duplicate_content`, read both sentences in `overlaps` first; resend the same request with the returned `reviewToken` only if the new text is the original or does not actually overlap. See the [updating guide](docs/guide/updating.md) for details.
+
 ### Available tools
 
-| Tool              | Purpose                                                                                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `codocs_search`   | Find relevant sections by keywords and get addresses to read with `codocs_get`                                      |
-| `codocs_list`     | Explore root documents and direct children with section names                                                       |
-| `codocs_get`      | Read a document or section by `name` or `name:section`, with references and revisions                               |
-| `codocs_write`    | Create documents, or update, replace, delete or move them using a read revision, singly or in one `changes` request |
-| `codocs_rename`   | Preview and apply a document or section rename together with the references that point to it                        |
-| `codocs_validate` | Check documents and `@codocs` references in code files for errors and warnings                                      |
-| `codocs_refresh`  | Rebuild the project's document and code reference indexes                                                           |
-| `codocs_guide`    | Read guidance for writing, updating, and recovering documents                                                       |
+| Tool              | Purpose                                                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `codocs_search`   | Find relevant sections by keywords and get addresses to read with `codocs_get`                                                                                  |
+| `codocs_list`     | Explore root documents and direct children with section names                                                                                                   |
+| `codocs_get`      | Read a document or section by `name` or `name:section`, with references and revisions                                                                           |
+| `codocs_write`    | Create documents, or update, replace, delete or move them using a read revision, singly or in one `changes` request; optionally blocks newly written duplicates |
+| `codocs_rename`   | Preview and apply a document or section rename together with the references that point to it                                                                    |
+| `codocs_validate` | Check documents and `@codocs` references in code files for errors and warnings                                                                                  |
+| `codocs_refresh`  | Rebuild the project's document and code reference indexes                                                                                                       |
+| `codocs_guide`    | Read guidance for writing, updating, and recovering documents                                                                                                   |
 
 To find where something is documented, the assistant calls `codocs_search` with a few short keywords taken from the task. It returns the addresses of the most relevant sections without their content, and the assistant reads them with `codocs_get` or explores the parent structure with `codocs_list`. A keyword with no match is reported separately, which does not mean that no related document exists.
 

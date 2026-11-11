@@ -283,6 +283,22 @@ export const storageDiagnosticMessages = {
 /** 저장 진단 코드의 원본 값에서 도출한 타입이다. */
 export type StorageDiagnosticCode =
   (typeof storageDiagnosticCodes)[keyof typeof storageDiagnosticCodes];
+/** codocs_write의 저장 전 중복 탐지가 반환하는 진단 코드다. @domainValues */
+export const reviewDiagnosticCodes = {
+  /** 새로 쓴 문장이 다른 문서의 내용과 겹쳐 저장하지 않았다. */
+  duplicateContent: 'duplicate_content',
+  /** 설정·모델 호출·응답 해석에 실패해 중복을 탐지하지 못했다. 저장은 진행한다. */
+  reviewFailed: 'review_failed',
+} as const;
+/** 중복 탐지 진단의 고정 문구다. 원인과 후속 안내는 suggestion에 둔다. */
+export const reviewDiagnosticMessages = {
+  duplicateContent:
+    '새로 쓴 문장이 다른 문서의 내용과 겹쳐 저장하지 않았습니다.',
+  reviewFailed: '중복을 탐지하지 못했습니다. 문서는 그대로 저장했습니다.',
+} as const;
+/** 중복 탐지 진단 코드의 원본 값에서 도출한 타입이다. */
+export type ReviewDiagnosticCode =
+  (typeof reviewDiagnosticCodes)[keyof typeof reviewDiagnosticCodes];
 /** core의 파서·스키마 검증·참조 문법·색인이 반환하는 진단 코드다. */
 export type DiagnosticCode =
   | YamlDiagnosticCode
@@ -292,7 +308,8 @@ export type DiagnosticCode =
   | ChangePlanDiagnosticCode
   | QueryDiagnosticCode
   | StorageDiagnosticCode
-  | RenameDiagnosticCode;
+  | RenameDiagnosticCode
+  | ReviewDiagnosticCode;
 /** 오류와 경고를 구분하는 공통 심각도다. */
 
 /** 시작 포함·끝 제외인 0 기반 UTF-16 원문 범위다. */

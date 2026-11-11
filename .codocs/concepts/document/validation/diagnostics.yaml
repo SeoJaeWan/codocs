@@ -45,6 +45,8 @@ _codocs:
   - change_section_not_found: [[codocs_write]] update의 edit·position이 가리킨 섹션이나 position의 기준 섹션이 문서에 없음
   - edit_text_not_found: [[codocs_write]] update의 edit에서 old가 섹션 값에 없음
   - edit_text_ambiguous: [[codocs_write]] update의 edit에서 old가 섹션 값에 두 번 이상 나옴. 앞뒤 글자를 더 넣어 한 곳만 가리키게 한다.
+  - duplicate_content: [[중복 탐지]]가 새로 쓴 문장이 다른 문서의 내용과 겹친다고 보아 [[codocs_write]]가 저장하지 않음. 겹치는 문장 쌍은 결과의 overlaps에 있다.
+  - review_failed: [[중복 탐지]]를 하지 못함(설정 오류, 모델 호출 실패·시간 초과·판정 거부·출력 해석 실패). 저장은 진행한 warning이며 원인은 suggestion에 있다.
   - codocs.codeReference.invalid·missing·missing_section·ambiguous: 코드 파일의 `@codocs` 표기를 해석하지 못했거나 대상 문서·섹션이 없거나 대상이 여러 개임. error이며 path는 코드 파일, range는 표기 위치다.
   - codocs.codeReference.unconfirmed: 대상 문서 탐색이 끝나지 않아 코드 참조를 확정하지 못함. 오류와 구분하는 warning이다.
   - section_not_found: [[codocs_get]]의 `이름:섹션` 주소에서 문서는 있지만 그 섹션이 없음

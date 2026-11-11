@@ -121,6 +121,39 @@ const writeSchema = z.union([
   writeItemSchema,
   z.strictObject({ changes: z.array(writeItemSchema).min(1) }),
 ]);
+/** 중복 탐지가 막은 요청을 다시 보낼 때 붙이는 확인 값이다. 막은 응답의 reviewToken을 그대로 넣는다. */
+const reviewTokenField = {
+  reviewToken: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      '중복 탐지가 막은 응답의 reviewToken. 겹치는 문장을 읽고 저장하기로 판단했을 때 같은 요청에 붙인다.',
+    ),
+};
+/**
+ * 중복 탐지가 켜진 서버의 write 입력이다. 단일 요청과 changes 요청의 최상위에 reviewToken을 하나 더 받는다.
+ * changes 항목 안의 reviewToken은 받지 않는다.
+ */
+const reviewWriteSchema = z.union([
+  z.discriminatedUnion(
+    'mode',
+    writeItemSchema.options.map(
+      /** 단일 요청 형태마다 확인 값을 더한다. */ (option) =>
+        option.extend(reviewTokenField),
+    ) as unknown as typeof writeItemSchema.options,
+  ),
+  z.strictObject({
+    changes: z.array(writeItemSchema).min(1),
+    ...reviewTokenField,
+  }),
+]);
+
+/** write 입력을 확인 값과 나머지 요청으로 나눈 결과다. */
+export interface ParsedWriteInput {
+  request: z.infer<typeof writeSchema>;
+  reviewToken?: string;
+}
 
 const renameBase = {
   id: z.string().min(1),
@@ -146,13 +179,29 @@ const renameSchema = z.discriminatedUnion('mode', [
   }),
 ]);
 
-/** 형식만 확인해 문서 자체의 상세 검증 진단은 변경 계획에 맡긴다. */
+/**
+ * 형식만 확인해 문서 자체의 상세 검증 진단은 변경 계획에 맡긴다.
+ * @param review 중복 탐지가 켜졌으면 true다. 이때만 reviewToken을 받고, 꺼져 있으면 reviewToken은 모르는 속성이라 거부한다.
+ * @returns 확인 값을 뗀 요청과 확인 값이다.
+ */
 export function parseWriteInput(
   input: unknown,
-): z.infer<typeof writeSchema> | undefined {
+  review = false,
+): ParsedWriteInput | undefined {
   if (!dataOnly(input)) return undefined;
-  const result = writeSchema.safeParse(input);
-  return result.success ? result.data : undefined;
+  if (!review) {
+    const result = writeSchema.safeParse(input);
+    return result.success ? { request: result.data } : undefined;
+  }
+  const result = reviewWriteSchema.safeParse(input);
+  if (!result.success) return undefined;
+  const { reviewToken, ...request } = result.data as z.infer<
+    typeof writeSchema
+  > & { reviewToken?: string };
+  return {
+    request,
+    ...(reviewToken === undefined ? {} : { reviewToken }),
+  };
 }
 
 /** 이름 변경 입력의 형식만 확인한다. 이름 충돌과 선택의 유효성은 workspace 계산에 맡긴다. */
@@ -178,15 +227,21 @@ export const codocsInputSchemas = new Map<CodocsToolName, z.ZodType>([
 ]);
 
 /** SDK에 제공하는 JSON Schema는 실행 검증과 동일한 Zod 원본에서 생성한다.
+ * options.review가 true이면 codocs_write에 reviewToken을 더한 스키마를 만든다.
  * */
 export function codocsJsonInputSchema(
   name: CodocsToolName,
+  options: { review?: boolean } = {},
 ): Record<string, unknown> {
   return {
     ...(name === 'codocs_write' || name === 'codocs_rename'
       ? { type: 'object' }
       : {}),
-    ...z.toJSONSchema(codocsInputSchemas.get(name)!),
+    ...z.toJSONSchema(
+      name === 'codocs_write' && options.review
+        ? reviewWriteSchema
+        : codocsInputSchemas.get(name)!,
+    ),
   };
 }
 

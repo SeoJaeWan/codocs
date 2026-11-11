@@ -25,6 +25,10 @@ import {
   createCodocsGuideHandler,
   type CodocsGuideResponse,
 } from '../guide/index.js';
+import {
+  createCodocsWriteReviewer,
+  type CodocsWriteReviewer,
+} from '../review/index.js';
 
 /** 요청 처리 결과의 공통 성공·실패 형태다. */
 export interface CodocsToolResult {
@@ -45,17 +49,27 @@ export function wrapCodocsResult(result: CodocsToolResult): CallToolResult {
 export const codocsServerInstructions =
   '이 서버는 프로젝트의 .codocs 문서를 조회하고 관리합니다. 작업을 시작할 때와 작업 범위가 바뀔 때마다 codocs_search를 호출해 관련 문서를 먼저 찾으세요. 대화 맥락에서 주제·용어·식별자를 뽑아 짧은 검색어 여러 개로 호출하고, 사용자 요청 원문을 통째로 검색어에 넣지 마세요. 결과의 address는 codocs_get에 그대로 넘겨 함께 읽고, 본문에 있는 [[링크]]도 확인하세요. emptyQueries에 담긴 검색어는 걸린 문서가 없다는 뜻이므로 해당 문서가 없을 수 있습니다. scanStatus가 partial이면 확인하지 못한 문서가 있어 결과 없음을 문서 없음으로 단정하지 마세요.';
 
+/** 중복 탐지가 켜졌을 때 codocs_write 설명 끝에 더하는 안내다. */
+export const codocsWriteReviewDescription =
+  ' 이 서버는 중복 탐지가 켜져 있습니다. 저장할 수 있는 요청이면 이번 요청으로 새로 쓴 문장(조금 고친 문장 제외)과 가까운 다른 문서의 섹션을 사용자가 설정한 모델 제공자에게 보내 겹치는 내용을 찾습니다. 겹치면 저장하지 않고 duplicate_content 오류와 overlaps(section·sentence·address·matchedSentence, 링크로 방향을 알면 copiedBy: new·existing, changes면 index), reviewToken을 돌려줍니다. 먼저 겹치는 두 문장을 읽고 새 글을 원본 문서로 가는 [[링크]]와 관계 설명으로 바꿀 수 있는지 보세요. 지금 쓰는 글이 원본이거나 겹치지 않는다고 판단할 때만 같은 요청에 reviewToken을 붙여 다시 보내면 탐지 없이 저장합니다(내용이 달라지거나 서버가 다시 시작되면 다시 탐지). 다른 문서가 이 글을 옮겨 적은 경우(copiedBy: existing)는 저장하고 overlaps로 알립니다. 탐지하지 못하면 저장하고 review_failed 경고로 알립니다.';
+
 /** 한 세션을 공유하는 SDK 서버와 실행 handler를 연결한다. 세션 종료는 호출자가 소유한다.
  * @param session 조회와 변경이 공유할 프로젝트 세션이다.
  * @param guide 가이드 원문 경계다. 생략하면 배포된 자산을 읽는다.
+ * @param options.reviewer 있으면 codocs_write가 저장 전에 중복을 탐지하고, 입력 스키마와 설명에 reviewToken을 더한다.
  */
 export function createCodocsServer(
   session: WorkspaceQuerySession,
   guide: (
     input?: unknown,
   ) => Promise<CodocsGuideResponse> = createCodocsGuideHandler(),
+  options: { reviewer?: CodocsWriteReviewer } = {},
 ): Server {
-  const handlers: CodocsQueryHandlers = createCodocsQueryHandlers(session);
+  const review = options.reviewer !== undefined;
+  const handlers: CodocsQueryHandlers = createCodocsQueryHandlers(
+    session,
+    options.reviewer ? { reviewer: options.reviewer } : {},
+  );
   const executionRegistry = new Map<
     CodocsToolName,
     {
@@ -110,7 +124,8 @@ export function createCodocsServer(
       'codocs_write',
       {
         description:
-          '문서를 생성(create), 부분 수정(update: set·unset·edit·position), 전체 교체(replace: id·revision·document), 삭제(delete: id·revision), 경로 이동(move: id·revision·path)하고 저장 결과와 색인 게시 상태를 반환합니다. create·move의 path는 프로젝트 루트(--project, 생략하면 서버 시작 위치) 기준 상대 경로이며 /로 구분하고 구간 하나 이상이 .codocs인 .yaml 또는 .yml 파일이어야 합니다(예: .codocs/orders/order.yaml, 하위 폴더의 .codocs는 packages/core/.codocs/a.yaml). 문서는 경로의 가장 바깥 .codocs에 속하며 필요한 .codocs와 바깥 폴더는 만듭니다. 하위 폴더의 .codocs는 .gitignore·.codocsignore가 제외하지 않은 위치만 인정하며 제외된 위치는 원인 메시지와 함께 invalid_workspace_path로 거절합니다. 역슬래시와 연속 슬래시는 /로 바꿔 받고, 절대 경로·. 또는 .. 구간·파일명 없는 경로·다른 확장자·.codocs 구간 없는 경로는 원인별 메시지와 예시로 거절합니다. 결과의 문서 경로(source.path·changes[].path·previousPath)는 OS와 무관하게 /로 구분하며 move·codocs_validate의 path에 그대로 쓸 수 있습니다. 요청 하나는 단일 변경이거나 changes 배열(1개 이상, 항목은 단일 변경과 같은 형태)이며 다른 최상위 속성은 invalid_input입니다. changes는 모든 항목을 반영한 최종 상태를 한 번 검증해 전부 저장하거나 아무것도 저장하지 않고, 같은 문서 ID나 경로가 두 번 나오면 invalid_input이며 결과는 입력 순서의 changes[](state: changed·restored·restore_failed·unchanged)입니다. 저장 도중 실패하면 반영한 항목을 되돌리며 되돌리지 못하면 write_restore_failed입니다. update의 edit은 [{section, old, new}]로 섹션 값(codocs_get이 돌려준 글자) 안의 old 하나를 new로 바꾸며 old가 정확히 한 번 나와야 합니다(없으면 edit_text_not_found, 여러 번이면 edit_text_ambiguous). position은 {섹션: {after: 기준}} 또는 {before: 기준}으로 새 섹션이나 기존 섹션을 기준 섹션의 뒤·앞으로 옮기고 적은 순서대로 적용하며, 위치를 정하지 않은 새 섹션은 마지막에 들어갑니다. 섹션 순서는 position으로만 바꿉니다. replace의 document는 _codocs를 포함한 문서 전체이며 생략한 최상위 섹션은 삭제되고 set·unset과 함께 보낼 수 없으며 name은 바꿀 수 없습니다(name_change_not_allowed, codocs_rename 사용). 변경이 다른 문서나 코드 파일의 참조 또는 건드리지 않은 문서의 parent를 새로 끊으면 reference_broken으로 거절하고, 확인이 필요한 코드 근거를 읽지 못했으면 code_evidence_incomplete로 거절하며 이때 파일은 바뀌지 않습니다. delete·move로 비게 된 폴더는 소유 .codocs 바로 아래까지 제거하며 .codocs 자체와 바깥 폴더는 남깁니다.',
+          '문서를 생성(create), 부분 수정(update: set·unset·edit·position), 전체 교체(replace: id·revision·document), 삭제(delete: id·revision), 경로 이동(move: id·revision·path)하고 저장 결과와 색인 게시 상태를 반환합니다. create·move의 path는 프로젝트 루트(--project, 생략하면 서버 시작 위치) 기준 상대 경로이며 /로 구분하고 구간 하나 이상이 .codocs인 .yaml 또는 .yml 파일이어야 합니다(예: .codocs/orders/order.yaml, 하위 폴더의 .codocs는 packages/core/.codocs/a.yaml). 문서는 경로의 가장 바깥 .codocs에 속하며 필요한 .codocs와 바깥 폴더는 만듭니다. 하위 폴더의 .codocs는 .gitignore·.codocsignore가 제외하지 않은 위치만 인정하며 제외된 위치는 원인 메시지와 함께 invalid_workspace_path로 거절합니다. 역슬래시와 연속 슬래시는 /로 바꿔 받고, 절대 경로·. 또는 .. 구간·파일명 없는 경로·다른 확장자·.codocs 구간 없는 경로는 원인별 메시지와 예시로 거절합니다. 결과의 문서 경로(source.path·changes[].path·previousPath)는 OS와 무관하게 /로 구분하며 move·codocs_validate의 path에 그대로 쓸 수 있습니다. 요청 하나는 단일 변경이거나 changes 배열(1개 이상, 항목은 단일 변경과 같은 형태)이며 다른 최상위 속성은 invalid_input입니다. changes는 모든 항목을 반영한 최종 상태를 한 번 검증해 전부 저장하거나 아무것도 저장하지 않고, 같은 문서 ID나 경로가 두 번 나오면 invalid_input이며 결과는 입력 순서의 changes[](state: changed·restored·restore_failed·unchanged)입니다. 저장 도중 실패하면 반영한 항목을 되돌리며 되돌리지 못하면 write_restore_failed입니다. update의 edit은 [{section, old, new}]로 섹션 값(codocs_get이 돌려준 글자) 안의 old 하나를 new로 바꾸며 old가 정확히 한 번 나와야 합니다(없으면 edit_text_not_found, 여러 번이면 edit_text_ambiguous). position은 {섹션: {after: 기준}} 또는 {before: 기준}으로 새 섹션이나 기존 섹션을 기준 섹션의 뒤·앞으로 옮기고 적은 순서대로 적용하며, 위치를 정하지 않은 새 섹션은 마지막에 들어갑니다. 섹션 순서는 position으로만 바꿉니다. replace의 document는 _codocs를 포함한 문서 전체이며 생략한 최상위 섹션은 삭제되고 set·unset과 함께 보낼 수 없으며 name은 바꿀 수 없습니다(name_change_not_allowed, codocs_rename 사용). 변경이 다른 문서나 코드 파일의 참조 또는 건드리지 않은 문서의 parent를 새로 끊으면 reference_broken으로 거절하고, 확인이 필요한 코드 근거를 읽지 못했으면 code_evidence_incomplete로 거절하며 이때 파일은 바뀌지 않습니다. delete·move로 비게 된 폴더는 소유 .codocs 바로 아래까지 제거하며 .codocs 자체와 바깥 폴더는 남깁니다.' +
+          (review ? codocsWriteReviewDescription : ''),
         execute: handlers.codocsWrite.bind(handlers),
       },
     ],
@@ -147,7 +162,9 @@ export function createCodocsServer(
         ]): Tool => ({
           name,
           description: entry.description,
-          inputSchema: codocsJsonInputSchema(name) as Tool['inputSchema'],
+          inputSchema: codocsJsonInputSchema(name, {
+            review,
+          }) as Tool['inputSchema'],
         }),
       ),
     }),
@@ -186,10 +203,17 @@ export function createStartupSession(options: {
 
 /** 시작 cwd와 프로젝트를 고정하고 연결·세션을 한 멱등 종료 경로로 소유한다. */
 export async function startCodocsStdio(
-  options: { cwd: string; project?: string },
+  options: {
+    cwd: string;
+    project?: string;
+    /** MCP 설정이 넘긴 환경 변수다. CODOCS_REVIEW_API_KEY가 있으면 중복 탐지를 켠다. 생략하면 끈다. */
+    env?: Readonly<Record<string, string | undefined>>;
+  },
   transport: StdioServerTransport = new StdioServerTransport(),
 ): Promise<{ close(): Promise<void> }> {
-  const session = createStartupSession(options);
+  const { env, ...start } = options;
+  const session = createStartupSession(start);
+  const reviewer = env ? createCodocsWriteReviewer({ env }) : undefined;
   let server: Server | undefined;
   let closing: Promise<void> | undefined;
   /** 연결과 세션을 한 번만 닫고 모든 호출자에게 같은 완료를 전달한다. */
@@ -206,7 +230,11 @@ export async function startCodocsStdio(
     return closing;
   };
   try {
-    server = createCodocsServer(session);
+    server = createCodocsServer(
+      session,
+      undefined,
+      reviewer ? { reviewer } : {},
+    );
     await server.connect(transport);
   } catch (error) {
     await close();
