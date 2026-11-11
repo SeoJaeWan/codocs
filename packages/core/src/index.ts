@@ -7,3 +7,4 @@ export * from './query/index.js';
 export * from './references/index.js';
 export * from './search/index.js';
 export * from './validator/index.js';
+export * from './write-review/index.js';
