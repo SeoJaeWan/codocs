@@ -15,14 +15,14 @@ AI도 `codocs_guide`를 호출하면 이 디렉터리의 같은 원문을 읽는
 
 ## 주제 선택
 
-| topic      | 안내                                            |
-| ---------- | ----------------------------------------------- |
-| overview   | 이 문서: 전체 순서와 주제 목록                  |
-| schema     | [`_codocs`와 섹션의 형식과 허용 값](schema.md)  |
-| writing    | [설명의 책임과 이름·참조·코드 연결](writing.md) |
-| examples   | [실행 가능한 가상 프로젝트](examples.md)        |
-| updating   | [revision 수정·삭제·충돌](updating.md)          |
-| validation | [진단과 색인 복구](validation.md)               |
+| topic      | 안내                                             |
+| ---------- | ------------------------------------------------ |
+| overview   | 이 문서: 전체 순서와 주제 목록                   |
+| schema     | [`_codocs`와 섹션의 형식과 허용 값](schema.md)   |
+| writing    | [설명의 책임과 이름·참조·코드 연결](writing.md)  |
+| examples   | [실행 가능한 가상 프로젝트](examples.md)         |
+| updating   | [revision 수정·삭제·충돌·중복 탐지](updating.md) |
+| validation | [진단과 색인 복구](validation.md)                |
 
 `codocs_guide({})`는 overview를 반환한다. 예를 들어 `codocs_guide({"topic":"updating"})`으로 수정 안내를 읽는다.
 결과의 `topic`, `topics`, `content`는 선택 주제·전체 주제·Markdown 원문이다. 상대 링크는 배포된 `docs/guide`를 기준으로 읽는다.

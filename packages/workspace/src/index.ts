@@ -13,3 +13,4 @@ export * from './rename/index.js';
 export * from './revision/index.js';
 export * from './storage/index.js';
 export * from './watcher/index.js';
+export * from './write-review/index.js';

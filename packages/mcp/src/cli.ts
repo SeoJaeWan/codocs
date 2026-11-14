@@ -35,6 +35,7 @@ async function main(): Promise<void> {
   state.owner = await startCodocsStdio({
     cwd,
     ...(project ? { project } : {}),
+    env: process.env,
   });
   if (state.ending) await state.owner.close();
   else process.stderr.write('Codocs MCP server ready\n');

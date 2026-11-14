@@ -41,6 +41,11 @@ import {
 import type { ProjectRoot } from '../project-root/index.js';
 import { calculateRevision } from '../revision/index.js';
 import {
+  reviewFields,
+  type WorkspaceWriteReviewFields,
+  type WorkspaceWriteReviewResult,
+} from '../write-review/index.js';
+import {
   applyWorkspaceFileBatch,
   workspaceFileOperationKinds,
   workspaceFileStates,
@@ -133,7 +138,7 @@ export interface WorkspaceBatchChangeResult {
 }
 
 /** 여러 항목 저장이 성공한 결과다. */
-export interface WorkspaceBatchWriteSuccess {
+export interface WorkspaceBatchWriteSuccess extends WorkspaceWriteReviewFields {
   success: true;
   /** 이번 요청의 변경이 남아 있으면 true다. */
   saved: boolean;
@@ -147,7 +152,7 @@ export interface WorkspaceBatchWriteSuccess {
 }
 
 /** 여러 항목 저장이 실패한 결과다. saved·changed는 복구하지 못한 변경이 남았을 때만 true다. */
-export interface WorkspaceBatchWriteFailure {
+export interface WorkspaceBatchWriteFailure extends WorkspaceWriteReviewFields {
   success: false;
   saved: boolean;
   changed: boolean;
@@ -493,6 +498,33 @@ export async function saveWorkspaceChanges(
   const planned = plan.items;
   const rejected = locationRejections(planned, scan);
   if (rejected.length) return { result: failed(rejected), touchedPaths: [] };
+  const reviewed: WorkspaceWriteReviewResult | undefined = options.review
+    ? await options.review({
+        projectRoot: root.projectRoot,
+        catalog: buildWorkspaceCatalog(scanForWrite(scan)),
+        items: planned
+          .filter((item) => item.changed)
+          .map(
+            /** 계획 항목에서 탐지에 필요한 값만 옮긴다. */ (item) => ({
+              index: item.index,
+              mode: item.mode,
+              path: item.path,
+              ...(item.previousPath === undefined
+                ? {}
+                : { previousPath: item.previousPath }),
+              ...(item.data === undefined ? {} : { data: item.data }),
+              ...(item.raw === undefined ? {} : { raw: item.raw }),
+            }),
+          ),
+        batch: true,
+      })
+    : undefined;
+  if (reviewed?.blocked)
+    return {
+      result: { ...failed([reviewed.blocked]), ...reviewFields(reviewed) },
+      touchedPaths: [],
+    };
+  const reviewWarnings = reviewed?.warnings ?? [];
   const operations: WorkspaceFileOperation[] = [];
   const itemOf: PlannedChangeItem[] = [];
   for (const item of planned) {
@@ -533,7 +565,6 @@ export async function saveWorkspaceChanges(
         : toChange(item, workspaceFileStates.unchanged, item.revision);
     },
   );
-  const diagnostics = [...plan.diagnostics, ...applied.diagnostics];
   const touched = new Set<string>();
   for (const operation of applied.operations)
     if (operation.state !== workspaceFileStates.unchanged) {
@@ -551,8 +582,13 @@ export async function saveWorkspaceChanges(
       saved: applied.saved,
       changed: applied.changed,
       changes,
-      warnings: plan.diagnostics,
-      diagnostics,
+      warnings: [...plan.diagnostics, ...reviewWarnings],
+      diagnostics: [
+        ...plan.diagnostics,
+        ...reviewWarnings,
+        ...applied.diagnostics,
+      ],
+      ...reviewFields(reviewed),
     },
     touchedPaths: [...touched],
   };

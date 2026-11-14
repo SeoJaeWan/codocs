@@ -51,7 +51,7 @@ describe('MCP 여덟 입력 계약', () => {
       revision: 'r1',
       document: { _codocs: { id: 'sample', name: '샘플' }, definition: '본문' },
     };
-    expect(parseWriteInput(replace)).toEqual(replace);
+    expect(parseWriteInput(replace)).toEqual({ request: replace });
     expect(parseWriteInput({ ...replace, set: { a: 1 } })).toBeUndefined();
     expect(parseWriteInput({ ...replace, unset: ['a'] })).toBeUndefined();
     expect(parseWriteInput({ ...replace, extra: 1 })).toBeUndefined();
@@ -77,8 +77,8 @@ describe('MCP 여덟 입력 계약', () => {
       revision: 'r1',
       path: '.codocs/b.yaml',
     };
-    expect(parseWriteInput(remove)).toEqual(remove);
-    expect(parseWriteInput(move)).toEqual(move);
+    expect(parseWriteInput(remove)).toEqual({ request: remove });
+    expect(parseWriteInput(move)).toEqual({ request: move });
     expect(parseWriteInput({ ...remove, extra: 1 })).toBeUndefined();
     expect(parseWriteInput({ ...move, document: {} })).toBeUndefined();
     expect(parseWriteInput({ mode: 'delete', id: 'a' })).toBeUndefined();
@@ -95,7 +95,7 @@ describe('MCP 여덟 입력 계약', () => {
       edit: [{ section: '개요', old: '이전', new: '이후' }],
       position: { 개요: { after: '_codocs' }, 결과: { before: '개요' } },
     };
-    expect(parseWriteInput(update)).toEqual(update);
+    expect(parseWriteInput(update)).toEqual({ request: update });
     expect(
       parseWriteInput({ ...update, edit: [{ section: '개요', old: '이전' }] }),
     ).toBeUndefined();
@@ -124,7 +124,7 @@ describe('MCP 여덟 입력 계약', () => {
       { mode: 'delete', id: 'd', revision: 'r' },
       { mode: 'move', id: 'e', revision: 'r', path: '.codocs/f.yaml' },
     ];
-    expect(parseWriteInput({ changes })).toEqual({ changes });
+    expect(parseWriteInput({ changes })).toEqual({ request: { changes } });
     expect(acceptsToolInput('codocs_write', { changes })).toBe(true);
     expect(parseWriteInput({ changes: [] })).toBeUndefined();
     expect(parseWriteInput({ changes: {} })).toBeUndefined();
@@ -289,5 +289,40 @@ describe('MCP 여덟 입력 계약', () => {
     expect(
       parseRenameInput({ mode: 'preview', id: 'a', newName: 'b' }),
     ).not.toHaveProperty('section');
+  });
+});
+
+describe('parseWriteInput: 중복 탐지 확인 값', () => {
+  const create = {
+    mode: 'create',
+    path: '.codocs/a.yaml',
+    document: { _codocs: { id: 'a', name: 'A' }, 개요: '본문' },
+  };
+
+  it('탐지가 켜지면 단일 요청 최상위의 reviewToken을 요청과 나눠 돌려준다', () => {
+    expect(parseWriteInput({ ...create, reviewToken: 't' }, true)).toEqual({
+      request: create,
+      reviewToken: 't',
+    });
+  });
+
+  it('탐지가 켜지면 changes 요청 최상위의 reviewToken을 요청과 나눠 돌려준다', () => {
+    expect(
+      parseWriteInput({ changes: [create], reviewToken: 't' }, true),
+    ).toEqual({ request: { changes: [create] }, reviewToken: 't' });
+  });
+
+  it('탐지가 켜져도 changes 항목 안의 reviewToken은 거부한다', () => {
+    expect(
+      parseWriteInput({ changes: [{ ...create, reviewToken: 't' }] }, true),
+    ).toBeUndefined();
+  });
+
+  it('탐지가 꺼져 있으면 reviewToken을 알 수 없는 속성으로 거부한다', () => {
+    expect(parseWriteInput({ ...create, reviewToken: 't' })).toBeUndefined();
+  });
+
+  it('탐지가 켜져도 reviewToken 없는 요청은 그대로 받는다', () => {
+    expect(parseWriteInput(create, true)).toEqual({ request: create });
   });
 });

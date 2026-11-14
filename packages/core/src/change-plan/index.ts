@@ -157,6 +157,8 @@ export type ChangePlanResult =
     }
   | {
       status: typeof changePlanStatuses.candidate;
+      /** create·update·replace 중 요청 종류다. */
+      mode: ChangePlanMode;
       path: string;
       id: string;
       raw: string;
@@ -1494,6 +1496,7 @@ export function planDocumentChange(
     if (item.raw === undefined || !item.data) return failure('invalidRequest');
     return {
       status: changePlanStatuses.candidate,
+      mode: item.mode,
       path: item.path,
       id: item.id,
       raw: item.raw,

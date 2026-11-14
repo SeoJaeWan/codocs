@@ -3,7 +3,12 @@ import {
   openInProcessProject,
   type InProcessProject,
 } from '../../test-support/in-process.js';
+import {
+  createCodocsWriteReviewer,
+  reviewEnvironmentKeys,
+} from '../review/index.js';
 import { codocsJsonInputSchema } from '../tool-input/index.js';
+import { codocsWriteReviewDescription } from './index.js';
 
 const toolNames = [
   'codocs_list',
@@ -98,4 +103,44 @@ describe('MCP 서버의 도구 목록과 안내', () => {
       expect(tool.description).toContain('packages/core/.codocs/a.yaml');
     },
   );
+});
+
+describe('중복 탐지 설정에 따른 codocs_write 안내', () => {
+  it('중복 탐지가 꺼진 서버의 codocs_write 스키마와 설명에는 reviewToken과 탐지 안내가 없다', async () => {
+    const write = (await opened.client.listTools()).tools.find(
+      (tool) => tool.name === 'codocs_write',
+    )!;
+
+    expect(JSON.stringify(write.inputSchema)).not.toContain('reviewToken');
+    expect(write.description).not.toContain(codocsWriteReviewDescription);
+  });
+
+  it('중복 탐지가 켜진 서버의 codocs_write는 스키마에 reviewToken을, 설명 끝에 탐지 안내를 더한다', async () => {
+    const reviewing = await openInProcessProject(
+      'mcp-listing-review-',
+      {},
+      undefined,
+      {
+        reviewer: createCodocsWriteReviewer({
+          env: { [reviewEnvironmentKeys.apiKey]: 'test-key' },
+          createProvider: () => ({ findOverlaps: () => Promise.resolve([]) }),
+        })!,
+      },
+    );
+    try {
+      const write = (await reviewing.client.listTools()).tools.find(
+        (tool) => tool.name === 'codocs_write',
+      )!;
+
+      expect(write.inputSchema).toEqual(
+        codocsJsonInputSchema('codocs_write', { review: true }),
+      );
+      expect(JSON.stringify(write.inputSchema)).toContain('reviewToken');
+      expect(write.description?.endsWith(codocsWriteReviewDescription)).toBe(
+        true,
+      );
+    } finally {
+      await reviewing.close();
+    }
+  });
 });

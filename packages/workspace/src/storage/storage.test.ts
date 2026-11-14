@@ -19,6 +19,7 @@ import {
 import { workspaceDiagnosticCodes } from '../diagnostics/index.js';
 import { createLink } from '../test-support/links.js';
 import { loadWorkspace } from '../loader/index.js';
+import type { WorkspaceWriteReviewRequest } from '../write-review/index.js';
 import {
   saveWorkspaceChange,
   type WorkspaceStorageFileHandle,
@@ -527,4 +528,136 @@ describe('saveWorkspaceChange: create 경로 정규화와 원인별 거절', () 
       expect(documentPathMessages[problem]).toContain(documentPathExample);
     },
   );
+});
+
+describe('saveWorkspaceChange: 저장 전 검토', () => {
+  it('검토가 막으면 파일과 폴더를 만들지 않고 막은 진단과 겹침·확인 값을 돌려준다', async () => {
+    const scan = await loadWorkspace({ cwd: root });
+    const blocked = {
+      code: 'duplicate_content',
+      severity: 'error' as const,
+      message: '겹칩니다.',
+    };
+    const overlaps = [
+      {
+        section: '새 문서:definition',
+        sentence: '설명',
+        address: '첫 문서:definition',
+        matchedSentence: '설명',
+      },
+    ];
+    const result = await saveWorkspaceChange(
+      { mode: 'create', path: '.codocs/nested/created.yaml', document },
+      scan,
+      {
+        review: () => Promise.resolve({ blocked, overlaps, reviewToken: 't' }),
+      },
+    );
+    expect(result).toEqual({
+      success: false,
+      saved: false,
+      changed: false,
+      diagnostics: [blocked],
+      overlaps,
+      reviewToken: 't',
+    });
+    await expect(readdir(folder)).resolves.toEqual(['first.yaml']);
+  });
+
+  it('검토에는 검증을 통과한 계획의 종류·경로·반영 뒤 데이터·원문을 넘긴다', async () => {
+    const scan = await loadWorkspace({ cwd: root });
+    const requests: WorkspaceWriteReviewRequest[] = [];
+    await saveWorkspaceChange(
+      { mode: 'create', path: '.codocs/created.yaml', document },
+      scan,
+      {
+        review: (request) => {
+          requests.push(request);
+          return Promise.resolve({});
+        },
+      },
+    );
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.projectRoot).toBe(scan.root?.projectRoot);
+    expect(requests[0]?.batch).toBe(false);
+    expect(requests[0]?.items).toHaveLength(1);
+    expect(requests[0]?.items[0]).toMatchObject({
+      index: 0,
+      mode: 'create',
+      path: '.codocs/created.yaml',
+      data: document,
+    });
+    expect(requests[0]?.items[0]?.raw).toContain('name: 새 문서');
+  });
+
+  it('기존 검증에 실패하는 요청은 검토를 부르지 않는다', async () => {
+    const scan = await loadWorkspace({ cwd: root });
+    let called = false;
+    const result = await saveWorkspaceChange(
+      {
+        mode: 'create',
+        path: '.codocs/created.yaml',
+        document: {
+          _codocs: { id: 'created', name: '첫 문서' },
+          definition: '설명',
+        },
+      },
+      scan,
+      {
+        review: () => {
+          called = true;
+          return Promise.resolve({});
+        },
+      },
+    );
+    expect(result.success).toBe(false);
+    expect(called).toBe(false);
+  });
+
+  it('바뀐 내용이 없는 요청은 검토를 부르지 않는다', async () => {
+    const { scan, input } = await updateRequest({ definition: '설명' });
+    let called = false;
+    const result = await saveWorkspaceChange(input, scan, {
+      review: () => {
+        called = true;
+        return Promise.resolve({});
+      },
+    });
+    expect(result).toMatchObject({ success: true, saved: false });
+    expect(called).toBe(false);
+  });
+
+  it('검토가 막지 않으면 저장하고 검토의 경고와 겹침을 결과에 더한다', async () => {
+    const scan = await loadWorkspace({ cwd: root });
+    const warning = {
+      code: 'review_failed',
+      severity: 'warning' as const,
+      message: '탐지하지 못했습니다.',
+    };
+    const overlaps = [
+      {
+        section: '새 문서:definition',
+        sentence: '설명',
+        address: '첫 문서:definition',
+        matchedSentence: '설명',
+        copiedBy: 'existing' as const,
+      },
+    ];
+    const result = await saveWorkspaceChange(
+      { mode: 'create', path: '.codocs/created.yaml', document },
+      scan,
+      { review: () => Promise.resolve({ warnings: [warning], overlaps }) },
+    );
+    expect(result).toMatchObject({
+      success: true,
+      saved: true,
+      warnings: [warning],
+      diagnostics: [warning],
+      overlaps,
+    });
+    expect(result).not.toHaveProperty('reviewToken');
+    await expect(
+      readFile(path.join(folder, 'created.yaml'), 'utf8'),
+    ).resolves.toContain('name: 새 문서');
+  });
 });

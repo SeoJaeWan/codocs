@@ -9,6 +9,10 @@ import {
   type WorkspaceMoveDeleteResult,
 } from '../batch-write/index.js';
 import {
+  reviewFields,
+  type WorkspaceWriteReview,
+} from '../write-review/index.js';
+import {
   WorkspaceCodeReferenceIndex,
   codeCollectionStatuses,
   codeFileReasons,
@@ -271,6 +275,12 @@ export type WorkspaceRenameResult =
       error: Diagnostic<string>;
       indexUpdated?: boolean;
     });
+
+/** write 호출마다 주는 선택 값이다. */
+export interface WorkspaceWriteOptions {
+  /** 검증을 통과한 저장 계획을 파일을 쓰기 전에 검토한다. 생략하면 탐지 없이 저장한다. */
+  review?: WorkspaceWriteReview;
+}
 
 /** 실제 파일 연산과 저장 후 관측의 실패·지연만 주입하는 검사 경계다. */
 export interface WorkspaceQuerySessionOptions {
@@ -1407,23 +1417,41 @@ export class WorkspaceQuerySession {
   /**
    * 저장은 한 번만 수행하고 색인 관측 실패에만 범위 재읽기를 추가 한 번 시도한다.
    */
-  write(input: {
-    mode: 'create' | 'update' | 'replace';
-    [key: string]: unknown;
-  }): Promise<WorkspaceSingleWriteResult>;
+  write(
+    input: {
+      mode: 'create' | 'update' | 'replace';
+      [key: string]: unknown;
+    },
+    options?: WorkspaceWriteOptions,
+  ): Promise<WorkspaceSingleWriteResult>;
   /** 단일 delete/move 요청이다. 입력 검증 실패나 게이트 거부는 write 실패 형태로 돌려준다. */
-  write(input: {
-    mode: 'delete' | 'move';
-    [key: string]: unknown;
-  }): Promise<WorkspaceMoveDeleteResult | WorkspaceSingleWriteResult>;
+  write(
+    input: {
+      mode: 'delete' | 'move';
+      [key: string]: unknown;
+    },
+    options?: WorkspaceWriteOptions,
+  ): Promise<WorkspaceMoveDeleteResult | WorkspaceSingleWriteResult>;
   /** 여러 항목 요청이다. 입력 검증 실패나 게이트 거부는 write 실패 형태로 돌려준다. */
-  write(input: {
-    changes: unknown;
-  }): Promise<WorkspaceBatchWriteResult | WorkspaceSingleWriteResult>;
+  write(
+    input: {
+      changes: unknown;
+    },
+    options?: WorkspaceWriteOptions,
+  ): Promise<WorkspaceBatchWriteResult | WorkspaceSingleWriteResult>;
   /** 형태를 모르는 입력이다. 모든 결과 형태가 가능하다. */
-  write(input: unknown): Promise<WorkspaceWriteResult>;
-  /** 입력 종류를 가려 단일 저장, 단일 delete/move, 여러 항목 저장 중 하나로 처리한다. */
-  async write(input: unknown): Promise<WorkspaceWriteResult> {
+  write(
+    input: unknown,
+    options?: WorkspaceWriteOptions,
+  ): Promise<WorkspaceWriteResult>;
+  /**
+   * 입력 종류를 가려 단일 저장, 단일 delete/move, 여러 항목 저장 중 하나로 처리한다.
+   * options.review가 있으면 검증을 통과한 계획을 파일을 쓰기 전에 검토하고, 막으면 저장하지 않는다.
+   */
+  async write(
+    input: unknown,
+    options: WorkspaceWriteOptions = {},
+  ): Promise<WorkspaceWriteResult> {
     if (this.#closed || this.#explicitRefreshPromise)
       return this.#writeFailure([workspaceIndexNotReady().error]);
     const scan = await this.#current();
@@ -1445,14 +1473,27 @@ export class WorkspaceQuerySession {
           workspaceIndexNotReady().error,
       ]);
     const classified = classifyWorkspaceWriteInput(input);
-    if (classified.kind !== workspaceWriteInputKinds.single)
+    const review = options.review;
+    if (classified.kind !== workspaceWriteInputKinds.single) {
+      const single = classified.kind === workspaceWriteInputKinds.singleBatch;
       return this.#writeBatch(
         classified.items,
         scan,
-        classified.kind === workspaceWriteInputKinds.singleBatch,
+        single,
+        review &&
+          /** 단일 delete·move는 항목 위치 없이 알린다. */ ((request) =>
+            review({ ...request, batch: !single })),
       );
-    const saved = await saveWorkspaceChange(input, scan, this.#options.storage);
-    if (!saved.success) return this.#writeFailure(saved.diagnostics);
+    }
+    const saved = await saveWorkspaceChange(input, scan, {
+      ...this.#options.storage,
+      ...(review ? { review } : {}),
+    });
+    if (!saved.success)
+      return {
+        ...this.#writeFailure(saved.diagnostics),
+        ...reviewFields(saved),
+      };
     if (!saved.saved) return saved;
     const indexFailure = await this.#publishSavedFiles([
       { path: saved.source.path, revision: saved.revision },
@@ -1473,12 +1514,12 @@ export class WorkspaceQuerySession {
     items: unknown,
     scan: WorkspaceScanResult,
     single: boolean,
+    review: WorkspaceWriteReview | undefined,
   ): Promise<WorkspaceWriteResult> {
-    const outcome = await saveWorkspaceChanges(
-      items,
-      scan,
-      this.#options.storage,
-    );
+    const outcome = await saveWorkspaceChanges(items, scan, {
+      ...this.#options.storage,
+      ...(review ? { review } : {}),
+    });
     let result: WorkspaceBatchWriteResult = outcome.result;
     if (outcome.touchedPaths.length && 'root' in scan && scan.root) {
       const targets = await readWorkspacePublishTargets(
