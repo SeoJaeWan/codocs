@@ -1,5 +1,13 @@
 # @codocs/language-server
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [69ae1c5]
+  - @codocs/workspace@0.2.0
+  - @codocs/core@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes
